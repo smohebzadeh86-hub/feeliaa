@@ -1,0 +1,9 @@
+{
+  "name": "feelia",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Therapy session transcription platform",
+  "scripts": {
+    "dev": "pnpm --filter server dev"
+  }
+}
