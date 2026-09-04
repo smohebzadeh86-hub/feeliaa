@@ -5,13 +5,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { testConnection } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
-import { Pool } from 'pg';
+import { clientRoutes } from './http/clients.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = Fastify({ logger: true });
 
-// Health check — حالا با دیتابیس
+// Health check
 app.get('/api/health', async () => {
   const dbOk = await testConnection();
   return {
@@ -22,6 +22,9 @@ app.get('/api/health', async () => {
     timestamp: new Date().toISOString(),
   };
 });
+
+// API Routes
+await app.register(clientRoutes);
 
 // Serve static (فرانت بعداً)
 const publicDir = path.join(__dirname, '..', '..', 'public');
@@ -35,10 +38,8 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 const start = async () => {
   try {
-    // اول: migrations
     await runMigrations();
     console.log('🌿 Feelia server starting...');
-
     await app.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`🌿 Feelia server running on http://localhost:${PORT}`);
   } catch (err) {
