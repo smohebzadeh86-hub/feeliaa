@@ -1,4 +1,8 @@
-// موتور رونویسی Soniox — نسخه‌ی سروری با preview
+// موتور رونویسی Soniox — با پشتیبانی پروکسی
+// منطق بر اساس مستندات رسمی Soniox:
+// - Non-final tokens: provisional (فوری نمایش، قابل تغییر)
+// - Final tokens: confirmed (یکبار فرستاده می‌شن، تغییر نمی‌کنن)
+// - ws.send("") = سیگنال پایان صدا (ضروری!)
 import { WebSocket } from 'ws';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 
@@ -9,15 +13,13 @@ export interface SonioxToken {
 }
 
 export interface SonioxCallbacks {
-  onPreview: (fullText: string) => void;
+  onPreview: (finalText: string, nonFinalText: string) => void;
   onStatus: (status: 'connecting' | 'connected' | 'reconnecting' | 'error', message?: string) => void;
   onFinished: (finalText: string) => void;
   onError: (error: string) => void;
 }
 
 const SONIOX_WS_URL = 'wss://stt-rt.soniox.com/transcribe-websocket';
-const SONIOX_MODEL = 'stt-rt-v5';
-
 const RECONNECT_BASE_DELAY = 1000;
 const MAX_RECONNECT = 6;
 const CONNECT_TIMEOUT = 8000;
@@ -26,11 +28,22 @@ const MAX_BUFFER_CHUNKS = 200;
 
 function createProxyAgent(): HttpsProxyAgent<string> | undefined {
   const proxyUrl = process.env.PROXY_URL;
-  if (proxyUrl) {
-    console.log('[stt] using proxy:', proxyUrl);
-    return new HttpsProxyAgent(proxyUrl);
-  }
+  if (proxyUrl) return new HttpsProxyAgent(proxyUrl);
   return undefined;
+}
+
+// ⭐ ساخت متن از tokens (طبق pattern رسمی)
+function buildTextFromTokens(tokens: SonioxToken[]): string {
+  let out = '';
+  let curSpeaker: number | null = null;
+  for (const t of tokens) {
+    if (t.speaker != null && t.speaker !== curSpeaker) {
+      curSpeaker = t.speaker;
+      out += (out ? '\n\n' : '') + `گوینده ${String(t.speaker).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[+d])}: `;
+    }
+    out += t.text;
+  }
+  return out;
 }
 
 export class SonioxEngine {
@@ -38,9 +51,8 @@ export class SonioxEngine {
   private callbacks: SonioxCallbacks;
   private apiKey: string;
   private proxyAgent: HttpsProxyAgent<string> | undefined;
-  
+
   private finalTokens: SonioxToken[] = [];
-  private lastSpeaker: number | null = null;
   private pendingChunks: Buffer[] = [];
   private stopRequested = false;
   private manuallyClosing = false;
@@ -48,45 +60,12 @@ export class SonioxEngine {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private finalizeTimer: ReturnType<typeof setTimeout> | null = null;
   private settled = false;
+  private startPromise: Promise<void> | null = null;
 
   constructor(apiKey: string, callbacks: SonioxCallbacks) {
     this.apiKey = apiKey;
     this.callbacks = callbacks;
     this.proxyAgent = createProxyAgent();
-  }
-
-  private toFa(num: number): string {
-    return String(num).replace(/[0-9]/g, d => '۰۱۲۳۴۵۶۷۸۹'[+d]);
-  }
-
-  private speakerLabel(n: number): string {
-    return `گوینده ${this.toFa(n)}`;
-  }
-
-  // ⭐ ساخت متن کامل از final tokens + non-final فعلی
-  private buildFullText(nonFinalTokens: SonioxToken[]): string {
-    let out = '';
-    let curSpeaker: number | null = null;
-    
-    // اول: همه‌ی final tokens (تجمعی)
-    for (const t of this.finalTokens) {
-      if (t.speaker != null && t.speaker !== curSpeaker) {
-        curSpeaker = t.speaker;
-        out += (out ? '\n\n' : '') + this.speakerLabel(t.speaker) + ': ';
-      }
-      out += t.text;
-    }
-    
-    // بعد: non-final فعلی (در حال گفتن)
-    for (const t of nonFinalTokens) {
-      if (t.speaker != null && t.speaker !== curSpeaker) {
-        curSpeaker = t.speaker;
-        out += (out && !out.endsWith('\n\n') ? '\n\n' : '') + (out ? this.speakerLabel(t.speaker) + ': ' : '');
-      }
-      out += t.text;
-    }
-    
-    return out;
   }
 
   private clearReconnectTimer() {
@@ -115,18 +94,16 @@ export class SonioxEngine {
     while (this.pendingChunks.length && this.ws && this.ws.readyState === WebSocket.OPEN) {
       try {
         this.ws.send(this.pendingChunks.shift()!);
-      } catch {
-        break;
-      }
+      } catch { break; }
     }
   }
 
   private openSocket(): Promise<void> {
     return new Promise((resolve, reject) => {
-      const socketOptions: any = { handshakeTimeout: CONNECT_TIMEOUT };
-      if (this.proxyAgent) socketOptions.agent = this.proxyAgent;
-      
-      const socket = new WebSocket(SONIOX_WS_URL, socketOptions);
+      const opts: any = { handshakeTimeout: CONNECT_TIMEOUT };
+      if (this.proxyAgent) opts.agent = this.proxyAgent;
+
+      const socket = new WebSocket(SONIOX_WS_URL, opts);
       this.ws = socket;
 
       const timeout = setTimeout(() => {
@@ -137,9 +114,10 @@ export class SonioxEngine {
       socket.onopen = () => {
         clearTimeout(timeout);
         try {
+          // ⭐ پیام اول: پیکربندی (طبق مستندات)
           socket.send(JSON.stringify({
             api_key: this.apiKey,
-            model: SONIOX_MODEL,
+            model: 'stt-rt-v5',
             audio_format: 'auto',
             language_hints: ['fa', 'en'],
             enable_language_identification: true,
@@ -148,6 +126,7 @@ export class SonioxEngine {
           }));
           this.flushPending();
         } catch (e) { reject(e); return; }
+
         this.callbacks.onStatus('connected', 'در حال رونویسی…');
         resolve();
       };
@@ -161,7 +140,7 @@ export class SonioxEngine {
           return;
         }
 
-        // ⭐ پردازش ALL tokens
+        // ⭐ Pattern رسمی: final tokens → append، non-final → reset هر بار
         const nonFinal: SonioxToken[] = [];
         for (const t of (msg.tokens || [])) {
           if (!t.text) continue;
@@ -172,10 +151,11 @@ export class SonioxEngine {
           }
         }
 
-        // ⭐ ارسال متن کامل (final + non-final) برای preview
+        // ⭐ Preview: متن final (تا الان) + متن non-final (در حال گفتن)
         if (msg.tokens && msg.tokens.length > 0) {
-          const fullText = this.buildFullText(nonFinal);
-          this.callbacks.onPreview(fullText);
+          const finalText = buildTextFromTokens(this.finalTokens);
+          const nonFinalText = buildTextFromTokens(nonFinal);
+          this.callbacks.onPreview(finalText, nonFinalText);
         }
 
         if (msg.finished) { this.settle(); }
@@ -199,7 +179,7 @@ export class SonioxEngine {
     }
     this.reconnectAttempts++;
     const delay = RECONNECT_BASE_DELAY * Math.pow(2, this.reconnectAttempts - 1);
-    this.callbacks.onStatus('reconnecting', `اتصال قطع شد؛ تلاش ${this.toFa(this.reconnectAttempts)} از ${this.toFa(MAX_RECONNECT)}…`);
+    this.callbacks.onStatus('reconnecting', `اتصال قطع شد؛ تلاش ${this.reconnectAttempts} از ${MAX_RECONNECT}…`);
     this.clearReconnectTimer();
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
@@ -213,12 +193,13 @@ export class SonioxEngine {
     this.settled = true;
     if (this.finalizeTimer) clearTimeout(this.finalizeTimer);
     this.clearReconnectTimer();
-    this.callbacks.onFinished(this.getFinalText());
+    this.callbacks.onFinished(buildTextFromTokens(this.finalTokens));
   }
 
   async start(): Promise<void> {
     this.callbacks.onStatus('connecting', 'در حال اتصال…');
-    await this.openSocket();
+    this.startPromise = this.openSocket();
+    await this.startPromise;
   }
 
   sendAudioChunk(buf: ArrayBuffer) {
@@ -232,15 +213,18 @@ export class SonioxEngine {
       try {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
           this.flushPending();
+          // ⭐ طبق مستندات: finalize + رشته‌ی خالی = سیگنال پایان
           this.ws.send(JSON.stringify({ type: 'finalize' }));
           this.ws.send('');
-        } else { this.settle(); }
+        } else {
+          this.settle();
+        }
       } catch { this.settle(); }
       this.finalizeTimer = setTimeout(() => { this.settle(); }, FINALIZE_TIMEOUT);
     });
   }
 
   getFinalText(): string {
-    return this.buildFullText([]);
+    return buildTextFromTokens(this.finalTokens);
   }
 }

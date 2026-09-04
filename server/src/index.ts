@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import Fastify from 'fastify';
 import { fastifyStatic } from '@fastify/static';
+import multipart from '@fastify/multipart';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { testConnection } from './db/connection.js';
@@ -27,6 +28,7 @@ app.get('/api/health', async () => {
 });
 
 // API Routes
+await app.register(multipart);
 await app.register(clientRoutes);
 await app.register(sessionRoutes);
 await app.register(transcriptionRoutes);

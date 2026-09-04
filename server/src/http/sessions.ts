@@ -2,6 +2,57 @@
 import { FastifyInstance } from 'fastify';
 import { query } from '../db/connection.js';
 
+// ⭐ پردازش صدا در background (طبق الگوی مستندات Soniox)
+async function processVoiceNoteInBackground(sessionId: string, buffer: Buffer) {
+  try {
+    const sonioxKey = process.env.SONIOX_API_KEY;
+    if (!sonioxKey) return;
+
+    const { SonioxEngine } = await import('../stt/soniox.js');
+
+    let finalText = '';
+
+    const engine = new SonioxEngine(sonioxKey, {
+      onPreview: () => {},
+      onStatus: (status) => { console.log('[voice-note] status:', status); },
+      onFinished: (text) => { finalText = text; },
+      onError: (err) => { console.log('[voice-note] Soniox error:', err); },
+    });
+
+    console.log('[voice-note] starting engine, size:', buffer.length);
+    
+    await engine.start();
+    
+    // ⭐ طبق مستندات: chunks of 3840 bytes + 120ms pause (شبیه streaming واقعی)
+    const CHUNK_SIZE = 3840;
+    for (let i = 0; i < buffer.length; i += CHUNK_SIZE) {
+      const chunk = buffer.subarray(i, Math.min(i + CHUNK_SIZE, buffer.length));
+      engine.sendAudioChunk(chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength));
+      await new Promise(resolve => setTimeout(resolve, 120));
+    }
+    
+    console.log('[voice-note] audio sent, finalizing...');
+    
+    // stop() حالا ws.send('') رو می‌فرسته — سیگنال پایان صدا
+    const text = await engine.stop();
+    
+    console.log('[voice-note] finished, text length:', (text || '').length);
+    
+    if (text && text.trim()) {
+      await query(
+        `INSERT INTO session_notes (session_id, type, text, wall_clock)
+         VALUES ($1, 'voice', $2, $3)`,
+        [sessionId, text.trim(), new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })]
+      );
+      console.log('[voice-note] ✓ saved to DB');
+    } else {
+      console.log('[voice-note] no text extracted');
+    }
+  } catch (err) {
+    console.log('[voice-note] background error:', String(err));
+  }
+}
+
 export async function sessionRoutes(app: FastifyInstance) {
 
   // POST /api/sessions — شروع جلسه‌ی جدید
@@ -18,7 +69,6 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'رضایت مراجع الزامی است' };
     }
 
-    // چک: مراجع وجود داره؟
     const clientCheck = await query(
       'SELECT code, alias FROM clients WHERE id = $1', [client_id]
     );
@@ -27,14 +77,12 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
 
-    // شماره‌ی جلسه: آخرین + ۱
     const lastNum = await query(
       'SELECT COALESCE(MAX(session_num), 0) + 1 as next FROM sessions WHERE client_id = $1',
       [client_id]
     );
     const sessionNum = lastNum.rows[0].next;
 
-    // تاریخ و ساعت: پیش‌فرض الان
     const now = new Date();
     const defaultDate = date || `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
     const defaultTime = start_time || `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -80,7 +128,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     };
   });
 
-  // PUT /api/sessions/:id — به‌روزرسانی (پایان جلسه / متن نهایی)
+  // PUT /api/sessions/:id
   app.put('/api/sessions/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as {
@@ -90,7 +138,6 @@ export async function sessionRoutes(app: FastifyInstance) {
       status?: string;
     };
 
-    // فقط فیلدهای ارسال‌شده رو آپدیت کن
     const updates: string[] = [];
     const values: unknown[] = [];
     let paramCount = 1;
@@ -112,6 +159,11 @@ export async function sessionRoutes(app: FastifyInstance) {
       values.push(body.status);
     }
     
+    if (updates.length === 0) {
+      reply.code(400);
+      return { error: 'چیزی برای به‌روزرسانی نیست' };
+    }
+
     updates.push(`updated_at = now()`);
     values.push(id);
 
@@ -126,6 +178,17 @@ export async function sessionRoutes(app: FastifyInstance) {
     }
 
     return { session: result.rows[0] };
+  });
+
+  // DELETE /api/sessions/:id
+  app.delete('/api/sessions/:id', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const result = await query('DELETE FROM sessions WHERE id = $1 RETURNING id', [id]);
+    if (result.rows.length === 0) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+    return { deleted: id };
   });
 
   // POST /api/sessions/:id/notes — افزودن یادداشت/علامت
@@ -163,5 +226,53 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'یادداشت یافت نشد' };
     }
     return { deleted: id };
+  });
+
+  // ⭐ آپلود فایل صوتی — async (فوری جواب، پردازش در background)
+  app.post('/api/sessions/:id/voice-note', async (request, reply) => {
+    const { id } = request.params as { id: string };
+
+    const sessionCheck = await query(
+      'SELECT id FROM sessions WHERE id = $1', [id]
+    );
+    if (sessionCheck.rows.length === 0) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+
+    const file = await (request as any).file();
+    if (!file) {
+      reply.code(400);
+      return { error: 'فایل صوتی ارسال نشده' };
+    }
+
+    const buffer = await file.toBuffer();
+    
+    if (buffer.length > 50 * 1024 * 1024) {
+      reply.code(400);
+      return { error: 'فایل صوتی بیش از حد بزرگ است' };
+    }
+
+    if (buffer.length < 100) {
+      reply.code(400);
+      return { error: 'فایل صوتی خیلی کوتاه است' };
+    }
+
+    const sonioxKey = process.env.SONIOX_API_KEY;
+    if (!sonioxKey) {
+      reply.code(500);
+      return { error: 'کلید Soniox تنظیم نشده' };
+    }
+
+    console.log('[voice-note] received, size:', buffer.length, 'bytes — processing in background');
+
+    // ⭐ فوری جواب بده (202) — تراپیست منتظر نمی‌مونه
+    processVoiceNoteInBackground(id, buffer).catch(() => {});
+
+    reply.code(202);
+    return { 
+      status: 'processing',
+      message: 'صدا دریافت شد — در حال رونویسی',
+    };
   });
 }

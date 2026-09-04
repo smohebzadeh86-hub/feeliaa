@@ -279,7 +279,7 @@ button.btn:disabled{cursor:not-allowed;opacity:.55}
           <button class="sign-chip" data-sign="بی‌قراری">بی‌قراری</button>
         </div>
         <div class="signs-log" id="signsLog"></div>
-        <div class="notes-label" style="font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:8px">📝 یادداشت سریع</div>
+        <div style="font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:8px">📝 یادداشت سریع</div>
         <div class="notes-log" id="notesLog"></div>
         <div class="qn-row">
           <input type="text" id="quickNoteInput" placeholder="یادداشت… (Enter)">
@@ -308,7 +308,8 @@ button.btn:disabled{cursor:not-allowed;opacity:.55}
     <div id="voiceNoteBox" class="sub-panel" hidden>
       <div class="timer" id="voiceTimer" style="font-size:26px;margin:4px 0 2px">۰۰:۰۰</div>
       <div class="rec-status" id="voiceStatus">آماده…</div>
-      <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="stopVoiceNote()">پایان ضبط</button>
+      <div class="live-text" id="voiceLiveText" style="min-height:60px">در حال ضبط… حرف بزنید</div>
+      <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="stopVoiceNote()">پایان ضبط و ثبت</button>
     </div>
     <div id="textNoteBox" class="sub-panel" hidden>
       <textarea id="textNoteInput" placeholder="متن یادداشت…"></textarea>
@@ -370,19 +371,20 @@ let lastTickAt=null;
 let timerRunning=false;
 let wsConnected=false;
 let wrapupNotes=[];
-let voiceNoteWS=null;
-let voiceRecorder=null;
-let voiceStream=null;
-let voiceElapsed=0;
-let voiceTimerInt=null;
-let voiceRunning=false;
 let finalizeTimeout=null;
-let voiceFinalText='';
 let lastVoiceActivityAt=0;
 let lastFinalProgressAt=0;
 let sttWarnAt=0;
 let sessionSigns=[];
 let sessionNotes=[];
+
+// Voice note state
+let voiceMediaRecorder=null;
+let voiceStream=null;
+let voiceWS=null;
+let voiceElapsed=0;
+let voiceTimerInt=null;
+let voiceRunning=false;
 
 const $=id=>document.getElementById(id);
 function toFa(n){return String(n).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[+d]);}
@@ -488,8 +490,6 @@ async function viewTranscript(sessionId){
   try{
     const data=await api(`/api/sessions/${sessionId}`);
     $('transcriptBox').textContent=data.session.transcript||'(متنی ثبت نشده)';
-    
-    // ⭐ نمایش یادداشت‌ها و علائم
     const notesBox=$('transcriptNotes');
     if(data.notes&&data.notes.length>0){
       notesBox.hidden=false;
@@ -724,7 +724,7 @@ function renderNotesLog(){
   sessionNotes.forEach(n=>{
     const item=document.createElement('div');
     item.className='note-log-item';
-    item.innerHTML=`<span class="note-log-time">${formatTimer(n.offset_ms||0)}</span> <span>📝 ${n.text}</span>`;
+    item.innerHTML=`<span class="note-log-time">${formatTimer(n.offset_ms||0)}</span> 📝 ${n.text}`;
     log.appendChild(item);
   });
 }
@@ -733,7 +733,7 @@ function renderNotesLog(){
   if(e.key==='Enter'){e.preventDefault();addQuickNote();}
 });
 
-// ===== End =====
+// ===== End Session =====
 function endSession(){
   if(!ws||!currentSession)return;
   $('btnEndSession').disabled=true;
@@ -748,7 +748,6 @@ function handleFinished(finalText){
   stopAllAudio();
   if(ws){try{ws.close();}catch(e){}ws=null;}
   clearInterval(timerInterval);
-  // ⭐ فقط duration_ms آپدیت کن — transcript رو سرور خودش ذخیره می‌کنه
   if(currentSession){
     api(`/api/sessions/${currentSession.id}`,{
       method:'PUT',
@@ -759,7 +758,6 @@ function handleFinished(finalText){
   $('wrapupInfo').textContent=`جلسه ${toFa(currentSession.session_num)} · ${currentSession.date} · مدت: ${toFa(mins)} دقیقه`;
   $('wrapupChips').innerHTML=`<span class="sum-chip">شروع: ${currentSession.start_time}</span><span class="sum-chip">مدت: ${toFa(mins)} دقیق</span>`;
   
-  // ⭐ علائم و یادداشت‌های حین جلسه رو در wrapup هم نشون بده
   renderWrapupSigns();
   renderWrapupNotesLog();
   
@@ -774,7 +772,7 @@ function renderWrapupSigns(){
   if(sessionSigns.length===0){log.innerHTML='';return;}
   let html='';
   sessionSigns.forEach(s=>{
-    html+=`<span class="sign-log-item" style="margin:3px">✓ ${s.sign_type} <span class="sign-log-time">${formatTimer(s.offset_ms||0)}</span></span>`;
+    html+=`<span class="sign-log-item" style="margin:3px;display:inline-flex">✓ ${s.sign_type} <span class="sign-log-time">${formatTimer(s.offset_ms||0)}</span></span>`;
   });
   log.innerHTML=html;
 }
@@ -796,7 +794,7 @@ function stopAllAudio(){
   if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
 }
 
-// ===== Wrapup =====
+// ===== Wrapup Post Notes =====
 function renderWrapupNotes(){
   const list=$('notesList');list.innerHTML='';
   wrapupNotes.forEach((n,i)=>{
@@ -834,86 +832,141 @@ async function addTextNote(){
   }catch(e){showBanner('error','خطا در ثبت');}
 }
 
-// ===== Voice Note =====
-async function startVoiceNote(){
-  if(!currentSession)return;
-  voiceFinalText='';
-  $('textNoteBox').hidden=true;$('voiceNoteBox').hidden=false;
-  $('voiceStatus').textContent='در حال اتصال…';
-  voiceElapsed=0;renderVoiceTimer();
-  $('voiceNoteBtn').disabled=true;
-  try{
-    voiceStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
-  }catch(e){
-    $('voiceStatus').textContent='میکروفون رد شد';
-    $('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;
+// ===== ⭐ Voice Note — WebSocket لایو (مثل جلسه، جدا از transcript) =====
+async function startVoiceNote() {
+  if (!currentSession) return;
+  
+  $('textNoteBox').hidden = true;
+  $('voiceNoteBox').hidden = false;
+  $('voiceStatus').textContent = 'در حال اتصال…';
+  $('voiceLiveText').textContent = 'در حال ضبط… حرف بزنید';
+  voiceElapsed = 0;
+  renderVoiceTimer();
+  $('voiceNoteBtn').disabled = true;
+  
+  try {
+    voiceStream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    });
+  } catch (e) {
+    $('voiceStatus').textContent = 'میکروفون رد شد';
+    cleanupVoice();
     return;
   }
-  const proto=location.protocol==='https:'?'wss':'ws';
-  voiceNoteWS=new WebSocket(`${proto}://${location.host}/ws/t/${currentSession.id}`);
-  voiceNoteWS.binaryType='arraybuffer';
-  voiceNoteWS.onopen=()=>{
-    const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg'].find(m=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m));
-    try{voiceRecorder=mime?new MediaRecorder(voiceStream,{mimeType:mime}):new MediaRecorder(voiceStream);}catch(e){return;}
-    voiceRecorder.ondataavailable=(e)=>{
-      if(e.data&&e.data.size>0&&voiceNoteWS&&voiceNoteWS.readyState===WebSocket.OPEN)voiceNoteWS.send(e.data);
+
+  // ⭐ WebSocket لایو برای voice note (endpoint جدا از جلسه)
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  voiceWS = new WebSocket(`${proto}://${location.host}/ws/voice/${currentSession.id}`);
+  voiceWS.binaryType = 'arraybuffer';
+
+  voiceWS.onopen = () => {
+    const mime = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg']
+      .find(m => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m));
+    
+    try {
+      voiceMediaRecorder = mime 
+        ? new MediaRecorder(voiceStream, { mimeType: mime })
+        : new MediaRecorder(voiceStream);
+    } catch (e) {
+      $('voiceStatus').textContent = 'خطا در ضبط';
+      cleanupVoice();
+      return;
+    }
+
+    voiceMediaRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0 && voiceWS && voiceWS.readyState === WebSocket.OPEN) {
+        voiceWS.send(e.data);
+      }
     };
-    voiceRecorder.start(250);
-    $('voiceStatus').textContent='در حال ضبط…';
+
+    voiceMediaRecorder.start(250);
+    $('voiceStatus').textContent = 'در حال ضبط — لایو رونویسی…';
     startVoiceTimer();
   };
-  voiceNoteWS.onmessage=(ev)=>{
-    if(typeof ev.data==='string'){
-      try{
-        const msg=JSON.parse(ev.data);
-        if(msg.type==='preview'){voiceFinalText=msg.text||'';}
-        else if(msg.type==='finished'){finishVoiceNote();}
-      }catch(e){}
+
+  voiceWS.onmessage = (ev) => {
+    if (typeof ev.data === 'string') {
+      try {
+        const msg = JSON.parse(ev.data);
+        if (msg.type === 'preview') {
+          // ⭐ لایو متن — همزمان با حرف زدن
+          $('voiceLiveText').textContent = msg.text || '…';
+        } else if (msg.type === 'status') {
+          $('voiceStatus').textContent = msg.message || msg.status;
+        } else if (msg.type === 'finished') {
+          // ⭐ ثبت نهایی — همون لحظه
+          if (msg.finalText && msg.finalText.trim()) {
+            wrapupNotes.push({
+              type: 'voice',
+              text: msg.finalText.trim(),
+              wall_clock: nowClock()
+            });
+            renderWrapupNotes();
+            $('voiceStatus').textContent = '✓ ثبت شد';
+          } else {
+            $('voiceStatus').textContent = 'متنی ثبت نشد';
+          }
+          setTimeout(cleanupVoice, 1500);
+        } else if (msg.type === 'error') {
+          $('voiceStatus').textContent = msg.message;
+        }
+      } catch (e) {}
     }
   };
-  voiceNoteWS.onclose=()=>{finishVoiceNote();};
+
+  voiceWS.onclose = () => {
+    if (voiceMediaRecorder && voiceMediaRecorder.state !== 'inactive') {
+      // سرور بسته ولی ما هنوز ضبط می‌کنیم — پایان
+      cleanupVoice();
+    }
+  };
 }
 
-function stopVoiceNote(){
-  if(voiceNoteWS&&voiceNoteWS.readyState===WebSocket.OPEN){
-    $('voiceStatus').textContent='در حال نهایی‌سازی…';
-    try{voiceNoteWS.send(JSON.stringify({type:'finalize'}));}catch(e){}
-    setTimeout(finishVoiceNote,8000);
-  }else{finishVoiceNote();}
-}
-
-function finishVoiceNote(){
-  if(!voiceRecorder&&!voiceNoteWS)return;
-  if(voiceRecorder&&voiceRecorder.state!=='inactive'){try{voiceRecorder.stop();}catch(e){}}
-  if(voiceStream){voiceStream.getTracks().forEach(t=>t.stop());voiceStream=null;}
-  if(voiceNoteWS){try{voiceNoteWS.close();}catch(e){}voiceNoteWS=null;}
-  clearInterval(voiceTimerInt);voiceRunning=false;
-  $('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;
-  if(voiceFinalText.trim()){
-    api(`/api/sessions/${currentSession.id}/notes`,{
-      method:'POST',body:{type:'voice',text:voiceFinalText.trim(),wall_clock:nowClock()}
-    }).then(data=>{
-      wrapupNotes.push({dbId:data.note.id,type:'voice',text:voiceFinalText.trim(),wall_clock:data.note.wall_clock});
-      renderWrapupNotes();
-    }).catch(()=>{
-      wrapupNotes.push({type:'voice',text:voiceFinalText.trim(),wall_clock:nowClock()});
-      renderWrapupNotes();
-    });
+function stopVoiceNote() {
+  if (voiceMediaRecorder && voiceMediaRecorder.state !== 'inactive') {
+    $('voiceStatus').textContent = 'در حال نهایی‌سازی…';
+    voiceMediaRecorder.stop();
+    
+    if (voiceWS && voiceWS.readyState === WebSocket.OPEN) {
+      voiceWS.send(JSON.stringify({ type: 'finalize' }));
+    }
   }
-  voiceFinalText='';
 }
 
-function startVoiceTimer(){
-  if(voiceRunning)return;
-  voiceRunning=true;
-  let last=Date.now();
+function cleanupVoice() {
+  if (voiceMediaRecorder && voiceMediaRecorder.state !== 'inactive') {
+    try { voiceMediaRecorder.stop(); } catch (e) {}
+  }
+  if (voiceStream) {
+    voiceStream.getTracks().forEach(t => t.stop());
+    voiceStream = null;
+  }
+  if (voiceWS) {
+    try { voiceWS.close(); } catch (e) {}
+    voiceWS = null;
+  }
   clearInterval(voiceTimerInt);
-  voiceTimerInt=setInterval(()=>{
-    if(!voiceRunning)return;
-    const now=Date.now();voiceElapsed+=now-last;last=now;renderVoiceTimer();
-  },200);
+  voiceRunning = false;
+  voiceMediaRecorder = null;
+  $('voiceNoteBox').hidden = true;
+  $('voiceNoteBtn').disabled = false;
 }
-function renderVoiceTimer(){$('voiceTimer').textContent=formatTimer(voiceElapsed);}
+
+function startVoiceTimer() {
+  if (voiceRunning) return;
+  voiceRunning = true;
+  let last = Date.now();
+  clearInterval(voiceTimerInt);
+  voiceTimerInt = setInterval(() => {
+    if (!voiceRunning) return;
+    const now = Date.now();
+    voiceElapsed += now - last; last = now;
+    renderVoiceTimer();
+  }, 200);
+}
+function renderVoiceTimer() {
+  $('voiceTimer').textContent = formatTimer(voiceElapsed);
+}
 
 async function finishSession(){
   if(!currentSession)return;
@@ -928,7 +981,8 @@ async function finishSession(){
 }
 
 function goBackToClients(){
-  stopAllAudio();finishVoiceNote();
+  stopAllAudio();
+  cleanupVoice();
   if(ws){try{ws.close();}catch(e){}ws=null;}
   clearInterval(timerInterval);
   currentSession=null;resetTimer();
@@ -937,7 +991,7 @@ function goBackToClients(){
 }
 
 window.addEventListener('beforeunload',e=>{
-  if(ws||voiceNoteWS){e.preventDefault();e.returnValue='';}
+  if(ws||voiceWS){e.preventDefault();e.returnValue='';}
 });
 
 document.addEventListener('DOMContentLoaded',()=>{loadClients();});
