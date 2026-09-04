@@ -117,6 +117,9 @@ button.btn:disabled{cursor:not-allowed;opacity:.55}
 .qn-row{display:flex;gap:8px}
 .qn-row input{flex:1;margin-bottom:0;font-size:13.5px;padding:11px 13px}
 .qn-row .btn{flex:none;padding:11px 16px;font-size:13.5px}
+.notes-log{margin-bottom:14px}
+.note-log-item{background:var(--sage-mist);border-right:3px solid var(--sage);padding:8px 12px;margin:6px 0;border-radius:8px;font-size:12.5px;color:var(--ink-2);display:flex;align-items:center;gap:8px}
+.note-log-time{color:var(--muted);font-size:10px;flex:none}
 .session-summary{display:flex;flex-wrap:wrap;gap:8px;margin:-10px 0 20px}
 .sum-chip{display:inline-flex;align-items:center;gap:7px;background:var(--sage-mist);border:1px solid var(--sage-soft);border-radius:99px;padding:6px 14px;font-size:12.5px;font-weight:600;color:var(--sage-deep)}
 .client-item{border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:15px 18px;margin-bottom:12px;background:var(--card);cursor:pointer;transition:border-color .2s}
@@ -165,6 +168,10 @@ button.btn:disabled{cursor:not-allowed;opacity:.55}
 .modal h3{margin:0 0 16px;font-size:17px;font-weight:800;color:var(--ink)}
 .modal .modal-actions{display:flex;gap:10px;margin-top:6px}
 .transcript-box{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:400px;overflow-y:auto;font-size:13.5px;line-height:2.1;white-space:pre-wrap;color:var(--ink-2)}
+.transcript-notes{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:200px;overflow-y:auto;margin-top:12px}
+.transcript-notes .inline-note{background:var(--sage-mist);border-right:3px solid var(--sage);padding:8px 12px;margin:6px 0;border-radius:8px;font-size:12.5px;color:var(--ink-2)}
+.transcript-notes .inline-note .note-time{color:var(--muted);font-size:10px}
+.transcript-notes .inline-sign{display:inline-flex;align-items:center;gap:5px;background:var(--gold-soft);color:var(--gold-deep);padding:2px 10px;border-radius:99px;font-size:11px;font-weight:600;margin:3px 0}
 .privacy-note{font-size:11.5px;color:var(--muted);text-align:center;line-height:2.1;margin-top:12px;padding:0 10px}
 @media(max-width:480px){
   body{padding:20px 12px 40px}
@@ -272,8 +279,10 @@ button.btn:disabled{cursor:not-allowed;opacity:.55}
           <button class="sign-chip" data-sign="بی‌قراری">بی‌قراری</button>
         </div>
         <div class="signs-log" id="signsLog"></div>
+        <div class="notes-label" style="font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:8px">📝 یادداشت سریع</div>
+        <div class="notes-log" id="notesLog"></div>
         <div class="qn-row">
-          <input type="text" id="quickNoteInput" placeholder="یادداشت سریع… (Enter)">
+          <input type="text" id="quickNoteInput" placeholder="یادداشت… (Enter)">
           <button class="btn btn-secondary" onclick="addQuickNote()">ثبت</button>
         </div>
       </div>
@@ -289,6 +298,8 @@ button.btn:disabled{cursor:not-allowed;opacity:.55}
       <p id="wrapupInfo"></p>
     </div>
     <div class="session-summary" id="wrapupChips"></div>
+    <div id="wrapupSignsLog" style="margin-bottom:14px"></div>
+    <div id="wrapupNotesLog" style="margin-bottom:14px"></div>
     <div id="notesList"></div>
     <div class="btn-row" style="margin-bottom:12px">
       <button class="btn btn-secondary" onclick="startVoiceNote()" id="voiceNoteBtn">🎙 یادداشت صوتی</button>
@@ -320,6 +331,7 @@ button.btn:disabled{cursor:not-allowed;opacity:.55}
     <div id="sessionsList"></div>
     <div id="sessionDetail" hidden style="margin-top:16px">
       <div class="transcript-box" id="transcriptBox"></div>
+      <div class="transcript-notes" id="transcriptNotes" hidden></div>
     </div>
     <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="startFromDetail()">شروع جلسه‌ی جدید</button>
     <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="goBackToClients()">بازگشت</button>
@@ -369,6 +381,8 @@ let voiceFinalText='';
 let lastVoiceActivityAt=0;
 let lastFinalProgressAt=0;
 let sttWarnAt=0;
+let sessionSigns=[];
+let sessionNotes=[];
 
 const $=id=>document.getElementById(id);
 function toFa(n){return String(n).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[+d]);}
@@ -474,6 +488,29 @@ async function viewTranscript(sessionId){
   try{
     const data=await api(`/api/sessions/${sessionId}`);
     $('transcriptBox').textContent=data.session.transcript||'(متنی ثبت نشده)';
+    
+    // ⭐ نمایش یادداشت‌ها و علائم
+    const notesBox=$('transcriptNotes');
+    if(data.notes&&data.notes.length>0){
+      notesBox.hidden=false;
+      let html='';
+      data.notes.forEach(n=>{
+        if(n.type==='sign'){
+          const t=n.offset_ms?formatTimer(n.offset_ms):'';
+          html+=`<div class="inline-sign">◆ ${n.sign_type} <span style="color:var(--muted)">${t}</span></div>`;
+        }else if(n.type==='note_during'){
+          const t=n.offset_ms?formatTimer(n.offset_ms):n.wall_clock||'';
+          html+=`<div class="inline-note">📝 ${n.text}<span class="note-time"> — ${t}</span></div>`;
+        }else if(n.type==='note_after'){
+          html+=`<div class="inline-note">✍ ${n.text}<span class="note-time"> — ${n.wall_clock||''}</span></div>`;
+        }else if(n.type==='voice'){
+          html+=`<div class="inline-note">🎙 ${n.text}<span class="note-time"> — ${n.wall_clock||''}</span></div>`;
+        }
+      });
+      notesBox.innerHTML=html;
+    }else{
+      notesBox.hidden=true;
+    }
     $('sessionDetail').hidden=false;
   }catch(e){showBanner('error',e.message);}
 }
@@ -499,7 +536,6 @@ function setupNewSession(client){
   $('consentBox').classList.remove('consented');
   $('consentBox').querySelector('.consent-title').textContent='⚠️ رضایت مراجع';
   $('btnStartSession').disabled=true;
-  $('signsLog').innerHTML='';
   showScreen('Setup');
 }
 
@@ -527,7 +563,10 @@ async function startSession(){
     resetTimer();
     $('liveText').hidden=true;
     $('chkLiveText').checked=false;
+    sessionSigns=[];
+    sessionNotes=[];
     $('signsLog').innerHTML='';
+    $('notesLog').innerHTML='';
     await connectWS();
   }catch(e){showBanner('error','خطا در شروع: '+e.message);}
 }
@@ -635,46 +674,61 @@ function pauseTimer(){
 }
 function renderTimer(){$('recTimer').textContent=formatTimer(elapsedMs);}
 
-// ===== Signs — با لیست ثبت‌شده =====
+// ===== Signs =====
 document.querySelectorAll('.sign-chip').forEach(chip=>{
   chip.addEventListener('click',async()=>{
-    if(!currentSession||!currentSession.id){
-      showBanner('warn','جلسه‌ی فعالی وجود ندارد.');
-      return;
-    }
+    if(!currentSession||!currentSession.id)return;
     chip.classList.add('logged');
     setTimeout(()=>chip.classList.remove('logged'),2000);
+    const signData={type:'sign',sign_type:chip.dataset.sign,offset_ms:elapsedMs,wall_clock:nowClock()};
+    sessionSigns.push(signData);
+    renderSignsLog();
     try{
       await api(`/api/sessions/${currentSession.id}/notes`,{
-        method:'POST',
-        body:{type:'sign',sign_type:chip.dataset.sign,offset_ms:elapsedMs,wall_clock:nowClock()}
+        method:'POST',body:signData
       });
-      addSignToLog(chip.dataset.sign);
     }catch(e){}
   });
 });
 
-function addSignToLog(signType){
+function renderSignsLog(){
   const log=$('signsLog');
-  const item=document.createElement('span');
-  item.className='sign-log-item';
-  item.innerHTML=`✓ ${signType} <span class="sign-log-time">${formatTimer(elapsedMs)}</span>`;
-  log.appendChild(item);
+  log.innerHTML='';
+  sessionSigns.forEach(s=>{
+    const item=document.createElement('span');
+    item.className='sign-log-item';
+    item.innerHTML=`✓ ${s.sign_type} <span class="sign-log-time">${formatTimer(s.offset_ms||0)}</span>`;
+    log.appendChild(item);
+  });
 }
 
-// ===== Quick Note =====
+// ===== Quick Notes =====
 async function addQuickNote(){
   const input=$('quickNoteInput');
   const text=input.value.trim();
   if(!text||!currentSession)return;
+  const noteData={type:'note_during',text,offset_ms:elapsedMs,wall_clock:nowClock()};
+  sessionNotes.push(noteData);
+  renderNotesLog();
+  input.value='';
   try{
     await api(`/api/sessions/${currentSession.id}/notes`,{
-      method:'POST',
-      body:{type:'note_during',text,offset_ms:elapsedMs,wall_clock:nowClock()}
+      method:'POST',body:noteData
     });
-    input.value='';
   }catch(e){}
 }
+
+function renderNotesLog(){
+  const log=$('notesLog');
+  log.innerHTML='';
+  sessionNotes.forEach(n=>{
+    const item=document.createElement('div');
+    item.className='note-log-item';
+    item.innerHTML=`<span class="note-log-time">${formatTimer(n.offset_ms||0)}</span> <span>📝 ${n.text}</span>`;
+    log.appendChild(item);
+  });
+}
+
  $('quickNoteInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){e.preventDefault();addQuickNote();}
 });
@@ -694,18 +748,45 @@ function handleFinished(finalText){
   stopAllAudio();
   if(ws){try{ws.close();}catch(e){}ws=null;}
   clearInterval(timerInterval);
+  // ⭐ فقط duration_ms آپدیت کن — transcript رو سرور خودش ذخیره می‌کنه
   if(currentSession){
     api(`/api/sessions/${currentSession.id}`,{
       method:'PUT',
-      body:{duration_ms:elapsedMs,status:'completed',...(finalText?{transcript:finalText}:{})}
+      body:{duration_ms:elapsedMs}
     }).catch(()=>{});
   }
   const mins=Math.floor(elapsedMs/60000);
   $('wrapupInfo').textContent=`جلسه ${toFa(currentSession.session_num)} · ${currentSession.date} · مدت: ${toFa(mins)} دقیقه`;
-  $('wrapupChips').innerHTML=`<span class="sum-chip">شروع: ${currentSession.start_time}</span><span class="sum-chip">مدت: ${toFa(mins)} دقیق</span>${finalText?'<span class="sum-chip">✓ متن ذخیره شد</span>':''}`;
-  wrapupNotes=[];renderWrapupNotes();
+  $('wrapupChips').innerHTML=`<span class="sum-chip">شروع: ${currentSession.start_time}</span><span class="sum-chip">مدت: ${toFa(mins)} دقیق</span>`;
+  
+  // ⭐ علائم و یادداشت‌های حین جلسه رو در wrapup هم نشون بده
+  renderWrapupSigns();
+  renderWrapupNotesLog();
+  
+  wrapupNotes=[];
+  renderWrapupNotes();
   $('btnEndSession').disabled=false;
   showScreen('Wrapup');
+}
+
+function renderWrapupSigns(){
+  const log=$('wrapupSignsLog');
+  if(sessionSigns.length===0){log.innerHTML='';return;}
+  let html='';
+  sessionSigns.forEach(s=>{
+    html+=`<span class="sign-log-item" style="margin:3px">✓ ${s.sign_type} <span class="sign-log-time">${formatTimer(s.offset_ms||0)}</span></span>`;
+  });
+  log.innerHTML=html;
+}
+
+function renderWrapupNotesLog(){
+  const log=$('wrapupNotesLog');
+  if(sessionNotes.length===0){log.innerHTML='';return;}
+  let html='';
+  sessionNotes.forEach(n=>{
+    html+=`<div class="note-log-item"><span class="note-log-time">${formatTimer(n.offset_ms||0)}</span> 📝 ${n.text}</div>`;
+  });
+  log.innerHTML=html;
 }
 
 function stopAllAudio(){
@@ -785,11 +866,8 @@ async function startVoiceNote(){
     if(typeof ev.data==='string'){
       try{
         const msg=JSON.parse(ev.data);
-        if(msg.type==='preview'){
-          voiceFinalText=msg.text||'';
-        }else if(msg.type==='finished'){
-          finishVoiceNote();
-        }
+        if(msg.type==='preview'){voiceFinalText=msg.text||'';}
+        else if(msg.type==='finished'){finishVoiceNote();}
       }catch(e){}
     }
   };
@@ -844,6 +922,7 @@ async function finishSession(){
     await api(`/api/sessions/${currentSession.id}`,{method:'PUT',body:{status:'completed'}});
     clearBanner();
     wrapupNotes=[];currentSession=null;resetTimer();
+    sessionSigns=[];sessionNotes=[];
     showScreen('Clients');loadClients();
   }catch(e){showBanner('error','خطا در ذخیره: '+e.message);}
 }
@@ -853,6 +932,7 @@ function goBackToClients(){
   if(ws){try{ws.close();}catch(e){}ws=null;}
   clearInterval(timerInterval);
   currentSession=null;resetTimer();
+  sessionSigns=[];sessionNotes=[];
   showScreen('Clients');loadClients();
 }
 
