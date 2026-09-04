@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+<title>فیلیا — دستیار جلسات درمان</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f6f4ef;--bg-glow:rgba(62,107,94,.09);
+  --card:#ffffff;--field:#fbfcfa;
+  --ink:#2b3a34;--ink-2:#4f5f58;--muted:#84918a;
+  --line:#e2e7e2;--line-soft:#edf0eb;
+  --sage:#3e6b5e;--sage-hover:#2e5749;--sage-deep:#2e5749;
+  --sage-soft:#e6efe9;--sage-mist:#f1f5f2;
+  --clay:#c96655;--clay-hover:#ad4f3f;--clay-deep:#ad4f3f;--clay-soft:#faebe7;
+  --gold:#b08c50;--gold-deep:#7c6531;--gold-soft:#f8f1e2;
+  --r-xl:24px;--r-lg:16px;--r-md:11px;
+  --shadow:0 1px 2px rgba(43,58,52,.04),0 12px 32px rgba(43,58,52,.07);
+  --glow-clay:rgba(201,102,85,.32);
+  --breathe-ring:rgba(201,102,85,.45);
+}
+[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#131815;--bg-glow:rgba(78,137,119,.08);
+  --card:#1c2320;--field:#171d1a;
+  --ink:#e7ece8;--ink-2:#c6cfc9;--muted:#8b978f;
+  --line:#2c352f;--line-soft:#242c28;
+  --sage:#4e8977;--sage-hover:#5a9783;--sage-deep:#a6cbb9;
+  --sage-soft:#264032;--sage-mist:#1f2b26;
+  --clay:#c96f5e;--clay-hover:#d58370;--clay-deep:#e8a294;--clay-soft:#38211b;
+  --gold:#c9a56a;--gold-deep:#d9bc80;--gold-soft:#2f2817;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.35);
+  --glow-clay:rgba(201,111,94,.34);
+  --breathe-ring:rgba(201,111,94,.4);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+[hidden]{display:none!important}
+body{font-family:'Vazirmatn',Tahoma,sans-serif;background:radial-gradient(900px 420px at 50% -180px,var(--bg-glow),transparent 70%),var(--bg);color:var(--ink);direction:rtl;text-align:right;min-height:100vh;display:flex;justify-content:center;padding:30px 16px 52px;line-height:1.9}
+.wrap{width:100%;max-width:620px}
+.app-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding:0 2px}
+.brand{display:flex;align-items:center;gap:13px}
+.brand-mark{flex:none;width:47px;height:47px}
+.brand-eyebrow{font-size:11px;font-weight:600;color:var(--sage);margin-bottom:1px}
+.brand-text h1{margin:0;font-size:17.5px;font-weight:800;color:var(--ink)}
+.icon-btn{width:44px;height:44px;border-radius:14px;background:var(--card);border:1.5px solid var(--line);color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:18px}
+.icon-btn:hover{color:var(--sage-deep);border-color:var(--sage)}
+.steps{display:flex;align-items:flex-start;justify-content:center;margin:0 0 24px;padding:0 6px}
+.step{display:flex;flex-direction:column;align-items:center;gap:7px;flex:none;min-width:56px}
+.step-dot{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--card);border:1.5px solid var(--line);color:var(--muted);font-size:13.5px;font-weight:600;transition:all .35s}
+.step-label{font-size:11.5px;color:var(--muted);font-weight:500}
+.step-line{flex:1;min-width:14px;height:2px;background:var(--line);margin:17px 7px 0;transition:background .4s}
+.step.active .step-dot{background:var(--sage);border-color:var(--sage);color:#fff;transform:scale(1.08)}
+.step.active .step-label{color:var(--sage-deep);font-weight:700}
+.step.done .step-dot{background:var(--sage-soft);border-color:var(--sage-soft);color:var(--sage-deep)}
+.step.done+.step-line{background:var(--sage-soft)}
+.card{background:var(--card);border-radius:var(--r-xl);box-shadow:var(--shadow);border:1px solid var(--line-soft);padding:28px 26px;margin-bottom:18px}
+.screen{animation:rise .5s cubic-bezier(.22,.9,.36,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.card-head{margin-bottom:22px}
+.card-head h2{margin:0;font-size:19px;font-weight:800;color:var(--ink)}
+.card-head p{margin:5px 0 0;font-size:13px;color:var(--muted)}
+label{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:7px}
+input,textarea{width:100%;padding:13px 15px;border:1.5px solid var(--line);border-radius:var(--r-md);font-family:inherit;font-size:15px;background-color:var(--field);color:var(--ink);margin-bottom:14px}
+input:focus,textarea:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 4px rgba(62,107,94,.13)}
+textarea{min-height:100px;resize:vertical}
+button.btn{border:none;border-radius:15px;padding:14px 20px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px;transition:background .2s,transform .08s}
+button.btn:active{transform:scale(.975)}
+button.btn:disabled{cursor:not-allowed;opacity:.55}
+.btn-primary{background:var(--sage);color:#fff;width:100%}
+.btn-primary:hover:not(:disabled){background:var(--sage-hover)}
+.btn-danger{background:var(--clay);color:#fff;width:100%;box-shadow:0 8px 22px var(--glow-clay)}
+.btn-danger:hover:not(:disabled){background:var(--clay-hover)}
+.btn-secondary{background:var(--sage-mist);color:var(--sage-deep);border:1.5px solid var(--sage-soft)}
+.btn-secondary:hover{background:var(--sage-soft)}
+.btn-ghost{background:transparent;color:var(--ink-2);border:1.5px solid var(--line)}
+.btn-ghost:hover{border-color:var(--sage);color:var(--sage-deep)}
+.btn-block{width:100%}
+.btn-xl{padding:17px 22px;font-size:16px;border-radius:17px}
+.btn-row{display:flex;gap:10px;margin-top:4px}
+.btn-row>button{flex:1}
+.rec-meta{display:flex;justify-content:center;margin-bottom:6px}
+.rec-chip{display:inline-flex;align-items:center;gap:8px;background:var(--sage-mist);border:1px solid var(--sage-soft);border-radius:99px;padding:6px 16px;font-size:12.5px;font-weight:600;color:var(--sage-deep)}
+.rec-stage{text-align:center;padding:12px 4px 6px}
+.rec-dot{position:relative;width:124px;height:124px;border-radius:50%;margin:14px auto 24px;background:var(--clay);display:grid;place-items:center;box-shadow:inset 0 7px 14px rgba(255,255,255,.28),0 18px 44px var(--glow-clay);transition:background .4s,transform .4s}
+.rec-dot::before,.rec-dot::after{content:'';position:absolute;inset:-5px;border-radius:50%;border:1.5px solid var(--breathe-ring);animation:breathe 3.2s cubic-bezier(.45,0,.2,1) infinite}
+.rec-dot::after{animation-delay:1.6s}
+@keyframes breathe{0%{transform:scale(1);opacity:.65}75%,100%{transform:scale(1.6);opacity:0}}
+.rec-dot.paused{background:#adb8b2;transform:scale(.94)}
+.rec-dot.paused::before,.rec-dot.paused::after{animation:none;opacity:0}
+.timer{font-size:47px;font-weight:300;color:var(--ink);direction:ltr;font-variant-numeric:tabular-nums;letter-spacing:1px;margin:0 0 4px;line-height:1.3}
+.rec-status{font-size:13.5px;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:8px;min-height:22px}
+.rec-status::before{content:'';flex:none;width:7px;height:7px;border-radius:50%;background:var(--sage)}
+.rec-status.warn{color:var(--clay-deep);font-weight:700}
+.rec-status.warn::before{background:var(--clay)}
+.level-meter{display:flex;gap:4px;align-items:center;justify-content:center;height:56px;margin:18px 0 6px}
+.level-meter span{display:block;width:5px;border-radius:99px;background:var(--sage);opacity:.9;height:5px;transition:height .09s linear}
+.live-text{max-height:200px;overflow-y:auto;background:var(--sage-mist);border:1px solid var(--sage-soft);border-radius:var(--r-lg);padding:14px 16px;font-size:14px;color:var(--ink-2);text-align:right;white-space:pre-wrap;line-height:2;margin-bottom:18px}
+.toggle-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px 0 20px;font-size:13px;font-weight:500;color:var(--ink-2);cursor:pointer;user-select:none}
+.toggle-row input{appearance:none;width:42px;height:24px;border-radius:99px;background:#d9dfda;margin:0;flex:none;position:relative;cursor:pointer;transition:background .25s}
+.toggle-row input::after{content:'';position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.22);transition:transform .25s}
+.toggle-row input:checked{background:var(--sage)}
+.toggle-row input:checked::after{transform:translateX(-18px)}
+.signs-area{border-top:1px dashed var(--line);margin-top:18px;padding-top:16px;text-align:right}
+.signs-label{font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:9px}
+.signs-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.sign-chip{padding:8px 14px;border-radius:99px;border:1.5px solid var(--sage-soft);background:var(--sage-mist);color:var(--sage-deep);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .15s,transform .1s}
+.sign-chip:hover{background:var(--sage-soft)}
+.sign-chip:active{transform:scale(.95)}
+.sign-chip.logged{background:var(--sage)!important;color:#fff!important;border-color:var(--sage)}
+.signs-log{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;min-height:8px}
+.sign-log-item{display:inline-flex;align-items:center;gap:6px;background:var(--sage-soft);border-radius:99px;padding:4px 12px;font-size:12px;font-weight:600;color:var(--sage-deep)}
+.sign-log-item .sign-log-time{color:var(--muted);font-size:10px;font-weight:500}
+.qn-row{display:flex;gap:8px}
+.qn-row input{flex:1;margin-bottom:0;font-size:13.5px;padding:11px 13px}
+.qn-row .btn{flex:none;padding:11px 16px;font-size:13.5px}
+.session-summary{display:flex;flex-wrap:wrap;gap:8px;margin:-10px 0 20px}
+.sum-chip{display:inline-flex;align-items:center;gap:7px;background:var(--sage-mist);border:1px solid var(--sage-soft);border-radius:99px;padding:6px 14px;font-size:12.5px;font-weight:600;color:var(--sage-deep)}
+.client-item{border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:15px 18px;margin-bottom:12px;background:var(--card);cursor:pointer;transition:border-color .2s}
+.client-item:hover{border-color:var(--sage)}
+.client-code{font-size:15px;font-weight:700;color:var(--sage-deep);direction:ltr;display:inline-block;font-variant-numeric:tabular-nums}
+.client-alias{font-size:14px;color:var(--ink);margin-right:8px}
+.client-meta{font-size:12px;color:var(--muted);margin-top:4px}
+.session-item{border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:15px 18px;margin-bottom:12px;background:var(--card);cursor:pointer;transition:border-color .2s}
+.session-item:hover{border-color:var(--sage)}
+.session-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.session-num{font-size:14px;font-weight:700;color:var(--ink)}
+.session-status{font-size:11px;padding:2px 10px;border-radius:99px;font-weight:600}
+.session-status.in_progress{background:var(--gold-soft);color:var(--gold-deep)}
+.session-status.completed{background:var(--sage-soft);color:var(--sage-deep)}
+.session-status.recovered{background:var(--clay-soft);color:var(--clay-deep)}
+.session-date{font-size:12px;color:var(--muted)}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty p{margin:0;font-size:14px;font-weight:600;color:var(--ink-2)}
+.empty span{display:block;font-size:12px;margin-top:5px}
+.consent-box{background:var(--gold-soft);border:1.5px solid #ecdfc2;border-radius:var(--r-lg);padding:18px;margin:16px 0}
+.consent-title{font-size:14px;font-weight:700;color:var(--gold-deep);margin-bottom:8px}
+.consent-text{font-size:13px;color:var(--gold-deep);line-height:1.9}
+.consent-actions{display:flex;gap:10px;margin-top:14px}
+.consent-actions button{flex:1}
+.consent-box.consented{background:var(--sage-soft);border-color:var(--sage)}
+.consent-box.consented .consent-title{color:var(--sage-deep)}
+.consent-box.consented .consent-text{color:var(--sage-deep)}
+.banner{border-radius:var(--r-lg);padding:14px 18px;font-size:13.5px;margin-bottom:16px;line-height:1.9;border:1.5px solid transparent}
+.banner.info{background:var(--sage-mist);color:var(--sage-deep);border-color:var(--sage-soft)}
+.banner.warn{background:var(--gold-soft);color:var(--gold-deep);border-color:#ecdfc2}
+.banner.error{background:var(--clay-soft);color:#8a4335;border-color:#f1d6cf}
+.note-item{border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:15px 18px;margin-bottom:12px;background:var(--field)}
+.note-head{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:8px}
+.note-tag{font-size:11.5px;font-weight:700;padding:3px 12px;border-radius:99px}
+.note-tag.tag-voice{background:var(--clay-soft);color:var(--clay-deep)}
+.note-tag.tag-text{background:var(--sage-soft);color:var(--sage-deep)}
+.note-time{font-size:11.5px;color:var(--muted);font-weight:500}
+.note-remove{margin-right:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;font-family:inherit;padding:4px 10px;border-radius:8px}
+.note-remove:hover{color:var(--clay-deep);background:var(--clay-soft)}
+.note-item p{margin:0;font-size:14px;line-height:2;white-space:pre-wrap;color:var(--ink)}
+.sub-panel{border-top:1px dashed var(--line);padding-top:20px;margin-top:16px}
+#voiceNoteBox{text-align:center}
+.modal-back{position:fixed;inset:0;background:rgba(38,50,45,.45);backdrop-filter:blur(7px);display:none;align-items:center;justify-content:center;padding:18px;z-index:50}
+.modal-back.open{display:flex}
+.modal{background:var(--card);border-radius:24px;padding:26px;max-width:430px;width:100%;box-shadow:0 24px 56px rgba(0,0,0,.25)}
+.modal h3{margin:0 0 16px;font-size:17px;font-weight:800;color:var(--ink)}
+.modal .modal-actions{display:flex;gap:10px;margin-top:6px}
+.transcript-box{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:400px;overflow-y:auto;font-size:13.5px;line-height:2.1;white-space:pre-wrap;color:var(--ink-2)}
+.privacy-note{font-size:11.5px;color:var(--muted);text-align:center;line-height:2.1;margin-top:12px;padding:0 10px}
+@media(max-width:480px){
+  body{padding:20px 12px 40px}
+  .card{padding:22px 18px}
+  .step-label{display:none}
+  .timer{font-size:40px}
+  .rec-dot{width:108px;height:108px}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="app-head">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 36 36" fill="none">
+          <rect width="36" height="36" rx="11" fill="#3e6b5e"/>
+          <rect x="10.6" y="14.5" width="3.3" height="7" rx="1.65" fill="#fff" opacity=".55"/>
+          <rect x="16.35" y="10" width="3.3" height="16" rx="1.65" fill="#fff"/>
+          <rect x="22.1" y="13" width="3.3" height="10" rx="1.65" fill="#fff" opacity=".55"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <div class="brand-eyebrow">دستیار درمانگر</div>
+        <h1>فیلیا</h1>
+      </div>
+    </div>
+    <button class="icon-btn" onclick="toggleTheme()">🌓</button>
+  </header>
+
+  <div id="bannerBox"></div>
+
+  <nav class="steps">
+    <div class="step active" id="step1"><span class="step-dot">۱</span><span class="step-label">مراجعین</span></div>
+    <div class="step-line"></div>
+    <div class="step" id="step2"><span class="step-dot">۲</span><span class="step-label">آماده‌سازی</span></div>
+    <div class="step-line"></div>
+    <div class="step" id="step3"><span class="step-dot">۳</span><span class="step-label">جلسه</span></div>
+    <div class="step-line"></div>
+    <div class="step" id="step4"><span class="step-dot">۴</span><span class="step-label">پایان</span></div>
+  </nav>
+
+  <section id="screenClients" class="card screen">
+    <div class="card-head">
+      <h2>مراجعین</h2>
+      <p>انتخاب مراجع یا مشاهده پرونده</p>
+    </div>
+    <div id="clientsList"></div>
+    <div class="empty" id="emptyClients" hidden>
+      <p>هنوز مراجعی ثبت نشده</p>
+      <span>اولین مراجع خود را اضافه کنید</span>
+    </div>
+    <button class="btn btn-secondary btn-block" style="margin-top:12px" onclick="showNewClientModal()">+ مراجع جدید</button>
+  </section>
+
+  <section id="screenSetup" class="card screen" hidden>
+    <div class="card-head">
+      <h2>جلسه‌ی جدید</h2>
+      <p id="setupClientInfo"></p>
+    </div>
+    <div class="session-summary" id="setupChips"></div>
+    <div class="consent-box" id="consentBox">
+      <div class="consent-title">⚠️ رضایت مراجع</div>
+      <div class="consent-text">
+        این جلسه به‌صورت زنده رونویسی می‌شود.<br>
+        صدای مراجع ذخیره نمی‌شود — فقط متن گفتگو ثبت می‌گردد.<br><br>
+        آیا مراجع از رونویسی آگاهی دارد و موافق است؟
+      </div>
+      <div class="consent-actions">
+        <button class="btn btn-ghost" onclick="setConsent(false)">خیر</button>
+        <button class="btn btn-primary" onclick="setConsent(true)">بله، موافق است</button>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-xl btn-block" id="btnStartSession" disabled onclick="startSession()">
+      شروع جلسه و رونویسی
+    </button>
+    <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="goBackToClients()">بازگشت</button>
+  </section>
+
+  <section id="screenLive" class="card screen" hidden>
+    <div class="rec-meta"><span class="rec-chip" id="recChip"></span></div>
+    <div class="rec-stage">
+      <div class="rec-dot" id="recDot">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round">
+          <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+        </svg>
+      </div>
+      <div class="timer" id="recTimer">۰۰:۰۰</div>
+      <div class="rec-status" id="recStatus">در حال اتصال…</div>
+      <div class="level-meter" id="levelMeter"></div>
+      <label class="toggle-row"><input type="checkbox" id="chkLiveText"> نمایش متن زنده</label>
+      <div class="live-text" id="liveText" hidden></div>
+      <div class="signs-area">
+        <div class="signs-label">🔬 علائم بدنی</div>
+        <div class="signs-row" id="signsRow">
+          <button class="sign-chip" data-sign="گریان">گریان</button>
+          <button class="sign-chip" data-sign="لرزش">لرزش</button>
+          <button class="sign-chip" data-sign="تنش عضلانی">تنش</button>
+          <button class="sign-chip" data-sign="سکوت طولانی">سکوت</button>
+          <button class="sign-chip" data-sign="خشم">خشم</button>
+          <button class="sign-chip" data-sign="پرخاشگری">پرخاش</button>
+          <button class="sign-chip" data-sign="اتصال چشمی گریزان">گریز چشمی</button>
+          <button class="sign-chip" data-sign="خواب‌آلودگی">خواب‌آلودگی</button>
+          <button class="sign-chip" data-sign="بی‌قراری">بی‌قراری</button>
+        </div>
+        <div class="signs-log" id="signsLog"></div>
+        <div class="qn-row">
+          <input type="text" id="quickNoteInput" placeholder="یادداشت سریع… (Enter)">
+          <button class="btn btn-secondary" onclick="addQuickNote()">ثبت</button>
+        </div>
+      </div>
+      <button class="btn btn-danger btn-xl btn-block" id="btnEndSession" style="margin-top:18px" onclick="endSession()">
+        پایان جلسه
+      </button>
+    </div>
+  </section>
+
+  <section id="screenWrapup" class="card screen" hidden>
+    <div class="card-head">
+      <h2>تکمیل جلسه</h2>
+      <p id="wrapupInfo"></p>
+    </div>
+    <div class="session-summary" id="wrapupChips"></div>
+    <div id="notesList"></div>
+    <div class="btn-row" style="margin-bottom:12px">
+      <button class="btn btn-secondary" onclick="startVoiceNote()" id="voiceNoteBtn">🎙 یادداشت صوتی</button>
+      <button class="btn btn-secondary" onclick="showTextInput()">✍ یادداشت متنی</button>
+    </div>
+    <div id="voiceNoteBox" class="sub-panel" hidden>
+      <div class="timer" id="voiceTimer" style="font-size:26px;margin:4px 0 2px">۰۰:۰۰</div>
+      <div class="rec-status" id="voiceStatus">آماده…</div>
+      <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="stopVoiceNote()">پایان ضبط</button>
+    </div>
+    <div id="textNoteBox" class="sub-panel" hidden>
+      <textarea id="textNoteInput" placeholder="متن یادداشت…"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="hideTextInput()">انصراف</button>
+        <button class="btn btn-secondary" onclick="addTextNote()">افزودن</button>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-xl btn-block" style="margin-top:20px" onclick="finishSession()">
+      ذخیره و پایان
+    </button>
+    <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="goBackToClients()">بازگشت بدون ذخیره</button>
+  </section>
+
+  <section id="screenClientDetail" class="card screen" hidden>
+    <div class="card-head">
+      <h2 id="detailTitle"></h2>
+      <p id="detailMeta"></p>
+    </div>
+    <div id="sessionsList"></div>
+    <div id="sessionDetail" hidden style="margin-top:16px">
+      <div class="transcript-box" id="transcriptBox"></div>
+    </div>
+    <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="startFromDetail()">شروع جلسه‌ی جدید</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="goBackToClients()">بازگشت</button>
+  </section>
+
+  <p class="privacy-note">🔒 صدای خام هرگز ذخیره نمی‌شود — فقط متن رونویسی‌شده.</p>
+</div>
+
+<div class="modal-back" id="newClientModal">
+  <div class="modal">
+    <h3>مراجع جدید</h3>
+    <label>نام مستعار (اختیاری)</label>
+    <input type="text" id="newClientAlias" placeholder="مثلاً: مراجع-الف">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeNewClientModal()">انصراف</button>
+      <button class="btn btn-primary" onclick="createNewClient()">ایجاد</button>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+let currentClient=null;
+let currentSession=null;
+let consent=false;
+let ws=null;
+let mediaRecorder=null;
+let audioStream=null;
+let audioCtx=null;
+let analyser=null;
+let levelRAF=null;
+let timerInterval=null;
+let elapsedMs=0;
+let lastTickAt=null;
+let timerRunning=false;
+let wsConnected=false;
+let wrapupNotes=[];
+let voiceNoteWS=null;
+let voiceRecorder=null;
+let voiceStream=null;
+let voiceElapsed=0;
+let voiceTimerInt=null;
+let voiceRunning=false;
+let finalizeTimeout=null;
+let voiceFinalText='';
+let lastVoiceActivityAt=0;
+let lastFinalProgressAt=0;
+let sttWarnAt=0;
+
+const $=id=>document.getElementById(id);
+function toFa(n){return String(n).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[+d]);}
+function pad2(n){return n<10?'0'+n:''+n;}
+function formatTimer(ms){const s=Math.floor(ms/1000);return toFa(pad2(Math.floor(s/60))+':'+pad2(s%60));}
+function showBanner(k,m){$('bannerBox').innerHTML=`<div class="banner ${k}">${m}</div>`;}
+function clearBanner(){$('bannerBox').innerHTML='';}
+function nowClock(){return new Date().toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'});}
+
+const levelMeter=$('levelMeter');
+for(let i=0;i<18;i++){const b=document.createElement('span');levelMeter.appendChild(b);}
+const levelBars=Array.from(levelMeter.children);
+function updateLevelMeter(lvl){
+  const active=Math.round(lvl*levelBars.length);
+  levelBars.forEach((bar,i)=>{bar.style.height=(i<active?(6+Math.random()*30):5)+'px';});
+  if(lvl>0.12)lastVoiceActivityAt=Date.now();
+}
+
+function toggleTheme(){
+  const cur=document.documentElement.getAttribute('data-theme');
+  document.documentElement.setAttribute('data-theme',cur==='dark'?'light':'dark');
+}
+
+function showScreen(name){
+  ['Clients','Setup','Live','Wrapup','ClientDetail'].forEach(s=>{
+    const el=$('screen'+s);if(el)el.hidden=s!==name;
+  });
+  const map={Clients:0,Setup:1,Live:2,Wrapup:3,ClientDetail:1};
+  const idx=map[name]??0;
+  for(let i=1;i<=4;i++){
+    const st=$('step'+i);
+    if(st){st.classList.toggle('active',(i-1)===idx);st.classList.toggle('done',(i-1)<idx);}
+  }
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+async function api(path,options={}){
+  const res=await fetch(path,{
+    method:options.method||'GET',
+    headers:{'Content-Type':'application/json'},
+    body:options.body?JSON.stringify(options.body):undefined,
+  });
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||'خطا');
+  return data;
+}
+
+// ===== Clients =====
+async function loadClients(){
+  try{
+    const data=await api('/api/clients');
+    renderClients(data.clients);
+  }catch(e){showBanner('error','خطا: '+e.message);}
+}
+
+function renderClients(clients){
+  const list=$('clientsList');
+  const empty=$('emptyClients');
+  list.innerHTML='';
+  empty.hidden=clients.length!==0;
+  clients.forEach(c=>{
+    const div=document.createElement('div');
+    div.className='client-item';
+    div.innerHTML=`<div><span class="client-code">${c.code}</span><span class="client-alias">${c.alias||''}</span></div>
+    <div class="client-meta">${toFa(c.session_count||'0')} جلسه${c.last_session_date?' · آخرین: '+c.last_session_date:''}</div>`;
+    div.onclick=()=>openClientDetail(c.id);
+    const btn=document.createElement('button');
+    btn.className='btn btn-primary';
+    btn.style.cssText='width:100%;margin-top:10px;padding:11px';
+    btn.textContent='شروع جلسه‌ی جدید';
+    btn.onclick=(e)=>{e.stopPropagation();setupNewSession(c);};
+    div.appendChild(btn);
+    list.appendChild(div);
+  });
+}
+
+async function openClientDetail(clientId){
+  try{
+    const data=await api(`/api/clients/${clientId}`);
+    currentClient=data.client;
+    $('detailTitle').textContent=`${data.client.code}${data.client.alias?' — '+data.client.alias:''}`;
+    $('detailMeta').textContent=`${toFa(data.sessions.length)} جلسه`;
+    const sl=$('sessionsList');
+    sl.innerHTML='';
+    $('sessionDetail').hidden=true;
+    data.sessions.forEach(s=>{
+      const div=document.createElement('div');
+      div.className='session-item';
+      const st=s.status==='completed'?'کامل':s.status==='in_progress'?'در جریان':'بازیابی';
+      div.innerHTML=`<div class="session-head"><span class="session-num">جلسه ${toFa(s.session_num)}</span>
+      <span class="session-status ${s.status}">${st}</span></div>
+      <div class="session-date">${s.date} · ${s.start_time}${s.duration_ms?' · '+toFa(Math.round(s.duration_ms/60000))+' دقیق':''}</div>`;
+      div.onclick=()=>viewTranscript(s.id);
+      sl.appendChild(div);
+    });
+    showScreen('ClientDetail');
+  }catch(e){showBanner('error',e.message);}
+}
+
+function startFromDetail(){if(currentClient)setupNewSession(currentClient);}
+
+async function viewTranscript(sessionId){
+  try{
+    const data=await api(`/api/sessions/${sessionId}`);
+    $('transcriptBox').textContent=data.session.transcript||'(متنی ثبت نشده)';
+    $('sessionDetail').hidden=false;
+  }catch(e){showBanner('error',e.message);}
+}
+
+function showNewClientModal(){$('newClientAlias').value='';$('newClientModal').classList.add('open');}
+function closeNewClientModal(){$('newClientModal').classList.remove('open');}
+
+async function createNewClient(){
+  const alias=$('newClientAlias').value.trim();
+  try{
+    const data=await api('/api/clients',{method:'POST',body:{alias}});
+    closeNewClientModal();
+    showBanner('info',`مراجع <b>${data.client.code}</b> ساخته شد.`);
+    loadClients();
+  }catch(e){showBanner('error',e.message);}
+}
+
+// ===== Setup =====
+function setupNewSession(client){
+  currentClient=client;consent=false;clearBanner();
+  $('setupClientInfo').textContent=`${client.code}${client.alias?' — '+client.alias:''}`;
+  $('setupChips').innerHTML=`<span class="sum-chip">جلسه‌ی ${toFa((parseInt(client.session_count)||0)+1)}</span>`;
+  $('consentBox').classList.remove('consented');
+  $('consentBox').querySelector('.consent-title').textContent='⚠️ رضایت مراجع';
+  $('btnStartSession').disabled=true;
+  $('signsLog').innerHTML='';
+  showScreen('Setup');
+}
+
+function setConsent(value){
+  consent=value;
+  if(value){
+    $('btnStartSession').disabled=false;
+    $('consentBox').classList.add('consented');
+    $('consentBox').querySelector('.consent-title').textContent='✓ رضایت ثبت شد';
+  }else{
+    $('btnStartSession').disabled=true;
+    $('consentBox').classList.remove('consented');
+    $('consentBox').querySelector('.consent-title').textContent='⚠️ رضایت مراجع';
+  }
+}
+
+async function startSession(){
+  clearBanner();if(!consent)return;
+  try{
+    const data=await api('/api/sessions',{method:'POST',body:{client_id:currentClient.id,consent:true}});
+    currentSession=data.session;
+    $('recChip').textContent=`${data.client.code}${data.client.alias?' · '+data.client.alias:''} · جلسه ${toFa(currentSession.session_num)}`;
+    showScreen('Live');
+    $('recStatus').textContent='در حال اتصال…';
+    resetTimer();
+    $('liveText').hidden=true;
+    $('chkLiveText').checked=false;
+    $('signsLog').innerHTML='';
+    await connectWS();
+  }catch(e){showBanner('error','خطا در شروع: '+e.message);}
+}
+
+// ===== WS + Audio =====
+async function connectWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}/ws/t/${currentSession.id}`);
+  ws.binaryType='arraybuffer';
+  ws.onopen=async()=>{await startMic();};
+  ws.onmessage=(ev)=>{
+    if(typeof ev.data==='string'){
+      try{handleMsg(JSON.parse(ev.data));}catch(e){}
+    }
+  };
+  ws.onclose=()=>{
+    wsConnected=false;
+    $('recDot').classList.add('paused');
+    pauseTimer();
+    if(!$('screenLive').hidden){$('recStatus').textContent='اتصال بسته شد';}
+  };
+}
+
+async function startMic(){
+  try{
+    audioStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  }catch(e){
+    showBanner('error','اجازه‌ی میکروفون داده نشد.');
+    $('recStatus').textContent='میکروفون رد شد';
+    return;
+  }
+  try{
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const src=audioCtx.createMediaStreamSource(audioStream);
+    analyser=audioCtx.createAnalyser();analyser.fftSize=512;
+    src.connect(analyser);
+    const data=new Uint8Array(analyser.frequencyBinCount);
+    const tick=()=>{
+      analyser.getByteTimeDomainData(data);
+      let sum=0;
+      for(let i=0;i<data.length;i++){const v=(data[i]-128)/128;sum+=v*v;}
+      updateLevelMeter(Math.min(1,Math.sqrt(sum/data.length)*4));
+      levelRAF=requestAnimationFrame(tick);
+    };
+    tick();
+  }catch(e){}
+
+  const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg'].find(m=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m));
+  try{
+    mediaRecorder=mime?new MediaRecorder(audioStream,{mimeType:mime}):new MediaRecorder(audioStream);
+  }catch(e){return;}
+  mediaRecorder.ondataavailable=(e)=>{
+    if(e.data&&e.data.size>0&&ws&&ws.readyState===WebSocket.OPEN)ws.send(e.data);
+  };
+  mediaRecorder.start(250);
+}
+
+function handleMsg(msg){
+  switch(msg.type){
+    case 'status':
+      wsConnected=msg.status==='connected';
+      $('recDot').classList.toggle('paused',!wsConnected);
+      $('recStatus').textContent=msg.message||msg.status;
+      $('recStatus').classList.toggle('warn',msg.status!=='connected');
+      if(wsConnected)startTimer();else pauseTimer();
+      break;
+    case 'preview':
+      lastFinalProgressAt=Date.now();
+      if(!$('liveText').hidden){
+        $('liveText').textContent=msg.text;
+        $('liveText').scrollTop=$('liveText').scrollHeight;
+      }
+      break;
+    case 'finished':
+      handleFinished(msg.finalText);
+      break;
+    case 'error':
+      showBanner('error',msg.message);
+      $('recStatus').textContent=msg.message;
+      $('recStatus').classList.add('warn');
+      break;
+  }
+}
+
+ $('chkLiveText').addEventListener('change',()=>{
+  $('liveText').hidden=!$('chkLiveText').checked;
+});
+
+// ===== Timer =====
+function resetTimer(){clearInterval(timerInterval);elapsedMs=0;lastTickAt=null;timerRunning=false;renderTimer();}
+function startTimer(){
+  if(timerRunning)return;
+  timerRunning=true;lastTickAt=Date.now();
+  clearInterval(timerInterval);
+  timerInterval=setInterval(()=>{
+    if(!timerRunning||lastTickAt===null)return;
+    const now=Date.now();elapsedMs+=now-lastTickAt;lastTickAt=now;renderTimer();
+  },200);
+}
+function pauseTimer(){
+  if(!timerRunning)return;
+  const now=Date.now();
+  if(lastTickAt!==null)elapsedMs+=now-lastTickAt;
+  lastTickAt=null;timerRunning=false;renderTimer();
+}
+function renderTimer(){$('recTimer').textContent=formatTimer(elapsedMs);}
+
+// ===== Signs — با لیست ثبت‌شده =====
+document.querySelectorAll('.sign-chip').forEach(chip=>{
+  chip.addEventListener('click',async()=>{
+    if(!currentSession||!currentSession.id){
+      showBanner('warn','جلسه‌ی فعالی وجود ندارد.');
+      return;
+    }
+    chip.classList.add('logged');
+    setTimeout(()=>chip.classList.remove('logged'),2000);
+    try{
+      await api(`/api/sessions/${currentSession.id}/notes`,{
+        method:'POST',
+        body:{type:'sign',sign_type:chip.dataset.sign,offset_ms:elapsedMs,wall_clock:nowClock()}
+      });
+      addSignToLog(chip.dataset.sign);
+    }catch(e){}
+  });
+});
+
+function addSignToLog(signType){
+  const log=$('signsLog');
+  const item=document.createElement('span');
+  item.className='sign-log-item';
+  item.innerHTML=`✓ ${signType} <span class="sign-log-time">${formatTimer(elapsedMs)}</span>`;
+  log.appendChild(item);
+}
+
+// ===== Quick Note =====
+async function addQuickNote(){
+  const input=$('quickNoteInput');
+  const text=input.value.trim();
+  if(!text||!currentSession)return;
+  try{
+    await api(`/api/sessions/${currentSession.id}/notes`,{
+      method:'POST',
+      body:{type:'note_during',text,offset_ms:elapsedMs,wall_clock:nowClock()}
+    });
+    input.value='';
+  }catch(e){}
+}
+ $('quickNoteInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();addQuickNote();}
+});
+
+// ===== End =====
+function endSession(){
+  if(!ws||!currentSession)return;
+  $('btnEndSession').disabled=true;
+  $('recStatus').textContent='در حال نهایی‌سازی…';
+  pauseTimer();
+  try{ws.send(JSON.stringify({type:'finalize'}));}catch(e){}
+  finalizeTimeout=setTimeout(()=>handleFinished(null),10000);
+}
+
+function handleFinished(finalText){
+  if(finalizeTimeout){clearTimeout(finalizeTimeout);finalizeTimeout=null;}
+  stopAllAudio();
+  if(ws){try{ws.close();}catch(e){}ws=null;}
+  clearInterval(timerInterval);
+  if(currentSession){
+    api(`/api/sessions/${currentSession.id}`,{
+      method:'PUT',
+      body:{duration_ms:elapsedMs,status:'completed',...(finalText?{transcript:finalText}:{})}
+    }).catch(()=>{});
+  }
+  const mins=Math.floor(elapsedMs/60000);
+  $('wrapupInfo').textContent=`جلسه ${toFa(currentSession.session_num)} · ${currentSession.date} · مدت: ${toFa(mins)} دقیقه`;
+  $('wrapupChips').innerHTML=`<span class="sum-chip">شروع: ${currentSession.start_time}</span><span class="sum-chip">مدت: ${toFa(mins)} دقیق</span>${finalText?'<span class="sum-chip">✓ متن ذخیره شد</span>':''}`;
+  wrapupNotes=[];renderWrapupNotes();
+  $('btnEndSession').disabled=false;
+  showScreen('Wrapup');
+}
+
+function stopAllAudio(){
+  if(mediaRecorder&&mediaRecorder.state!=='inactive'){try{mediaRecorder.stop();}catch(e){}}
+  if(audioStream){audioStream.getTracks().forEach(t=>t.stop());audioStream=null;}
+  if(levelRAF)cancelAnimationFrame(levelRAF);
+  if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
+}
+
+// ===== Wrapup =====
+function renderWrapupNotes(){
+  const list=$('notesList');list.innerHTML='';
+  wrapupNotes.forEach((n,i)=>{
+    const div=document.createElement('div');
+    div.className='note-item';
+    const tag=n.type==='voice'?'صوتی':'متنی';
+    const cls=n.type==='voice'?'note-tag tag-voice':'note-tag tag-text';
+    div.innerHTML=`<div class="note-head"><span class="${cls}">${tag}</span><span class="note-time">${n.wall_clock||''}</span><button class="note-remove" data-i="${i}">حذف</button></div><p></p>`;
+    div.querySelector('p').textContent=n.text||'';
+    list.appendChild(div);
+  });
+  list.querySelectorAll('.note-remove').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const i=parseInt(btn.dataset.i);
+      const note=wrapupNotes[i];
+      if(note&&note.dbId)api(`/api/notes/${note.dbId}`,{method:'DELETE'}).catch(()=>{});
+      wrapupNotes.splice(i,1);renderWrapupNotes();
+    });
+  });
+}
+
+function showTextInput(){$('voiceNoteBox').hidden=true;$('textNoteBox').hidden=false;$('textNoteInput').focus();}
+function hideTextInput(){$('textNoteBox').hidden=true;}
+
+async function addTextNote(){
+  const text=$('textNoteInput').value.trim();
+  if(!text||!currentSession)return;
+  try{
+    const data=await api(`/api/sessions/${currentSession.id}/notes`,{
+      method:'POST',body:{type:'note_after',text,wall_clock:nowClock()}
+    });
+    $('textNoteInput').value='';$('textNoteBox').hidden=true;
+    wrapupNotes.push({dbId:data.note.id,type:'text',text,wall_clock:data.note.wall_clock});
+    renderWrapupNotes();
+  }catch(e){showBanner('error','خطا در ثبت');}
+}
+
+// ===== Voice Note =====
+async function startVoiceNote(){
+  if(!currentSession)return;
+  voiceFinalText='';
+  $('textNoteBox').hidden=true;$('voiceNoteBox').hidden=false;
+  $('voiceStatus').textContent='در حال اتصال…';
+  voiceElapsed=0;renderVoiceTimer();
+  $('voiceNoteBtn').disabled=true;
+  try{
+    voiceStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+  }catch(e){
+    $('voiceStatus').textContent='میکروفون رد شد';
+    $('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;
+    return;
+  }
+  const proto=location.protocol==='https:'?'wss':'ws';
+  voiceNoteWS=new WebSocket(`${proto}://${location.host}/ws/t/${currentSession.id}`);
+  voiceNoteWS.binaryType='arraybuffer';
+  voiceNoteWS.onopen=()=>{
+    const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg'].find(m=>MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m));
+    try{voiceRecorder=mime?new MediaRecorder(voiceStream,{mimeType:mime}):new MediaRecorder(voiceStream);}catch(e){return;}
+    voiceRecorder.ondataavailable=(e)=>{
+      if(e.data&&e.data.size>0&&voiceNoteWS&&voiceNoteWS.readyState===WebSocket.OPEN)voiceNoteWS.send(e.data);
+    };
+    voiceRecorder.start(250);
+    $('voiceStatus').textContent='در حال ضبط…';
+    startVoiceTimer();
+  };
+  voiceNoteWS.onmessage=(ev)=>{
+    if(typeof ev.data==='string'){
+      try{
+        const msg=JSON.parse(ev.data);
+        if(msg.type==='preview'){
+          voiceFinalText=msg.text||'';
+        }else if(msg.type==='finished'){
+          finishVoiceNote();
+        }
+      }catch(e){}
+    }
+  };
+  voiceNoteWS.onclose=()=>{finishVoiceNote();};
+}
+
+function stopVoiceNote(){
+  if(voiceNoteWS&&voiceNoteWS.readyState===WebSocket.OPEN){
+    $('voiceStatus').textContent='در حال نهایی‌سازی…';
+    try{voiceNoteWS.send(JSON.stringify({type:'finalize'}));}catch(e){}
+    setTimeout(finishVoiceNote,8000);
+  }else{finishVoiceNote();}
+}
+
+function finishVoiceNote(){
+  if(!voiceRecorder&&!voiceNoteWS)return;
+  if(voiceRecorder&&voiceRecorder.state!=='inactive'){try{voiceRecorder.stop();}catch(e){}}
+  if(voiceStream){voiceStream.getTracks().forEach(t=>t.stop());voiceStream=null;}
+  if(voiceNoteWS){try{voiceNoteWS.close();}catch(e){}voiceNoteWS=null;}
+  clearInterval(voiceTimerInt);voiceRunning=false;
+  $('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;
+  if(voiceFinalText.trim()){
+    api(`/api/sessions/${currentSession.id}/notes`,{
+      method:'POST',body:{type:'voice',text:voiceFinalText.trim(),wall_clock:nowClock()}
+    }).then(data=>{
+      wrapupNotes.push({dbId:data.note.id,type:'voice',text:voiceFinalText.trim(),wall_clock:data.note.wall_clock});
+      renderWrapupNotes();
+    }).catch(()=>{
+      wrapupNotes.push({type:'voice',text:voiceFinalText.trim(),wall_clock:nowClock()});
+      renderWrapupNotes();
+    });
+  }
+  voiceFinalText='';
+}
+
+function startVoiceTimer(){
+  if(voiceRunning)return;
+  voiceRunning=true;
+  let last=Date.now();
+  clearInterval(voiceTimerInt);
+  voiceTimerInt=setInterval(()=>{
+    if(!voiceRunning)return;
+    const now=Date.now();voiceElapsed+=now-last;last=now;renderVoiceTimer();
+  },200);
+}
+function renderVoiceTimer(){$('voiceTimer').textContent=formatTimer(voiceElapsed);}
+
+async function finishSession(){
+  if(!currentSession)return;
+  showBanner('info','در حال ذخیره…');
+  try{
+    await api(`/api/sessions/${currentSession.id}`,{method:'PUT',body:{status:'completed'}});
+    clearBanner();
+    wrapupNotes=[];currentSession=null;resetTimer();
+    showScreen('Clients');loadClients();
+  }catch(e){showBanner('error','خطا در ذخیره: '+e.message);}
+}
+
+function goBackToClients(){
+  stopAllAudio();finishVoiceNote();
+  if(ws){try{ws.close();}catch(e){}ws=null;}
+  clearInterval(timerInterval);
+  currentSession=null;resetTimer();
+  showScreen('Clients');loadClients();
+}
+
+window.addEventListener('beforeunload',e=>{
+  if(ws||voiceNoteWS){e.preventDefault();e.returnValue='';}
+});
+
+document.addEventListener('DOMContentLoaded',()=>{loadClients();});
+</script>
+</body>
+</html>

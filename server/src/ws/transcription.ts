@@ -4,115 +4,93 @@ import websocket from '@fastify/websocket';
 import { query } from '../db/connection.js';
 import { SonioxEngine } from '../stt/soniox.js';
 
-// مدیریت جلساتِ فعال
 const activeSessions = new Map<string, SonioxEngine>();
 
 export async function transcriptionRoutes(app: FastifyInstance) {
   await app.register(websocket);
 
-  app.get('/ws/t/:sessionId', { websocket: true }, (connection, request) => {
+  app.get('/ws/t/:sessionId', { websocket: true }, (socket, request) => {
     const { sessionId } = request.params as { sessionId: string };
-    
     const sonioxKey = process.env.SONIOX_API_KEY;
-    if (!sonioxKey) {
-      connection.send(JSON.stringify({ type: 'error', message: 'کلید Soniox تنظیم نشده' }));
-      connection.close();
+
+    if (!sonioxKey || sonioxKey === 'your-key-here') {
+      socket.send(JSON.stringify({ type: 'error', message: 'کلید Soniox تنظیم نشده' }));
+      socket.close();
       return;
     }
 
-    // چک: جلسه در DB وجود داره؟
     query('SELECT id, status FROM sessions WHERE id = $1', [sessionId]).then(result => {
       if (result.rows.length === 0) {
-        connection.send(JSON.stringify({ type: 'error', message: 'جلسه یافت نشد' }));
-        connection.close();
+        socket.send(JSON.stringify({ type: 'error', message: 'جلسه یافت نشد' }));
+        socket.close();
         return;
       }
 
-      // اگر جلسه‌ی فعالِ دیگه‌ای برای همین session بود، ببندش
-      const existing = activeSessions.get(sessionId);
-      if (existing) {
-        activeSessions.delete(sessionId);
-      }
-
-      // ساخت موتور Soniox
       const engine = new SonioxEngine(sonioxKey, {
-        onTokens: (tokens) => {
-          // متنِ نهایی‌شده → مرورگر + DB (throttled)
-          connection.send(JSON.stringify({ type: 'tokens', tokens }));
-          
-          const text = engine.getFinalText();
-          if (text) {
-            query(
-              'UPDATE sessions SET transcript = $1, updated_at = now() WHERE id = $2',
-              [text, sessionId]
-            ).catch(() => {});
-          }
+        // ⭐ preview: متن کامل (final + در حال گفتن)
+        onPreview: (fullText) => {
+          try {
+            socket.send(JSON.stringify({ type: 'preview', text: fullText }));
+          } catch (e) {}
         },
         onStatus: (status, message) => {
-          connection.send(JSON.stringify({ type: 'status', status, message }));
+          try {
+            socket.send(JSON.stringify({ type: 'status', status, message }));
+          } catch (e) {}
         },
         onFinished: (finalText) => {
-          connection.send(JSON.stringify({ type: 'finished', finalText }));
-          
-          // ذخیره‌ی نهایی + تغییر status
+          try {
+            socket.send(JSON.stringify({ type: 'finished', finalText }));
+          } catch (e) {}
           query(
             `UPDATE sessions SET transcript = $1, status = 'completed', updated_at = now() WHERE id = $2`,
             [finalText, sessionId]
           ).then(() => {
             activeSessions.delete(sessionId);
-            connection.close();
+            try { socket.close(); } catch (e) {}
           }).catch(() => {
             activeSessions.delete(sessionId);
-            connection.close();
+            try { socket.close(); } catch (e) {}
           });
         },
         onError: (error) => {
-          connection.send(JSON.stringify({ type: 'error', message: error }));
+          try {
+            socket.send(JSON.stringify({ type: 'error', message: error }));
+          } catch (e) {}
         },
       });
 
       activeSessions.set(sessionId, engine);
 
-      // شروع موتور
       engine.start().catch(err => {
-        connection.send(JSON.stringify({ 
-          type: 'error', 
-          message: 'خطا در اتصال به سرویس رونویسی',
-          detail: String(err)
-        }));
+        try {
+          socket.send(JSON.stringify({ type: 'error', message: 'خطا در اتصال به Soniox' }));
+        } catch (e) {}
       });
 
-      // دریافتِ صدا از مرورگر
-      connection.on('message', (data, isBinary) => {
+      socket.on('message', (data: Buffer, isBinary: boolean) => {
         if (isBinary) {
-          // chunk صوتی
-          engine.sendAudioChunk(data as Buffer);
+          engine.sendAudioChunk(data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength));
         } else {
-          // پیام JSON
           try {
             const msg = JSON.parse(data.toString());
             if (msg.type === 'finalize') {
-              engine.stop().then(finalText => {
-                // onFinished callback همین رو handle می‌کنه
-              });
+              engine.stop().then(() => {});
             }
           } catch {}
         }
       });
 
-      connection.on('close', () => {
-        // اگر مرورگر بست ولی finalize نفرستاد — auto-finalize
+      socket.on('close', () => {
         const eng = activeSessions.get(sessionId);
         if (eng) {
-          eng.stop().then(() => {
-            activeSessions.delete(sessionId);
-          });
+          eng.stop().then(() => { activeSessions.delete(sessionId); })
+            .catch(() => { activeSessions.delete(sessionId); });
         }
       });
 
     }).catch(err => {
-      connection.send(JSON.stringify({ type: 'error', message: 'خطای دیتابیس' }));
-      connection.close();
+      try { socket.send(JSON.stringify({ type: 'error', message: 'خطای دیتابیس' })); } catch (e) {}
     });
   });
 }

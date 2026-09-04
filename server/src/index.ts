@@ -1,4 +1,5 @@
 // Feelia Server — Entry Point
+import 'dotenv/config';
 import Fastify from 'fastify';
 import { fastifyStatic } from '@fastify/static';
 import path from 'node:path';
@@ -7,6 +8,7 @@ import { testConnection } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { clientRoutes } from './http/clients.js';
 import { sessionRoutes } from './http/sessions.js';
+import { transcriptionRoutes } from './ws/transcription.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,13 +29,14 @@ app.get('/api/health', async () => {
 // API Routes
 await app.register(clientRoutes);
 await app.register(sessionRoutes);
+await app.register(transcriptionRoutes);
 
-// Serve static (فرانت بعداً)
+// Serve static (فرانت)
 const publicDir = path.join(__dirname, '..', '..', 'public');
 try {
   await app.register(fastifyStatic, { root: publicDir });
 } catch (e) {
-  // public/ هنوز وجود نداره — فعلاً اوکیه
+  // public/ وجود نداره
 }
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
