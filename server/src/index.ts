@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { testConnection } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { clientRoutes } from './http/clients.js';
+import { sessionRoutes } from './http/sessions.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,6 +26,7 @@ app.get('/api/health', async () => {
 
 // API Routes
 await app.register(clientRoutes);
+await app.register(sessionRoutes);
 
 // Serve static (فرانت بعداً)
 const publicDir = path.join(__dirname, '..', '..', 'public');
