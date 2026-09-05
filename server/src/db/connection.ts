@@ -5,6 +5,12 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://feelia:feelia2025@localhost:5432/feelia',
 });
 
+// ⭐ بدون این، خطای یک کانکشنِ idle (مثلاً قطعی موقت دیتابیس) کل پروسه‌ی Node رو
+// کرش می‌ده و همه‌ی جلسات فعال رو قطع می‌کنه — این مستندات خود node-postgres است.
+pool.on('error', (err) => {
+  console.error('[db] unexpected error on idle client:', err.message);
+});
+
 export async function query(text: string, params?: unknown[]) {
   const start = Date.now();
   const result = await pool.query(text, params as never[]);

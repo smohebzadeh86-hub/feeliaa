@@ -106,13 +106,23 @@ export class SonioxEngine {
       const socket = new WebSocket(SONIOX_WS_URL, opts);
       this.ws = socket;
 
+      // ⭐ رفع باگ: اگر اولین تلاش اتصال شکست بخورد (error/close قبل از open)،
+      // این Promise باید reject بشه — وگرنه start() تا ابد معلق می‌مونه و
+      // هیچ خطایی به کاربر نشون داده نمی‌شه (نه در پیش‌بررسی، نه در جلسه‌ی زنده).
+      let connectSettled = false;
+      const settleConnect = (err?: Error) => {
+        if (connectSettled) return;
+        connectSettled = true;
+        clearTimeout(timeout);
+        if (err) reject(err); else resolve();
+      };
+
       const timeout = setTimeout(() => {
         try { socket.close(); } catch {}
-        reject(new Error('connection-timeout'));
+        settleConnect(new Error('connection-timeout'));
       }, CONNECT_TIMEOUT);
 
       socket.onopen = () => {
-        clearTimeout(timeout);
         try {
           // ⭐ پیام اول: پیکربندی (طبق مستندات)
           socket.send(JSON.stringify({
@@ -125,10 +135,10 @@ export class SonioxEngine {
             enable_endpoint_detection: true,
           }));
           this.flushPending();
-        } catch (e) { reject(e); return; }
+        } catch (e) { settleConnect(e as Error); return; }
 
         this.callbacks.onStatus('connected', 'در حال رونویسی…');
-        resolve();
+        settleConnect();
       };
 
       socket.onmessage = (ev) => {
@@ -162,12 +172,16 @@ export class SonioxEngine {
       };
 
       socket.onclose = () => {
-        clearTimeout(timeout);
+        if (!connectSettled) {
+          // هرگز به‌طور موفق وصل نشد — reconnect اینجا معنی نداره، caller باید خطا رو ببینه
+          settleConnect(new Error('connection-failed'));
+          return;
+        }
         if (this.manuallyClosing || this.stopRequested) { this.settle(); return; }
         this.attemptReconnect();
       };
 
-      socket.onerror = () => { clearTimeout(timeout); };
+      socket.onerror = () => {};
     });
   }
 
@@ -202,7 +216,7 @@ export class SonioxEngine {
     await this.startPromise;
   }
 
-  sendAudioChunk(buf: ArrayBuffer) {
+  sendAudioChunk(buf: ArrayBufferLike) {
     this.bufferOrSend(Buffer.from(buf));
   }
 

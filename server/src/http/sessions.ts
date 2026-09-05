@@ -1,6 +1,8 @@
-// CRUD برای جلسات
+// CRUD برای جلسات — همیشه از مسیر مراجعِ متعلق به تراپیستِ واردشده
 import { FastifyInstance } from 'fastify';
 import { query } from '../db/connection.js';
+import { requireAuth } from '../auth/guard.js';
+import { getOwnedClient, getOwnedSession } from '../db/ownership.js';
 
 // ⭐ پردازش صدا در background (طبق الگوی مستندات Soniox)
 async function processVoiceNoteInBackground(sessionId: string, buffer: Buffer) {
@@ -20,9 +22,9 @@ async function processVoiceNoteInBackground(sessionId: string, buffer: Buffer) {
     });
 
     console.log('[voice-note] starting engine, size:', buffer.length);
-    
+
     await engine.start();
-    
+
     // ⭐ طبق مستندات: chunks of 3840 bytes + 120ms pause (شبیه streaming واقعی)
     const CHUNK_SIZE = 3840;
     for (let i = 0; i < buffer.length; i += CHUNK_SIZE) {
@@ -30,14 +32,14 @@ async function processVoiceNoteInBackground(sessionId: string, buffer: Buffer) {
       engine.sendAudioChunk(chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength));
       await new Promise(resolve => setTimeout(resolve, 120));
     }
-    
+
     console.log('[voice-note] audio sent, finalizing...');
-    
+
     // stop() حالا ws.send('') رو می‌فرسته — سیگنال پایان صدا
     const text = await engine.stop();
-    
+
     console.log('[voice-note] finished, text length:', (text || '').length);
-    
+
     if (text && text.trim()) {
       await query(
         `INSERT INTO session_notes (session_id, type, text, wall_clock)
@@ -54,8 +56,9 @@ async function processVoiceNoteInBackground(sessionId: string, buffer: Buffer) {
 }
 
 export async function sessionRoutes(app: FastifyInstance) {
+  app.addHook('preHandler', requireAuth);
 
-  // POST /api/sessions — شروع جلسه‌ی جدید
+  // POST /api/sessions — شروع جلسه‌ی جدید (مراجع باید مالِ همین تراپیست باشه)
   app.post('/api/sessions', async (request, reply) => {
     const { client_id, consent, date, start_time } = request.body as {
       client_id: string;
@@ -69,10 +72,8 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'رضایت مراجع الزامی است' };
     }
 
-    const clientCheck = await query(
-      'SELECT code, alias FROM clients WHERE id = $1', [client_id]
-    );
-    if (clientCheck.rows.length === 0) {
+    const client = await getOwnedClient(client_id, request.therapistId!);
+    if (!client) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
@@ -97,7 +98,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     reply.code(201);
     return {
       session: result.rows[0],
-      client: clientCheck.rows[0],
+      client: { code: client.code, alias: client.alias },
     };
   });
 
@@ -106,10 +107,10 @@ export async function sessionRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
 
     const sessionResult = await query(
-      `SELECT s.*, c.code, c.alias 
-       FROM sessions s 
-       JOIN clients c ON c.id = s.client_id 
-       WHERE s.id = $1`, [id]
+      `SELECT s.*, c.code, c.alias
+       FROM sessions s
+       JOIN clients c ON c.id = s.client_id
+       WHERE s.id = $1 AND c.therapist_id = $2`, [id, request.therapistId]
     );
 
     if (sessionResult.rows.length === 0) {
@@ -136,7 +137,15 @@ export async function sessionRoutes(app: FastifyInstance) {
       anchors?: Array<{ chars: number; off: number }>;
       duration_ms?: number;
       status?: string;
+      date?: string;
+      start_time?: string;
     };
+
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
 
     const updates: string[] = [];
     const values: unknown[] = [];
@@ -158,7 +167,15 @@ export async function sessionRoutes(app: FastifyInstance) {
       updates.push(`status = $${paramCount++}`);
       values.push(body.status);
     }
-    
+    if (body.date !== undefined) {
+      updates.push(`date = $${paramCount++}`);
+      values.push(body.date);
+    }
+    if (body.start_time !== undefined) {
+      updates.push(`start_time = $${paramCount++}`);
+      values.push(body.start_time);
+    }
+
     if (updates.length === 0) {
       reply.code(400);
       return { error: 'چیزی برای به‌روزرسانی نیست' };
@@ -166,9 +183,12 @@ export async function sessionRoutes(app: FastifyInstance) {
 
     updates.push(`updated_at = now()`);
     values.push(id);
+    values.push(request.therapistId);
 
     const result = await query(
-      `UPDATE sessions SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING *`,
+      `UPDATE sessions SET ${updates.join(', ')}
+       WHERE id = $${paramCount} AND client_id IN (SELECT id FROM clients WHERE therapist_id = $${paramCount + 1})
+       RETURNING *`,
       values
     );
 
@@ -183,11 +203,25 @@ export async function sessionRoutes(app: FastifyInstance) {
   // DELETE /api/sessions/:id
   app.delete('/api/sessions/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const result = await query('DELETE FROM sessions WHERE id = $1 RETURNING id', [id]);
+
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+
+    const result = await query(
+      `DELETE FROM sessions
+       WHERE id = $1 AND client_id IN (SELECT id FROM clients WHERE therapist_id = $2)
+       RETURNING id`,
+      [id, request.therapistId]
+    );
+
     if (result.rows.length === 0) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
+
     return { deleted: id };
   });
 
@@ -207,6 +241,12 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'type الزامی است' };
     }
 
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+
     const result = await query(
       `INSERT INTO session_notes (session_id, type, text, sign_type, offset_ms, wall_clock)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
@@ -220,7 +260,14 @@ export async function sessionRoutes(app: FastifyInstance) {
   // DELETE /api/notes/:id — حذف یادداشت
   app.delete('/api/notes/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const result = await query('DELETE FROM session_notes WHERE id = $1 RETURNING id', [id]);
+
+    const result = await query(
+      `DELETE FROM session_notes n USING sessions s, clients c
+       WHERE n.id = $1 AND n.session_id = s.id AND s.client_id = c.id AND c.therapist_id = $2
+       RETURNING n.id`,
+      [id, request.therapistId]
+    );
+
     if (result.rows.length === 0) {
       reply.code(404);
       return { error: 'یادداشت یافت نشد' };
@@ -232,10 +279,8 @@ export async function sessionRoutes(app: FastifyInstance) {
   app.post('/api/sessions/:id/voice-note', async (request, reply) => {
     const { id } = request.params as { id: string };
 
-    const sessionCheck = await query(
-      'SELECT id FROM sessions WHERE id = $1', [id]
-    );
-    if (sessionCheck.rows.length === 0) {
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
@@ -247,7 +292,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     }
 
     const buffer = await file.toBuffer();
-    
+
     if (buffer.length > 50 * 1024 * 1024) {
       reply.code(400);
       return { error: 'فایل صوتی بیش از حد بزرگ است' };
@@ -270,7 +315,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     processVoiceNoteInBackground(id, buffer).catch(() => {});
 
     reply.code(202);
-    return { 
+    return {
       status: 'processing',
       message: 'صدا دریافت شد — در حال رونویسی',
     };
