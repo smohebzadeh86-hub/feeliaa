@@ -1,10 +1,29 @@
 // اجرای migrations — از فایل‌های SQL
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { query, testConnection } from './connection.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// محل پوشه‌ی migrations بسته به نحوه‌ی اجرا فرق می‌کند:
+// - dev (tsx از src/): خودِ __dirname
+// - prod (node از dist/): __dirname، به شرطی که build فایل‌های .sql را کپی کرده باشد
+// - fallbackها: وقتی cwd پوشه‌ی server/ یا ریشه‌ی ریپو است
+function resolveMigrationsDir(): string {
+  const candidates = [
+    path.join(__dirname, 'migrations'),
+    path.join(process.cwd(), 'src/db/migrations'),
+    path.join(process.cwd(), 'server/src/db/migrations'),
+  ];
+  for (const dir of candidates) {
+    if (existsSync(dir)) return dir;
+  }
+  throw new Error(
+    `[db] migrations directory not found. Tried:\n - ${candidates.join('\n - ')}\n` +
+    `If you run from dist/, make sure "pnpm --filter server run build" copied the .sql files.`
+  );
+}
 
 export async function runMigrations() {
   const connected = await testConnection();
@@ -21,7 +40,7 @@ export async function runMigrations() {
     )
   `);
 
-  const migrationsDir = path.join(__dirname, 'migrations');
+  const migrationsDir = resolveMigrationsDir();
   const files = readdirSync(migrationsDir)
     .filter(f => f.endsWith('.sql'))
     .sort();
