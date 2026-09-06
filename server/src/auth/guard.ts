@@ -9,6 +9,7 @@ export const SESSION_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // ثانیه
 declare module 'fastify' {
   interface FastifyRequest {
     therapistId: string | null;
+    isAdmin: boolean;
   }
 }
 
@@ -17,10 +18,19 @@ export async function registerAuthContext(app: FastifyInstance) {
   await app.register(cookie);
 
   app.decorateRequest('therapistId', null);
+  app.decorateRequest('isAdmin', false);
 
   app.addHook('onRequest', async (request) => {
     const token = request.cookies[SESSION_COOKIE];
-    request.therapistId = await resolveSession(token);
+    const resolved = await resolveSession(token);
+    // ⭐ active=false یعنی همون لحظه، بدونِ نیاز به حذفِ خودِ نشست، دسترسی قطع می‌شه
+    if (!resolved || !resolved.active) {
+      request.therapistId = null;
+      request.isAdmin = false;
+      return;
+    }
+    request.therapistId = resolved.therapistId;
+    request.isAdmin = resolved.isAdmin;
   });
 }
 
@@ -28,5 +38,16 @@ export async function registerAuthContext(app: FastifyInstance) {
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   if (!request.therapistId) {
     reply.code(401).send({ error: 'ابتدا وارد شوید' });
+  }
+}
+
+// preHandler برای روت‌های ادمین — عمداً ۴۰۳ (نه ۴۰۴) تا ادمینِ واقعی بفهمه چرا رد شد
+export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
+  if (!request.therapistId) {
+    reply.code(401).send({ error: 'ابتدا وارد شوید' });
+    return;
+  }
+  if (!request.isAdmin) {
+    reply.code(403).send({ error: 'دسترسی ادمین لازم است' });
   }
 }

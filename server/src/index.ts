@@ -9,6 +9,7 @@ import { testConnection } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
 import { registerAuthContext } from './auth/guard.js';
 import { authRoutes } from './http/auth.js';
+import { adminRoutes } from './http/admin.js';
 import { clientRoutes } from './http/clients.js';
 import { sessionRoutes } from './http/sessions.js';
 import { sttRoutes } from './http/stt.js';
@@ -34,6 +35,7 @@ app.get('/api/health', async () => {
 await app.register(multipart);
 await registerAuthContext(app);
 await app.register(authRoutes);
+await app.register(adminRoutes);
 await app.register(clientRoutes);
 await app.register(sessionRoutes);
 await app.register(sttRoutes);

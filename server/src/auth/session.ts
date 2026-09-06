@@ -20,15 +20,28 @@ export async function createSession(therapistId: string): Promise<string> {
   return token;
 }
 
-export async function resolveSession(token: string | undefined): Promise<string | null> {
+export interface ResolvedSession {
+  therapistId: string;
+  isAdmin: boolean;
+  active: boolean;
+}
+
+// ⭐ یک کوئری (نه دو): وضعیتِ نشست + is_admin/active همین‌جا برمی‌گرده تا هر
+// درخواست بلافاصله بعدِ غیرفعال‌شدنِ حساب رد بشه (نه فقط دفعه‌ی بعدیِ لاگین).
+export async function resolveSession(token: string | undefined): Promise<ResolvedSession | null> {
   if (!token) return null;
 
   const result = await query(
-    'SELECT therapist_id FROM auth_sessions WHERE token_hash = $1 AND expires_at > now()',
+    `SELECT t.id as therapist_id, t.is_admin, t.active
+     FROM auth_sessions s
+     JOIN therapists t ON t.id = s.therapist_id
+     WHERE s.token_hash = $1 AND s.expires_at > now()`,
     [hashToken(token)]
   );
 
-  return result.rows[0]?.therapist_id ?? null;
+  const row = result.rows[0];
+  if (!row) return null;
+  return { therapistId: row.therapist_id, isAdmin: row.is_admin, active: row.active };
 }
 
 export async function destroySession(token: string | undefined): Promise<void> {

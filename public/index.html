@@ -248,6 +248,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   .rec-dot{width:108px;height:108px}
   .rec-dot svg{width:40px;height:40px}
   .clients-grid{grid-template-columns:1fr}
+  #adminStats{grid-template-columns:repeat(2,1fr)!important}
 }
 </style>
 </head>
@@ -270,6 +271,9 @@ button.btn svg{width:18px;height:18px;flex:none}
       </div>
     </div>
     <div style="display:flex;gap:8px">
+      <button class="icon-btn" id="adminBtn" onclick="openAdminPanel()" title="پنل ادمین" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>
+      </button>
       <button class="icon-btn" id="logoutBtn" onclick="logout()" title="خروج از حساب" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
       </button>
@@ -298,12 +302,41 @@ button.btn svg{width:18px;height:18px;flex:none}
       <label>نام (اختیاری)</label>
       <input type="text" id="authName" placeholder="نام شما" autocomplete="name">
     </div>
-    <label>ایمیل</label>
-    <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="username">
+    <label>شماره موبایل</label>
+    <input type="tel" id="authPhone" placeholder="۰۹۱۲۳۴۵۶۷۸۹" autocomplete="username" inputmode="numeric" dir="ltr" style="text-align:left">
+    <div id="authEmailField" hidden>
+      <label>ایمیل (اختیاری)</label>
+      <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" dir="ltr" style="text-align:left">
+    </div>
     <label>رمز عبور</label>
     <input type="password" id="authPassword" placeholder="حداقل ۸ کاراکتر" autocomplete="current-password">
     <button class="btn btn-primary btn-block" id="authSubmitBtn" onclick="submitAuth()">ورود</button>
     <button class="btn btn-ghost btn-block" style="margin-top:10px" id="authToggleBtn" onclick="toggleAuthMode()">حساب ندارید؟ ثبت‌نام کنید</button>
+  </section>
+
+  <section id="screenAdmin" class="card screen" hidden>
+    <div class="card-head">
+      <h2>پنل ادمین</h2>
+      <p>مدیریت تراپیست‌ها و دیتای سیستم</p>
+    </div>
+    <div id="adminStats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px"></div>
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="adminSearchInput" placeholder="جست‌وجوی نام یا شماره…" oninput="searchAdminTherapists()">
+    </div>
+    <div id="adminTherapistsList"></div>
+    <div class="empty" id="adminEmpty" hidden><p>تراپیستی یافت نشد</p></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminPanel()">بازگشت</button>
+  </section>
+
+  <section id="screenAdminTherapist" class="card screen" hidden>
+    <div class="card-head">
+      <h2 id="adminTherapistTitle"></h2>
+      <p id="adminTherapistMeta"></p>
+    </div>
+    <div id="adminTherapistClients"></div>
+    <div class="empty" id="adminTherapistEmpty" hidden><p>این تراپیست هنوز مراجعی ندارد</p></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminTherapistDetail()">بازگشت به پنل ادمین</button>
   </section>
 
   <section id="screenClients" class="card screen" hidden>
@@ -538,6 +571,19 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
+<div class="modal-back" id="deleteTherapistModal">
+  <div class="modal">
+    <h3>حذف کامل این تراپیست؟</h3>
+    <p id="deleteTherapistText"></p>
+    <label>برای تأیید، شماره موبایلش را تایپ کنید</label>
+    <input type="text" id="deleteTherapistConfirmInput" dir="ltr" style="text-align:left" oninput="checkDeleteTherapistConfirm()">
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeDeleteTherapist()">انصراف</button>
+      <button class="btn btn-danger" id="deleteTherapistConfirmBtn" disabled onclick="confirmDeleteTherapist()">بله، حذف کامل</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-back" id="deleteClientModal">
   <div class="modal">
     <h3>حذف مراجع؟</h3>
@@ -688,7 +734,7 @@ function updateSteps(idx){
   }
 }
 function showScreen(name){
-  ['Auth','Clients','Setup','Live','Wrapup','ClientDetail'].forEach(s=>{
+  ['Auth','Clients','Setup','Live','Wrapup','ClientDetail','Admin','AdminTherapist'].forEach(s=>{
     const el=$('screen'+s);
     if(el)el.hidden=s!==name;
   });
@@ -736,22 +782,24 @@ function resetConsent(){
 function toggleAuthMode(){
   authMode=authMode==='login'?'register':'login';
   $('authNameField').hidden=authMode!=='register';
+  $('authEmailField').hidden=authMode!=='register';
   $('authTitle').textContent=authMode==='register'?'ثبت‌نام تراپیست':'ورود تراپیست';
   $('authSubmitBtn').textContent=authMode==='register'?'ثبت‌نام':'ورود';
   $('authToggleBtn').textContent=authMode==='register'?'حساب دارید؟ وارد شوید':'حساب ندارید؟ ثبت‌نام کنید';
 }
 async function submitAuth(){
   clearBanner();
+  const phone=$('authPhone').value.trim();
   const email=$('authEmail').value.trim();
   const password=$('authPassword').value;
   const name=$('authName').value.trim();
-  if(!email||!password){showBanner('error','ایمیل و رمز عبور را وارد کنید.');return;}
+  if(!phone||!password){showBanner('error','شماره موبایل و رمز عبور را وارد کنید.');return;}
   try{
     const path=authMode==='register'?'/api/auth/register':'/api/auth/login';
-    const body=authMode==='register'?{email,password,name}:{email,password};
+    const body=authMode==='register'?{phone,password,name,email:email||undefined}:{phone,password};
     const data=await api(path,{method:'POST',body});
     currentTherapist=data.therapist;
-    $('authEmail').value='';$('authPassword').value='';
+    $('authPhone').value='';$('authEmail').value='';$('authPassword').value='';
     await enterApp();
   }catch(e){showBanner('error',e.message);}
 }
@@ -759,6 +807,7 @@ async function logout(){
   try{await api('/api/auth/logout',{method:'POST'});}catch(e){}
   currentTherapist=null;
   $('logoutBtn').hidden=true;
+  $('adminBtn').hidden=true;
   showScreen('Auth');
 }
 
@@ -775,6 +824,7 @@ async function init(){
 
 async function enterApp(){
   $('logoutBtn').hidden=false;
+  $('adminBtn').hidden=!(currentTherapist&&currentTherapist.is_admin);
   showScreen('Clients');
   $('skeletonList').hidden=false;
   $('clientsList').innerHTML='';
@@ -790,6 +840,209 @@ async function enterApp(){
   }
   // P3: اگر session فعالی در همین دستگاه بود، بنر «ادامه رونویسی زنده» اولویت دارد
   try{await checkActiveSessionBanner();}catch(e){}
+}
+
+// ===== پنل ادمین =====
+let adminTherapists=[];
+let adminDeleteTargetTherapist=null;
+let adminDeleteTargetClient=null;
+let currentAdminTherapistId=null;
+
+async function openAdminPanel(){
+  clearBanner();
+  showScreen('Admin');
+  await Promise.all([loadAdminStats(),loadAdminTherapists()]);
+}
+function closeAdminPanel(){
+  showScreen('Clients');
+  loadClients();
+}
+
+async function loadAdminStats(){
+  try{
+    const data=await api('/api/admin/stats');
+    renderAdminStats(data.stats);
+  }catch(e){showBanner('error',e.message);}
+}
+function renderAdminStats(s){
+  const items=[
+    ['تراپیست‌ها',s.therapists],
+    ['مراجعین',s.clients],
+    ['کل جلسات',s.sessions],
+    ['جلساتِ امروز',s.sessions_today],
+  ];
+  $('adminStats').innerHTML=items.map(function(it){
+    return '<div class="card" style="padding:14px;text-align:center">'+
+      '<div style="font-size:22px;font-weight:800;color:var(--sage-deep)">'+toFa(it[1])+'</div>'+
+      '<div style="font-size:11.5px;color:var(--muted);margin-top:4px">'+it[0]+'</div></div>';
+  }).join('');
+}
+
+async function loadAdminTherapists(q){
+  try{
+    const url='/api/admin/therapists'+(q?('?q='+encodeURIComponent(q)):'');
+    const data=await api(url);
+    adminTherapists=data.therapists||[];
+    renderAdminTherapists(adminTherapists);
+  }catch(e){showBanner('error',e.message);}
+}
+let adminSearchTimer=null;
+function searchAdminTherapists(){
+  clearTimeout(adminSearchTimer);
+  adminSearchTimer=setTimeout(function(){
+    loadAdminTherapists($('adminSearchInput').value.trim());
+  },250);
+}
+
+function renderAdminTherapists(list){
+  const box=$('adminTherapistsList');
+  box.innerHTML='';
+  $('adminEmpty').hidden=list.length>0;
+  list.forEach(function(t){
+    const div=document.createElement('div');
+    div.className='client-card';
+    div.style.cursor='default';
+
+    const top=document.createElement('div');
+    top.className='client-top';
+    const alias=document.createElement('span');
+    alias.className='client-alias';
+    alias.textContent=(t.name||'—')+(t.is_admin?' 👑':'');
+    const code=document.createElement('span');
+    code.className='client-code';
+    code.textContent=t.phone;
+    top.appendChild(alias);top.appendChild(code);
+    div.appendChild(top);
+
+    const meta=document.createElement('div');
+    meta.className='client-meta';
+    meta.textContent=toFa(t.client_count||0)+' مراجع · '+toFa(t.session_count||0)+' جلسه'+(t.email?' · '+t.email:'')+(!t.active?' · غیرفعال':'');
+    div.appendChild(meta);
+
+    const row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:10px;margin-top:6px';
+    const toggleLabel=document.createElement('label');
+    toggleLabel.className='toggle-row';
+    toggleLabel.style.cssText='margin:0;font-size:12px';
+    const toggleInput=document.createElement('input');
+    toggleInput.type='checkbox';
+    toggleInput.checked=!!t.active;
+    toggleInput.addEventListener('change',function(){adminSetActive(t.id,toggleInput.checked);});
+    toggleLabel.appendChild(toggleInput);
+    toggleLabel.appendChild(document.createTextNode('فعال'));
+    row.appendChild(toggleLabel);
+
+    const adminToggleLabel=document.createElement('label');
+    adminToggleLabel.className='toggle-row';
+    adminToggleLabel.style.cssText='margin:0;font-size:12px';
+    const adminToggleInput=document.createElement('input');
+    adminToggleInput.type='checkbox';
+    adminToggleInput.checked=!!t.is_admin;
+    adminToggleInput.addEventListener('change',function(){adminSetIsAdmin(t.id,adminToggleInput.checked);});
+    adminToggleLabel.appendChild(adminToggleInput);
+    adminToggleLabel.appendChild(document.createTextNode('ادمین'));
+    row.appendChild(adminToggleLabel);
+    div.appendChild(row);
+
+    const actions=document.createElement('div');
+    actions.className='client-actions';
+    const btnView=document.createElement('button');
+    btnView.className='btn btn-ghost btn-sm';
+    btnView.textContent='مشاهده مراجعین';
+    btnView.addEventListener('click',function(){openAdminTherapistDetail(t.id);});
+    const btnDel=document.createElement('button');
+    btnDel.className='btn btn-danger btn-sm';
+    btnDel.textContent='حذف';
+    btnDel.addEventListener('click',function(){showDeleteTherapist(t.id,t.phone);});
+    actions.appendChild(btnView);actions.appendChild(btnDel);
+    div.appendChild(actions);
+
+    box.appendChild(div);
+  });
+}
+
+async function adminSetActive(id,active){
+  try{
+    await api('/api/admin/therapists/'+id,{method:'PATCH',body:{active}});
+    loadAdminTherapists($('adminSearchInput').value.trim());
+  }catch(e){showBanner('error',e.message);loadAdminTherapists($('adminSearchInput').value.trim());}
+}
+async function adminSetIsAdmin(id,isAdmin){
+  try{
+    await api('/api/admin/therapists/'+id,{method:'PATCH',body:{is_admin:isAdmin}});
+    loadAdminTherapists($('adminSearchInput').value.trim());
+  }catch(e){showBanner('error',e.message);loadAdminTherapists($('adminSearchInput').value.trim());}
+}
+
+function showDeleteTherapist(id,phone){
+  adminDeleteTargetTherapist={id:id,phone:phone};
+  $('deleteTherapistText').innerHTML='همه‌ی مراجعین، جلسات و یادداشت‌های این تراپیست هم برای همیشه حذف می‌شوند.';
+  $('deleteTherapistConfirmInput').value='';
+  $('deleteTherapistConfirmBtn').disabled=true;
+  $('deleteTherapistModal').classList.add('open');
+}
+function closeDeleteTherapist(){$('deleteTherapistModal').classList.remove('open');adminDeleteTargetTherapist=null;}
+function checkDeleteTherapistConfirm(){
+  if(!adminDeleteTargetTherapist)return;
+  const typed=$('deleteTherapistConfirmInput').value.trim();
+  $('deleteTherapistConfirmBtn').disabled=(typed!==adminDeleteTargetTherapist.phone);
+}
+async function confirmDeleteTherapist(){
+  if(!adminDeleteTargetTherapist)return;
+  const id=adminDeleteTargetTherapist.id;
+  closeDeleteTherapist();
+  try{
+    await api('/api/admin/therapists/'+id,{method:'DELETE'});
+    showBanner('info','تراپیست حذف شد.');
+    loadAdminStats();loadAdminTherapists($('adminSearchInput').value.trim());
+  }catch(e){showBanner('error',e.message);}
+}
+
+async function openAdminTherapistDetail(id){
+  try{
+    const data=await api('/api/admin/therapists/'+id+'/clients');
+    currentAdminTherapistId=id;
+    $('adminTherapistTitle').textContent=(data.therapist.name||data.therapist.phone);
+    $('adminTherapistMeta').textContent=data.therapist.phone+' · '+toFa(data.clients.length)+' مراجع';
+    const box=$('adminTherapistClients');
+    box.innerHTML='';
+    $('adminTherapistEmpty').hidden=data.clients.length>0;
+    data.clients.forEach(function(c){
+      const div=document.createElement('div');
+      div.className='session-item';
+      div.style.cursor='default';
+      const head=document.createElement('div');
+      head.className='session-head';
+      head.style.paddingLeft='0';
+      const code=document.createElement('span');
+      code.className='session-num';
+      code.textContent=c.code+(c.alias?' — '+c.alias:'');
+      head.appendChild(code);
+      const delBtn=document.createElement('button');
+      delBtn.className='btn btn-ghost btn-sm';
+      delBtn.textContent='حذف مراجع';
+      delBtn.addEventListener('click',function(){adminDeleteClient(c.id);});
+      head.appendChild(delBtn);
+      div.appendChild(head);
+      const date=document.createElement('div');
+      date.className='session-date';
+      date.textContent=toFa(c.session_count||0)+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'');
+      div.appendChild(date);
+      box.appendChild(div);
+    });
+    showScreen('AdminTherapist');
+  }catch(e){showBanner('error',e.message);}
+}
+function closeAdminTherapistDetail(){
+  showScreen('Admin');
+}
+async function adminDeleteClient(clientId){
+  adminDeleteTargetClient=clientId;
+  try{
+    await api('/api/admin/clients/'+clientId,{method:'DELETE'});
+    showBanner('info','مراجع حذف شد.');
+    if(currentAdminTherapistId)openAdminTherapistDetail(currentAdminTherapistId);
+  }catch(e){showBanner('error',e.message);}
 }
 
 // ===== P3: ادامه رونویسی زنده بعد از reload =====

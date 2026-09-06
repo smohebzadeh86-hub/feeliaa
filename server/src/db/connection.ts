@@ -3,6 +3,11 @@ import { Pool } from 'pg';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://feelia:feelia2025@localhost:5432/feelia',
+  // ⭐ برنامه کاملاً فارسیه — بدون این، بعضی سرورهای Postgres (بسته به locale سیستمی که
+  // روشون initialize شدن) client_encoding رو چیزی غیر از UTF8 (مثل WIN1252) فرض می‌کنن
+  // و هر متنِ فارسی توی INSERT/UPDATE با خطای «character has no equivalent» رد می‌شه.
+  // این باید همون لحظه‌ی startup اعمال بشه (نه بعد از connect)، وگرنه با کوئریِ اول race می‌کنه.
+  options: '-c client_encoding=UTF8',
 });
 
 // ⭐ بدون این، خطای یک کانکشنِ idle (مثلاً قطعی موقت دیتابیس) کل پروسه‌ی Node رو
