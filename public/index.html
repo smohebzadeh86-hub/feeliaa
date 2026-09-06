@@ -320,6 +320,9 @@ button.btn svg{width:18px;height:18px;flex:none}
       <p>مدیریت تراپیست‌ها و دیتای سیستم</p>
     </div>
     <div id="adminStats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px"></div>
+    <button class="btn btn-secondary btn-block" style="margin-bottom:16px" onclick="adminDownloadAll()">
+      دانلود کاملِ دیتای سیستم
+    </button>
     <div class="search-box">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
       <input type="text" id="adminSearchInput" placeholder="جست‌وجوی نام یا شماره…" oninput="searchAdminTherapists()">
@@ -496,7 +499,6 @@ button.btn svg{width:18px;height:18px;flex:none}
     <div id="sessionDetail" hidden style="margin-top:16px">
       <div class="btn-row" style="margin-bottom:10px">
         <button class="btn btn-ghost btn-sm" onclick="openEditSessionMeta()">ویرایش تاریخ/ساعت</button>
-        <button class="btn btn-ghost btn-sm" onclick="downloadSessionReport()">دانلود گزارش</button>
       </div>
       <div class="transcript-box" id="transcriptBox"></div>
       <div class="transcript-notes" id="transcriptNotes" hidden></div>
@@ -950,11 +952,15 @@ function renderAdminTherapists(list){
     btnView.className='btn btn-ghost btn-sm';
     btnView.textContent='مشاهده مراجعین';
     btnView.addEventListener('click',function(){openAdminTherapistDetail(t.id);});
+    const btnDownload=document.createElement('button');
+    btnDownload.className='btn btn-ghost btn-sm';
+    btnDownload.textContent='دانلود دیتا';
+    btnDownload.addEventListener('click',function(){adminDownloadTherapist(t.id);});
     const btnDel=document.createElement('button');
     btnDel.className='btn btn-danger btn-sm';
     btnDel.textContent='حذف';
     btnDel.addEventListener('click',function(){showDeleteTherapist(t.id,t.phone);});
-    actions.appendChild(btnView);actions.appendChild(btnDel);
+    actions.appendChild(btnView);actions.appendChild(btnDownload);actions.appendChild(btnDel);
     div.appendChild(actions);
 
     box.appendChild(div);
@@ -1043,6 +1049,15 @@ async function adminDeleteClient(clientId){
     showBanner('info','مراجع حذف شد.');
     if(currentAdminTherapistId)openAdminTherapistDetail(currentAdminTherapistId);
   }catch(e){showBanner('error',e.message);}
+}
+
+// ⭐ تنها مسیرِ خروجِ دیتا از پلتفرم — فقط ادمین، فقط از همین دو تابع.
+// هدرِ Content-Disposition سمتِ سرور تنظیم شده، پس یک navigation ساده کافیه.
+function adminDownloadTherapist(id){
+  window.location.href='/api/admin/therapists/'+id+'/export';
+}
+function adminDownloadAll(){
+  window.location.href='/api/admin/export';
 }
 
 // ===== P3: ادامه رونویسی زنده بعد از reload =====
@@ -1373,52 +1388,8 @@ async function saveSessionMeta(){
   }catch(e){showBanner('error',e.message);}
 }
 
-// ===== دانلود گزارش جلسه =====
-function buildSessionReportText(session,notes){
-  const lines=[];
-  lines.push('گزارش جلسه — فیلیا');
-  lines.push('مراجع: '+session.code+(session.alias?' — '+session.alias:''));
-  lines.push('جلسه‌ی شماره '+session.session_num);
-  lines.push('تاریخ: '+session.date+'   ساعت شروع: '+session.start_time);
-  if(session.duration_ms)lines.push('مدت: '+Math.round(session.duration_ms/60000)+' دقیقه');
-  lines.push('وضعیت: '+(session.status==='completed'?'کامل':session.status==='in_progress'?'در جریان':'قطع‌شده'));
-  lines.push('');
-  lines.push('--- متن رونویسی ---');
-  lines.push(session.transcript||'(متنی ثبت نشده)');
-
-  const signs=notes.filter(function(n){return n.type==='sign';});
-  if(signs.length){
-    lines.push('');
-    lines.push('--- علائم بدنی ---');
-    signs.forEach(function(n){lines.push('- '+n.sign_type+(n.wall_clock?' ('+n.wall_clock+')':''));});
-  }
-  const during=notes.filter(function(n){return n.type==='note_during';});
-  if(during.length){
-    lines.push('');
-    lines.push('--- یادداشت‌های حین جلسه ---');
-    during.forEach(function(n){lines.push('- '+n.text+(n.wall_clock?' ('+n.wall_clock+')':''));});
-  }
-  const after=notes.filter(function(n){return n.type==='note_after'||n.type==='voice';});
-  if(after.length){
-    lines.push('');
-    lines.push('--- یادداشت‌های پایانی ---');
-    after.forEach(function(n){lines.push('- '+n.text+(n.wall_clock?' ('+n.wall_clock+')':''));});
-  }
-  return lines.join('\n');
-}
-function downloadSessionReport(){
-  if(!currentViewSession)return;
-  const text=buildSessionReportText(currentViewSession,currentViewNotes);
-  const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;
-  a.download='جلسه-'+(currentViewSession.session_num||'')+'-'+(currentViewSession.code||'')+'.txt';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(function(){URL.revokeObjectURL(url);},1000);
-}
+// ⭐ عمداً هیچ دانلود/اشتراک‌گذاریِ دیتا از سمتِ تراپیست وجود نداره — فقط ادمین
+// (توی پنلِ ادمین، با احرازِ سمتِ سرور) می‌تونه دیتا رو از پلتفرم خارج کنه.
 
 function showNewClientModal(){$('newClientAlias').value='';$('newClientModal').classList.add('open');}
 function closeNewClientModal(){$('newClientModal').classList.remove('open');}

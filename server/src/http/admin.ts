@@ -3,6 +3,53 @@ import { FastifyInstance } from 'fastify';
 import { query } from '../db/connection.js';
 import { requireAdmin } from '../auth/guard.js';
 
+// دیتای کاملِ یک تراپیست: مراجعین + جلسات (با متنِ رونویسی) + یادداشت‌ها/علائم.
+// فقط از دو مسیرِ export که پشتِ requireAdmin هستن صدا زده می‌شه.
+async function buildTherapistExport(therapistId: string) {
+  const t = await query('SELECT id, phone, email, name, created_at FROM therapists WHERE id = $1', [therapistId]);
+  if (t.rows.length === 0) return null;
+
+  const clients = await query(
+    'SELECT id, code, alias, created_at FROM clients WHERE therapist_id = $1 ORDER BY created_at',
+    [therapistId]
+  );
+
+  const sessions = await query(`
+    SELECT s.id, s.client_id, s.session_num, s.date, s.start_time, s.duration_ms,
+           s.status, s.transcript, s.created_at
+    FROM sessions s
+    JOIN clients c ON c.id = s.client_id
+    WHERE c.therapist_id = $1
+    ORDER BY s.client_id, s.session_num
+  `, [therapistId]);
+
+  const notes = await query(`
+    SELECT n.id, n.session_id, n.type, n.text, n.sign_type, n.offset_ms, n.wall_clock, n.created_at
+    FROM session_notes n
+    JOIN sessions s ON s.id = n.session_id
+    JOIN clients c ON c.id = s.client_id
+    WHERE c.therapist_id = $1
+    ORDER BY n.session_id, n.offset_ms NULLS LAST, n.created_at
+  `, [therapistId]);
+
+  const notesBySession = new Map<string, any[]>();
+  for (const n of notes.rows) {
+    if (!notesBySession.has(n.session_id)) notesBySession.set(n.session_id, []);
+    notesBySession.get(n.session_id)!.push(n);
+  }
+  const sessionsByClient = new Map<string, any[]>();
+  for (const s of sessions.rows) {
+    const withNotes = { ...s, notes: notesBySession.get(s.id) || [] };
+    if (!sessionsByClient.has(s.client_id)) sessionsByClient.set(s.client_id, []);
+    sessionsByClient.get(s.client_id)!.push(withNotes);
+  }
+
+  return {
+    therapist: t.rows[0],
+    clients: clients.rows.map(c => ({ ...c, sessions: sessionsByClient.get(c.id) || [] })),
+  };
+}
+
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdmin);
 
@@ -63,6 +110,35 @@ export async function adminRoutes(app: FastifyInstance) {
     `, [id]);
 
     return { therapist: therapist.rows[0], clients: clients.rows };
+  });
+
+  // ⭐ خروج دیتا از پلتفرم فقط از همین دو مسیر ممکنه — هر دو پشتِ requireAdmin.
+  // هیچ مسیرِ مشابهی سمتِ تراپیستِ معمولی وجود نداره (عمداً حذف شد).
+
+  // GET /api/admin/therapists/:id/export — دیتای کاملِ یک تراپیست (شاملِ متنِ رونویسی)
+  app.get('/api/admin/therapists/:id/export', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const data = await buildTherapistExport(id);
+    if (!data) {
+      reply.code(404);
+      return { error: 'تراپیست یافت نشد' };
+    }
+    reply.header('Content-Disposition', `attachment; filename="feelia-${data.therapist.phone}.json"`);
+    reply.type('application/json');
+    return data;
+  });
+
+  // GET /api/admin/export — دیتای کاملِ همه‌ی تراپیست‌ها (خروجیِ کل سیستم)
+  app.get('/api/admin/export', async (request, reply) => {
+    const ids = await query('SELECT id FROM therapists ORDER BY created_at');
+    const all = [];
+    for (const row of ids.rows) {
+      const data = await buildTherapistExport(row.id);
+      if (data) all.push(data);
+    }
+    reply.header('Content-Disposition', `attachment; filename="feelia-export-${new Date().toISOString().slice(0, 10)}.json"`);
+    reply.type('application/json');
+    return { exported_at: new Date().toISOString(), therapists: all };
   });
 
   // PATCH /api/admin/therapists/:id — { active?, is_admin? }
