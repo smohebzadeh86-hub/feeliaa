@@ -61,11 +61,19 @@ export class SonioxEngine {
   private finalizeTimer: ReturnType<typeof setTimeout> | null = null;
   private settled = false;
   private startPromise: Promise<void> | null = null;
+  // P1: resolverهای stop() — باگ قبلی: stop() هیچ‌وقت resolve نمی‌شد
+  private stopResolvers: Array<(t: string) => void> = [];
 
-  constructor(apiKey: string, callbacks: SonioxCallbacks) {
+  // ⭐ اولویت ۱ (Replace-not-Append): متن final ذخیره‌شده‌ی قبلیِ جلسه.
+  // موتور جدید finalTokens را از صفر شروع می‌کند، ولی هر چه بیرون می‌دهد
+  // (preview/finished) باید ادامه‌ی همین prefix باشد، نه جایگزین آن.
+  private prefix = '';
+
+  constructor(apiKey: string, callbacks: SonioxCallbacks, opts?: { initialTranscript?: string }) {
     this.apiKey = apiKey;
     this.callbacks = callbacks;
     this.proxyAgent = createProxyAgent();
+    this.prefix = (opts?.initialTranscript ?? '').trim();
   }
 
   private clearReconnectTimer() {
@@ -146,6 +154,7 @@ export class SonioxEngine {
         try { msg = JSON.parse(ev.data as string); } catch { return; }
 
         if (msg.error_code) {
+          console.log('[soniox] error from service, full payload:', JSON.stringify(msg));
           this.callbacks.onError(`خطای سرویس: ${msg.error_message || msg.error_code}`);
           return;
         }
@@ -161,9 +170,9 @@ export class SonioxEngine {
           }
         }
 
-        // ⭐ Preview: متن final (تا الان) + متن non-final (در حال گفتن)
+        // ⭐ Preview: متن final کامل (prefix + تا الان) + متن non-final (در حال گفتن)
         if (msg.tokens && msg.tokens.length > 0) {
-          const finalText = buildTextFromTokens(this.finalTokens);
+          const finalText = this.composedFinalText();
           const nonFinalText = buildTextFromTokens(nonFinal);
           this.callbacks.onPreview(finalText, nonFinalText);
         }
@@ -205,9 +214,27 @@ export class SonioxEngine {
   private settle() {
     if (this.settled) return;
     this.settled = true;
-    if (this.finalizeTimer) clearTimeout(this.finalizeTimer);
+    if (this.finalizeTimer) { clearTimeout(this.finalizeTimer); this.finalizeTimer = null; }
     this.clearReconnectTimer();
-    this.callbacks.onFinished(buildTextFromTokens(this.finalTokens));
+    const text = this.getFinalText();
+    try { this.callbacks.onFinished(text); } catch {}
+    // P1: باز کردن قفل همه‌ی await engine.stop() ها (از جمله voice-note background)
+    const resolvers = this.stopResolvers.splice(0);
+    for (const r of resolvers) { try { r(text); } catch {} }
+  }
+
+  // P1: قطع سخت بدون finalize — برای interruption / manual-pause / cancel.
+  // برخلاف stop()، هیچ onFinished صدا زده نمی‌شود؛ confirmed قبلی در DB امن است.
+  abort() {
+    if (this.settled) { try { this.ws?.close(); } catch {} return; }
+    this.settled = true; // جلوی settle/onFinished بعدی را می‌گیرد
+    this.stopRequested = true;
+    this.manuallyClosing = true;
+    if (this.finalizeTimer) { clearTimeout(this.finalizeTimer); this.finalizeTimer = null; }
+    this.clearReconnectTimer();
+    try { this.ws?.close(); } catch {}
+    const resolvers = this.stopResolvers.splice(0);
+    for (const r of resolvers) { try { r(this.getFinalText()); } catch {} }
   }
 
   async start(): Promise<void> {
@@ -218,6 +245,29 @@ export class SonioxEngine {
 
   sendAudioChunk(buf: ArrayBufferLike) {
     this.bufferOrSend(Buffer.from(buf));
+  }
+
+  // P1: ارسال فقط اگر سوکت Soniox باز است؛ بدون صف داخلی، بدون throw.
+  // true = به transport تحویل شد (مبنای ACK) — نه processed، نه durable.
+  // false = هنوز forward نشده؛ لایه‌ی ordering باید نگه دارد و ACK ندهد.
+  private chunkLogCount = 0;
+  trySendAudioChunk(buf: ArrayBufferLike): boolean {
+    try {
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const b = Buffer.from(buf);
+        if (this.chunkLogCount < 5) {
+          this.chunkLogCount++;
+          console.log(`[soniox] forwarding chunk #${this.chunkLogCount}, size=${b.length}, firstBytes=${b.subarray(0, 8).toString('hex')}`);
+        }
+        this.ws.send(b);
+        return true;
+      }
+    } catch {}
+    return false;
+  }
+
+  isSonioxOpen(): boolean {
+    try { return !!this.ws && this.ws.readyState === WebSocket.OPEN; } catch { return false; }
   }
 
   async stop(): Promise<string> {
@@ -238,7 +288,15 @@ export class SonioxEngine {
     });
   }
 
+  // ⭐ اولویت ۱: متن final کامل جلسه = prefix (قبل از قطعی) + finals جدید این موتور
+  private composedFinalText(): string {
+    const current = buildTextFromTokens(this.finalTokens);
+    if (!this.prefix) return current;
+    if (!current) return this.prefix;
+    return this.prefix + '\n\n' + current;
+  }
+
   getFinalText(): string {
-    return buildTextFromTokens(this.finalTokens);
+    return this.composedFinalText();
   }
 }
