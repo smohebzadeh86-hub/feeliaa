@@ -405,6 +405,10 @@ button.btn svg{width:18px;height:18px;flex:none}
           <button class="btn btn-secondary" onclick="addQuickNote()">ثبت</button>
         </div>
       </div>
+      <div class="btn-row" style="margin:10px 0">
+        <button class="btn btn-secondary" id="btnPauseLive" onclick="pauseSessionLive()">توقف موقت</button>
+        <button class="btn btn-secondary" id="btnResumeLive" onclick="resumeSessionLive()" hidden>ادامه</button>
+      </div>
       <button class="btn btn-danger btn-xl btn-block" id="btnEndSession" style="margin-top:18px" onclick="endSession()">پایان جلسه</button>
       <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="showCancelModal()">لغو جلسه</button>
     </div>
@@ -590,9 +594,34 @@ let sttWatchdogTimer=null;
 
 let audioBuffer=[];
 const MAX_AUDIO_BUFFER=200;
+// P1: chunk identity پایدار در طول session + صف unacked (فقط این‌ها replay می‌شوند)
+let p1ClientId=null;
+let p1NextSeq=1;
+let unacked=[];
+let serverAckedSeq=0;
+let manualPaused=false;
+let p1Terminal=false;
+const P1_UNACKED_MAX=200;
+function p1NewClientId(){
+  try{
+    if(window.crypto&&crypto.randomUUID)return crypto.randomUUID();
+  }catch(e){}
+  return 'c-'+Date.now().toString(36)+'-'+Math.floor(Math.random()*1e9).toString(36);
+}
 let wsReconnectAttempts=0;
 let wsReconnectTimer=null;
 const WS_RECONNECT_DELAYS=[1000,2000,4000,8000,16000,32000];
+// P1-F2: timeoutهای تأیید pause/resume — قابل تنظیم
+const PAUSE_ACK_TIMEOUT=3000;
+const RESUME_ACK_TIMEOUT=5000;
+let pauseAckTimer=null;
+let resumeAckTimer=null;
+let resumePending=false;
+function clearP1AckTimers(){
+  if(pauseAckTimer){clearTimeout(pauseAckTimer);pauseAckTimer=null;}
+  if(resumeAckTimer){clearTimeout(resumeAckTimer);resumeAckTimer=null;}
+  resumePending=false;
+}
 
 let voiceMediaRecorder=null;
 let voiceStream=null;
@@ -739,6 +768,77 @@ async function enterApp(){
   renderClients(allClients);
   if(recoveredRes.recovered&&recoveredRes.recovered.length>0){
     showInterruptedBanner(recoveredRes.recovered[0]);
+  }
+  // P3: اگر session فعالی در همین دستگاه بود، بنر «ادامه رونویسی زنده» اولویت دارد
+  try{await checkActiveSessionBanner();}catch(e){}
+}
+
+// ===== P3: ادامه رونویسی زنده بعد از reload =====
+async function checkActiveSessionBanner(){
+  let sid=null;
+  try{sid=localStorage.getItem('feelia_active_session');}catch(e){}
+  if(!sid)return;
+  let s=null;
+  try{
+    const r=await api('/api/sessions/'+sid);
+    s=r.session;
+  }catch(e){
+    try{localStorage.removeItem('feelia_active_session');}catch(ee){}
+    return;
+  }
+  if(!s||(s.status!=='in_progress'&&s.status!=='recovered')){
+    try{localStorage.removeItem('feelia_active_session');}catch(e){}
+    return;
+  }
+  const stateLabel=s.status==='recovered'?'ناتمام مانده':'در حال انجام است';
+  bannerBox.innerHTML='<div class="banner warn" style="display:block"><b>جلسه‌ی نیمه‌تمام — ادامه می‌دهید؟</b><br>این جلسه '+stateLabel+' و متن آن حفظ شده است.<br><div class="btn-row" style="margin-top:10px"><button class="btn btn-secondary" onclick="liveResumeSession(\''+s.id+'\')" style="flex:1">ادامه‌ی رونویسی زنده</button><button class="btn btn-ghost" onclick="clearBanner()" style="flex:1">بعداً</button></div></div>';
+}
+
+async function liveResumeSession(sessionId){
+  clearBanner();
+  try{
+    const sessionRes=await api('/api/sessions/'+sessionId);
+    const sess=sessionRes.session;
+    if(!sess||(sess.status!=='in_progress'&&sess.status!=='recovered')){
+      try{localStorage.removeItem('feelia_active_session');}catch(e){}
+      showBanner('error','جلسه قابل ادامه نیست.');
+      return;
+    }
+    // P3 (spec): برای recovered حتماً قبل از اتصال WS جدید به in_progress برگردد
+    if(sess.status==='recovered'){
+      await api('/api/sessions/'+sessionId,{method:'PUT',body:{status:'in_progress'}});
+      sess.status='in_progress';
+    }
+    const clientRes=await api('/api/clients/'+sess.client_id);
+    currentSession=sess;
+    currentClient=clientRes.client;
+    try{localStorage.setItem('feelia_active_session',sess.id);}catch(e){}
+    $('recChip').innerHTML=IC_MIC+'<span></span>';
+    $('recChip').querySelector('span').textContent=currentClient.code+(currentClient.alias?' · '+currentClient.alias:'')+' · جلسه '+toFa(currentSession.session_num)+' · '+toFa(currentSession.date);
+    showScreen('Live');
+    $('recStatus').textContent='در حال اتصال…';
+    resetTimer();
+    if(sess.duration_ms&&sess.duration_ms>0){elapsedMs=sess.duration_ms;renderTimer();}
+    $('liveText').hidden=true;
+    $('chkLiveText').checked=false;
+    sessionSigns=[];
+    sessionNotes=[];
+    $('signsLog').innerHTML='';
+    $('notesLog').innerHTML='';
+    audioBuffer=[];
+    wsReconnectAttempts=0;
+    // P1 reuse: نسل/seq تازه، prefix از DB می‌آید، موتور جدید روی همان transcript ادامه می‌دهد
+    p1ClientId=p1NewClientId();
+    p1NextSeq=1;unacked=[];serverAckedSeq=0;manualPaused=false;p1Terminal=false;
+    updatePauseUI();
+    startSttWatchdog();
+    await connectWS();
+  }catch(e){
+    // P3: فقط اگر session دیگر وجود ندارد (حذف شده)، کلید stale را پاک کن — نه برای خطای شبکه
+    if(e&&e.message&&e.message.indexOf('یافت نشد')>=0){
+      try{localStorage.removeItem('feelia_active_session');}catch(ee){}
+    }
+    showBanner('error','خطا: '+e.message);
   }
 }
 
@@ -1116,6 +1216,8 @@ async function startSession(){
   try{
     const data=await api('/api/sessions',{method:'POST',body:{client_id:currentClient.id,consent:true}});
     currentSession=data.session;
+    // P3: session فعال را برای resume بعد از reload نگه دار
+    try{localStorage.setItem('feelia_active_session',currentSession.id);}catch(e){}
     $('recChip').innerHTML=IC_MIC+'<span></span>';
     $('recChip').querySelector('span').textContent=data.client.code+(data.client.alias?' · '+data.client.alias:'')+' · جلسه '+toFa(currentSession.session_num)+' · '+toFa(currentSession.date);
     showScreen('Live');
@@ -1129,6 +1231,11 @@ async function startSession(){
     $('notesLog').innerHTML='';
     audioBuffer=[];
     wsReconnectAttempts=0;
+    // P1: شروع نسل seq تازه برای این session
+    p1ClientId=p1NewClientId();
+    try{sessionStorage.setItem('p1c-'+currentSession.id,p1ClientId);}catch(e){}
+    p1NextSeq=1;unacked=[];serverAckedSeq=0;manualPaused=false;p1Terminal=false;
+    updatePauseUI();
     startSttWatchdog();
     await connectWS();
   }catch(e){showBanner('error','خطا: '+e.message);}
@@ -1160,6 +1267,10 @@ async function connectWS(){
   ws.binaryType='arraybuffer';
   ws.onopen=async function(){
     if(wsReconnectAttempts>0)$('recStatus').textContent='اتصال برقرار — ادامه…';
+    // P1: handshake — سرور resumePoint و hint یک‌بارمصرف برمی‌گرداند
+    try{ws.send(JSON.stringify({type:'hello',clientId:p1ClientId}));}catch(e){}
+    // P1: اتصال تازه در حین pause یعنی resume ضمنی (میکروفون با startMic برمی‌گردد)
+    if(manualPaused){manualPaused=false;updatePauseUI();}
     await startMic();
   };
   ws.onmessage=function(ev){
@@ -1168,6 +1279,12 @@ async function connectWS(){
     }
   };
   ws.onclose=function(){
+    if(p1Terminal||manualPaused){
+      wsConnected=false;
+      $('recDot').classList.add('paused');
+      pauseTimer();
+      return;
+    }
     if(mediaRecorder&&mediaRecorder.state==='recording'){
       wsConnected=false;
       $('recDot').classList.add('paused');
@@ -1185,6 +1302,7 @@ async function connectWS(){
 }
 
 function attemptWSReconnect(){
+  if(p1Terminal||manualPaused)return;
   if(wsReconnectAttempts>=WS_RECONNECT_DELAYS.length){
     $('recStatus').textContent='اتصال قطع — متن تا اینجا سالم است';
     return;
@@ -1235,21 +1353,60 @@ async function startMic(){
   }catch(e){return;}
   mediaRecorder.ondataavailable=function(e){
     if(e.data&&e.data.size>0){
-      if(ws&&ws.readyState===WebSocket.OPEN){
-        ws.send(e.data);
-        lastAudioSentAt=Date.now();
-      }
-      else{
-        audioBuffer.push(e.data);
-        if(audioBuffer.length>MAX_AUDIO_BUFFER)audioBuffer.shift();
+      // P1: هر chunk یک seq پایدار؛ اول meta بعد blob (ترتیب WS). unacked فقط با ACK جلو می‌رود.
+      const seq=p1NextSeq++;
+      const item={seq:seq,data:e.data};
+      unacked.push(item);
+      if(unacked.length>P1_UNACKED_MAX)unacked.shift();
+      if(!manualPaused&&ws&&ws.readyState===WebSocket.OPEN){
+        try{ws.send(JSON.stringify({type:'chunk-meta',seq:seq}));}catch(err){}
+        try{ws.send(e.data);lastAudioSentAt=Date.now();}catch(err){}
       }
     }
   };
   mediaRecorder.start(250);
 }
 
+function p1ReplayUnacked(){
+  // P1: فقط unackedها (seq > serverAckedSeq) به ترتیب صعودی؛ ackشده‌ها هرگز replay نه.
+  if(!ws||ws.readyState!==WebSocket.OPEN)return;
+  unacked=unacked.filter(function(it){return it.seq>serverAckedSeq;});
+  unacked.slice().sort(function(a,b){return a.seq-b.seq;}).forEach(function(it){
+    try{ws.send(JSON.stringify({type:'chunk-meta',seq:it.seq}));}catch(e){}
+    try{ws.send(it.data);}catch(e){}
+  });
+}
 function handleMsg(msg){
   switch(msg.type){
+    case 'ack':
+      // P1: ACK = تحویل به transport سونیکس؛ unacked را جلو ببر
+      if(typeof msg.ackSeq==='number'&&msg.ackSeq>serverAckedSeq){
+        serverAckedSeq=msg.ackSeq;
+        unacked=unacked.filter(function(it){return it.seq>serverAckedSeq;});
+      }
+      break;
+    case 'resumed':
+      // P1-F2: تأیید resume رسید
+      resumePending=false;
+      if(resumeAckTimer){clearTimeout(resumeAckTimer);resumeAckTimer=null;}
+      // P1: resumePoint سرور معتبر است؛ شمارنده را جلو ببر، عقب نبر
+      if(typeof msg.resumePoint==='number'){
+        if(msg.resumePoint>=serverAckedSeq)serverAckedSeq=msg.resumePoint;
+        unacked=unacked.filter(function(it){return it.seq>serverAckedSeq;});
+        if(msg.resumePoint>=p1NextSeq)p1NextSeq=msg.resumePoint+1;
+      }
+      wsReconnectAttempts=0;
+      p1ReplayUnacked();
+      lastPreviewAt=Date.now();
+      break;
+    case 'paused':
+      // P1-F2: تأیید pause رسید؛ اگر دیر رسیده و ما به interruption برگشته‌ایم، converge کن
+      if(pauseAckTimer){clearTimeout(pauseAckTimer);pauseAckTimer=null;}
+      else if(!manualPaused&&currentSession&&!p1Terminal&&ws&&ws.readyState===WebSocket.OPEN){
+        try{ws.send(JSON.stringify({type:'resume'}));}catch(e){}
+      }
+      lastPreviewAt=Date.now();
+      break;
     case 'status':
       wsConnected=msg.status==='connected';
       $('recDot').classList.toggle('paused',!wsConnected);
@@ -1257,8 +1414,9 @@ function handleMsg(msg){
       $('recStatus').classList.toggle('warn',msg.status!=='connected');
       if(wsConnected){
         wsReconnectAttempts=0;
+        p1ReplayUnacked();
         if(audioBuffer.length>0&&ws&&ws.readyState===WebSocket.OPEN){
-          audioBuffer.forEach(function(c){ws.send(c);});
+          audioBuffer.forEach(function(c){try{ws.send(c);}catch(e){}});
           audioBuffer=[];
         }
         startTimer();
@@ -1399,9 +1557,76 @@ function renderNotesLog(){
   });
 }
 
+// ===== P1: Manual Pause — intentional، بدون grace timer و بدون reconnect خودکار =====
+function updatePauseUI(){
+  const bp=$('btnPauseLive'),br=$('btnResumeLive');
+  if(bp)bp.hidden=manualPaused;
+  if(br)br.hidden=!manualPaused;
+}
+function pauseSessionLive(){
+  if(!ws||!currentSession||manualPaused||p1Terminal)return;
+  manualPaused=true;
+  if(wsReconnectTimer){clearTimeout(wsReconnectTimer);wsReconnectTimer=null;}
+  try{ws.send(JSON.stringify({type:'pause'}));}catch(e){}
+  // P1-F1: unacked عمداً نگه داشته می‌شود تا resume آن را replay کند (dedup سرور تکراری را می‌گیرد)
+  // P1-F2: اگر سرور pause را تأیید نکرد، به interruption برمی‌گردیم — نه pause کاذب
+  clearP1AckTimers();
+  pauseAckTimer=setTimeout(function(){
+    pauseAckTimer=null;
+    if(!manualPaused||p1Terminal||!currentSession)return;
+    manualPaused=false;
+    updatePauseUI();
+    $('recStatus').textContent='توقف اعمال نشد — اتصال را بررسی کنید؛ در حال تلاش برای اتصال…';
+    $('recStatus').classList.add('warn');
+    startMic().then(function(){
+      if(!p1Terminal)attemptWSReconnect();
+    });
+  },PAUSE_ACK_TIMEOUT);
+  // میکروفون خاموش، capture جدیدی در pause نیست
+  if(mediaRecorder&&mediaRecorder.state!=='inactive'){try{mediaRecorder.stop();}catch(e){}}
+  if(audioStream){audioStream.getTracks().forEach(function(t){t.stop();});audioStream=null;}
+  if(levelRAF)cancelAnimationFrame(levelRAF);
+  pauseTimer();
+  $('recDot').classList.add('paused');
+  $('recStatus').textContent='متوقف شد — برای ادامه «ادامه» بزنید';
+  updatePauseUI();
+}
+async function resumeSessionLive(){
+  if(!currentSession||!manualPaused||p1Terminal)return;
+  manualPaused=false;
+  updatePauseUI();
+  $('recStatus').textContent='در حال اتصال…';
+  clearP1AckTimers();
+  resumePending=true;
+  if(!ws||ws.readyState!==WebSocket.OPEN){
+    wsReconnectAttempts=0;
+    await connectWS();
+  }else{
+    try{ws.send(JSON.stringify({type:'resume'}));}catch(e){}
+    await startMic();
+  }
+  // P1-F2: اگر 'resumed' نیامد، صادقانه به pause برمی‌گردیم (سرور هنوز MANUAL_PAUSED است)
+  resumeAckTimer=setTimeout(function(){
+    resumeAckTimer=null;
+    if(!resumePending||p1Terminal||!currentSession)return;
+    resumePending=false;
+    manualPaused=true;
+    updatePauseUI();
+    $('recStatus').textContent='ادامه اعمال نشد — دوباره «ادامه» بزنید';
+    $('recStatus').classList.add('warn');
+  },RESUME_ACK_TIMEOUT);
+}
+
 // ===== End =====
 function endSession(){
   if(!ws||!currentSession)return;
+  // P3: finalize → دیگر session فعالی نیست
+  try{localStorage.removeItem('feelia_active_session');}catch(e){}
+  p1Terminal=true;
+  if(wsReconnectTimer){clearTimeout(wsReconnectTimer);wsReconnectTimer=null;}
+  manualPaused=false;
+  updatePauseUI();
+  clearP1AckTimers();
   $('btnEndSession').disabled=true;
   $('recStatus').textContent='در حال نهایی‌سازی…';
   pauseTimer();
@@ -1410,8 +1635,11 @@ function endSession(){
 }
 
 function handleFinished(ft){
+  // P3: پایان واقعی جلسه → کلید resume پاک شود (idempotent)
+  try{localStorage.removeItem('feelia_active_session');}catch(e){}
+  p1Terminal=true;
   if(finalizeTimeout){clearTimeout(finalizeTimeout);finalizeTimeout=null;}
-  if(wsReconnectTimer)clearTimeout(wsReconnectTimer);
+  if(wsReconnectTimer){clearTimeout(wsReconnectTimer);wsReconnectTimer=null;}
   stopAllAudio();
   if(ws){try{ws.close();}catch(e){}ws=null;}
   clearInterval(timerInterval);
@@ -1475,11 +1703,13 @@ function renderWrapupNotesLog(){
 }
 
 function stopAllAudio(){
+  clearP1AckTimers();
   if(mediaRecorder&&mediaRecorder.state!=='inactive'){try{mediaRecorder.stop();}catch(e){}}
   if(audioStream){audioStream.getTracks().forEach(function(t){t.stop();});audioStream=null;}
   if(levelRAF)cancelAnimationFrame(levelRAF);
   if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
   audioBuffer=[];
+  unacked=[];
   stopSttWatchdog();
 }
 
@@ -1487,6 +1717,11 @@ function showCancelModal(){$('cancelModal').classList.add('open');}
 function closeCancelModal(){$('cancelModal').classList.remove('open');}
 async function confirmCancelSession(){
   closeCancelModal();
+  // P3: cancel → ترمینال، کلید resume پاک شود
+  try{localStorage.removeItem('feelia_active_session');}catch(e){}
+  p1Terminal=true;
+  manualPaused=false;
+  try{if(ws&&ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({type:'cancel'}));}catch(e){}
   stopAllAudio();
   if(ws){try{ws.close();}catch(e){}ws=null;}
   if(wsReconnectTimer)clearTimeout(wsReconnectTimer);
@@ -1655,6 +1890,8 @@ function renderVoiceTimer(){$('voiceTimer').textContent=formatTimer(voiceElapsed
 
 async function finishSession(){
   if(!currentSession)return;
+  // P3: completed → کلید resume پاک شود
+  try{localStorage.removeItem('feelia_active_session');}catch(e){}
   showBanner('info','در حال ذخیره…');
   try{
     await api('/api/sessions/'+currentSession.id,{method:'PUT',body:{status:'completed'}});
@@ -1670,6 +1907,8 @@ async function finishSession(){
 }
 
 function goBackToClients(){
+  p1Terminal=true;
+  manualPaused=false;
   stopAllAudio();
   cleanupVoice();
   if(ws){try{ws.close();}catch(e){}ws=null;}
@@ -1685,6 +1924,12 @@ function goBackToClients(){
 }
 
 window.addEventListener('beforeunload',function(e){
+  // P1: close-hint فقط fast-path است؛ correctness به آن وابسته نیست (failure detection + timeout)
+  try{
+    if(ws&&ws.readyState===WebSocket.OPEN&&currentSession&&!p1Terminal){
+      try{ws.send(JSON.stringify({type:'close-hint',intent:'close'}));}catch(err){}
+    }
+  }catch(err){}
   if(ws||voiceWS){e.preventDefault();e.returnValue='';}
 });
 
