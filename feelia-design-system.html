@@ -1,0 +1,576 @@
+<title>سیستم طراحی فیلیا</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f6f4ef;--bg-glow:rgba(62,107,94,.09);
+  --card:#ffffff;--field:#fbfcfa;
+  --ink:#2b3a34;--ink-2:#4f5f58;--muted:#84918a;
+  --line:#e2e7e2;--line-soft:#edf0eb;
+  --sage:#3e6b5e;--sage-hover:#2e5749;--sage-deep:#2e5749;
+  --sage-soft:#e6efe9;--sage-mist:#f1f5f2;
+  --clay:#c96655;--clay-hover:#ad4f3f;--clay-deep:#ad4f3f;--clay-soft:#faebe7;--clay-line:#f1d6cf;
+  --gold:#b08c50;--gold-deep:#7c6531;--gold-soft:#f8f1e2;
+  --toggle-off:#d9dfda;
+  --code-bg:#eef1ec;--code-ink:#3c4a44;
+  --r-xl:24px;--r-lg:16px;--r-md:11px;--r-sm:8px;
+  --shadow:0 1px 2px rgba(43,58,52,.04),0 12px 32px rgba(43,58,52,.07);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#131815;--bg-glow:rgba(78,137,119,.08);
+    --card:#1c2320;--field:#171d1a;
+    --ink:#e7ece8;--ink-2:#c6cfc9;--muted:#8b978f;
+    --line:#2c352f;--line-soft:#242c28;
+    --sage:#4e8977;--sage-hover:#5a9783;--sage-deep:#a6cbb9;
+    --sage-soft:#264032;--sage-mist:#1f2b26;
+    --clay:#c96f5e;--clay-hover:#d58370;--clay-deep:#e8a294;--clay-soft:#38211b;--clay-line:#4a2c24;
+    --gold:#c9a56a;--gold-deep:#d9bc80;--gold-soft:#2f2817;
+    --toggle-off:#39443d;
+    --code-bg:#1a2119;--code-ink:#b9c4bd;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#131815;--bg-glow:rgba(78,137,119,.08);
+  --card:#1c2320;--field:#171d1a;
+  --ink:#e7ece8;--ink-2:#c6cfc9;--muted:#8b978f;
+  --line:#2c352f;--line-soft:#242c28;
+  --sage:#4e8977;--sage-hover:#5a9783;--sage-deep:#a6cbb9;
+  --sage-soft:#264032;--sage-mist:#1f2b26;
+  --clay:#c96f5e;--clay-hover:#d58370;--clay-deep:#e8a294;--clay-soft:#38211b;--clay-line:#4a2c24;
+  --gold:#c9a56a;--gold-deep:#d9bc80;--gold-soft:#2f2817;
+  --toggle-off:#39443d;
+  --code-bg:#1a2119;--code-ink:#b9c4bd;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Vazirmatn',Tahoma,sans-serif;
+  background:radial-gradient(1000px 460px at 50% -220px,var(--bg-glow),transparent 70%),var(--bg);
+  color:var(--ink);direction:rtl;text-align:right;line-height:1.9;
+  font-variant-numeric:tabular-nums;
+}
+.wrap{max-width:920px;margin:0 auto;padding:28px 20px 90px}
+
+/* ===== Header ===== */
+.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:8px;padding:4px 2px}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-mark{flex:none;width:38px;height:38px}
+.brand h1{margin:0;font-size:18px;font-weight:800}
+.brand .eyebrow{font-size:11px;font-weight:600;color:var(--sage-deep);margin-bottom:1px}
+.theme-toggle{display:flex;align-items:center;gap:8px;background:var(--card);border:1.5px solid var(--line);border-radius:99px;padding:5px;box-shadow:var(--shadow)}
+.theme-toggle button{border:none;background:none;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--muted);padding:7px 14px;border-radius:99px;cursor:pointer;transition:background .15s,color .15s}
+.theme-toggle button.active{background:var(--sage);color:#fff}
+
+.lede{font-size:14px;color:var(--ink-2);max-width:640px;margin:18px 2px 6px;line-height:2}
+.lede b{color:var(--ink);font-weight:700}
+
+/* ===== Nav ===== */
+.tocbar{position:sticky;top:0;z-index:20;background:var(--bg);padding:14px 0 12px;margin-bottom:8px;border-bottom:1px solid var(--line-soft)}
+.tocbar-inner{max-width:920px;margin:0 auto;padding:0 20px;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.tocbar-inner::-webkit-scrollbar{display:none}
+.tocbar a{flex:none;font-size:12.5px;font-weight:600;color:var(--ink-2);text-decoration:none;padding:8px 13px;border-radius:99px;background:var(--card);border:1px solid var(--line-soft);white-space:nowrap;transition:border-color .15s,color .15s}
+.tocbar a:hover{border-color:var(--sage);color:var(--sage-deep)}
+
+/* ===== Sections ===== */
+section{margin:56px 0}
+.sec-head{margin-bottom:22px}
+.sec-num{font-size:11.5px;font-weight:700;color:var(--sage-deep);letter-spacing:.03em;margin-bottom:6px}
+.sec-head h2{margin:0;font-size:22px;font-weight:800}
+.sec-head p{margin:8px 0 0;font-size:13.5px;color:var(--muted);max-width:600px;line-height:1.9}
+
+.card{background:var(--card);border:1px solid var(--line-soft);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:22px}
+.grid{display:grid;gap:14px}
+.grid-4{grid-template-columns:repeat(4,1fr)}
+.grid-3{grid-template-columns:repeat(3,1fr)}
+.grid-2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:760px){.grid-4{grid-template-columns:repeat(2,1fr)}.grid-3{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.grid-4,.grid-3,.grid-2{grid-template-columns:1fr}}
+
+code, .mono{font-family:'SFMono-Regular',Consolas,'Vazirmatn',monospace;direction:ltr;display:inline-block}
+.chip-code{background:var(--code-bg);color:var(--code-ink);font-size:12px;padding:3px 8px;border-radius:6px;direction:ltr;unicode-bidi:isolate}
+
+/* ---- Color swatches ---- */
+.swatch{border:1px solid var(--line-soft);border-radius:var(--r-md);overflow:hidden;background:var(--card)}
+.swatch-fill{height:64px}
+.swatch-meta{padding:10px 12px}
+.swatch-name{font-size:12.5px;font-weight:700;margin-bottom:3px}
+.swatch-hex{font-size:11px;color:var(--muted)}
+.swatch-use{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6}
+
+/* ---- Type scale ---- */
+.type-row{display:flex;align-items:baseline;gap:18px;padding:14px 0;border-bottom:1px solid var(--line-soft)}
+.type-row:last-child{border-bottom:none}
+.type-tag{flex:none;width:150px;font-size:11.5px;color:var(--muted)}
+.type-tag b{display:block;color:var(--ink-2);font-size:12.5px;font-weight:700;margin-bottom:2px}
+.type-sample{flex:1;color:var(--ink)}
+
+/* ---- Spacing ruler ---- */
+.sp-row{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.sp-bar{height:14px;background:var(--sage);border-radius:4px}
+.sp-label{width:70px;flex:none;font-size:12px;color:var(--ink-2)}
+.sp-px{width:50px;flex:none;font-size:11.5px;color:var(--muted);direction:ltr;text-align:left}
+
+/* ---- radius swatches ---- */
+.r-box{width:64px;height:64px;background:var(--sage-mist);border:1.5px solid var(--sage-soft)}
+
+/* ---- icon size demo ---- */
+.icon-demo{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.icon-demo .stage{width:100%;background:var(--field);border:1px solid var(--line-soft);border-radius:var(--r-md);display:grid;place-items:center;height:88px}
+.icon-demo svg{color:var(--sage-deep)}
+.icon-demo .lbl{font-size:11.5px;color:var(--muted)}
+.icon-demo .lbl b{color:var(--ink-2);display:block;font-size:12px;margin-bottom:1px}
+
+/* ---- buttons (mirrors real component classes) ---- */
+button.btn{border:none;border-radius:15px;padding:13px 20px;font-family:inherit;font-size:14.5px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:background .2s,transform .08s}
+button.btn:active{transform:scale(.975)}
+button.btn:disabled{cursor:not-allowed;opacity:.55}
+.btn-primary{background:var(--sage);color:#fff}
+.btn-primary:hover:not(:disabled){background:var(--sage-hover)}
+.btn-danger{background:var(--clay);color:#fff}
+.btn-danger:hover:not(:disabled){background:var(--clay-hover)}
+.btn-secondary{background:var(--sage-mist);color:var(--sage-deep);border:1.5px solid var(--sage-soft)}
+.btn-ghost{background:transparent;color:var(--ink-2);border:1.5px solid var(--line)}
+.btn-ghost:hover{border-color:var(--sage);color:var(--sage-deep)}
+.btn-sm{padding:8px 14px;font-size:12.5px;border-radius:10px}
+.btn-row{display:flex;gap:10px;flex-wrap:wrap}
+
+/* ---- chips ---- */
+.sign-chip{padding:7px 13px;border-radius:99px;border:1.5px solid var(--sage-soft);background:var(--sage-mist);color:var(--sage-deep);font-family:inherit;font-size:12px;font-weight:600}
+.sign-chip.logged{background:var(--sage);color:#fff;border-color:var(--sage)}
+.status-pill{font-size:11px;padding:3px 11px;border-radius:99px;font-weight:600;display:inline-block}
+.status-pill.in_progress{background:var(--gold-soft);color:var(--gold-deep)}
+.status-pill.completed{background:var(--sage-soft);color:var(--sage-deep)}
+.status-pill.recovered{background:var(--clay-soft);color:var(--clay-deep)}
+
+/* ---- banners ---- */
+.banner{border-radius:var(--r-lg);padding:13px 16px;font-size:13px;line-height:1.85;border:1.5px solid transparent}
+.banner.info{background:var(--sage-mist);color:var(--sage-deep);border-color:var(--sage-soft)}
+.banner.warn{background:var(--gold-soft);color:var(--gold-deep);border-color:#ecdfc2}
+.banner.error{background:var(--clay-soft);color:var(--clay-deep);border-color:var(--clay-line)}
+
+/* ---- rule / pitfall cards ---- */
+.rule{display:flex;gap:14px;padding:16px;border:1px solid var(--line-soft);border-radius:var(--r-md);background:var(--card);margin-bottom:10px}
+.rule .mark{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:800}
+.rule.good .mark{background:var(--sage-soft);color:var(--sage-deep)}
+.rule.bad .mark{background:var(--clay-soft);color:var(--clay-deep)}
+.rule .body b{display:block;font-size:13.5px;font-weight:700;margin-bottom:3px}
+.rule .body span{font-size:12.5px;color:var(--muted);line-height:1.8}
+.rule .body .evidence{margin-top:6px;font-size:11.5px;color:var(--sage-deep);background:var(--sage-mist);display:inline-block;padding:3px 9px;border-radius:6px}
+
+.checklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px}
+.checklist li{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;color:var(--ink-2);line-height:1.8}
+.checklist li::before{content:'';flex:none;width:18px;height:18px;margin-top:2px;border-radius:5px;border:1.5px solid var(--sage);background:var(--sage-mist)}
+
+footer{margin-top:70px;padding-top:20px;border-top:1px solid var(--line-soft);font-size:12px;color:var(--muted);text-align:center;line-height:2}
+</style>
+
+<div class="wrap">
+
+  <div class="top">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 36 36" fill="none">
+        <rect width="36" height="36" rx="11" fill="#3e6b5e"/>
+        <rect x="10.6" y="14.5" width="3.3" height="7" rx="1.65" fill="#fff" opacity=".55"/>
+        <rect x="16.35" y="10" width="3.3" height="16" rx="1.65" fill="#fff"/>
+        <rect x="22.1" y="13" width="3.3" height="10" rx="1.65" fill="#fff" opacity=".55"/>
+      </svg>
+      <div>
+        <div class="eyebrow">فیلیا</div>
+        <h1>سیستم طراحی</h1>
+      </div>
+    </div>
+    <div class="theme-toggle" role="group" aria-label="پیش‌نمایش تم">
+      <button data-mode="light">روشن</button>
+      <button data-mode="dark">تاریک</button>
+      <button data-mode="" class="active">سیستم</button>
+    </div>
+  </div>
+
+  <p class="lede">این سند، نقشه‌ی راهِ طراحیِ فیلیاست — نه یک تئوریِ عمومی، بلکه <b>مستندسازیِ همان زبان بصری‌ای که همین حالا در <span class="chip-code">public/index.html</span> پیاده شده</b>. هر توکن، هر قانون، و هر موردِ «این کار را نکن» در این صفحه، از یک باگ یا تصمیم واقعی در همین پروژه بیرون آمده. وقتی جزئی جدید به رابط کاربری اضافه می‌کنی، اول اینجا رو نگاه کن.</p>
+
+  <nav class="tocbar">
+    <div class="tocbar-inner">
+      <a href="#principles">اصول</a>
+      <a href="#color">رنگ</a>
+      <a href="#type">تایپوگرافی</a>
+      <a href="#space">فاصله‌گذاری</a>
+      <a href="#icons">آیکون‌ها</a>
+      <a href="#components">کامپوننت‌ها</a>
+      <a href="#darkmode">قرارداد تم تاریک</a>
+      <a href="#pitfalls">لغزش‌گاه‌های واقعی</a>
+      <a href="#checklist">چک‌لیست پیش از commit</a>
+    </div>
+  </nav>
+
+  <!-- ============ PRINCIPLES ============ -->
+  <section id="principles">
+    <div class="sec-head">
+      <div class="sec-num">۰۱ — اصول</div>
+      <h2>سه اصل، برای هر تصمیمِ طراحی</h2>
+      <p>وقتی بین دو گزینه مردد بودی، این‌ها داور نهایی‌اند.</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="card">
+        <b style="font-size:14px">۱. آرامشِ بالینی</b>
+        <p style="font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.9">رنگِ تأکیدی (سبز) کمیاب و عمدیه. توی پرونده و آرشیو (۹۵٪ عمرِ محصول) تقریباً هیچ رنگِ تأکیدی دیده نمی‌شه؛ فقط جای CTA اصلی.</p>
+      </div>
+      <div class="card">
+        <b style="font-size:14px">۲. حین جلسه = حداقلِ محرک</b>
+        <p style="font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.9">صفحه‌ی جلسه‌ی زنده تنها جایی‌ست که یک انیمیشنِ همیشگی (تنفسِ دایره) مجازه. هیچ حرکتِ بی‌دلیلِ دیگه‌ای اونجا راه نداره.</p>
+      </div>
+      <div class="card">
+        <b style="font-size:14px">۳. صداقتِ بصری</b>
+        <p style="font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.9">هر پیام خطا باید علت + راه‌حل بگه، نه فقط «خطا». هیچ حذف/عملِ برگشت‌ناپذیری بدون گفتنِ دقیقِ چی از دست می‌ره، انجام نشه.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COLOR ============ -->
+  <section id="color">
+    <div class="sec-head">
+      <div class="sec-num">۰۲ — رنگ</div>
+      <h2>توکن‌های رنگی</h2>
+      <p>هر رنگ یک نقشِ معنایی داره، نه فقط یک ظاهر. <b>سبز = اصلی</b>، <b>طلایی = هشدار/نشانه‌ی موقت</b>، <b>قرمزخاکی = خطر/حذف</b>. رنگِ خام (hex) هیچ‌وقت مستقیم توی CSS نوشته نمی‌شه — همیشه از طریقِ متغیر.</p>
+    </div>
+
+    <div class="grid grid-4" style="margin-bottom:14px">
+      <div class="swatch">
+        <div class="swatch-fill" style="background:var(--sage)"></div>
+        <div class="swatch-meta">
+          <div class="swatch-name">--sage</div>
+          <div class="swatch-hex mono">#3e6b5e</div>
+          <div class="swatch-use">رنگِ تأکیدی اصلی: دکمه‌ی primary، تب فعال، دایره‌ی ضبط</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-fill" style="background:var(--sage-mist)"></div>
+        <div class="swatch-meta">
+          <div class="swatch-name">--sage-mist</div>
+          <div class="swatch-hex mono">#f1f5f2</div>
+          <div class="swatch-use">پس‌زمینه‌ی چیپ/بنر اطلاعاتی</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-fill" style="background:var(--clay)"></div>
+        <div class="swatch-meta">
+          <div class="swatch-name">--clay</div>
+          <div class="swatch-hex mono">#c96655</div>
+          <div class="swatch-use">دکمه‌ی خطر، دایره‌ی «در حال ضبط»</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-fill" style="background:var(--clay-soft)"></div>
+        <div class="swatch-meta">
+          <div class="swatch-name">--clay-soft</div>
+          <div class="swatch-hex mono">#faebe7</div>
+          <div class="swatch-use">پس‌زمینه‌ی بنرِ خطا و تگ صوتی</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-fill" style="background:var(--gold)"></div>
+        <div class="swatch-meta">
+          <div class="swatch-name">--gold</div>
+          <div class="swatch-hex mono">#b08c50</div>
+          <div class="swatch-use">هشدار، وضعیتِ «در جریان»</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-fill" style="background:var(--ink)"></div>
+        <div class="swatch-meta">
+          <div class="swatch-name">--ink</div>
+          <div class="swatch-hex mono">#2b3a34</div>
+          <div class="swatch-use">متنِ اصلی</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-fill" style="background:var(--muted)"></div>
+        <div class="swatch-meta">
+          <div class="swatch-name">--muted</div>
+          <div class="swatch-hex mono">#84918a</div>
+          <div class="swatch-use">متنِ ثانویه — <b>هرگز با opacity اضافه ترکیب نشه</b> (پایین رو ببین)</div>
+        </div>
+      </div>
+      <div class="swatch">
+        <div class="swatch-fill" style="background:var(--bg);border-bottom:1px solid var(--line)"></div>
+        <div class="swatch-meta">
+          <div class="swatch-name">--bg / --card</div>
+          <div class="swatch-hex mono">#f6f4ef / #fff</div>
+          <div class="swatch-use">پس‌زمینه‌ی صفحه و کارت</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rule bad">
+      <div class="mark">✕</div>
+      <div class="body">
+        <b>یک باگِ واقعی: opacity روی رنگِ خاموش‌شده</b>
+        <span>آیکونِ حذفِ کارتِ مراجع با <span class="chip-code">color:var(--muted)</span> + <span class="chip-code">opacity:.55</span> نوشته شده بود — یعنی خاکستریِ کم‌رنگ رو دوباره کم‌رنگ‌تر کردن. کنتراست واقعی حدود ۱.۷:۱ بود (زیر حداقلِ خوانایی).</span>
+        <div class="evidence">قانون: اگه رنگ خودش برای حالتِ ثانویه انتخاب شده (مثل muted)، دیگه opacity اضافه نزن.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ TYPE ============ -->
+  <section id="type">
+    <div class="sec-head">
+      <div class="sec-num">۰۳ — تایپوگرافی</div>
+      <h2>مقیاسِ فونت</h2>
+      <p>فونت: <b>Vazirmatn</b> (وزن‌های ۴۰۰ و ۶۰۰ و ۷۰۰ و ۸۰۰). امروز ۱۶ اندازه‌ی متفاوت توی کد استفاده شده — پراکنده‌تر از چیزی که باید باشه. مقصدِ بعدی، رسیدن به ستونِ سمتِ راستِ همین جدوله.</p>
+    </div>
+    <div class="card">
+      <div class="type-row">
+        <div class="type-tag"><b>display</b>۴۷px / ۴۰۰<br>تایمرِ جلسه‌ی زنده — تنها مصرف</div>
+        <div class="type-sample" style="font-size:47px;font-weight:400">۰۰:۰۰</div>
+      </div>
+      <div class="type-row">
+        <div class="type-tag"><b>title</b>۱۹px / ۸۰۰<br>عنوانِ صفحه و مودال</div>
+        <div class="type-sample" style="font-size:19px;font-weight:800">جلسه‌ی جدید</div>
+      </div>
+      <div class="type-row">
+        <div class="type-tag"><b>heading</b>۱۶–۱۷px / ۷۰۰<br>عنوانِ بخش</div>
+        <div class="type-sample" style="font-size:16px;font-weight:700">علائم بدنی</div>
+      </div>
+      <div class="type-row">
+        <div class="type-tag"><b>body</b>۱۴–۱۵px / ۴۰۰<br>متنِ اصلی</div>
+        <div class="type-sample" style="font-size:14.5px">صدای این جلسه به‌صورت زنده به متن تبدیل می‌شود.</div>
+      </div>
+      <div class="type-row">
+        <div class="type-tag"><b>caption</b>۱۲–۱۳px / ۵۰۰<br>راهنما، متادیتا</div>
+        <div class="type-sample" style="font-size:12.5px;color:var(--muted)">۱ جلسه · آخرین: ۱۴۰۳/۰۶/۱۵</div>
+      </div>
+      <div class="type-row">
+        <div class="type-tag"><b>micro</b>۱۰–۱۱px / ۶۰۰<br>برچسب، زمانِ کوچک</div>
+        <div class="type-sample" style="font-size:11px;font-weight:600;color:var(--muted)">۰۰:۱۲</div>
+      </div>
+    </div>
+    <div class="rule good" style="margin-top:14px">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>قانون: عددها همیشه tabular-nums</b>
+        <span>تایمر، تاریخ، ساعت — همه باید هم‌عرض بمونن تا هنگام تیک‌خوردن نلرزن. این صفحه هم همین قانون رو روی <span class="chip-code">body</span> فعال کرده.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ SPACING ============ -->
+  <section id="space">
+    <div class="sec-head">
+      <div class="sec-num">۰۴ — فاصله‌گذاری و شعاع</div>
+      <h2>مقیاسِ ۴ پیکسلی</h2>
+      <p>فاصله‌ها ضریبی از ۴ هستن. شعاعِ گوشه فقط چهار مقدار داره — بیشتر از این، تصمیمِ طراحی رو مبهم می‌کنه.</p>
+    </div>
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="sp-row"><div class="sp-label">sp-2</div><div class="sp-bar" style="width:8px"></div><div class="sp-px">8px</div></div>
+        <div class="sp-row"><div class="sp-label">sp-3</div><div class="sp-bar" style="width:12px"></div><div class="sp-px">12px</div></div>
+        <div class="sp-row"><div class="sp-label">sp-4</div><div class="sp-bar" style="width:16px"></div><div class="sp-px">16px</div></div>
+        <div class="sp-row"><div class="sp-label">sp-5</div><div class="sp-bar" style="width:20px"></div><div class="sp-px">20px</div></div>
+        <div class="sp-row"><div class="sp-label">sp-6</div><div class="sp-bar" style="width:28px"></div><div class="sp-px">28px</div></div>
+        <div class="sp-row" style="margin-bottom:0"><div class="sp-label">sp-7</div><div class="sp-bar" style="width:36px"></div><div class="sp-px">36px</div></div>
+      </div>
+      <div class="card" style="display:flex;align-items:center;justify-content:space-around">
+        <div style="text-align:center">
+          <div class="r-box" style="border-radius:8px;margin:0 auto 8px"></div>
+          <span style="font-size:11.5px;color:var(--muted)">r-sm · چیپ کوچک</span>
+        </div>
+        <div style="text-align:center">
+          <div class="r-box" style="border-radius:11px;margin:0 auto 8px"></div>
+          <span style="font-size:11.5px;color:var(--muted)">r-md · دکمه/ورودی</span>
+        </div>
+        <div style="text-align:center">
+          <div class="r-box" style="border-radius:16px;margin:0 auto 8px"></div>
+          <span style="font-size:11.5px;color:var(--muted)">r-lg · کارت</span>
+        </div>
+        <div style="text-align:center">
+          <div class="r-box" style="border-radius:24px;margin:0 auto 8px"></div>
+          <span style="font-size:11.5px;color:var(--muted)">r-xl · صفحه/مودال</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ICONS ============ -->
+  <section id="icons">
+    <div class="sec-head">
+      <div class="sec-num">۰۵ — آیکون‌ها</div>
+      <h2>هر SVG باید اندازه‌ی صریح داشته باشه</h2>
+      <p>یک SVG بدون <span class="chip-code">width/height</span> و بدون قانونِ CSS، به‌صورتِ پیش‌فرضِ مرورگر رندر می‌شه — که معمولاً خیلی بزرگ‌تر از چیزیه که فکر می‌کنی. این دقیقاً همون چیزی بود که دایره‌ی ضبط و چیپِ ساعتِ شروع رو خراب کرده بود.</p>
+    </div>
+    <div class="grid grid-4">
+      <div class="icon-demo">
+        <div class="stage"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></div>
+        <div class="lbl"><b>۲۰px</b>دکمه‌ی هدر (۴۴px)</div>
+      </div>
+      <div class="icon-demo">
+        <div class="stage"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg></div>
+        <div class="lbl"><b>۱۵px</b>حذفِ کارت (۳۲px)</div>
+      </div>
+      <div class="icon-demo">
+        <div class="stage"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></div>
+        <div class="lbl"><b>۱۳px</b>آیکونِ چیپِ خلاصه</div>
+      </div>
+      <div class="icon-demo">
+        <div class="stage"><svg width="46" height="46" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></div>
+        <div class="lbl"><b>۴۶px</b>دایره‌ی ضبط (۱۲۴px)</div>
+      </div>
+    </div>
+    <div class="rule bad" style="margin-top:14px">
+      <div class="mark">✕</div>
+      <div class="body">
+        <b>باگِ واقعی: آیکونِ لبه‌به‌لبه</b>
+        <span>داخلِ دایره‌ی ضبط، هیچ‌جا اندازه‌ی SVG تعریف نشده بود. نتیجه: آیکون داخلِ دایره ۱۰۸ در ۱۰۸ پیکسل رندر شد — یعنی کلِ دایره رو پُر کرد.</span>
+        <div class="evidence">قانون: به هیچ SVG اجازه نده بدونِ <span class="chip-code" style="direction:ltr">width/height</span> صریح (روی خودِ svg یا از طریقِ CSS) وارد صفحه بشه.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ COMPONENTS ============ -->
+  <section id="components">
+    <div class="sec-head">
+      <div class="sec-num">۰۶ — کامپوننت‌ها</div>
+      <h2>واژگانِ بصری</h2>
+      <p>هر جزءِ جدید باید ترکیبی از همین‌ها باشه، نه یک استایلِ تازه.</p>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <b style="font-size:13px;display:block;margin-bottom:12px;color:var(--ink-2)">دکمه‌ها</b>
+      <div class="btn-row">
+        <button class="btn btn-primary">ذخیره و پایان</button>
+        <button class="btn btn-secondary">یادداشت صوتی</button>
+        <button class="btn btn-ghost">بازگشت</button>
+        <button class="btn btn-danger">بله، حذف شود</button>
+        <button class="btn btn-ghost btn-sm">ویرایش تاریخ/ساعت</button>
+        <button class="btn btn-primary" disabled>غیرفعال</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <b style="font-size:13px;display:block;margin-bottom:12px;color:var(--ink-2)">چیپ‌ها و وضعیت‌ها</b>
+      <div class="btn-row" style="align-items:center">
+        <span class="sign-chip">گریان</span>
+        <span class="sign-chip logged">لرزش (ثبت‌شده)</span>
+        <span class="status-pill in_progress">در جریان</span>
+        <span class="status-pill completed">کامل</span>
+        <span class="status-pill recovered">قطع‌شده</span>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;gap:10px">
+      <b style="font-size:13px;color:var(--ink-2)">بنرها — سه سطحِ معنایی</b>
+      <div class="banner info">جلسه ادامه یافت — متن سالم است، یادداشت اضافه کنید و ذخیره کنید.</div>
+      <div class="banner warn">جلسه‌ی ۲ ناتمام مانده — ادامه و تکمیل؟</div>
+      <div class="banner error">اتصال رونویسی برقرار نشد: بررسی پروکسی یا کلید API</div>
+    </div>
+  </section>
+
+  <!-- ============ DARK MODE CONTRACT ============ -->
+  <section id="darkmode">
+    <div class="sec-head">
+      <div class="sec-num">۰۷ — قراردادِ تمِ تاریک</div>
+      <h2>هیچ رنگِ خامی، هیچ‌وقت</h2>
+      <p>هر رنگی که مستقیم نوشته بشه (نه از طریقِ متغیر)، در یکی از دو تم قطعاً بد دیده می‌شه. این قانون تخیلی نیست — دقیقاً همین اتفاق برای بنرِ خطا افتاده بود.</p>
+    </div>
+    <div class="rule bad">
+      <div class="mark">✕</div>
+      <div class="body">
+        <b>باگِ واقعی: <span class="chip-code">.banner.error{color:#8a4335}</span></b>
+        <span>این رنگ فقط برای زمینه‌ی روشن انتخاب شده بود. توی تمِ تاریک، پس‌زمینه‌ی <span class="chip-code">--clay-soft</span> خودش تیره می‌شه ولی این رنگِ متن ثابت می‌مونه — نتیجه: متنِ قهوه‌ای روی زمینه‌ی قهوه‌ایِ تیره، تقریباً ناخوانا. جالبه که همون‌جا، دقیقاً یک خط پایین‌تر (تگِ یادداشتِ صوتی)، همین رنگِ معنایی با <span class="chip-code">var(--clay-deep)</span> درست نوشته شده بود.</span>
+        <div class="evidence">تعمیر: color:var(--clay-deep) + یک متغیرِ جدید --clay-line برای border، هر دو با نسخه‌ی روشن/تاریک</div>
+      </div>
+    </div>
+    <div class="rule good">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>روشِ ممیزی، قبل از هر انتشار</b>
+        <span>دنبالِ <span class="chip-code">color:#</span> یا <span class="chip-code">background:#</span> بیرون از بلوکِ تعریفِ متغیرها بگرد. اگه پیدا شد، یا باید متغیر بشه یا توضیح داشته باشه چرا عمداً ثابته (مثلاً سفیدِ داخلِ لوگو).</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ PITFALLS ============ -->
+  <section id="pitfalls">
+    <div class="sec-head">
+      <div class="sec-num">۰۸ — لغزش‌گاه‌های واقعی</div>
+      <h2>باگ‌هایی که پیدا و رفع شدن</h2>
+      <p>این‌ها فرضی نیستن — دقیقاً در پروژه‌ی فیلیا اتفاق افتادن.</p>
+    </div>
+
+    <div class="rule bad">
+      <div class="mark">✕</div>
+      <div class="body">
+        <b>کلاسِ تایپ‌شده = بی‌استایل، نه خطا</b>
+        <span>چیپِ ساعتِ شروعِ جلسه <span class="chip-code">class="sum-ch"</span> داشت به‌جای <span class="chip-code">sum-chip"</span>. چون کلاسی به این اسم توی CSS تعریف نشده، هیچ خطایی هم پرتاب نمی‌شه — فقط عنصر بی‌قواره و بزرگ رندر می‌شه. این نوع باگ ساکته و فقط با چشم یا اسکریپتِ مقایسه‌ی کلاس‌ها پیدا می‌شه.</span>
+      </div>
+    </div>
+
+    <div class="rule bad">
+      <div class="mark">✕</div>
+      <div class="body">
+        <b>موقعیتِ absolute بدونِ رزروِ فضا</b>
+        <span>دکمه‌ی حذفِ کارتِ مراجع (absolute, top:12px, left:12px) دقیقاً روی متنِ کدِ مراجع می‌افتاد، چون هیچ padding-left ای برای متنِ کنارش رزرو نشده بود — با اینکه نسخه‌ی مشابهش (لیستِ جلسات) این رزرو رو داشت.</span>
+        <div class="evidence">قانون: هر عنصرِ absolute-positioned روی گوشه‌ی کارت، باید با padding روی کانتینرِ محتوا جبران بشه.</div>
+      </div>
+    </div>
+
+    <div class="rule bad">
+      <div class="mark">✕</div>
+      <div class="body">
+        <b>Promise ای که نه resolve می‌شه نه reject</b>
+        <span>موتورِ اتصال به Soniox، وقتی اولین تلاشِ اتصال شکست می‌خورد، وارد چرخه‌ی reconnect می‌شد بدون اینکه Promiseِ اولیه رو settle کنه — یعنی «در حال اتصال...» تا ابد می‌موند، بدون هیچ خطایی. این کلاس از باگ (async state که هیچ‌وقت finalize نمی‌شه) مخصوصِ CSS نیست، ولی دقیقاً همون «چیزی نشون داده نمی‌شه» رو توی UI تولید می‌کنه.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ CHECKLIST ============ -->
+  <section id="checklist">
+    <div class="sec-head">
+      <div class="sec-num">۰۹ — چک‌لیست پیش از هر تغییرِ ظاهری</div>
+      <h2>قبل از commit، این‌ها رو نگاه کن</h2>
+    </div>
+    <div class="card">
+      <ul class="checklist">
+        <li>هر <span class="chip-code">class="..."</span> که نوشتی، دقیقاً همون اسم توی <span class="chip-code">&lt;style&gt;</span> تعریف شده؟</li>
+        <li>هر SVGِ جدید، اندازه‌ی صریح (width/height) داره — یا از طریقِ خودِ تگ یا از طریقِ یک قانونِ CSS؟</li>
+        <li>هیچ <span class="chip-code">color:#hex</span> یا <span class="chip-code">background:#hex</span> بیرون از بلوکِ تعریفِ متغیرها ننوشتی؟</li>
+        <li>اگه رنگی از قبل «کم‌رنگ» انتخاب شده (مثل muted)، دوباره opacity روش نذاشتی؟</li>
+        <li>عنصرِ absolute-positioned، فضای رزروشده‌ی خودش رو از محتوای کناری گرفته؟</li>
+        <li>در هر دو تمِ روشن و تاریک، این تغییر رو واقعاً دیدی — نه فقط فرض کردی؟</li>
+        <li>پیامِ خطا، هم علت رو می‌گه هم راهِ بعدی رو؟</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    منبعِ حقیقت، همیشه <span class="chip-code">public/index.html</span> است — این سند فقط آینه‌ی اونه.<br>
+    نسخه ۱٫۰ — بر اساسِ ممیزیِ طراحیِ انجام‌شده در همین گفت‌وگو
+  </footer>
+
+</div>
+
+<script>
+(function(){
+  var buttons = document.querySelectorAll('.theme-toggle button');
+  buttons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var mode = btn.getAttribute('data-mode');
+      if(mode){ document.documentElement.setAttribute('data-theme', mode); }
+      else { document.documentElement.removeAttribute('data-theme'); }
+      buttons.forEach(function(b){ b.classList.toggle('active', b===btn); });
+      try{ localStorage.setItem('feelia-ds-theme', mode); }catch(e){}
+    });
+  });
+  try{
+    var saved = localStorage.getItem('feelia-ds-theme');
+    if(saved){
+      var match = document.querySelector('.theme-toggle button[data-mode="'+saved+'"]');
+      if(match) match.click();
+    }
+  }catch(e){}
+})();
+</script>
