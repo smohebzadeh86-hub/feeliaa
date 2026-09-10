@@ -392,7 +392,7 @@ button.btn svg{width:18px;height:18px;flex:none}
     <div id="preflightBox" style="margin-bottom:14px">
       <div class="banner info" id="preflightMicRow">در حال بررسی میکروفون…</div>
       <div class="banner info" id="preflightSttRow">در حال بررسی اتصال رونویسی…</div>
-      <button class="btn btn-ghost btn-sm" onclick="runPreflight()">بررسی دوباره‌ی میکروفون و اتصال</button>
+      <button class="btn btn-ghost btn-block" onclick="runPreflight()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>بررسی دوباره‌ی میکروفون و اتصال</button>
     </div>
     <button class="btn btn-primary btn-xl btn-block" id="btnStartSession" disabled onclick="startSession()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
@@ -691,13 +691,386 @@ function formatTimer(ms){const s=Math.floor(ms/1000);return toFa(pad2(Math.floor
 function showBanner(k,m){bannerBox.innerHTML='<div class="banner '+k+'">'+m+'</div>';}
 function clearBanner(){bannerBox.innerHTML='';}
 // پیامِ خطای میکروفون بر اساسِ نوعِ خطای واقعیِ مرورگر — نه یک جمله‌ی عمومی برای همه‌چیز.
+// قدم ۳ (پروژه فیلیا): افتراقی برای هر name جدا + WebView + ناامن بودن صفحه.
+// هیچ رفتار ضبطی عوض نشده؛ فقط متن راهنما دقیق‌تر شده تا کاربر بداند چه کار کند.
 function describeMicError(e){
   const name=(e&&e.name)||'';
-  if(name==='NotAllowedError')return 'دسترسی به میکروفون رد شد. از تنظیماتِ مرورگر برای همین صفحه، Microphone را روی Allow بگذارید و دوباره امتحان کنید.';
-  if(name==='NotFoundError')return 'میکروفونی پیدا نشد. اتصالِ میکروفون به دستگاه را بررسی کنید.';
-  if(name==='NotReadableError')return 'برنامه‌ی دیگری در حالِ استفاده از میکروفون است. آن را ببندید و دوباره امتحان کنید.';
+  try{
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)
+      return 'مرورگر شما ضبط صدا را پشتیبانی نمی‌کند. با Chrome به‌روز (اندروید/دسکتاپ) یا Safari (آیفون) امتحان کنید.';
+  }catch(_){}
+  if(name==='NotAllowedError'||name==='PermissionDeniedError')
+    return 'دسترسی به میکروفون رد شد. از تنظیماتِ مرورگر برای همین صفحه، Microphone را روی Allow بگذارید و دوباره امتحان کنید.';
+  if(name==='NotFoundError'||name==='DevicesNotFoundError')
+    return 'میکروفونی پیدا نشد. اتصالِ میکروفون به دستگاه را بررسی کنید.';
+  if(name==='NotReadableError'||name==='TrackStartError')
+    return 'برنامه‌ی دیگری در حالِ استفاده از میکروفون است. آن را ببندید و دوباره امتحان کنید.';
+  if(name==='OverconstrainedError'||name==='ConstraintNotSatisfiedError')
+    return 'تنظیمات میکروفون با دستگاه شما سازگار نیست. هندزفری را جدا کنید یا با دستگاه دیگری امتحان کنید.';
+  if(name==='AbortError')
+    return 'درخواست میکروفون ناتمام ماند. یک‌بار صفحه را رفرش کنید و دوباره امتحان کنید.';
+  if(name==='SecurityError')
+    return 'مرورگر به‌خاطر امنیت اجازه نداد. صفحه باید با HTTPS یا localhost باز شود؛ داخل WebView هم ممکن است بسته باشد.';
+  if(name==='NotSupportedError')
+    return 'این مرورگر ضبط صدا را پشتیبانی نمی‌کند. با Chrome یا Safari امتحان کنید.';
+  if(name==='TypeError')
+    return 'آدرس صفحه معتبر نیست. با HTTPS یا localhost باز کنید و دوباره امتحان کنید.';
+  try{
+    if(typeof detectWebView==='function'&&detectWebView().isWebView)
+      return 'داخل مرورگر داخلی (تلگرام/اینستاگرام) ضبط پایدار نیست. همین صفحه را در Chrome یا Safari باز کنید.';
+  }catch(_){}
   if(!window.isSecureContext)return 'این صفحه باید از یک آدرسِ امن (HTTPS) یا localhost باز بشه تا اجازه‌ی میکروفون بگیره.';
   return 'دسترسی به میکروفون داده نشد.';
+}
+// ===== MicModule (قدم ۱: جداسازی بدون تغییر رفتار) =====
+// هدف: متمرکز کردنِ getUserMedia / بستنِ trackها / انتخابِ mime / ساختِ MediaRecorder.
+// طبق داک Soniox (soniox.html → audio-formats + مثال Node خام): مرورگر باید WebM/Opus
+// بفرستد و سرور با audio_format:auto آن را تشخیص دهد. این ماژول فقط همان رفتارِ قبلی را
+// کپسوله می‌کند؛ هیچ constraint یا mime جدیدی اضافه نشده تا رفتار عوض نشود.
+const MicModule={
+  LIVE_CONSTRAINTS:{audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}},
+  PREFLIGHT_CONSTRAINTS:{audio:true},
+  MIME_CANDIDATES:['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg']
+};
+function Mic_pickMimeType(){
+  return MicModule.MIME_CANDIDATES.find(function(m){return window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m);})||'';
+}
+function Mic_requestStream(constraints){
+  return navigator.mediaDevices.getUserMedia(constraints);
+}
+function Mic_stopStream(stream){
+  if(!stream)return;
+  try{stream.getTracks().forEach(function(t){t.stop();});}catch(e){}
+}
+function Mic_createRecorder(stream,mime){
+  if(mime)return new MediaRecorder(stream,{mimeType:mime});
+  return new MediaRecorder(stream);
+}
+// ===== قدم ۲: تشخیص WebView (فقط تشخیص + راهنما، بدون تغییر ضبط) =====
+// چرا؟ اتصال مستقیم Soniox (قدم ۶، طبق soniox.html) به WebSocket خام + getUserMedia پایدار
+// نیاز دارد. WebViewهای داخلی تلگرام/اینستاگرام/گوگل معمولاً میکروفون را محدود می‌کنند.
+// این تابع فقط تشخیص می‌دهد و راهنما نشان می‌دهد؛ هیچ Constraint یا mime را عوض نمی‌کند.
+function detectWebView(){
+  try{
+    const ua=navigator.userAgent||'';
+    const low=ua.toLowerCase();
+    if(/fban\/|fbios|fbav\//i.test(ua))return {isWebView:true,reason:'facebook'};
+    if(/instagram/i.test(ua))return {isWebView:true,reason:'instagram'};
+    if(/telegram/i.test(ua))return {isWebView:true,reason:'telegram'};
+    if(/micromessenger|line\/|twitter|tiktok/i.test(ua))return {isWebView:true,reason:'inapp'};
+    if(/\bw v\b/.test(low)||/\bw v;/.test(low)||/; wv\)/.test(low)||/ version\/.*chrome\/.*mobile/i.test(ua)&&/ wv/.test(low))return {isWebView:true,reason:'android-webview'};
+    if(/iphone|ipad|ipod/i.test(ua)&&/applewebkit/i.test(ua)&&!/safari/i.test(ua))return {isWebView:true,reason:'ios-webview'};
+    return {isWebView:false,reason:''};
+  }catch(e){return {isWebView:false,reason:''};}
+}
+function maybeShowWebViewHint(){
+  try{
+    const box=$('preflightBox');
+    if(!box)return false;
+    const w=detectWebView();
+    let row=$('preflightWebViewRow');
+    if(!w.isWebView){if(row)row.remove();return false;}
+    if(!row){
+      row=document.createElement('div');
+      row.id='preflightWebViewRow';
+      box.insertBefore(row,box.firstChild);
+    }
+    row.className='banner warn';
+    row.textContent='به‌نظر می‌رسد داخل مرورگر داخلی (تلگرام/اینستاگرام) هستی. برای ضبط پایدار، همین صفحه را در Chrome (اندروید) یا Safari (آیفون) باز کن.';
+    return true;
+  }catch(e){return false;}
+}
+// ===== قدم ۴: بررسی HTTPS / Secure Context (فقط تشخیص + راهنما) =====
+// چرا؟ getUserMedia فقط در Secure Context کار می‌کند (HTTPS یا localhost).
+// روی http://feelia.ir میکروفون همیشه رد می‌شود. این تابع زودتر و شفاف‌تر هشدار می‌دهد؛
+// منطق ضبط و دکمه شروع عوض نشده (دکمه از قبل با preflightMicOk=false غیرفعال می‌شد).
+function checkSecureAudioEnv(){
+  try{
+    const proto=(location.protocol||'').toLowerCase();
+    const host=(location.hostname||'').toLowerCase();
+    const isLocal=host===''||host==='localhost'||host==='127.0.0.1'||host==='[::1]';
+    const ok=!!window.isSecureContext||proto==='https:'||isLocal;
+    return {ok:ok,proto:proto,host:host,isLocal:isLocal,secure:!!window.isSecureContext};
+  }catch(e){return {ok:true,proto:'',host:'',isLocal:false,secure:true};}
+}
+function maybeShowHttpsHint(){
+  try{
+    const box=$('preflightBox');
+    if(!box)return true;
+    const s=checkSecureAudioEnv();
+    let row=$('preflightHttpsRow');
+    if(s.ok){if(row)row.remove();return true;}
+    if(!row){
+      row=document.createElement('div');
+      row.id='preflightHttpsRow';
+      box.insertBefore(row,box.firstChild);
+    }
+    row.className='banner error';
+    row.textContent='این صفحه با اتصال ناامن (HTTP) باز شده و مرورگر اجازه میکروفون نمی‌دهد. با https:// همین آدرس باز کن (روی localhost مشکلی نیست).';
+    return false;
+  }catch(e){return true;}
+}
+// ===== قدم ۶: اتصال مستقیم مرورگر به Soniox (پشت flag، مسیر قدیمی دست نخورده) =====
+// طبق soniox.html (مثال Node خام soniox_realtime.js): پیام اول JSON کانفیگ شامل api_key،
+// بعد باینری صوت (WebM/Opus با audio_format:auto)، پایان با رشته خالی.
+// این ماژول فقط mint می‌گیرد + WS خام باز می‌کند؛ connectWS/startMic قدیمی عین قبل کار می‌کند.
+// تست دستی فقط via کنسول: SonioxDirect.quickTest(currentSession.id)
+const SonioxDirect={
+  finalText:'',unreliable:false,ws:null,
+  async mint(sessionId){
+    const res=await fetch('/api/stt/realtime-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId})});
+    const data=await res.json();
+    if(!res.ok)throw new Error(data.error||'mint failed');
+    return data;
+  },
+  connect(cred,callbacks){
+    callbacks=callbacks||{};
+    const self=this;
+    self.finalText='';self.unreliable=false;self.curSpeaker=null;
+    return new Promise(function(resolve,reject){
+      let settled=false;
+      let ws;
+      try{ws=new WebSocket(cred.websocket_url);}catch(e){reject(e);return;}
+      self.ws=ws;
+      ws.binaryType='arraybuffer';
+      const timer=setTimeout(function(){if(!settled){settled=true;try{ws.close();}catch(e){}reject(new Error('direct-timeout'));}},8000);
+      ws.onopen=function(){
+        try{
+          ws.send(JSON.stringify({
+            api_key:cred.api_key,
+            model:(cred.stt_defaults&&cred.stt_defaults.model)||cred.model||'stt-rt-v5',
+            audio_format:'auto',
+            language_hints:['fa'],
+            enable_language_identification:true,
+            enable_speaker_diarization:true,
+            enable_endpoint_detection:true
+          }));
+        }catch(e){clearTimeout(timer);settled=true;reject(e);return;}
+        clearTimeout(timer);settled=true;
+        try{if(callbacks.onStatus)callbacks.onStatus('connected');}catch(e){}
+        resolve(ws);
+      };
+      ws.onmessage=function(ev){
+        try{
+          const msg=JSON.parse(ev.data);
+          if(msg.error_code){
+            self.unreliable=true;
+            try{if(callbacks.onError)callbacks.onError(msg.error_message||msg.error_code);}catch(e){}
+            return;
+          }
+          const toks=msg.tokens||[];
+          let nonFinal='';
+          toks.forEach(function(t){
+            if(!t.text)return;
+            if(t.is_final){
+              // تفکیک گوینده مثل موتور سرور (buildTextFromTokens): با عوض شدن speaker لیبل بزن
+              if(t.speaker!=null&&t.speaker!==self.curSpeaker){
+                self.curSpeaker=t.speaker;
+                const faSp=String(t.speaker).replace(/[0-9]/g,function(d){return '۰۱۲۳۴۵۶۷۸۹'[+d];});
+                self.finalText+=(self.finalText?'\n\n':'')+'گوینده '+faSp+': ';
+              }
+              self.finalText+=t.text;
+            }
+            else nonFinal+=t.text;
+          });
+          try{if(callbacks.onResult)callbacks.onResult({final:self.finalText,interim:nonFinal});}catch(e){}
+          if(msg.finished){try{if(callbacks.onFinished)callbacks.onFinished(self.finalText);}catch(e){}}
+        }catch(e){}
+      };
+      ws.onerror=function(){self.unreliable=true;try{if(callbacks.onError)callbacks.onError('direct-error');}catch(e){}};
+      ws.onclose=function(){try{if(callbacks.onClose)callbacks.onClose(self.finalText,self.unreliable);}catch(e){}};
+    });
+  },
+  sendAudio(blob){
+    try{
+      if(this.ws&&this.ws.readyState===WebSocket.OPEN){this.ws.send(blob);return true;}
+    }catch(e){}
+    return false;
+  },
+  finalize(){
+    try{
+      if(this.ws&&this.ws.readyState===WebSocket.OPEN){
+        try{this.ws.send(JSON.stringify({type:'finalize'}));}catch(e){}
+        try{this.ws.send('');}catch(e){}
+      }
+    }catch(e){}
+  },
+  close(){try{if(this.ws) this.ws.close();}catch(e){}this.ws=null;},
+  async quickTest(sessionId){
+    console.log('[direct] mint…');
+    const cred=await this.mint(sessionId);
+    console.log('[direct] connecting to',cred.websocket_url);
+    await this.connect(cred,{onStatus:function(s){console.log('[direct] status:',s);},onError:function(e){console.log('[direct] error:',e);}});
+    console.log('[direct] CONNECTED — config accepted. closing…');
+    this.close();
+    return 'DIRECT_OK';
+  },
+  // قدم ۷: تست صدای واقعی (مسیر قدیمی دست نخورده).
+  // یک استریم تازه می‌گیرد (MicModule)، به WS مستقیم می‌فرستد، توکن‌ها را لاگ می‌کند.
+  // اگر reconnect/error رخ دهد unreliable=true می‌ماند و caller باید به مسیر قدیمی (/ws/t) برگردد.
+  async liveTest(sessionId,seconds){
+    seconds=seconds||10;
+    const self=this;
+    console.log('[direct-live] mint…');
+    const cred=await self.mint(sessionId);
+    let stream;
+    try{stream=await Mic_requestStream(MicModule.LIVE_CONSTRAINTS);}
+    catch(e){console.log('[direct-live] mic error:',describeMicError(e));throw e;}
+    console.log('[direct-live] mic ok, connecting…');
+    let lastResult={final:'',interim:''};
+    await self.connect(cred,{
+      onStatus:function(s){console.log('[direct-live] status:',s);},
+      onError:function(e){console.log('[direct-live] error:',e);},
+      onResult:function(r){lastResult=r;console.log('[direct-live] final:['+r.final+'] interim:['+r.interim+']');},
+      onFinished:function(t){console.log('[direct-live] finished:',t);}
+    });
+    const mime=Mic_pickMimeType();
+    console.log('[direct-live] mime:',mime||'(default)');
+    const rec=Mic_createRecorder(stream,mime);
+    let sent=0;
+    rec.ondataavailable=function(e){
+      if(e.data&&e.data.size>0){if(self.sendAudio(e.data)){sent++;}}
+    };
+    rec.start(250);
+    console.log('[direct-live] recording '+seconds+'s — حرف بزن…');
+    await new Promise(function(res){setTimeout(res,seconds*1000);});
+    try{rec.stop();}catch(e){}
+    Mic_stopStream(stream);
+    self.finalize();
+    console.log('[direct-live] sent chunks:',sent,'— ۱ ثانیه صبر برای توکن‌های آخر…');
+    await new Promise(function(res){setTimeout(res,1000);});
+    const out={final:lastResult.final,interim:lastResult.interim,sent:sent,unreliable:self.unreliable};
+    console.log('[direct-live] DONE:',out);
+    self.close();
+    if(out.unreliable)console.log('[direct-live] unreliable=true → باید به مسیر قدیمی (/ws/t) برگردی');
+    return out;
+  }
+};
+try{window.SonioxDirect=SonioxDirect;}catch(e){}
+// ===== قدم ۸: جلسه واقعی با اتصال مستقیم + ذخیره + fallback (پشت تیک آزمایشی) =====
+// مسیر قدیمی (/ws/t) به‌عنوان fallback سالم مانده.
+// startSession همیشه اول startDirectLive را امتحان می‌کند و در صورت خطا fallback می‌زند.
+let directActive=false;
+let directFinalText='';
+let directRec=null;
+let directStream=null;
+let directFallbackDone=false;
+// UI تیک حذف شد (تصمیم: کاربر نباید انتخاب تکنیکال ببیند).
+// رفتار: همیشه اول مستقیم، اگر نشد خودکار fallback به پروکسی.
+// برای دیباگ دستی: localStorage feelia_direct='0' بذار تا همیشه پروکسی برود.
+function isDirectMode(){
+  try{
+    if(localStorage.getItem('feelia_direct')==='0')return false;
+    return true;
+  }catch(e){return true;}
+}
+function setDirectMode(v){
+  try{localStorage.setItem('feelia_direct',v?'1':'0');}catch(e){}
+}
+function cleanDirectText(t){
+  // تگ‌های پایانی Soniox را پاک کن ولی پاراگراف‌بندی «گوینده X» (\n\n) را نگه دار.
+  // (نکته: \u200c نیم‌فاصله جزو \s نیست و دست نمی‌خورد.)
+  let s=String(t||'').replace(/<\/?end>/g,'').replace(/<fin>/g,'');
+  s=s.split('\n').map(function(line){return line.replace(/[ \t]{2,}/g,' ').replace(/^[ \t]+|[ \t]+$/g,'');}).join('\n');
+  s=s.replace(/\n{3,}/g,'\n\n').trim();
+  return s;
+}
+async function startDirectLive(){
+  directFallbackDone=false;
+  directFinalText='';
+  directPrefix='';
+  lastSavedDirectText=null;
+  $('recStatus').textContent='در حال اتصال مستقیم به Soniox…';
+  let cred;
+  try{cred=await SonioxDirect.mint(currentSession.id);}
+  catch(e){await fallbackToProxy('mint');return;}
+  try{
+    await SonioxDirect.connect(cred,{
+      onStatus:function(){wsConnected=true;$('recDot').classList.remove('paused');$('recStatus').textContent='در حال رونویسی مستقیم…';$('recStatus').classList.remove('warn');clearLiveConnBanner();startTimer();lastPreviewAt=Date.now();},
+      onResult:function(r){
+        lastPreviewAt=Date.now();
+        directFinalText=cleanDirectText(r.final);
+        const full=r.final+(r.interim?' '+r.interim:'');
+        if(!$('liveText').hidden)$('liveText').textContent=cleanDirectText(full);
+        $('recStatus').classList.remove('warn');
+        clearLiveConnBanner();
+      },
+      onError:function(){fallbackToProxy('soniox-error');},
+      onClose:function(){
+        // بستنِ عمدی (pause/end) fallback نمی‌خواهد؛ فقط قطعِ غافلگیرانه وسط ضبط
+        if(directClosing)return;
+        if(!directActive||manualPaused||p1Terminal)return;
+        fallbackToProxy('closed');
+      }
+    });
+  }catch(e){await fallbackToProxy('connect');return;}
+  directActive=true;
+  wsConnected=true;
+  // میکروفون تازه برای استریم مستقیم (MicModule) + level-meter مثل مسیر قدیمی
+  if(audioStream){Mic_stopStream(audioStream);audioStream=null;}
+  try{directStream=await Mic_requestStream(MicModule.LIVE_CONSTRAINTS);}
+  catch(e){
+    $('recStatus').textContent='میکروفون در دسترس نیست';
+    $('recStatus').classList.add('warn');
+    setLiveConnBanner('error','<b>ضبط متوقف است.</b><br>'+describeMicError(e));
+    try{SonioxDirect.close();}catch(_){}
+    directActive=false;
+    return;
+  }
+  audioStream=directStream;
+  try{
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const src=audioCtx.createMediaStreamSource(directStream);
+    analyser=audioCtx.createAnalyser();analyser.fftSize=512;src.connect(analyser);
+    const data=new Uint8Array(analyser.frequencyBinCount);
+    const tick=function(){
+      try{analyser.getByteTimeDomainData(data);}catch(_){return;}
+      let sum=0;for(let i=0;i<data.length;i++){const v=(data[i]-128)/128;sum+=v*v;}
+      updateLevelMeter(Math.min(1,Math.sqrt(sum/data.length)*4));
+      levelRAF=requestAnimationFrame(tick);
+    };
+    tick();
+  }catch(e){}
+  const mime=Mic_pickMimeType();
+  try{directRec=Mic_createRecorder(directStream,mime);}catch(e){await fallbackToProxy('recorder');return;}
+  directRec.ondataavailable=function(e){
+    if(e.data&&e.data.size>0){
+      lastAudioSentAt=Date.now();
+      if(!SonioxDirect.sendAudio(e.data)){/* WS بسته است؛ fallback در onError/close انجام می‌شود */}
+    }
+  };
+  try{directRec.start(250);}catch(e){}
+  startTimer();
+}
+async function fallbackToProxy(reason){
+  if(directFallbackDone)return;
+  directFallbackDone=true;
+  try{SonioxDirect.close();}catch(e){}
+  directActive=false;wsConnected=false;
+  setLiveConnBanner('warn','<b>اتصال مستقیم قطع شد ('+reason+').</b><br>به مسیر معمول برگشتیم — ضبط ادامه دارد و متن تا اینجا حفظ شده.');
+  $('recStatus').textContent='برگشت به مسیر معمول…';
+  try{await connectWS();}catch(e){}
+}
+async function endDirectLive(){
+  $('recStatus').textContent='در حال نهایی‌سازی مستقیم…';
+  pauseTimer();
+  directPauseEpoch+=1;
+  try{if(directRec&&directRec.state!=='inactive')directRec.stop();}catch(e){}
+  SonioxDirect.finalize();
+  await new Promise(function(res){setTimeout(res,1200);});
+  const finalText=cleanDirectText(directFinalText||SonioxDirect.finalText);
+  directClosing=true;
+  try{SonioxDirect.close();}catch(e){}
+  directClosing=false;
+  directActive=false;wsConnected=false;
+  if(audioStream){Mic_stopStream(audioStream);audioStream=null;}
+  if(levelRAF){cancelAnimationFrame(levelRAF);levelRAF=null;}
+  if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
+  stopSttWatchdog();stopDurationAutosave();
+  try{
+    await api('/api/sessions/'+currentSession.id,{method:'PUT',body:{transcript:finalText,duration_ms:elapsedMs}});
+  }catch(e){}
+  handleFinished(null);
 }
 // بنرِ اختصاصیِ صفحه‌ی جلسه‌ی زنده — جدا از bannerBox، تا وضعیتِ اتصال هرگز با پیام‌های
 // دیگر (مثل «یادداشت ثبت شد») قاطی یا rewrite نشه. فقط برای مشکلِ واقعیِ اتصال/توقف
@@ -1417,6 +1790,8 @@ function setupNewSession(client){
 // ===== بررسی پیش از شروع: میکروفون + اتصال به سرویس رونویسی =====
 async function runPreflight(){
   preflightMicOk=false;preflightSttOk=false;
+  try{maybeShowWebViewHint();}catch(e){}
+  try{maybeShowHttpsHint();}catch(e){}
   updateStartButtonState();
   $('preflightMicRow').className='banner info';
   $('preflightMicRow').textContent='در حال بررسی میکروفون…';
@@ -1424,8 +1799,8 @@ async function runPreflight(){
   $('preflightSttRow').textContent='در حال بررسی اتصال رونویسی…';
 
   try{
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
-    stream.getTracks().forEach(function(t){t.stop();});
+    const stream=await Mic_requestStream(MicModule.PREFLIGHT_CONSTRAINTS);
+    Mic_stopStream(stream);
     preflightMicOk=true;
     $('preflightMicRow').className='banner info';
     $('preflightMicRow').textContent='میکروفون: آماده';
@@ -1484,7 +1859,8 @@ async function startSession(){
     updatePauseUI();
     startSttWatchdog();
     startDurationAutosave();
-    await connectWS();
+    if(isDirectMode()){await startDirectLive();}
+    else{await connectWS();}
   }catch(e){showBanner('error','خطا: '+e.message);}
 }
 
@@ -1498,7 +1874,9 @@ function startSttWatchdog(){
   lastVoiceActivityAt=null;
   sttWarnAt=null;
   sttWatchdogTimer=setInterval(function(){
-    if(!mediaRecorder||mediaRecorder.state!=='recording')return;
+    const proxyRec=mediaRecorder&&mediaRecorder.state==='recording';
+    const directRecOn=directRec&&directRec.state==='recording';
+    if(!proxyRec&&!directRecOn)return;
     const now=Date.now();
     if(sttWarnAt&&(now-sttWarnAt)<90000)return; // تکرار نکن، حداکثر هر ۹۰ ثانیه
     const speaking=lastVoiceActivityAt&&(now-lastVoiceActivityAt<6000);
@@ -1521,6 +1899,11 @@ function stopSttWatchdog(){
 // فیکس: هر ۱۰ ثانیه duration_ms رو مستقل از پایانِ جلسه ذخیره کن.
 function persistDuration(){
   if(!currentSession)return;
+  // در حالت مستقیم، متن هم دوره‌ای ذخیره شود (در پروکسی، سرور خودش این کار را می‌کند)
+  if(directActive&&cleanDirectText(directFinalText||'')!==lastSavedDirectText){
+    saveDirectTranscript();
+    return;
+  }
   api('/api/sessions/'+currentSession.id,{method:'PUT',body:{duration_ms:elapsedMs}}).catch(function(){});
 }
 function startDurationAutosave(){
@@ -1599,13 +1982,13 @@ async function startMic(){
   // رکوردرِ قدیمی (اگه بود) کامل بسته می‌شه و یکیِ کاملاً تازه با هدرِ تازه ساخته می‌شه —
   // seq/unacked هم دقیقاً همین‌جا صفر می‌شه تا با ordering-resetِ سمتِ سرور هماهنگ باشه.
   if(mediaRecorder&&mediaRecorder.state!=='inactive'){try{mediaRecorder.stop();}catch(e){}}
-  if(audioStream){audioStream.getTracks().forEach(function(t){t.stop();});audioStream=null;}
+  if(audioStream){Mic_stopStream(audioStream);audioStream=null;}
   if(levelRAF){cancelAnimationFrame(levelRAF);levelRAF=null;}
   if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
   mediaRecorder=null;
   p1NextSeq=1;unacked=[];serverAckedSeq=0;
   try{
-    audioStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    audioStream=await Mic_requestStream(MicModule.LIVE_CONSTRAINTS);
   }catch(e){
     const msg=describeMicError(e);
     setLiveConnBanner('error','<b>ضبط متوقف است.</b><br>'+msg);
@@ -1633,9 +2016,9 @@ async function startMic(){
     tick();
   }catch(e){}
 
-  const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg'].find(function(m){return MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m);});
+  const mime=Mic_pickMimeType();
   try{
-    mediaRecorder=mime?new MediaRecorder(audioStream,{mimeType:mime}):new MediaRecorder(audioStream);
+    mediaRecorder=Mic_createRecorder(audioStream,mime);
   }catch(e){return;}
   mediaRecorder.ondataavailable=function(e){
     if(e.data&&e.data.size>0){
@@ -1852,7 +2235,90 @@ function updatePauseUI(){
   if(bp)bp.hidden=manualPaused;
   if(br)br.hidden=!manualPaused;
 }
+let directPrefix='';
+let lastSavedDirectText=null;
+// ذخیره میان‌دوره‌ای متن مستقیم (fire-and-forget) — مثل persist سرور در مسیر پروکسی.
+// چون در حالت مستقیم سرور متن را نمی‌بیند، خود مرورگر باید دوره‌ای ذخیره کند.
+function saveDirectTranscript(){
+  if(!currentSession||!directActive)return;
+  const t=cleanDirectText(directFinalText||'');
+  if(t===lastSavedDirectText)return;
+  lastSavedDirectText=t;
+  api('/api/sessions/'+currentSession.id,{method:'PUT',body:{transcript:t,duration_ms:elapsedMs}}).catch(function(){});
+}
+let directPauseEpoch=0;
+let directClosing=false;
+async function pauseDirectLive(){
+  if(!directActive||!currentSession||manualPaused||p1Terminal)return;
+  manualPaused=true;
+  directPauseEpoch+=1;
+  const myEpoch=directPauseEpoch;
+  const myWs=SonioxDirect.ws;
+  // میکروفون فوری خاموش (UI لحظه‌ای)، ولی WS را نبند تا دمِ جمله flush شود.
+  // باگ قبلی: بستنِ فوری WS دمِ گفتارِ (interim) قبل از توقف را دور می‌ریخت.
+  try{if(directRec&&directRec.state!=='inactive')directRec.stop();}catch(e){}
+  directRec=null;
+  if(levelRAF){cancelAnimationFrame(levelRAF);levelRAF=null;}
+  pauseTimer();
+  $('recDot').classList.add('paused');
+  $('recStatus').textContent='در حال ثبت دمِ گفتار…';
+  updatePauseUI();
+  try{SonioxDirect.finalize();}catch(e){}
+  await new Promise(function(res){setTimeout(res,800);});
+  // در این ۸۰۰ms ممکن است کاربر «ادامه» زده باشد — اگر epoch عوض شده، هیچ‌کاری نکن
+  // (وگرنه WS تازه‌ی resume را می‌کشتیم و استاتوس را بازنویسی می‌کردیم).
+  if(myEpoch!==directPauseEpoch)return;
+  if(!manualPaused)return;
+  // حالا که توکن‌های آخر final شدن (onResult آپدیت کرده)، prefix را بگیر و ببند
+  directPrefix=cleanDirectText(directFinalText||'');
+  if(!$('liveText').hidden&&directPrefix)$('liveText').textContent=directPrefix;
+  saveDirectTranscript();
+  persistDuration();
+  directClosing=true;
+  try{if(SonioxDirect.ws===myWs)SonioxDirect.close();}catch(e){}
+  directClosing=false;
+  if(myEpoch!==directPauseEpoch)return;
+  $('recStatus').textContent='متوقف شد — برای ادامه «ادامه» بزنید';
+}
+async function resumeDirectLive(){
+  if(!currentSession||!manualPaused||p1Terminal)return;
+  manualPaused=false;
+  directPauseEpoch+=1;
+  updatePauseUI();
+  $('recStatus').textContent='در حال اتصال مستقیم…';
+  const prefix=directPrefix||directFinalText||'';
+  let cred;
+  try{cred=await SonioxDirect.mint(currentSession.id);}
+  catch(e){$('recStatus').textContent='ادامه اعمال نشد — دوباره «ادامه» بزنید';manualPaused=true;updatePauseUI();return;}
+  try{
+    await SonioxDirect.connect(cred,{
+      onStatus:function(){$('recDot').classList.remove('paused');$('recStatus').textContent='در حال رونویسی مستقیم…';startTimer();lastPreviewAt=Date.now();},
+      onResult:function(r){
+        lastPreviewAt=Date.now();
+        const fresh=cleanDirectText(r.final);
+        directFinalText=(prefix?(prefix+' '):'')+fresh;
+        const full=r.final+(r.interim?' '+r.interim:'');
+        if(!$('liveText').hidden)$('liveText').textContent=cleanDirectText((prefix?' '+prefix:'')+' '+full);
+      },
+      onError:function(){setLiveConnBanner('warn','<b>اتصال مستقیم قطع شد.</b><br>به مسیر معمول برگشتیم.');fallbackToProxy('resume-error');}
+    });
+  }catch(e){manualPaused=true;updatePauseUI();$('recStatus').textContent='ادامه اعمال نشد — دوباره «ادامه» بزنید';return;}
+  directActive=true;
+  try{
+    if(!directStream||!directStream.active){
+      if(audioStream){Mic_stopStream(audioStream);audioStream=null;}
+      directStream=await Mic_requestStream(MicModule.LIVE_CONSTRAINTS);
+      audioStream=directStream;
+    }
+  }catch(e){$('recStatus').textContent='میکروفون در دسترس نیست';manualPaused=true;updatePauseUI();return;}
+  const mime=Mic_pickMimeType();
+  try{directRec=Mic_createRecorder(directStream,mime);}catch(e){return;}
+  directRec.ondataavailable=function(e){if(e.data&&e.data.size>0){lastAudioSentAt=Date.now();SonioxDirect.sendAudio(e.data);}};
+  try{directRec.start(250);}catch(e){}
+  startTimer();
+}
 function pauseSessionLive(){
+  if(directActive){pauseDirectLive();return;}
   if(!ws||!currentSession||manualPaused||p1Terminal)return;
   manualPaused=true;
   if(wsReconnectTimer){clearTimeout(wsReconnectTimer);wsReconnectTimer=null;}
@@ -1875,7 +2341,7 @@ function pauseSessionLive(){
   },PAUSE_ACK_TIMEOUT);
   // میکروفون خاموش، capture جدیدی در pause نیست
   if(mediaRecorder&&mediaRecorder.state!=='inactive'){try{mediaRecorder.stop();}catch(e){}}
-  if(audioStream){audioStream.getTracks().forEach(function(t){t.stop();});audioStream=null;}
+  if(audioStream){Mic_stopStream(audioStream);audioStream=null;}
   if(levelRAF)cancelAnimationFrame(levelRAF);
   pauseTimer();
   $('recDot').classList.add('paused');
@@ -1885,6 +2351,7 @@ function pauseSessionLive(){
 }
 async function resumeSessionLive(){
   if(!currentSession||!manualPaused||p1Terminal)return;
+  if(directPrefix!==''||directActive||isDirectMode()){await resumeDirectLive();return;}
   manualPaused=false;
   updatePauseUI();
   $('recStatus').textContent='در حال اتصال…';
@@ -1911,6 +2378,7 @@ async function resumeSessionLive(){
 
 // ===== End =====
 function endSession(){
+  if(directActive&&currentSession){endDirectLive();return;}
   if(!ws||!currentSession)return;
   // P3: finalize → دیگر session فعالی نیست
   try{localStorage.removeItem('feelia_active_session');}catch(e){}
@@ -1996,8 +2464,11 @@ function renderWrapupNotesLog(){
 
 function stopAllAudio(){
   clearP1AckTimers();
+  try{if(directRec&&directRec.state!=='inactive')directRec.stop();}catch(e){}
+  directRec=null;directActive=false;
+  try{if(SonioxDirect.ws)SonioxDirect.close();}catch(e){}
   if(mediaRecorder&&mediaRecorder.state!=='inactive'){try{mediaRecorder.stop();}catch(e){}}
-  if(audioStream){audioStream.getTracks().forEach(function(t){t.stop();});audioStream=null;}
+  if(audioStream){Mic_stopStream(audioStream);audioStream=null;}
   if(levelRAF)cancelAnimationFrame(levelRAF);
   if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
   audioBuffer=[];
@@ -2102,7 +2573,7 @@ async function startVoiceNote(){
   renderVoiceTimer();
   $('voiceNoteBtn').disabled=true;
   try{
-    voiceStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+    voiceStream=await Mic_requestStream(MicModule.LIVE_CONSTRAINTS);
   }catch(e){
     $('voiceStatus').textContent=describeMicError(e);
     cleanupVoice();
@@ -2112,9 +2583,9 @@ async function startVoiceNote(){
   voiceWS=new WebSocket(proto+'://'+location.host+'/ws/voice/'+currentSession.id);
   voiceWS.binaryType='arraybuffer';
   voiceWS.onopen=function(){
-    const mime=['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg'].find(function(m){return MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m);});
+    const mime=Mic_pickMimeType();
     try{
-      voiceMediaRecorder=mime?new MediaRecorder(voiceStream,{mimeType:mime}):new MediaRecorder(voiceStream);
+      voiceMediaRecorder=Mic_createRecorder(voiceStream,mime);
     }catch(e){
       $('voiceStatus').textContent='خطا در ضبط';
       cleanupVoice();
@@ -2158,7 +2629,7 @@ function stopVoiceNote(){
 }
 function cleanupVoice(){
   if(voiceMediaRecorder&&voiceMediaRecorder.state!=='inactive'){try{voiceMediaRecorder.stop();}catch(e){}}
-  if(voiceStream){voiceStream.getTracks().forEach(function(t){t.stop();});voiceStream=null;}
+  if(voiceStream){Mic_stopStream(voiceStream);voiceStream=null;}
   if(voiceWS){try{voiceWS.close();}catch(e){}voiceWS=null;}
   clearInterval(voiceTimerInt);
   voiceRunning=false;
@@ -2202,6 +2673,7 @@ async function finishSession(){
 function goBackToClients(){
   p1Terminal=true;
   manualPaused=false;
+  directActive=false;
   stopAllAudio();
   cleanupVoice();
   if(ws){try{ws.close();}catch(e){}ws=null;}
@@ -2223,7 +2695,9 @@ window.addEventListener('beforeunload',function(e){
       try{ws.send(JSON.stringify({type:'close-hint',intent:'close'}));}catch(err){}
     }
   }catch(err){}
-  if(ws||voiceWS){e.preventDefault();e.returnValue='';}
+  let directOpen=false;
+  try{directOpen=!!(SonioxDirect.ws&&SonioxDirect.ws.readyState===WebSocket.OPEN);}catch(_){}
+  if(ws||voiceWS||directOpen){e.preventDefault();e.returnValue='';}
 });
 
 document.addEventListener('DOMContentLoaded',function(){init();});

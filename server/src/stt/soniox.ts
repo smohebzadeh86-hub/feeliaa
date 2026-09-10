@@ -137,7 +137,7 @@ export class SonioxEngine {
             api_key: this.apiKey,
             model: 'stt-rt-v5',
             audio_format: 'auto',
-            language_hints: ['fa', 'en'],
+            language_hints: ['fa'],
             enable_language_identification: true,
             enable_speaker_diarization: true,
             enable_endpoint_detection: true,
