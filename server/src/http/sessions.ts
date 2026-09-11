@@ -3,6 +3,12 @@ import { FastifyInstance } from 'fastify';
 import { query } from '../db/connection.js';
 import { requireAuth } from '../auth/guard.js';
 import { getOwnedClient, getOwnedSession } from '../db/ownership.js';
+import {
+  enqueueBatch,
+  pendingAudioFor,
+  processBatchQueue,
+  validateAudioBuffer,
+} from '../stt/batchqueue.js';
 
 // ⭐ پردازش صدا در background (طبق الگوی مستندات Soniox)
 async function processVoiceNoteInBackground(sessionId: string, buffer: Buffer) {
@@ -129,11 +135,14 @@ export async function sessionRoutes(app: FastifyInstance) {
     };
   });
 
-  // PUT /api/sessions/:id
+  // PUT /api/sessions/:id — با محافظ نسخه برای transcript (جلوگیری از overwrite stale)
   app.put('/api/sessions/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as {
       transcript?: string;
+      transcript_version?: number;
+      realtime_reliable?: boolean;
+      stt_mode?: string;
       anchors?: Array<{ chars: number; off: number }>;
       duration_ms?: number;
       status?: string;
@@ -152,8 +161,32 @@ export async function sessionRoutes(app: FastifyInstance) {
     let paramCount = 1;
 
     if (body.transcript !== undefined) {
+      // ✅ Compare-and-swap: اگر caller نسخه‌ی پایه بفرستد و با DB نخورد → 409، نه overwrite.
+      // callerهای قدیمی (بدون transcript_version) همچنان پذیرفته‌اند (سازگاری عقبرو).
+      if (typeof body.transcript_version === 'number') {
+        const curV = await query('SELECT transcript_version FROM sessions WHERE id = $1', [id]);
+        const cv: number = curV.rows[0]?.transcript_version ?? 0;
+        if (cv !== body.transcript_version) {
+          reply.code(409);
+          return {
+            error: 'نسخه‌ی transcript قدیمی است؛ ابتدا تازه‌سازی کنید',
+            code: 'version-conflict',
+            current_version: cv,
+          };
+        }
+      }
       updates.push(`transcript = $${paramCount++}`);
       values.push(body.transcript);
+      // هر write موفق، نسخه را یکی جلو می‌برد — اتمیک در همین UPDATE
+      updates.push(`transcript_version = transcript_version + 1`);
+    }
+    if (body.realtime_reliable !== undefined) {
+      updates.push(`realtime_reliable = $${paramCount++}`);
+      values.push(body.realtime_reliable);
+    }
+    if (body.stt_mode !== undefined) {
+      updates.push(`stt_mode = $${paramCount++}`);
+      values.push(body.stt_mode);
     }
     if (body.anchors !== undefined) {
       updates.push(`anchors = $${paramCount++}`);
@@ -319,5 +352,81 @@ export async function sessionRoutes(app: FastifyInstance) {
       status: 'processing',
       message: 'صدا دریافت شد — در حال رونویسی',
     };
+  });
+
+  // ===== Batch fallback (فقط مسیر شکست realtime) =====
+  // حریم خصوصی: صوت فقط وقتی به سرور می‌آید که realtime ناموفق/غیرقابل‌اعتماد باشد.
+  // بعد از رونویسی موفق، فایل صوتی حذف می‌شود. GET این فایل از هیچ مسیری سرو نمی‌شود.
+  // ?purpose=transcript (پیش‌فرض) → merge در sessions.transcript
+  // ?purpose=note → فقط session_notes(type='voice')، هرگز transcript (ISSUE 3)
+  app.post('/api/sessions/:id/batch-audio', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const purpose = ((request.query as any)?.purpose === 'note' ? 'note' : 'transcript') as
+      import('../stt/batchqueue.js').BatchPurpose;
+
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+    if (owned.status === 'completed' || owned.status === 'canceled') {
+      reply.code(400);
+      return { error: 'جلسه پایان یافته است' };
+    }
+
+    const file = await (request as any).file();
+    if (!file) {
+      reply.code(400);
+      return { error: 'فایل صوتی ارسال نشده' };
+    }
+    const buffer: Buffer = await file.toBuffer();
+    const problem = validateAudioBuffer(buffer);
+    if (problem) {
+      reply.code(400);
+      return { error: problem };
+    }
+
+    const { baseVersion } = await enqueueBatch(id, buffer, purpose);
+    // پردازش ناهمگام؛ اگر egress قطع باشد queued می‌ماند و با retry بعدی جلو می‌رود
+    processBatchQueue(id, purpose).catch(() => {});
+
+    reply.code(202);
+    return { status: 'queued', purpose, message: 'صوت در صف رونویسی قرار گرفت', base_version: baseVersion };
+  });
+
+  app.get('/api/sessions/:id/batch-status', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+    const hasAudio = !!pendingAudioFor(id, 'transcript');
+    const hasNoteAudio = !!pendingAudioFor(id, 'note');
+    return {
+      batch_status: owned.batch_status ?? null,
+      stt_mode: owned.stt_mode ?? null,
+      realtime_reliable: owned.realtime_reliable ?? null,
+      transcript_version: owned.transcript_version ?? 0,
+      audio_pending: hasAudio,
+      note_audio_pending: hasNoteAudio,
+    };
+  });
+
+  app.post('/api/sessions/:id/batch-retry', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const purpose = ((request.query as any)?.purpose === 'note' ? 'note' : 'transcript') as
+      import('../stt/batchqueue.js').BatchPurpose;
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+    if (!pendingAudioFor(id, purpose)) {
+      reply.code(400);
+      return { error: 'صوتی در صف نیست' };
+    }
+    processBatchQueue(id, purpose).catch(() => {});
+    return { status: 'retrying', purpose };
   });
 }

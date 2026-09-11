@@ -597,6 +597,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
+<script src="/feelia-rt.js"></script>
 <script>
 'use strict';
 
@@ -819,8 +820,14 @@ const SonioxDirect={
   finalText:'',unreliable:false,ws:null,
   async mint(sessionId){
     const res=await fetch('/api/stt/realtime-session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sessionId})});
-    const data=await res.json();
-    if(!res.ok)throw new Error(data.error||'mint failed');
+    // ⭐ استتوس HTTP حفظ می‌شود تا 401 احراز هویت از خطای Soniox/شبکه قابل افتراق بماند
+    const data=await res.json().catch(function(){return{};});
+    if(!res.ok){
+      const err=new Error((data&&data.error)||'mint failed');
+      err.status=res.status;
+      err.code=data&&data.code;
+      throw err;
+    }
     return data;
   },
   connect(cred,callbacks){
@@ -983,7 +990,17 @@ async function startDirectLive(){
   $('recStatus').textContent='در حال اتصال مستقیم به Soniox…';
   let cred;
   try{cred=await SonioxDirect.mint(currentSession.id);}
-  catch(e){await fallbackToProxy('mint');return;}
+  catch(e){
+    // ⭐ روی 401 به پروکسی fallback نزن: با همان نشستِ مرده، upgrade وب‌سوکت /ws/t هم
+    // 401 می‌گیرد و فقط یک 401 گیج‌کننده‌ی دوم در DevTools می‌ماند. صریح بگو دوباره وارد شود.
+    if(e&&e.status===401){
+      $('recStatus').textContent='نشست منقضی شده — دوباره وارد شوید';
+      $('recStatus').classList.add('warn');
+      setLiveConnBanner('error','<b>نشست شما منقضی شده (خطای 401).</b><br>از حساب خارج و دوباره وارد شوید؛ بدون ورود معتبر، مسیر جایگزین هم رد می‌شود.');
+      return;
+    }
+    await fallbackToProxy('mint');return;
+  }
   try{
     await SonioxDirect.connect(cred,{
       onStatus:function(){wsConnected=true;$('recDot').classList.remove('paused');$('recStatus').textContent='در حال رونویسی مستقیم…';$('recStatus').classList.remove('warn');clearLiveConnBanner();startTimer();lastPreviewAt=Date.now();},
@@ -1125,14 +1142,23 @@ async function api(path,options={}){
     headers:options.body?{'Content-Type':'application/json'}:undefined,
     body:options.body?JSON.stringify(options.body):undefined,
   });
-  const data=await res.json();
-  if(!res.ok)throw new Error(data.error||'خطا');
+  // ⭐ استتوس HTTP به خطا الصاق می‌شود تا 401 (نشست منقضی) از خطای سرویس قابل افتراق بماند؛
+  // بدنه‌ی غیر JSON (مثل صفحه‌ی خطای Nginx) هم دیگر استتوس واقعی را ماسکه نمی‌کند.
+  const data=await res.json().catch(function(){return{};});
+  if(!res.ok){
+    const err=new Error((data&&data.error)||'خطا');
+    err.status=res.status;
+    err.code=data&&data.code;
+    throw err;
+  }
   return data;
 }
 
 // ===== رضایت =====
 function updateStartButtonState(){
-  $('btnStartSession').disabled=!(consent&&preflightMicOk&&preflightSttOk);
+  // عمداً فقط consent + میکروفون gate است؛ وضعیت STT دیگر شروع را بلاک نمی‌کند —
+  // failure realtime داخل lifecycle (reconnect/batch) مدیریت می‌شود.
+  $('btnStartSession').disabled=!(consent&&preflightMicOk);
 }
 function setConsent(value){
   consent=value;
@@ -1494,6 +1520,12 @@ async function liveResumeSession(sessionId){
     updatePauseUI();
     startSttWatchdog();
     startDurationAutosave();
+    if(window.FeeliaRT&&window.FeeliaRT.isAvailable()){
+      try{
+        const started=await startNewRTSession();
+        if(started)return;
+      }catch(e){}
+    }
     await connectWS();
   }catch(e){
     // P3: فقط اگر session دیگر وجود ندارد (حذف شده)، کلید stale را پاک کن — نه برای خطای شبکه
@@ -1813,19 +1845,24 @@ async function runPreflight(){
   try{
     const res=await api('/api/stt/check');
     if(res.ok){
-      preflightSttOk=true;
       $('preflightSttRow').className='banner info';
-      $('preflightSttRow').textContent='اتصال رونویسی: آماده';
+      $('preflightSttRow').textContent='اتصال رونویسی: آماده (مسیر مستقیم Browser→Soniox)';
     }else{
-      preflightSttOk=false;
-      $('preflightSttRow').className='banner error';
-      $('preflightSttRow').textContent='اتصال رونویسی برقرار نشد'+(res.error?': '+res.error:'');
+      $('preflightSttRow').className='banner warn';
+      $('preflightSttRow').textContent='هشدار رونویسی: '+(res.error||'نامشخص')+' — جلسه بلاک نمی‌شود؛ در صورت قطعی، ضبط durable و صف batch فعال است.';
     }
   }catch(e){
-    preflightSttOk=false;
-    $('preflightSttRow').className='banner error';
-    $('preflightSttRow').textContent='خطا در بررسی اتصال رونویسی.';
+    // ⭐ 401 یعنی کوکی نشست معتبر نیست (منقضی/حذف‌شده/غیرفعال) — مشکل از Soniox نیست
+    if(e&&e.status===401){
+      $('preflightSttRow').className='banner error';
+      $('preflightSttRow').textContent='نشست شما منقضی شده — یک‌بار خارج و دوباره وارد شوید (خطای 401).';
+    }else{
+      $('preflightSttRow').className='banner warn';
+      $('preflightSttRow').textContent='بررسی اتصال ناموفق بود — جلسه بلاک نمی‌شود؛ failure داخل lifecycle مدیریت می‌شود.';
+    }
   }
+  // عمداً غیرمسدودکننده: /api/stt/check مسیر proxy قدیم را هم می‌سنجد که dependency اصلی نیست
+  preflightSttOk=true;
 
   updateStartButtonState();
 }
@@ -1859,6 +1896,13 @@ async function startSession(){
     updatePauseUI();
     startSttWatchdog();
     startDurationAutosave();
+    if(window.FeeliaRT&&window.FeeliaRT.isAvailable()){
+      try{
+        const started=await startNewRTSession();
+        if(started)return;
+      }catch(e){}
+      // fallthrough به مسیر legacy proxy
+    }
     if(isDirectMode()){await startDirectLive();}
     else{await connectWS();}
   }catch(e){showBanner('error','خطا: '+e.message);}
@@ -1876,7 +1920,8 @@ function startSttWatchdog(){
   sttWatchdogTimer=setInterval(function(){
     const proxyRec=mediaRecorder&&mediaRecorder.state==='recording';
     const directRecOn=directRec&&directRec.state==='recording';
-    if(!proxyRec&&!directRecOn)return;
+    const rtOn=typeof rtSession!=='undefined'&&rtSession&&(rtSession.state==='ACTIVE'||rtSession.state==='RECONNECTING'||rtSession.state==='RECOVERED'||rtSession.state==='FAILED');
+    if(!proxyRec&&!directRecOn&&!rtOn)return;
     const now=Date.now();
     if(sttWarnAt&&(now-sttWarnAt)<90000)return; // تکرار نکن، حداکثر هر ۹۰ ثانیه
     const speaking=lastVoiceActivityAt&&(now-lastVoiceActivityAt<6000);
@@ -1912,6 +1957,179 @@ function startDurationAutosave(){
 }
 function stopDurationAutosave(){
   if(durationAutosaveTimer){clearInterval(durationAutosaveTimer);durationAutosaveTimer=null;}
+}
+
+// ===== FeeliaRT glue (production realtime: Browser→Soniox) =====
+// مسیرهای قدیمی (proxy /ws/t و SonioxDirect) دست‌نخورده پایین نگه داشته شده‌اند؛
+// این glue وقتی feelia-rt.js لود شده باشد، lifecycle جدید را صاحب می‌شود.
+let rtSession=null;
+let rtVoice=null;
+async function startNewRTSession(){
+  rtSession=window.FeeliaRT.createSession(currentSession.id,{mode:'live',
+    onState:rtOnState,
+    onResult:function(r){
+      lastPreviewAt=Date.now();
+      if(!$('liveText').hidden){
+        $('liveText').textContent=r.final+(r.interim?' '+r.interim:'');
+        $('liveText').scrollTop=$('liveText').scrollHeight;
+      }
+      $('recStatus').classList.remove('warn');
+    },
+    onError:function(m){
+      try{setLiveConnBanner('warn','<b>realtime:</b> '+escapeHtml(m));}catch(e){}
+    }
+  });
+  $('recStatus').textContent='در حال اتصال مستقیم به Soniox…';
+  let ok=false;
+  try{ok=await rtSession.start();}catch(e){ok=false;}
+  if(!ok){
+    try{window.FeeliaRT.forget(rtSession);}catch(e){}
+    rtSession=null;
+    return false;
+  }
+  // ISSUE 4: حالت durable-only (mint ناموفق ولی میکروفون فعال) — usable است،
+  // legacy proxy صدا زده نمی‌شود؛ realtime صادقانه FAILED گزارش می‌شود.
+  if(rtSession.state==='FAILED'||rtSession.realtimeUp===false){
+    setLiveConnBanner('warn','<b>realtime در دسترس نیست</b> — ضبط محلی (durable) فعال است.<br>جلسه ادامه دارد؛ در پایان از صف batch استفاده می‌شود.');
+    $('recStatus').textContent='ضبط محلی فعال — realtime ناموفق';
+    $('recStatus').classList.add('warn');
+  }
+  startTimer();startSttWatchdog();startDurationAutosave();
+  return true;
+}
+function rtOnState(st,snap){
+  if(!currentSession)return;
+  snap=snap||{};
+  var map={
+    STARTING:'در حال اتصال مستقیم به Soniox…',
+    ACTIVE:'در حال رونویسی…',
+    RECOVERED:'اتصال برقرار — ادامه…',
+    RECONNECTING:'اتصال قطع — تلاش '+toFa((snap.reconnectAttempts||0)+1)+'…',
+    NETWORK_PAUSED:'اینترنت قطع است — در انتظار…',
+    MANUAL_PAUSED:'متوقف شد — برای ادامه «ادامه» بزنید',
+    FINALIZING:'در حال نهایی‌سازی…',
+    FAILED:'realtime ناموفق — ضبط durable ادامه دارد'
+  };
+  if(map[st])$('recStatus').textContent=map[st];
+  if(st==='ACTIVE'||st==='RECOVERED'){
+    wsConnected=true;$('recDot').classList.remove('paused');
+    $('recStatus').classList.remove('warn');clearLiveConnBanner();startTimer();
+  }else if(st==='RECONNECTING'||st==='NETWORK_PAUSED'){
+    wsConnected=false;$('recDot').classList.add('paused');pauseTimer();
+    setLiveConnBanner('warn','<b>اتصال realtime قطع شد</b> — در حال تلاش برای وصل‌شدنِ دوباره…<br>متنِ تا اینجا حفظ شده و ضبط durable ادامه دارد.');
+  }else if(st==='FAILED'){
+    wsConnected=false;pauseTimer();
+    setLiveConnBanner('warn','<b>realtime ناموفق شد.</b><br>ضبط durable ادامه دارد؛ در پایان از صف batch استفاده می‌شود.');
+  }
+}
+async function endNewRTSession(){
+  const s=rtSession;
+  if(!s||!currentSession)return;
+  try{localStorage.removeItem('feelia_active_session');}catch(e){}
+  p1Terminal=true;manualPaused=false;updatePauseUI();clearP1AckTimers();
+  $('btnEndSession').disabled=true;
+  $('recStatus').textContent='در حال نهایی‌سازی…';
+  pauseTimer();
+  let out={text:'',reliable:false,mode:'error'};
+  try{out=await s.finish();}catch(e){}
+  rtSession=null;
+  try{window.FeeliaRT.forget(s);}catch(e){}
+  if(out&&(out.mode==='batch-pending')){
+    showBanner('warn','رونویسی batch در صف ماند؛ متن realtime (غیرقابل‌اعتماد) ذخیره شد و با آماده‌شدن batch تکمیل می‌شود.');
+    // ISSUE 2: تخلیه صف در پس‌زمینه — UI بلاک نمی‌شود؛ با تکمیل، بنر اطلاع می‌دهد.
+    try{
+      s.awaitBatchDrain().then(function(r){
+        if(r&&r.drained&&r.ok)showBanner('info','رونویسی batch کامل شد و به پرونده اضافه شد.');
+      });
+    }catch(e){}
+  }
+  else if(out&&!out.reliable&&out.mode==='batch')
+    showBanner('info','متن نهایی از مسیر batch آمد (realtime غیرقابل‌اعتماد بود).');
+  handleFinished(null);
+}
+async function rtPauseLive(){
+  if(!rtSession)return;
+  // ISSUE 5: UI فقط وقتی paused می‌شود که موتور واقعاً قبول کند؛
+  // در غیر این صورت (STARTING/RECONNECTING/FINALIZING/...) پیام صادقانه می‌دهد و wedge نمی‌شود.
+  let ok=false;
+  try{ok=await rtSession.pause();}catch(e){ok=false;}
+  if(!rtSession)return;
+  if(ok){
+    manualPaused=true;updatePauseUI();
+    $('recStatus').textContent='متوقف شد — برای ادامه «ادامه» بزنید';
+    persistDuration();
+  }else{
+    $('recStatus').textContent='توقف اعمال نشد — وضعیت فعلی اجازه توقف نمی‌دهد';
+    $('recStatus').classList.add('warn');
+  }
+}
+async function rtResumeLive(){
+  if(!rtSession)return;
+  manualPaused=false;updatePauseUI();
+  $('recStatus').textContent='در حال اتصال…';
+  let ok=false;
+  try{ok=await rtSession.resume();}catch(e){ok=false;}
+  if(!ok){manualPaused=true;updatePauseUI();$('recStatus').textContent='ادامه اعمال نشد — دوباره «ادامه» بزنید';}
+}
+async function startVoiceNoteDirect(){
+  $('textNoteBox').hidden=true;
+  $('voiceNoteBox').hidden=false;
+  $('voiceStatus').textContent='در حال اتصال مستقیم…';
+  $('voiceLiveText').textContent='در حال ضبط… حرف بزنید';
+  $('voiceNoteBtn').disabled=true;
+  const s=window.FeeliaRT.createSession(currentSession.id,{mode:'note',
+    onState:function(){},
+    onResult:function(r){
+      $('voiceLiveText').textContent=(r.final+(r.interim?' '+r.interim:''))||'…';
+    },
+    onError:function(m){$('voiceStatus').textContent=m;}
+  });
+  let ok=false;
+  try{ok=await s.start();}catch(e){ok=false;}
+  if(!ok){try{window.FeeliaRT.forget(s);}catch(e){}return false;}
+  rtVoice=s;
+  // ISSUE 4 برای یادداشت هم: durable-only صادقانه گزارش می‌شود، نه «لایو رونویسی».
+  $('voiceStatus').textContent=(s.realtimeUp===false)
+    ?'ضبط محلی فعال — realtime ناموفق؛ در پایان batch استفاده می‌شود'
+    :'در حال ضبط — لایو رونویسی…';
+  return true;
+}
+async function stopVoiceNoteDirect(){
+  const s=rtVoice;
+  rtVoice=null;
+  if(!s)return;
+  $('voiceStatus').textContent='در حال نهایی‌سازی…';
+  let out={text:'',reliable:true,mode:'realtime'};
+  try{out=await s.finish();}catch(e){}
+  try{window.FeeliaRT.forget(s);}catch(e){}
+  if(out.text&&out.text.trim()&&(out.reliable||out.mode==='batch')){
+    wrapupNotes.push({type:'voice',text:out.text.trim(),wall_clock:nowClock()});
+    renderWrapupNotes();
+    $('voiceStatus').textContent='ثبت شد'+(out.reliable?'':' (از batch)');
+    setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},1500);
+    return;
+  }
+  if(out.mode==='batch-pending-note'){
+    // ISSUE 3: یادداشت در صف note است (نه transcript) — تکمیل در پس‌زمینه، بعد به لیست اضافه می‌شود.
+    $('voiceStatus').textContent='realtime ناموفق — batch یادداشت در حال پردازش…';
+    try{
+      s.awaitBatchDrain({forNote:true}).then(function(r){
+        if(r&&r.drained&&r.ok&&r.result&&r.result.text){
+          wrapupNotes.push({dbId:r.result.noteId,type:'voice',text:r.result.text,wall_clock:nowClock()});
+          renderWrapupNotes();
+          $('voiceStatus').textContent='ثبت شد (از batch)';
+        }else{
+          $('voiceStatus').textContent='batch فعلاً کامل نشد — صوت در صف ماند و با retry بعدی ثبت می‌شود';
+        }
+        setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},2500);
+      });
+    }catch(e){
+      setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},1500);
+    }
+    return;
+  }
+  $('voiceStatus').textContent='متنی ثبت نشد';
+  setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},1500);
 }
 
 // ===== WS =====
@@ -2318,6 +2536,7 @@ async function resumeDirectLive(){
   startTimer();
 }
 function pauseSessionLive(){
+  if(rtSession){rtPauseLive();return;}
   if(directActive){pauseDirectLive();return;}
   if(!ws||!currentSession||manualPaused||p1Terminal)return;
   manualPaused=true;
@@ -2350,6 +2569,7 @@ function pauseSessionLive(){
   persistDuration(); // فوری ذخیره کن — منتظرِ تیکِ ۱۰ثانیه‌ایِ autosave نمون
 }
 async function resumeSessionLive(){
+  if(rtSession){rtResumeLive();return;}
   if(!currentSession||!manualPaused||p1Terminal)return;
   if(directPrefix!==''||directActive||isDirectMode()){await resumeDirectLive();return;}
   manualPaused=false;
@@ -2378,6 +2598,7 @@ async function resumeSessionLive(){
 
 // ===== End =====
 function endSession(){
+  if(rtSession){endNewRTSession();return;}
   if(directActive&&currentSession){endDirectLive();return;}
   if(!ws||!currentSession)return;
   // P3: finalize → دیگر session فعالی نیست
@@ -2464,6 +2685,9 @@ function renderWrapupNotesLog(){
 
 function stopAllAudio(){
   clearP1AckTimers();
+  try{if(rtSession)rtSession.abort();}catch(e){}
+  try{if(rtVoice)rtVoice.abort();}catch(e){}
+  rtSession=null;rtVoice=null;
   try{if(directRec&&directRec.state!=='inactive')directRec.stop();}catch(e){}
   directRec=null;directActive=false;
   try{if(SonioxDirect.ws)SonioxDirect.close();}catch(e){}
@@ -2481,6 +2705,7 @@ function showCancelModal(){$('cancelModal').classList.add('open');}
 function closeCancelModal(){$('cancelModal').classList.remove('open');}
 async function confirmCancelSession(){
   closeCancelModal();
+  if(rtSession){try{rtSession.abort();}catch(e){}try{window.FeeliaRT.forget(rtSession);}catch(ee){}rtSession=null;}
   // P3: cancel → ترمینال، کلید resume پاک شود
   try{localStorage.removeItem('feelia_active_session');}catch(e){}
   p1Terminal=true;
@@ -2565,6 +2790,13 @@ async function addTextNote(){
 // Voice Note
 async function startVoiceNote(){
   if(!currentSession)return;
+  if(window.FeeliaRT&&window.FeeliaRT.isAvailable()&&!rtVoice&&!voiceWS&&(!voiceMediaRecorder||voiceMediaRecorder.state==='inactive')){
+    try{
+      const ok=await startVoiceNoteDirect();
+      if(ok)return;
+    }catch(e){}
+    // fallthrough به مسیر legacy
+  }
   $('textNoteBox').hidden=true;
   $('voiceNoteBox').hidden=false;
   $('voiceStatus').textContent='در حال اتصال…';
@@ -2621,6 +2853,7 @@ async function startVoiceNote(){
 }
 
 function stopVoiceNote(){
+  if(rtVoice){stopVoiceNoteDirect();return;}
   if(voiceMediaRecorder&&voiceMediaRecorder.state!=='inactive'){
     $('voiceStatus').textContent='در حال نهایی‌سازی…';
     voiceMediaRecorder.stop();
@@ -2628,6 +2861,7 @@ function stopVoiceNote(){
   }
 }
 function cleanupVoice(){
+  if(rtVoice){try{rtVoice.abort();}catch(e){}try{window.FeeliaRT.forget(rtVoice);}catch(ee){}rtVoice=null;}
   if(voiceMediaRecorder&&voiceMediaRecorder.state!=='inactive'){try{voiceMediaRecorder.stop();}catch(e){}}
   if(voiceStream){Mic_stopStream(voiceStream);voiceStream=null;}
   if(voiceWS){try{voiceWS.close();}catch(e){}voiceWS=null;}
@@ -2697,7 +2931,9 @@ window.addEventListener('beforeunload',function(e){
   }catch(err){}
   let directOpen=false;
   try{directOpen=!!(SonioxDirect.ws&&SonioxDirect.ws.readyState===WebSocket.OPEN);}catch(_){}
-  if(ws||voiceWS||directOpen){e.preventDefault();e.returnValue='';}
+  let rtOpen=false;
+  try{rtOpen=!!(window.FeeliaRT&&window.FeeliaRT.hasOpenConnection());}catch(_){}
+  if(ws||voiceWS||directOpen||rtOpen){e.preventDefault();e.returnValue='';}
 });
 
 document.addEventListener('DOMContentLoaded',function(){init();});

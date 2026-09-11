@@ -14,6 +14,7 @@ import { clientRoutes } from './http/clients.js';
 import { sessionRoutes } from './http/sessions.js';
 import { sttRoutes } from './http/stt.js';
 import { transcriptionRoutes } from './ws/transcription.js';
+import { sweepOldBatchFiles } from './stt/batchqueue.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -54,6 +55,8 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const start = async () => {
   try {
     await runMigrations();
+    // پاک‌سازی فایل‌های صوت batch قدیمی (حریم خصوصی/دیسک)
+    try { sweepOldBatchFiles(); } catch {}
     console.log('🌿 Feelia server starting...');
     await app.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`🌿 Feelia server running on http://localhost:${PORT}`);

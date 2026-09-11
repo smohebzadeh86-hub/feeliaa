@@ -4,6 +4,7 @@
   "private": true,
   "description": "Therapy session transcription platform",
   "scripts": {
-    "dev": "pnpm --filter server dev"
+    "dev": "pnpm --filter server dev",
+    "test:rt": "node scripts/rt-harness.cjs"
   }
 }

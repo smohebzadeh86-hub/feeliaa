@@ -4,3 +4,5 @@ dist/
 *.log
 .DS_Store
 uploads/
+# صف موقت صوت batch fallback — حریم خصوصی: هرگز کامیت نشود
+data/
