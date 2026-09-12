@@ -121,6 +121,7 @@
     this.interim = '';
     this.baseVersion = 0; // transcript_version پایه برای CAS
     this.dirty = false;
+    this.autosaveFailStreak = 0;
     this.unreliable = false;
     this.reconnectAttempts = 0;
     this.hadGap = false;
@@ -362,6 +363,19 @@
     }, delay);
   };
 
+  // BUG-FIX (speaker continuity): Soniox شماره‌گذاری speaker را در هر اتصال WS تازه
+  // از صفر شروع می‌کند (مستند نیست، ولی هیچ پارامتری هم برای ادامه‌ی آن بین اتصال‌ها
+  // وجود ندارد). یعنی «گوینده ۰» قبل از یک reconnect/resume ربطی به «گوینده ۰» بعد از
+  // آن ندارد. به‌جای وانمود به تداوم (که می‌تواند حرف اشتباه را به شخص اشتباه نسبت
+  // دهد — خطرناک برای یادداشت درمانی)، این نقطه را صریح در transcript علامت می‌زنیم
+  // و شماره‌گذاری را از نو (با اولین لیبل تازه) شروع می‌کنیم.
+  RTSession.prototype.noteDiscontinuity = function () {
+    this.curSpeaker = null;
+    this.confirmed += (this.confirmed ? '\n\n' : '') +
+      '[اتصال دوباره برقرار شد — شماره‌گذاری گوینده‌ها از این نقطه ممکن است با قبل فرق کند]';
+    this.dirty = true;
+  };
+
   // اتصال با credential تازه (هر reconnect یک mint — single_use).
   // موفق → true؛ ناموفق → false (caller تصمیم reconnect/FAILED می‌گیرد).
   // ISSUE 1: هر تلاش به connEpoch لحظه‌ی شروع گره خورده؛ اگر تا زمان resolve،
@@ -382,9 +396,13 @@
           return false;
         }
         self.ws = ws;
+        // BUG-FIX: هر اتصال بعد از اولین (چه reconnect چه resume دستی) یک دیارizationِ
+        // تازه‌ی Soniox است — قبل از افزایش generation علامت بزن (شرط روی مقدار فعلی).
+        var isReconnect = self.generation > 0;
         self.generation++;
         self.reconnectAttempts = 0;
         self.realtimeUp = true;
+        if (isReconnect) self.noteDiscontinuity();
         // استریمر زنده روی همان stream با MediaRecorder تازه (هدر تازه)؛ durable دست‌نخورده ادامه می‌دهد
         self.startLivePusher();
         self.setState(self.hadGap ? STATES.RECOVERED : STATES.ACTIVE);
@@ -488,10 +506,22 @@
     var self = this;
     if (!self.persist) return;
     if (self.autosaveTimer) clearInterval(self.autosaveTimer);
+    self.autosaveFailStreak = 0;
     self.autosaveTimer = setInterval(function () {
       if (self.dirty && (self.state === STATES.ACTIVE || self.state === STATES.RECOVERED)) {
         self.dirty = false;
-        self.persistConfirmed().catch(function () { self.dirty = true; });
+        self.persistConfirmed().then(function () {
+          self.autosaveFailStreak = 0;
+        }).catch(function () {
+          self.dirty = true;
+          self.autosaveFailStreak++;
+          // BUG-FIX: قبلاً شکست‌های پیاپی ذخیره‌سازی کاملاً بی‌صدا بودند — کاربر تا پایان
+          // جلسه متوجه نمی‌شد که متن چند دقیقه است ذخیره نشده. بعد از ۳ شکست پیاپی
+          // (~۱۵ ثانیه) یک بار هشدار بده؛ متن هنوز در RAM/durable حفظ است.
+          if (self.autosaveFailStreak === 3) {
+            try { self.cb.onError('ذخیره‌ی خودکار متن چند بار پیاپی ناموفق بوده — اتصال اینترنت را بررسی کنید؛ متن فعلی و ضبط محلی حفظ است'); } catch (e) {}
+          }
+        });
       }
     }, AUTOSAVE_MS);
   };
