@@ -43,7 +43,12 @@ function buildTextFromTokens(tokens: SonioxToken[]): string {
     }
     out += t.text;
   }
-  return out;
+  // BUG-FIX: Soniox گاهی تگ‌های پایانی <end>/<fin> را داخل متن token برمی‌گرداند.
+  // فرانت (feelia-rt.js/index.html) این‌ها را قبل از نمایش پاک می‌کند، ولی مسیرهای
+  // سمت سرور (batch fallback، یادداشت صوتی legacy) مستقیماً از این تابع استفاده
+  // می‌کردند و بدون پاک‌سازی در DB ذخیره می‌شد — دقیقاً همان مسیر safety-net که
+  // تازه رفع شد.
+  return out.replace(/<\/?end>/g, '').replace(/<fin>/g, '');
 }
 
 export class SonioxEngine {
