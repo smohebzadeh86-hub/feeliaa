@@ -272,6 +272,12 @@ export class SonioxEngine {
 
   async stop(): Promise<string> {
     return new Promise((resolve) => {
+      // BUG-FIX: این resolver قبلاً هیچ‌جا به stopResolvers اضافه نمی‌شد — یعنی
+      // settle() (چه با finished واقعی، چه با FINALIZE_TIMEOUT) resolver را صدا
+      // می‌زد ولی این Promise خاص هرگز عضو آن آرایه نبود، پس awaitِ stop() تا ابد
+      // معلق می‌ماند. این دقیقاً همان چیزی بود که در batch fallback باعث hang
+      // دائمی processBatchQueue می‌شد (safety-net اصلی transcript از کار افتاده بود).
+      this.stopResolvers.push(resolve);
       this.stopRequested = true;
       this.manuallyClosing = true;
       try {
