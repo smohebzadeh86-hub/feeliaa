@@ -1227,6 +1227,12 @@ async function enterApp(){
   $('logoutBtn').hidden=false;
   $('adminBtn').hidden=!(currentTherapist&&currentTherapist.is_admin);
   showScreen('Clients');
+  // BUG-FIX (easy reconnect after refresh): این چک قبلاً بعد از لود کامل لیست
+  // مراجعین اجرا می‌شد و بنرش با بنر «جلسه‌ی ناتمام» رونویسی (overwrite) می‌شد —
+  // یعنی گاهی اصلاً دیده نمی‌شد. حالا اول از همه (بدون معطلی برای هیچ درخواست
+  // دیگری) چک و نمایش داده می‌شود.
+  var hadActiveBanner=false;
+  try{hadActiveBanner=await checkActiveSessionBanner();}catch(e){}
   $('skeletonList').hidden=false;
   $('clientsList').innerHTML='';
   $('emptyFirst').hidden=true;
@@ -1236,11 +1242,9 @@ async function enterApp(){
   $('skeletonList').hidden=true;
   allClients=clientsRes.clients||[];
   renderClients(allClients);
-  if(recoveredRes.recovered&&recoveredRes.recovered.length>0){
+  if(!hadActiveBanner&&recoveredRes.recovered&&recoveredRes.recovered.length>0){
     showInterruptedBanner(recoveredRes.recovered[0]);
   }
-  // P3: اگر session فعالی در همین دستگاه بود، بنر «ادامه رونویسی زنده» اولویت دارد
-  try{await checkActiveSessionBanner();}catch(e){}
 }
 
 // ===== پنل ادمین =====
@@ -1463,21 +1467,24 @@ function adminDownloadAll(){
 async function checkActiveSessionBanner(){
   let sid=null;
   try{sid=localStorage.getItem('feelia_active_session');}catch(e){}
-  if(!sid)return;
+  if(!sid)return false;
   let s=null;
   try{
     const r=await api('/api/sessions/'+sid);
     s=r.session;
   }catch(e){
     try{localStorage.removeItem('feelia_active_session');}catch(ee){}
-    return;
+    return false;
   }
   if(!s||(s.status!=='in_progress'&&s.status!=='recovered')){
     try{localStorage.removeItem('feelia_active_session');}catch(e){}
-    return;
+    return false;
   }
-  const stateLabel=s.status==='recovered'?'ناتمام مانده':'در حال انجام است';
-  bannerBox.innerHTML='<div class="banner warn" style="display:block"><b>جلسه‌ی نیمه‌تمام — ادامه می‌دهید؟</b><br>این جلسه '+stateLabel+' و متن آن حفظ شده است.<br><div class="btn-row" style="margin-top:10px"><button class="btn btn-secondary" onclick="liveResumeSession(\''+s.id+'\')" style="flex:1">ادامه‌ی رونویسی زنده</button><button class="btn btn-ghost" onclick="clearBanner()" style="flex:1">بعداً</button></div></div>';
+  const stateLabel=s.status==='recovered'?'ناتمام مانده (اینترنت/صفحه قطع شده بود)':'در حال انجام است';
+  // BUG-FIX: قبلاً یک دکمه‌ی معمولی در ردیف بنرهای دیگر بود و به‌راحتی از دید جا می‌ماند.
+  // حالا برجسته‌تر و صریح‌تر است — همان یک دکمه، ولی تنها و اول چیزی که کاربر می‌بیند.
+  bannerBox.innerHTML='<div class="banner warn" style="display:block"><b>جلسه‌ی زنده‌ی نیمه‌تمام پیدا شد</b><br>این جلسه '+stateLabel+'؛ متن رونویسی‌شده تا همین الان حفظ است.<br><div class="btn-row" style="margin-top:10px"><button class="btn btn-primary" onclick="liveResumeSession(\''+s.id+'\')" style="flex:2;font-weight:700">↻ ادامه‌ی رونویسی زنده</button><button class="btn btn-ghost" onclick="clearBanner()" style="flex:1">بعداً</button></div></div>';
+  return true;
 }
 
 async function liveResumeSession(sessionId){
@@ -2014,6 +2021,10 @@ function rtOnState(st,snap){
   if(st==='ACTIVE'||st==='RECOVERED'){
     wsConnected=true;$('recDot').classList.remove('paused');
     $('recStatus').classList.remove('warn');clearLiveConnBanner();startTimer();
+  }else if(st==='MANUAL_PAUSED'){
+    // BUG-FIX: این حالت قبلاً هیچ‌جا pauseTimer() صدا نمی‌زد — تایمر جلسه در حین
+    // توقف دستی همچنان می‌شمرد. طول جلسه‌ی واقعی (بدون زمان توقف) اشتباه ثبت می‌شد.
+    wsConnected=false;$('recDot').classList.add('paused');pauseTimer();
   }else if(st==='RECONNECTING'||st==='NETWORK_PAUSED'){
     wsConnected=false;$('recDot').classList.add('paused');pauseTimer();
     setLiveConnBanner('warn','<b>اتصال realtime قطع شد</b> — در حال تلاش برای وصل‌شدنِ دوباره…<br>متنِ تا اینجا حفظ شده و ضبط durable ادامه دارد.');
