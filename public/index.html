@@ -240,6 +240,9 @@ button.btn svg{width:18px;height:18px;flex:none}
 
 .privacy-note{font-size:11.5px;color:var(--muted);text-align:center;line-height:2.1;margin-top:12px;padding:0 10px}
 .privacy-note svg{width:14px;height:14px;vertical-align:-2px;margin-left:5px}
+.link-btn{display:block;margin:2px auto 0;background:none;border:none;padding:2px 6px;font:inherit;font-size:11.5px;color:var(--sage-deep);text-decoration:underline;cursor:pointer}
+.link-btn[hidden]{display:none}
+.ux-consent .consent-actions{margin-top:10px}
 @media(max-width:480px){
   body{padding:20px 12px 40px}
   .card{padding:22px 18px}
@@ -283,7 +286,19 @@ button.btn svg{width:18px;height:18px;flex:none}
     </div>
   </header>
 
-  <div id="bannerBox"></div>
+  <div id="bannerBox" data-clarity-mask="true"></div>
+
+  <!-- رضایتِ خودِ تراپیست برای تحلیلِ تجربه‌ی کاربری (Microsoft Clarity) — مستقل از رضایتِ بالینیِ مراجع.
+       نمایش/پنهان: public/feelia-analytics.js — مستندات: docs/analytics-clarity.md -->
+  <div class="banner info ux-consent" id="uxConsentBox" hidden>
+    <b>به بهتر شدنِ فیلیا کمک می‌کنید؟</b><br>
+    با اجازه‌ی شما، نحوه‌ی کار با رابطِ کاربری (کلیک، اسکرول و جابه‌جایی بین صفحه‌ها) با Microsoft Clarity ثبت می‌شود تا مشکلاتِ تجربه‌ی کاربری را پیدا کنیم.
+    اطلاعاتِ مراجع، متنِ جلسه، یادداشت‌ها و صدا ارسال نمی‌شوند و متن‌های حساس پیش از ارسال پوشانده می‌شوند.
+    <div class="consent-actions">
+      <button class="btn btn-ghost" onclick="FeeliaAnalytics.deny()">نه، ممنون</button>
+      <button class="btn btn-primary" onclick="FeeliaAnalytics.grant()">اجازه می‌دهم</button>
+    </div>
+  </div>
 
   <nav class="flow-steps hidden" id="stepsNav">
     <div class="step active" id="step1"><span class="step-dot">۱</span><span class="step-label">آماده‌سازی</span></div>
@@ -293,7 +308,7 @@ button.btn svg{width:18px;height:18px;flex:none}
     <div class="step" id="step3"><span class="step-dot">۳</span><span class="step-label">پایان</span></div>
   </nav>
 
-  <section id="screenAuth" class="card screen">
+  <section id="screenAuth" class="card screen" data-clarity-mask="true">
     <div class="card-head">
       <h2 id="authTitle">ورود تراپیست</h2>
       <p id="authSubtitle">برای دسترسی به پرونده‌ی مراجعین وارد شوید</p>
@@ -314,7 +329,7 @@ button.btn svg{width:18px;height:18px;flex:none}
     <button class="btn btn-ghost btn-block" style="margin-top:10px" id="authToggleBtn" onclick="toggleAuthMode()">حساب ندارید؟ ثبت‌نام کنید</button>
   </section>
 
-  <section id="screenAdmin" class="card screen" hidden>
+  <section id="screenAdmin" class="card screen" data-clarity-mask="true" hidden>
     <div class="card-head">
       <h2>پنل ادمین</h2>
       <p>مدیریت تراپیست‌ها و دیتای سیستم</p>
@@ -332,7 +347,7 @@ button.btn svg{width:18px;height:18px;flex:none}
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminPanel()">بازگشت</button>
   </section>
 
-  <section id="screenAdminTherapist" class="card screen" hidden>
+  <section id="screenAdminTherapist" class="card screen" data-clarity-mask="true" hidden>
     <div class="card-head">
       <h2 id="adminTherapistTitle"></h2>
       <p id="adminTherapistMeta"></p>
@@ -349,13 +364,13 @@ button.btn svg{width:18px;height:18px;flex:none}
     </div>
     <div class="search-box">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input type="text" id="searchInput" placeholder="جست‌وجوی کد یا نام مستعار…" oninput="filterClients()">
+      <input type="text" id="searchInput" data-clarity-mask="true" placeholder="جست‌وجوی کد یا نام مستعار…" oninput="filterClients()">
     </div>
     <div id="skeletonList" hidden>
       <div class="skeleton-card"><div class="skeleton-line short"></div><div class="skeleton-line"></div></div>
       <div class="skeleton-card"><div class="skeleton-line short"></div><div class="skeleton-line"></div></div>
     </div>
-    <div class="clients-grid" id="clientsList"></div>
+    <div class="clients-grid" id="clientsList" data-clarity-mask="true"></div>
     <div class="empty" id="emptyFirst" hidden>
       <p>هنوز مراجعی ثبت نشده</p><span>اولین مراجع خود را اضافه کنید</span>
     </div>
@@ -371,9 +386,9 @@ button.btn svg{width:18px;height:18px;flex:none}
   <section id="screenSetup" class="card screen" hidden>
     <div class="card-head">
       <h2>جلسه‌ی جدید</h2>
-      <p id="setupClientInfo"></p>
+      <p id="setupClientInfo" data-clarity-mask="true"></p>
     </div>
-    <div class="session-summary" id="setupChips"></div>
+    <div class="session-summary" id="setupChips" data-clarity-mask="true"></div>
     <div class="consent-box" id="consentBox">
       <div class="consent-title">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -402,8 +417,8 @@ button.btn svg{width:18px;height:18px;flex:none}
   </section>
 
   <section id="screenLive" class="card screen" hidden>
-    <div class="rec-meta"><span class="rec-chip" id="recChip"></span></div>
-    <div id="liveConnBanner"></div>
+    <div class="rec-meta"><span class="rec-chip" id="recChip" data-clarity-mask="true"></span></div>
+    <div id="liveConnBanner" data-clarity-mask="true"></div>
     <div class="rec-stage">
       <div class="rec-dot" id="recDot">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round">
@@ -414,13 +429,13 @@ button.btn svg{width:18px;height:18px;flex:none}
       <div class="rec-status" id="recStatus">در حال اتصال…</div>
       <div class="level-meter" id="levelMeter"></div>
       <label class="toggle-row"><input type="checkbox" id="chkLiveText"> نمایش متن زنده</label>
-      <div class="live-text" id="liveText" hidden></div>
+      <div class="live-text" id="liveText" data-clarity-mask="true" hidden></div>
       <div class="signs-area">
         <div class="signs-label">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           علائم بدنی
         </div>
-        <div class="signs-row" id="signsRow">
+        <div class="signs-row" id="signsRow" data-clarity-mask="true">
           <button class="sign-chip" data-sign="گریان">گریان</button>
           <button class="sign-chip" data-sign="لرزش">لرزش</button>
           <button class="sign-chip" data-sign="تنش عضلانی">تنش</button>
@@ -431,13 +446,13 @@ button.btn svg{width:18px;height:18px;flex:none}
           <button class="sign-chip" data-sign="خواب‌آلودگی">خواب‌آلودگی</button>
           <button class="sign-chip" data-sign="بی‌قراری">بی‌قراری</button>
         </div>
-        <div class="signs-log" id="signsLog"></div>
+        <div class="signs-log" id="signsLog" data-clarity-mask="true"></div>
         <div class="signs-label" style="margin-top:14px">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           یادداشت سریع
         </div>
-        <div class="notes-log" id="notesLog"></div>
-        <div class="qn-row">
+        <div class="notes-log" id="notesLog" data-clarity-mask="true"></div>
+        <div class="qn-row" data-clarity-mask="true">
           <input type="text" id="quickNoteInput" placeholder="یادداشت… (Enter)">
           <button class="btn btn-secondary" onclick="addQuickNote()">ثبت</button>
         </div>
@@ -454,12 +469,12 @@ button.btn svg{width:18px;height:18px;flex:none}
   <section id="screenWrapup" class="card screen" hidden>
     <div class="card-head">
       <h2>تکمیل جلسه</h2>
-      <p id="wrapupInfo"></p>
+      <p id="wrapupInfo" data-clarity-mask="true"></p>
     </div>
-    <div class="session-summary" id="wrapupChips"></div>
-    <div id="wrapupSignsLog" style="margin-bottom:14px"></div>
-    <div id="wrapupNotesLog" style="margin-bottom:14px"></div>
-    <div id="notesList"></div>
+    <div class="session-summary" id="wrapupChips" data-clarity-mask="true"></div>
+    <div id="wrapupSignsLog" data-clarity-mask="true" style="margin-bottom:14px"></div>
+    <div id="wrapupNotesLog" data-clarity-mask="true" style="margin-bottom:14px"></div>
+    <div id="notesList" data-clarity-mask="true"></div>
     <div class="btn-row" style="margin-bottom:12px">
       <button class="btn btn-secondary" onclick="startVoiceNote()" id="voiceNoteBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
@@ -470,13 +485,13 @@ button.btn svg{width:18px;height:18px;flex:none}
         یادداشت متنی
       </button>
     </div>
-    <div id="voiceNoteBox" class="sub-panel" hidden>
+    <div id="voiceNoteBox" class="sub-panel" data-clarity-mask="true" hidden>
       <div class="timer" id="voiceTimer" style="font-size:26px;margin:4px 0 2px">۰۰:۰۰</div>
       <div class="rec-status" id="voiceStatus">آماده…</div>
       <div class="live-text" id="voiceLiveText" style="min-height:60px">در حال ضبط… حرف بزنید</div>
       <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="stopVoiceNote()">پایان ضبط و ثبت</button>
     </div>
-    <div id="textNoteBox" class="sub-panel" hidden>
+    <div id="textNoteBox" class="sub-panel" data-clarity-mask="true" hidden>
       <textarea id="textNoteInput" placeholder="متن یادداشت…"></textarea>
       <div class="btn-row">
         <button class="btn btn-ghost" onclick="hideTextInput()">انصراف</button>
@@ -492,11 +507,11 @@ button.btn svg{width:18px;height:18px;flex:none}
 
   <section id="screenClientDetail" class="card screen" hidden>
     <div class="card-head">
-      <h2 id="detailTitle"></h2>
+      <h2 id="detailTitle" data-clarity-mask="true"></h2>
       <p id="detailMeta"></p>
     </div>
-    <div id="sessionsList"></div>
-    <div id="sessionDetail" hidden style="margin-top:16px">
+    <div id="sessionsList" data-clarity-mask="true"></div>
+    <div id="sessionDetail" data-clarity-mask="true" hidden style="margin-top:16px">
       <div class="btn-row" style="margin-bottom:10px">
         <button class="btn btn-ghost btn-sm" onclick="openEditSessionMeta()">ویرایش تاریخ/ساعت</button>
       </div>
@@ -510,10 +525,11 @@ button.btn svg{width:18px;height:18px;flex:none}
   <p class="privacy-note">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4.5" y="10.5" width="15" height="10" rx="3"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
     صدای خام هرگز ذخیره نمی‌شود — فقط متن رونویسی‌شده.
+    <button type="button" class="link-btn" id="uxConsentToggle" onclick="FeeliaAnalytics.toggleConsent()" hidden></button>
   </p>
 </div>
 
-<div class="modal-back" id="newClientModal">
+<div class="modal-back" id="newClientModal" data-clarity-mask="true">
   <div class="modal">
     <h3>مراجع جدید</h3>
     <p>کد یکتا خودکار ساخته می‌شود.</p>
@@ -537,7 +553,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
-<div class="modal-back" id="exitModal">
+<div class="modal-back" id="exitModal" data-clarity-mask="true">
   <div class="modal">
     <h3>مطمئن هستید؟</h3>
     <p id="exitWarningText">هنوز ذخیره نکرده‌اید.</p>
@@ -548,7 +564,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
-<div class="modal-back" id="deleteSessionModal">
+<div class="modal-back" id="deleteSessionModal" data-clarity-mask="true">
   <div class="modal">
     <h3>حذف این جلسه؟</h3>
     <p id="deleteSessionText"></p>
@@ -559,7 +575,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
-<div class="modal-back" id="editSessionModal">
+<div class="modal-back" id="editSessionModal" data-clarity-mask="true">
   <div class="modal">
     <h3>ویرایش تاریخ و ساعت جلسه</h3>
     <label>تاریخ (مثال: ۱۴۰۳/۰۵/۱۲)</label>
@@ -573,7 +589,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
-<div class="modal-back" id="deleteTherapistModal">
+<div class="modal-back" id="deleteTherapistModal" data-clarity-mask="true">
   <div class="modal">
     <h3>حذف کامل این تراپیست؟</h3>
     <p id="deleteTherapistText"></p>
@@ -586,7 +602,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
-<div class="modal-back" id="deleteClientModal">
+<div class="modal-back" id="deleteClientModal" data-clarity-mask="true">
   <div class="modal">
     <h3>حذف مراجع؟</h3>
     <p id="deleteClientText"></p>
@@ -598,6 +614,7 @@ button.btn svg{width:18px;height:18px;flex:none}
 </div>
 
 <script src="/feelia-rt.js"></script>
+<script src="/feelia-analytics.js"></script>
 <script>
 'use strict';
 
@@ -691,6 +708,8 @@ function pad2(n){return n<10?'0'+n:''+n;}
 function formatTimer(ms){const s=Math.floor(ms/1000);return toFa(pad2(Math.floor(s/60))+':'+pad2(s%60));}
 function showBanner(k,m){bannerBox.innerHTML='<div class="banner '+k+'">'+m+'</div>';}
 function clearBanner(){bannerBox.innerHTML='';}
+// تحلیلِ تجربه‌ی کاربری (Clarity): فقط نامِ رویداد از allowlistِ public/feelia-analytics.js — هرگز داده. fail-open.
+function uxTrack(name){try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.event(name);}catch(e){}}
 // پیامِ خطای میکروفون بر اساسِ نوعِ خطای واقعیِ مرورگر — نه یک جمله‌ی عمومی برای همه‌چیز.
 // قدم ۳ (پروژه فیلیا): افتراقی برای هر name جدا + WebView + ناامن بودن صفحه.
 // هیچ رفتار ضبطی عوض نشده؛ فقط متن راهنما دقیق‌تر شده تا کاربر بداند چه کار کند.
@@ -1134,6 +1153,7 @@ function showScreen(name){
   showSteps(inFlow);
   if(inFlow)updateSteps({Setup:0,Live:1,Wrapup:2}[name]);
   window.scrollTo({top:0,behavior:'smooth'});
+  try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.screen(name);}catch(e){}
 }
 
 async function api(path,options={}){
@@ -1162,12 +1182,14 @@ function updateStartButtonState(){
 }
 function setConsent(value){
   consent=value;
+  if(value)uxTrack('client_consent_given');
   if(value){
     $('consentBox').hidden=true;
   }
   updateStartButtonState();
 }
 function declineConsentAndExit(){
+  uxTrack('client_consent_declined');
   setConsent(false);
   goBackToClients();
   showBanner('warn','چون مراجع موافق رونویسی نبود، جلسه شروع نشد.');
@@ -1200,16 +1222,20 @@ async function submitAuth(){
     const body=authMode==='register'?{phone,password,name,email:email||undefined}:{phone,password};
     const data=await api(path,{method:'POST',body});
     currentTherapist=data.therapist;
+    uxTrack(authMode==='register'?'signup_completed':'login_completed');
     $('authPhone').value='';$('authEmail').value='';$('authPassword').value='';
     await enterApp();
   }catch(e){showBanner('error',e.message);}
 }
 async function logout(){
+  uxTrack('logout_clicked');
   try{await api('/api/auth/logout',{method:'POST'});}catch(e){}
   currentTherapist=null;
   $('logoutBtn').hidden=true;
   $('adminBtn').hidden=true;
   showScreen('Auth');
+  // اگر Clarity در این صفحه لود شده بود، reload تا ضبط به کاربرِ بعدیِ همین تب نرسد
+  try{if(window.FeeliaAnalytics&&window.FeeliaAnalytics.onLogout())location.reload();}catch(e){}
 }
 
 // ===== Init =====
@@ -1227,6 +1253,8 @@ async function enterApp(){
   $('logoutBtn').hidden=false;
   $('adminBtn').hidden=!(currentTherapist&&currentTherapist.is_admin);
   showScreen('Clients');
+  // fire-and-forget — Clarity هیچ مسیری از ورود را منتظر نمی‌گذارد
+  try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.boot(currentTherapist);}catch(e){}
   // BUG-FIX (easy reconnect after refresh): این چک قبلاً بعد از لود کامل لیست
   // مراجعین اجرا می‌شد و بنرش با بنر «جلسه‌ی ناتمام» رونویسی (overwrite) می‌شد —
   // یعنی گاهی اصلاً دیده نمی‌شد. حالا اول از همه (بدون معطلی برای هیچ درخواست
@@ -1488,6 +1516,7 @@ async function checkActiveSessionBanner(){
 }
 
 async function liveResumeSession(sessionId){
+  uxTrack('session_live_resume_clicked');
   clearBanner();
   try{
     const sessionRes=await api('/api/sessions/'+sessionId);
@@ -1548,6 +1577,7 @@ function showInterruptedBanner(s){
 }
 
 function resumeSession(sessionId){
+  uxTrack('session_interrupted_resume_clicked');
   clearBanner();
   fetch('/api/sessions/'+sessionId).then(function(r){return r.json();}).then(async function(sessionRes){
     const clientRes=await api('/api/clients/'+sessionRes.session.client_id);
@@ -1669,6 +1699,7 @@ async function confirmDeleteClient(){
   closeDeleteClient();
   try{
     await api('/api/clients/'+deleteTargetClient,{method:'DELETE'});
+    uxTrack('client_deleted');
     showBanner('info','مراجع حذف شد.');
     loadClients();
   }catch(e){showBanner('error',e.message);}
@@ -1686,6 +1717,7 @@ async function confirmDeleteSession(){
   closeDeleteSession();
   try{
     await api('/api/sessions/'+deleteTargetSession,{method:'DELETE'});
+    uxTrack('session_deleted');
     showBanner('info','جلسه حذف شد.');
     if(currentClient)openClientDetail(currentClient.id);
   }catch(e){showBanner('error',e.message);}
@@ -1775,6 +1807,7 @@ async function viewTranscript(sessionId){
       });
     }else nb.hidden=true;
     $('sessionDetail').hidden=false;
+    uxTrack('transcript_opened');
   }catch(e){showBanner('error',e.message);}
 }
 
@@ -1793,6 +1826,7 @@ async function saveSessionMeta(){
   if(!date||!start_time){showBanner('error','تاریخ و ساعت را کامل وارد کنید.');return;}
   try{
     const data=await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{date,start_time}});
+    uxTrack('session_meta_edited');
     currentViewSession=data.session;
     closeEditSessionMeta();
     showBanner('info','تاریخ و ساعت جلسه به‌روزرسانی شد.');
@@ -1803,16 +1837,17 @@ async function saveSessionMeta(){
 // ⭐ عمداً هیچ دانلود/اشتراک‌گذاریِ دیتا از سمتِ تراپیست وجود نداره — فقط ادمین
 // (توی پنلِ ادمین، با احرازِ سمتِ سرور) می‌تونه دیتا رو از پلتفرم خارج کنه.
 
-function showNewClientModal(){$('newClientAlias').value='';$('newClientModal').classList.add('open');}
+function showNewClientModal(){uxTrack('client_create_opened');$('newClientAlias').value='';$('newClientModal').classList.add('open');}
 function closeNewClientModal(){$('newClientModal').classList.remove('open');}
 async function createNewClient(){
   const alias=$('newClientAlias').value.trim();
   try{
     const data=await api('/api/clients',{method:'POST',body:{alias:alias}});
+    uxTrack('client_created');
     closeNewClientModal();
     showBanner('info','مراجع <b>'+data.client.code+'</b> ساخته شد.');
     loadClients();
-  }catch(e){showBanner('error',e.message);}
+  }catch(e){uxTrack('client_create_failed');showBanner('error',e.message);}
 }
 
 // ===== Setup =====
@@ -1845,6 +1880,7 @@ async function runPreflight(){
     $('preflightMicRow').textContent='میکروفون: آماده';
   }catch(e){
     preflightMicOk=false;
+    try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.micError(e&&e.name);}catch(_){}
     $('preflightMicRow').className='banner error';
     $('preflightMicRow').textContent=describeMicError(e);
   }
@@ -1877,9 +1913,11 @@ async function runPreflight(){
 async function startSession(){
   clearBanner();
   if(!consent)return;
+  uxTrack('session_start_clicked');
   try{
     const data=await api('/api/sessions',{method:'POST',body:{client_id:currentClient.id,consent:true}});
     currentSession=data.session;
+    uxTrack('session_started');
     // P3: session فعال را برای resume بعد از reload نگه دار
     try{localStorage.setItem('feelia_active_session',currentSession.id);}catch(e){}
     $('recChip').innerHTML=IC_MIC+'<span></span>';
@@ -1912,7 +1950,7 @@ async function startSession(){
     }
     if(isDirectMode()){await startDirectLive();}
     else{await connectWS();}
-  }catch(e){showBanner('error','خطا: '+e.message);}
+  }catch(e){uxTrack('session_start_failed');showBanner('error','خطا: '+e.message);}
 }
 
 // ===== Watchdog: صدا ارسال می‌شود ولی متنی برنمی‌گردد =====
@@ -2341,7 +2379,7 @@ function handleMsg(msg){
   }
 }
 
- $('chkLiveText').addEventListener('change',function(){$('liveText').hidden=!$('chkLiveText').checked;});
+ $('chkLiveText').addEventListener('change',function(){$('liveText').hidden=!$('chkLiveText').checked;uxTrack('live_text_toggled');});
 
 // ===== Timer =====
 function resetTimer(){clearInterval(timerInterval);elapsedMs=0;lastTickAt=null;timerRunning=false;renderTimer();}
@@ -2372,6 +2410,7 @@ function renderTimer(){$('recTimer').textContent=formatTimer(elapsedMs);}
 document.querySelectorAll('.sign-chip').forEach(function(chip){
   chip.addEventListener('click',async function(){
     if(!currentSession||!currentSession.id)return;
+    uxTrack('sign_added'); // ⚠️ نوعِ علامت هرگز ارسال نمی‌شود
     chip.classList.add('logged');
     setTimeout(function(){chip.classList.remove('logged');},2000);
     const sd={type:'sign',sign_type:chip.dataset.sign,offset_ms:elapsedMs,wall_clock:nowClock()};
@@ -2424,6 +2463,7 @@ async function addQuickNote(){
   const input=$('quickNoteInput');
   const text=input.value.trim();
   if(!text||!currentSession)return;
+  uxTrack('quick_note_added');
   const nd={type:'note_during',text:text,offset_ms:elapsedMs,wall_clock:nowClock()};
   sessionNotes.push(nd);
   renderNotesLog();
@@ -2547,6 +2587,7 @@ async function resumeDirectLive(){
   startTimer();
 }
 function pauseSessionLive(){
+  uxTrack('session_pause_clicked');
   if(rtSession){rtPauseLive();return;}
   if(directActive){pauseDirectLive();return;}
   if(!ws||!currentSession||manualPaused||p1Terminal)return;
@@ -2580,6 +2621,7 @@ function pauseSessionLive(){
   persistDuration(); // فوری ذخیره کن — منتظرِ تیکِ ۱۰ثانیه‌ایِ autosave نمون
 }
 async function resumeSessionLive(){
+  uxTrack('session_resume_clicked');
   if(rtSession){rtResumeLive();return;}
   if(!currentSession||!manualPaused||p1Terminal)return;
   if(directPrefix!==''||directActive||isDirectMode()){await resumeDirectLive();return;}
@@ -2609,6 +2651,7 @@ async function resumeSessionLive(){
 
 // ===== End =====
 function endSession(){
+  uxTrack('session_end_clicked');
   if(rtSession){endNewRTSession();return;}
   if(directActive&&currentSession){endDirectLive();return;}
   if(!ws||!currentSession)return;
@@ -2716,6 +2759,7 @@ function showCancelModal(){$('cancelModal').classList.add('open');}
 function closeCancelModal(){$('cancelModal').classList.remove('open');}
 async function confirmCancelSession(){
   closeCancelModal();
+  uxTrack('session_canceled');
   if(rtSession){try{rtSession.abort();}catch(e){}try{window.FeeliaRT.forget(rtSession);}catch(ee){}rtSession=null;}
   // P3: cancel → ترمینال، کلید resume پاک شود
   try{localStorage.removeItem('feelia_active_session');}catch(e){}
@@ -2749,7 +2793,7 @@ function showExitWarning(){
   $('exitModal').classList.add('open');
 }
 function closeExitWarning(){$('exitModal').classList.remove('open');}
-function confirmExitWithoutSave(){closeExitWarning();goBackToClients();}
+function confirmExitWithoutSave(){uxTrack('session_exit_without_save');closeExitWarning();goBackToClients();}
 
 // ===== Wrapup =====
 function renderWrapupNotes(){
@@ -2794,6 +2838,7 @@ async function addTextNote(){
     $('textNoteInput').value='';
     $('textNoteBox').hidden=true;
     wrapupNotes.push({dbId:d.note.id,type:'text',text:d.note.text,wall_clock:d.note.wall_clock});
+    uxTrack('text_note_added');
     renderWrapupNotes();
   }catch(e){showBanner('error','خطا در ثبت');}
 }
@@ -2801,6 +2846,7 @@ async function addTextNote(){
 // Voice Note
 async function startVoiceNote(){
   if(!currentSession)return;
+  uxTrack('voice_note_started');
   if(window.FeeliaRT&&window.FeeliaRT.isAvailable()&&!rtVoice&&!voiceWS&&(!voiceMediaRecorder||voiceMediaRecorder.state==='inactive')){
     try{
       const ok=await startVoiceNoteDirect();
@@ -2864,6 +2910,7 @@ async function startVoiceNote(){
 }
 
 function stopVoiceNote(){
+  uxTrack('voice_note_stop_clicked');
   if(rtVoice){stopVoiceNoteDirect();return;}
   if(voiceMediaRecorder&&voiceMediaRecorder.state!=='inactive'){
     $('voiceStatus').textContent='در حال نهایی‌سازی…';
@@ -2904,6 +2951,7 @@ async function finishSession(){
   showBanner('info','در حال ذخیره…');
   try{
     await api('/api/sessions/'+currentSession.id,{method:'PUT',body:{status:'completed'}});
+    uxTrack('session_saved');
     clearBanner();
     wrapupNotes=[];
     currentSession=null;

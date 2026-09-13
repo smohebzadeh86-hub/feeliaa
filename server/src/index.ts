@@ -13,6 +13,7 @@ import { adminRoutes } from './http/admin.js';
 import { clientRoutes } from './http/clients.js';
 import { sessionRoutes } from './http/sessions.js';
 import { sttRoutes } from './http/stt.js';
+import { clientConfigRoutes } from './http/clientConfig.js';
 import { transcriptionRoutes } from './ws/transcription.js';
 import { sweepOldBatchFiles } from './stt/batchqueue.js';
 
@@ -40,6 +41,7 @@ await app.register(adminRoutes);
 await app.register(clientRoutes);
 await app.register(sessionRoutes);
 await app.register(sttRoutes);
+await app.register(clientConfigRoutes);
 await app.register(transcriptionRoutes);
 
 // Serve static (فرانت)
