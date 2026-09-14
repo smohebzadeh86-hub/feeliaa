@@ -359,9 +359,16 @@ export async function sessionRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
-    // آرشیو فقط صداست، به transcript دست نمی‌زنه — پس رویِ جلسه‌ی completed هم مجازه
-    // (finish() و PUT status=completed تقریباً هم‌زمان و بدونِ ترتیبِ تضمین‌شده می‌رن).
-    if (purpose !== 'archive' && (owned.status === 'completed' || owned.status === 'canceled')) {
+    // ⭐ فیکسِ باگِ واقعی: آرشیو و یادداشتِ صوتی هیچ‌کدام transcript را دست نمی‌زنند،
+    // پس رویِ جلسه‌ی completed هم باید مجاز باشند — مخصوصاً purpose=note، چون تنها
+    // نقطه‌ی UI که یادداشتِ صوتی می‌سازد (دکمه‌ی «یادداشت صوتی» در Wrapup) همیشه
+    // بعد از این اجرا می‌شود که endNewRTSession() همین‌جا status=completed فرستاده
+    // (کامنتِ خودِ همان تابع: «finish() و PUT status=completed تقریباً هم‌زمان می‌رن»).
+    // یعنی قبل از این فیکس، مسیرِ batch-pending-note برایِ صد-درصدِ یادداشت‌های
+    // صوتی‌ای که realtime نداشتند با ۴۰۰ رد می‌شد — صدا ضبط می‌شد ولی هیچ‌وقت
+    // آپلود/رونویسی نمی‌شد. purpose=transcript همچنان روی جلسه‌ی تمام‌شده مسدود
+    // می‌ماند (نباید متنِ نهایی بعد از پایان تغییر کند).
+    if (purpose === 'transcript' && (owned.status === 'completed' || owned.status === 'canceled')) {
       reply.code(400);
       return { error: 'جلسه پایان یافته است' };
     }
