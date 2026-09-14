@@ -13,8 +13,11 @@ import { adminRoutes } from './http/admin.js';
 import { clientRoutes } from './http/clients.js';
 import { sessionRoutes } from './http/sessions.js';
 import { sttRoutes } from './http/stt.js';
+import { clientConfigRoutes } from './http/clientConfig.js';
 import { transcriptionRoutes } from './ws/transcription.js';
 import { sweepOldBatchFiles } from './stt/batchqueue.js';
+import { sweepOldSessionAudio } from './stt/sessionAudioArchive.js';
+import { sweepOldResolveJobs } from './stt/speakerResolve.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -40,6 +43,7 @@ await app.register(adminRoutes);
 await app.register(clientRoutes);
 await app.register(sessionRoutes);
 await app.register(sttRoutes);
+await app.register(clientConfigRoutes);
 await app.register(transcriptionRoutes);
 
 // Serve static (فرانت)
@@ -57,6 +61,11 @@ const start = async () => {
     await runMigrations();
     // پاک‌سازی فایل‌های صوت batch قدیمی (حریم خصوصی/دیسک)
     try { sweepOldBatchFiles(); } catch {}
+    // آرشیوِ صدایِ ادمین: هم سرِ startup هم هر ۲۴ ساعت — سروری که هفته‌ها ری‌استارت
+    // نمی‌شه هم نباید صدایِ بیشتر از سقفِ نگه‌داری رو نگه داره.
+    try { await sweepOldSessionAudio(); } catch {}
+    setInterval(() => { sweepOldSessionAudio().catch(() => {}); }, 24 * 60 * 60 * 1000);
+    setInterval(() => { try { sweepOldResolveJobs(); } catch {} }, 60 * 60 * 1000);
     console.log('🌿 Feelia server starting...');
     await app.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`🌿 Feelia server running on http://localhost:${PORT}`);

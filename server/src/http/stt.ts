@@ -29,6 +29,9 @@ function mintRateLimited(therapistId: string): boolean {
   return false;
 }
 
+// enable_endpoint_detection:true — برگردوندم به مقدارِ قبلی: خاموش‌کردنش (طبقِ
+// توصیه‌ی docsِ Soniox برایِ دقتِ diarization) در عمل با صدایِ واقعی تاخیرِ محسوس و
+// غیرقابل‌قبولی توی finalize‌شدنِ متنِ زنده ایجاد کرد — سرعتِ کپشنِ زنده اولویتِ بالاتریه.
 const STT_DEFAULTS = {
   model: 'stt-rt-v5',
   audio_format: 'auto',

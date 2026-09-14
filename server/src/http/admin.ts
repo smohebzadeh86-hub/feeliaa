@@ -1,7 +1,9 @@
 // پنل ادمین — فقط is_admin=true. هیچ‌جا متنِ رونویسی‌شده‌ی جلسات نمایش داده نمی‌شود.
 import { FastifyInstance } from 'fastify';
+import { createReadStream, statSync } from 'node:fs';
 import { query } from '../db/connection.js';
 import { requireAdmin } from '../auth/guard.js';
+import { listSessionAudio, getSessionAudioRow } from '../stt/sessionAudioArchive.js';
 
 // دیتای کاملِ یک تراپیست: مراجعین + جلسات (با متنِ رونویسی) + یادداشت‌ها/علائم.
 // فقط از دو مسیرِ export که پشتِ requireAdmin هستن صدا زده می‌شه.
@@ -110,6 +112,80 @@ export async function adminRoutes(app: FastifyInstance) {
     `, [id]);
 
     return { therapist: therapist.rows[0], clients: clients.rows };
+  });
+
+  // GET /api/admin/clients/:id/sessions — لیستِ جلساتِ یک مراجع (فقط متادیتا، بدونِ متن)
+  // برایِ رفتنِ ادمین از تراپیست → مراجع → جلسه → صدا.
+  app.get('/api/admin/clients/:id/sessions', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const client = await query('SELECT id, code, alias FROM clients WHERE id = $1', [id]);
+    if (client.rows.length === 0) {
+      reply.code(404);
+      return { error: 'مراجع یافت نشد' };
+    }
+    const sessions = await query(`
+      SELECT s.id, s.session_num, s.date, s.start_time, s.duration_ms, s.status,
+        COUNT(a.id) as audio_count
+      FROM sessions s
+      LEFT JOIN session_audio a ON a.session_id = s.id
+      WHERE s.client_id = $1
+      GROUP BY s.id
+      ORDER BY s.session_num DESC
+    `, [id]);
+    return { client: client.rows[0], sessions: sessions.rows };
+  });
+
+  // GET /api/admin/sessions/:id/audio — لیستِ سگمنت‌هایِ صدایِ آرشیوشده‌ی یک جلسه
+  // (فقط متادیتا — bytes/seq/created_at، نه خودِ فایل).
+  app.get('/api/admin/sessions/:id/audio', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const session = await query('SELECT id FROM sessions WHERE id = $1', [id]);
+    if (session.rows.length === 0) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+    const rows = await listSessionAudio(id);
+    return {
+      audio: rows.map((r) => ({
+        id: r.id, seq: r.seq, bytes: r.bytes, mime: r.mime, source: r.source, created_at: r.created_at,
+      })),
+    };
+  });
+
+  // GET /api/admin/session-audio/:audioId/stream — پخشِ خودِ فایلِ صدا (با Range،
+  // برایِ اینکه <audio> بتونه scrub کنه). فقط پشتِ requireAdmin — لینکِ عمومی نداره،
+  // از static directory سرو نمی‌شه.
+  app.get('/api/admin/session-audio/:audioId/stream', async (request, reply) => {
+    const { audioId } = request.params as { audioId: string };
+    const row = await getSessionAudioRow(audioId);
+    if (!row) {
+      reply.code(404);
+      return { error: 'فایلِ صدا یافت نشد' };
+    }
+    let stat;
+    try {
+      stat = statSync(row.path);
+    } catch {
+      reply.code(404);
+      return { error: 'فایل رویِ دیسک پیدا نشد' };
+    }
+    const range = request.headers.range;
+    const contentType = row.mime || 'audio/webm';
+    if (range) {
+      const m = /bytes=(\d*)-(\d*)/.exec(range);
+      const start = m && m[1] ? parseInt(m[1], 10) : 0;
+      const end = m && m[2] ? parseInt(m[2], 10) : stat.size - 1;
+      reply.code(206);
+      reply.header('Content-Range', `bytes ${start}-${end}/${stat.size}`);
+      reply.header('Accept-Ranges', 'bytes');
+      reply.header('Content-Length', end - start + 1);
+      reply.header('Content-Type', contentType);
+      return reply.send(createReadStream(row.path, { start, end }));
+    }
+    reply.header('Accept-Ranges', 'bytes');
+    reply.header('Content-Length', stat.size);
+    reply.header('Content-Type', contentType);
+    return reply.send(createReadStream(row.path));
   });
 
   // ⭐ خروج دیتا از پلتفرم فقط از همین دو مسیر ممکنه — هر دو پشتِ requireAdmin.

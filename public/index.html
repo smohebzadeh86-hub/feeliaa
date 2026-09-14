@@ -103,17 +103,64 @@ button.btn svg{width:18px;height:18px;flex:none}
 .skeleton-line.short{width:60%}
 @keyframes shimmer{0%{opacity:.5}50%{opacity:.8}100%{opacity:.5}}
 
+.client-tabs{display:flex;gap:6px;background:var(--field);border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:4px;margin-bottom:14px}
+.client-tab{flex:1;text-align:center;padding:10px;border-radius:12px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;background:none;border:none;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
+.client-tab.active{background:var(--card);color:var(--sage-deep);box-shadow:0 1px 3px rgba(43,58,52,.08)}
+.client-tab .count{font-size:10.5px;background:var(--sage-soft);color:var(--sage-deep);border-radius:99px;padding:1px 7px;font-variant-numeric:tabular-nums}
+.client-tab:not(.active) .count{background:var(--line-soft);color:var(--muted)}
+
+.filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.cat-filter-row{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;flex:1;-ms-overflow-style:none;scrollbar-width:none}
+.cat-filter-row::-webkit-scrollbar{display:none}
+.cat-filter-chip{flex:none;padding:7px 14px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);font-family:inherit;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.cat-filter-chip.active{background:var(--sage);border-color:var(--sage);color:#fff}
+/* ⭐ چیپِ دسته‌ای که جنسیت داره، به‌جایِ بازکردنِ ردیفِ دوم، خودش این‌جا
+   جاش رو با یه کنترلِ دوتکه (segmented) عوض می‌کنه — همون‌جا، همون ردیف. */
+.cat-seg{flex:none;display:inline-flex;border-radius:99px;overflow:hidden;border:1.5px solid var(--sage)}
+.cat-seg button{border:none;background:var(--card);color:var(--sage-deep);font-family:inherit;font-size:12px;font-weight:600;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.cat-seg button:not(:first-child){border-inline-start:1.5px solid var(--sage)}
+.cat-seg button.active{background:var(--sage);color:#fff}
+.cat-seg button:not(.active):hover{background:var(--sage-mist)}
+
+.sort-menu{position:relative;flex:none}
+.sort-btn{width:38px;height:38px;border-radius:var(--r-md);border:1.5px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:color .2s,border-color .2s}
+.sort-btn:hover,.sort-btn.active{color:var(--sage-deep);border-color:var(--sage)}
+.sort-btn svg{width:16px;height:16px}
+.sort-drop{position:absolute;left:0;top:44px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);padding:5px;min-width:170px;display:none;z-index:6}
+.sort-menu.open .sort-drop{display:block}
+.sort-drop button{width:100%;text-align:right;background:none;border:none;padding:9px 11px;border-radius:8px;font-family:inherit;font-size:12.5px;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sort-drop button:hover{background:var(--sage-mist);color:var(--sage-deep)}
+.sort-drop button.active{color:var(--sage-deep);font-weight:700}
+
 .clients-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 .client-card{border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:18px;background:var(--card);cursor:pointer;transition:border-color .2s,box-shadow .2s;position:relative;display:flex;flex-direction:column;gap:10px}
 .client-card:hover{border-color:var(--sage);box-shadow:0 4px 16px rgba(62,107,94,.08)}
+.client-card.inactive{background:var(--field)}
 .client-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-left:38px}
+.client-name{display:flex;align-items:baseline;gap:8px;min-width:0;flex-wrap:wrap}
 .client-alias{font-size:15px;font-weight:700;color:var(--ink)}
 .client-code{font-size:13px;font-weight:700;color:var(--sage-deep);direction:ltr;font-variant-numeric:tabular-nums}
-.client-meta{font-size:12px;color:var(--muted);line-height:1.7}
+.client-meta{font-size:12px;color:var(--muted);line-height:1.7;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cat-badge{font-size:10px;font-weight:600;color:var(--ink-2);background:var(--field);border:1px solid var(--line-soft);border-radius:99px;padding:2px 9px;flex:none}
+.client-card.inactive .cat-badge{background:var(--card)}
+.status-reason{font-size:11.5px;color:var(--gold-deep)}
 .client-actions{display:flex;gap:8px;margin-top:auto}
 .client-actions .btn-primary{flex:1.4}
 .client-actions .btn-ghost{flex:1}
-.client-delete,.session-delete{
+
+.client-menu{position:absolute;top:12px;left:12px}
+.client-menu-btn{width:32px;height:32px;border-radius:9px;background:none;border:none;color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:color .2s,background .2s}
+.client-menu-btn:hover,.client-menu-btn:focus-visible{color:var(--sage-deep);background:var(--sage-mist)}
+.client-menu-btn svg{width:16px;height:16px}
+.client-menu-drop{position:absolute;top:38px;left:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);padding:5px;min-width:180px;display:none;z-index:5}
+.client-menu.open .client-menu-drop{display:block}
+.client-menu-drop button{width:100%;text-align:right;background:none;border:none;padding:9px 11px;border-radius:8px;font-family:inherit;font-size:12.5px;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;gap:8px}
+.client-menu-drop button:hover{background:var(--sage-mist);color:var(--sage-deep)}
+.client-menu-drop button.danger:hover{background:var(--clay-soft);color:var(--clay-deep)}
+.client-menu-drop hr{border:none;border-top:1px solid var(--line-soft);margin:4px 2px}
+.client-menu-drop svg{width:14px;height:14px}
+
+.session-delete{
   position:absolute;top:12px;left:12px;
   width:32px;height:32px;
   border-radius:9px;
@@ -123,13 +170,13 @@ button.btn svg{width:18px;height:18px;flex:none}
   display:grid;place-items:center;
   transition:color .2s,background .2s,opacity .2s;
 }
-.client-delete:hover,.session-delete:hover{
+.session-delete:hover{
   color:var(--clay-deep);background:var(--clay-soft);opacity:1;
 }
-.client-delete:focus-visible,.session-delete:focus-visible{
+.session-delete:focus-visible{
   outline:3px solid rgba(193,102,85,.35);outline-offset:2px;opacity:1;
 }
-.client-delete svg,.session-delete svg{width:15px;height:15px}
+.session-delete svg{width:15px;height:15px}
 
 .session-item{border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:15px 18px;margin-bottom:12px;background:var(--card);cursor:pointer;transition:border-color .2s;position:relative}
 .session-item:hover{border-color:var(--sage)}
@@ -230,6 +277,14 @@ button.btn svg{width:18px;height:18px;flex:none}
 .modal .modal-actions{display:flex;gap:10px;margin-top:6px}
 .exit-sub{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.7}
 
+.radio-group{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.radio-opt{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1.5px solid var(--line);border-radius:var(--r-sm);cursor:pointer;font-size:13.5px;color:var(--ink-2);margin-bottom:0}
+.radio-opt:has(input:checked){border-color:var(--sage);background:var(--sage-mist);color:var(--ink)}
+.radio-opt input{accent-color:var(--sage);width:auto;margin:0;padding:0;background:none;border:none}
+.cat-select{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.cat-opt{padding:8px 13px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);font-family:inherit;font-size:12px;color:var(--ink-2);cursor:pointer}
+.cat-opt.sel{background:var(--sage);border-color:var(--sage);color:#fff}
+
 .transcript-box{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:400px;overflow-y:auto;font-size:13.5px;line-height:2.1;white-space:pre-wrap;color:var(--ink-2)}
 .transcript-notes{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:200px;overflow-y:auto;margin-top:12px}
 .transcript-notes .inline-note{background:var(--sage-mist);border-right:3px solid var(--sage);padding:8px 12px;margin:6px 0;border-radius:8px;font-size:12.5px;color:var(--ink-2)}
@@ -240,6 +295,9 @@ button.btn svg{width:18px;height:18px;flex:none}
 
 .privacy-note{font-size:11.5px;color:var(--muted);text-align:center;line-height:2.1;margin-top:12px;padding:0 10px}
 .privacy-note svg{width:14px;height:14px;vertical-align:-2px;margin-left:5px}
+.link-btn{display:block;margin:2px auto 0;background:none;border:none;padding:2px 6px;font:inherit;font-size:11.5px;color:var(--sage-deep);text-decoration:underline;cursor:pointer}
+.link-btn[hidden]{display:none}
+.ux-consent .consent-actions{margin-top:10px}
 @media(max-width:480px){
   body{padding:20px 12px 40px}
   .card{padding:22px 18px}
@@ -283,7 +341,19 @@ button.btn svg{width:18px;height:18px;flex:none}
     </div>
   </header>
 
-  <div id="bannerBox"></div>
+  <div id="bannerBox" data-clarity-mask="true"></div>
+
+  <!-- رضایتِ خودِ تراپیست برای تحلیلِ تجربه‌ی کاربری (Microsoft Clarity) — مستقل از رضایتِ بالینیِ مراجع.
+       نمایش/پنهان: public/feelia-analytics.js — مستندات: docs/analytics-clarity.md -->
+  <div class="banner info ux-consent" id="uxConsentBox" hidden>
+    <b>به بهتر شدنِ فیلیا کمک می‌کنید؟</b><br>
+    با اجازه‌ی شما، نحوه‌ی کار با رابطِ کاربری (کلیک، اسکرول و جابه‌جایی بین صفحه‌ها) با Microsoft Clarity ثبت می‌شود تا مشکلاتِ تجربه‌ی کاربری را پیدا کنیم.
+    اطلاعاتِ مراجع، متنِ جلسه، یادداشت‌ها و صدا ارسال نمی‌شوند و متن‌های حساس پیش از ارسال پوشانده می‌شوند.
+    <div class="consent-actions">
+      <button class="btn btn-ghost" onclick="FeeliaAnalytics.deny()">نه، ممنون</button>
+      <button class="btn btn-primary" onclick="FeeliaAnalytics.grant()">اجازه می‌دهم</button>
+    </div>
+  </div>
 
   <nav class="flow-steps hidden" id="stepsNav">
     <div class="step active" id="step1"><span class="step-dot">۱</span><span class="step-label">آماده‌سازی</span></div>
@@ -293,7 +363,7 @@ button.btn svg{width:18px;height:18px;flex:none}
     <div class="step" id="step3"><span class="step-dot">۳</span><span class="step-label">پایان</span></div>
   </nav>
 
-  <section id="screenAuth" class="card screen">
+  <section id="screenAuth" class="card screen" data-clarity-mask="true">
     <div class="card-head">
       <h2 id="authTitle">ورود تراپیست</h2>
       <p id="authSubtitle">برای دسترسی به پرونده‌ی مراجعین وارد شوید</p>
@@ -301,6 +371,10 @@ button.btn svg{width:18px;height:18px;flex:none}
     <div id="authNameField" hidden>
       <label>نام (اختیاری)</label>
       <input type="text" id="authName" placeholder="نام شما" autocomplete="name">
+    </div>
+    <div id="authSpecialtyField" hidden>
+      <label>تخصص (اختیاری)</label>
+      <input type="text" id="authSpecialty" placeholder="مثلاً: روان‌شناسِ بالینی" autocomplete="off">
     </div>
     <label>شماره موبایل</label>
     <input type="tel" id="authPhone" placeholder="۰۹۱۲۳۴۵۶۷۸۹" autocomplete="username" inputmode="numeric" dir="ltr" style="text-align:left">
@@ -314,7 +388,7 @@ button.btn svg{width:18px;height:18px;flex:none}
     <button class="btn btn-ghost btn-block" style="margin-top:10px" id="authToggleBtn" onclick="toggleAuthMode()">حساب ندارید؟ ثبت‌نام کنید</button>
   </section>
 
-  <section id="screenAdmin" class="card screen" hidden>
+  <section id="screenAdmin" class="card screen" data-clarity-mask="true" hidden>
     <div class="card-head">
       <h2>پنل ادمین</h2>
       <p>مدیریت تراپیست‌ها و دیتای سیستم</p>
@@ -332,7 +406,7 @@ button.btn svg{width:18px;height:18px;flex:none}
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminPanel()">بازگشت</button>
   </section>
 
-  <section id="screenAdminTherapist" class="card screen" hidden>
+  <section id="screenAdminTherapist" class="card screen" data-clarity-mask="true" hidden>
     <div class="card-head">
       <h2 id="adminTherapistTitle"></h2>
       <p id="adminTherapistMeta"></p>
@@ -342,20 +416,48 @@ button.btn svg{width:18px;height:18px;flex:none}
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminTherapistDetail()">بازگشت به پنل ادمین</button>
   </section>
 
+  <!-- ⭐ فقط برایِ ادمین: لیستِ جلساتِ یک مراجع + پخشِ صدایِ آرشیوشده (دیباگِ STT) -->
+  <section id="screenAdminSessions" class="card screen" data-clarity-mask="true" hidden>
+    <div class="card-head">
+      <h2 id="adminSessionsTitle"></h2>
+      <p>صدا فقط برایِ بازبینیِ فنی نگه داشته می‌شود — حداکثر ۱۴ روز.</p>
+    </div>
+    <div id="adminSessionsList"></div>
+    <div class="empty" id="adminSessionsEmpty" hidden><p>این مراجع هنوز جلسه‌ای ندارد</p></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminSessions()">بازگشت</button>
+  </section>
+
   <section id="screenClients" class="card screen" hidden>
     <div class="card-head">
       <h2>مراجعین</h2>
       <p>انتخاب مراجع یا مشاهده پرونده</p>
     </div>
+    <div class="client-tabs">
+      <button class="client-tab active" id="clientTabActive" onclick="switchClientTab('active')">فعال <span class="count" id="countActive">۰</span></button>
+      <button class="client-tab" id="clientTabInactive" onclick="switchClientTab('inactive')">غیرفعال <span class="count" id="countInactive">۰</span></button>
+    </div>
     <div class="search-box">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input type="text" id="searchInput" placeholder="جست‌وجوی کد یا نام مستعار…" oninput="filterClients()">
+      <input type="text" id="searchInput" data-clarity-mask="true" placeholder="جست‌وجوی کد یا نام مستعار…" oninput="filterClients()">
+    </div>
+    <div class="filter-bar">
+      <div class="cat-filter-row" id="catFilterRow"></div>
+      <div class="sort-menu" id="sortMenu">
+        <button class="sort-btn" type="button" title="ترتیبِ نمایش" onclick="toggleSortMenu(event)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h10M3 12h7M3 18h4"/><path d="M17 4v16M17 4l-4 4M17 4l4 4"/></svg>
+        </button>
+        <div class="sort-drop" id="sortDrop">
+          <button type="button" class="active" data-sort="default" onclick="setSortMode('default')">پیش‌فرض</button>
+          <button type="button" data-sort="recent_session" onclick="setSortMode('recent_session')">آخرین جلسه</button>
+          <button type="button" data-sort="alpha" onclick="setSortMode('alpha')">الفبا (نام)</button>
+        </div>
+      </div>
     </div>
     <div id="skeletonList" hidden>
       <div class="skeleton-card"><div class="skeleton-line short"></div><div class="skeleton-line"></div></div>
       <div class="skeleton-card"><div class="skeleton-line short"></div><div class="skeleton-line"></div></div>
     </div>
-    <div class="clients-grid" id="clientsList"></div>
+    <div class="clients-grid" id="clientsList" data-clarity-mask="true"></div>
     <div class="empty" id="emptyFirst" hidden>
       <p>هنوز مراجعی ثبت نشده</p><span>اولین مراجع خود را اضافه کنید</span>
     </div>
@@ -371,9 +473,9 @@ button.btn svg{width:18px;height:18px;flex:none}
   <section id="screenSetup" class="card screen" hidden>
     <div class="card-head">
       <h2>جلسه‌ی جدید</h2>
-      <p id="setupClientInfo"></p>
+      <p id="setupClientInfo" data-clarity-mask="true"></p>
     </div>
-    <div class="session-summary" id="setupChips"></div>
+    <div class="session-summary" id="setupChips" data-clarity-mask="true"></div>
     <div class="consent-box" id="consentBox">
       <div class="consent-title">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -402,8 +504,8 @@ button.btn svg{width:18px;height:18px;flex:none}
   </section>
 
   <section id="screenLive" class="card screen" hidden>
-    <div class="rec-meta"><span class="rec-chip" id="recChip"></span></div>
-    <div id="liveConnBanner"></div>
+    <div class="rec-meta"><span class="rec-chip" id="recChip" data-clarity-mask="true"></span></div>
+    <div id="liveConnBanner" data-clarity-mask="true"></div>
     <div class="rec-stage">
       <div class="rec-dot" id="recDot">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round">
@@ -414,13 +516,13 @@ button.btn svg{width:18px;height:18px;flex:none}
       <div class="rec-status" id="recStatus">در حال اتصال…</div>
       <div class="level-meter" id="levelMeter"></div>
       <label class="toggle-row"><input type="checkbox" id="chkLiveText"> نمایش متن زنده</label>
-      <div class="live-text" id="liveText" hidden></div>
+      <div class="live-text" id="liveText" data-clarity-mask="true" hidden></div>
       <div class="signs-area">
         <div class="signs-label">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           علائم بدنی
         </div>
-        <div class="signs-row" id="signsRow">
+        <div class="signs-row" id="signsRow" data-clarity-mask="true">
           <button class="sign-chip" data-sign="گریان">گریان</button>
           <button class="sign-chip" data-sign="لرزش">لرزش</button>
           <button class="sign-chip" data-sign="تنش عضلانی">تنش</button>
@@ -431,13 +533,13 @@ button.btn svg{width:18px;height:18px;flex:none}
           <button class="sign-chip" data-sign="خواب‌آلودگی">خواب‌آلودگی</button>
           <button class="sign-chip" data-sign="بی‌قراری">بی‌قراری</button>
         </div>
-        <div class="signs-log" id="signsLog"></div>
+        <div class="signs-log" id="signsLog" data-clarity-mask="true"></div>
         <div class="signs-label" style="margin-top:14px">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
           یادداشت سریع
         </div>
-        <div class="notes-log" id="notesLog"></div>
-        <div class="qn-row">
+        <div class="notes-log" id="notesLog" data-clarity-mask="true"></div>
+        <div class="qn-row" data-clarity-mask="true">
           <input type="text" id="quickNoteInput" placeholder="یادداشت… (Enter)">
           <button class="btn btn-secondary" onclick="addQuickNote()">ثبت</button>
         </div>
@@ -454,12 +556,12 @@ button.btn svg{width:18px;height:18px;flex:none}
   <section id="screenWrapup" class="card screen" hidden>
     <div class="card-head">
       <h2>تکمیل جلسه</h2>
-      <p id="wrapupInfo"></p>
+      <p id="wrapupInfo" data-clarity-mask="true"></p>
     </div>
-    <div class="session-summary" id="wrapupChips"></div>
-    <div id="wrapupSignsLog" style="margin-bottom:14px"></div>
-    <div id="wrapupNotesLog" style="margin-bottom:14px"></div>
-    <div id="notesList"></div>
+    <div class="session-summary" id="wrapupChips" data-clarity-mask="true"></div>
+    <div id="wrapupSignsLog" data-clarity-mask="true" style="margin-bottom:14px"></div>
+    <div id="wrapupNotesLog" data-clarity-mask="true" style="margin-bottom:14px"></div>
+    <div id="notesList" data-clarity-mask="true"></div>
     <div class="btn-row" style="margin-bottom:12px">
       <button class="btn btn-secondary" onclick="startVoiceNote()" id="voiceNoteBtn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
@@ -470,13 +572,13 @@ button.btn svg{width:18px;height:18px;flex:none}
         یادداشت متنی
       </button>
     </div>
-    <div id="voiceNoteBox" class="sub-panel" hidden>
+    <div id="voiceNoteBox" class="sub-panel" data-clarity-mask="true" hidden>
       <div class="timer" id="voiceTimer" style="font-size:26px;margin:4px 0 2px">۰۰:۰۰</div>
       <div class="rec-status" id="voiceStatus">آماده…</div>
       <div class="live-text" id="voiceLiveText" style="min-height:60px">در حال ضبط… حرف بزنید</div>
       <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="stopVoiceNote()">پایان ضبط و ثبت</button>
     </div>
-    <div id="textNoteBox" class="sub-panel" hidden>
+    <div id="textNoteBox" class="sub-panel" data-clarity-mask="true" hidden>
       <textarea id="textNoteInput" placeholder="متن یادداشت…"></textarea>
       <div class="btn-row">
         <button class="btn btn-ghost" onclick="hideTextInput()">انصراف</button>
@@ -492,14 +594,16 @@ button.btn svg{width:18px;height:18px;flex:none}
 
   <section id="screenClientDetail" class="card screen" hidden>
     <div class="card-head">
-      <h2 id="detailTitle"></h2>
+      <h2 id="detailTitle" data-clarity-mask="true"></h2>
       <p id="detailMeta"></p>
     </div>
-    <div id="sessionsList"></div>
-    <div id="sessionDetail" hidden style="margin-top:16px">
+    <div id="sessionsList" data-clarity-mask="true"></div>
+    <div id="sessionDetail" data-clarity-mask="true" hidden style="margin-top:16px">
       <div class="btn-row" style="margin-bottom:10px">
         <button class="btn btn-ghost btn-sm" onclick="openEditSessionMeta()">ویرایش تاریخ/ساعت</button>
+        <button class="btn btn-ghost btn-sm" id="resolveSpeakersBtn" hidden onclick="startResolveSpeakersUI()">بازسازیِ شماره‌گذاریِ گوینده‌ها</button>
       </div>
+      <div id="resolveSpeakersStatus" hidden style="margin-bottom:8px;font-size:12.5px;color:var(--muted)"></div>
       <div class="transcript-box" id="transcriptBox"></div>
       <div class="transcript-notes" id="transcriptNotes" hidden></div>
     </div>
@@ -510,18 +614,63 @@ button.btn svg{width:18px;height:18px;flex:none}
   <p class="privacy-note">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4.5" y="10.5" width="15" height="10" rx="3"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
     صدای خام هرگز ذخیره نمی‌شود — فقط متن رونویسی‌شده.
+    <button type="button" class="link-btn" id="uxConsentToggle" onclick="FeeliaAnalytics.toggleConsent()" hidden></button>
   </p>
 </div>
 
-<div class="modal-back" id="newClientModal">
+<div class="modal-back" id="newClientModal" data-clarity-mask="true">
   <div class="modal">
     <h3>مراجع جدید</h3>
     <p>کد یکتا خودکار ساخته می‌شود.</p>
     <label>نام مستعار (اختیاری)</label>
-    <input type="text" id="newClientAlias" placeholder="مثلاً: مراجع-الف" style="margin-bottom:0">
+    <input type="text" id="newClientAlias" placeholder="مثلاً: مراجع-الف" style="margin-bottom:14px">
+    <label>دسته‌بندی (اختیاری)</label>
+    <div class="cat-select" id="newClientCatSelect"></div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn btn-ghost" onclick="closeNewClientModal()">انصراف</button>
       <button class="btn btn-primary" onclick="createNewClient()">ایجاد</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="resolveSpeakersModal" data-clarity-mask="true">
+  <div class="modal">
+    <h3>بازسازیِ شماره‌گذاریِ گوینده‌ها</h3>
+    <p>این عملیات کلِ صدایِ آرشیوشده‌ی جلسه رو یک‌جا دوباره رونویسی می‌کنه تا شماره‌ی گوینده‌ها از اول تا آخرِ جلسه یکدست بمونه. متنِ فعلی پاک نمی‌شه — فقط یه پیش‌نمایش می‌بینی و خودت تصمیم می‌گیری جایگزین بشه یا نه.</p>
+    <div class="transcript-box" id="resolveSpeakersPreview" style="margin-top:10px;max-height:260px"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeResolveSpeakersModal()">بستن</button>
+      <button class="btn btn-primary" id="resolveSpeakersApplyBtn" onclick="applyResolvedSpeakers()">جایگزینیِ متن</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="deactivateClientModal" data-clarity-mask="true">
+  <div class="modal">
+    <h3>انتقال به غیرفعال‌ها</h3>
+    <p>دلیل غیرفعال‌شدنِ <b id="deactivateClientCode"></b> چیست؟ این فقط برای یادآوریِ خودتان ثبت می‌شود.</p>
+    <div class="radio-group" id="deactivateReasonGroup">
+      <label class="radio-opt"><input type="radio" name="deactivateReason" value="ناتوانی مالی" checked> ناتوانیِ مالی</label>
+      <label class="radio-opt"><input type="radio" name="deactivateReason" value="ظرفیت روحی/زمانی"> ظرفیتِ روحی/زمانی</label>
+      <label class="radio-opt"><input type="radio" name="deactivateReason" value="روند تکمیل شد"> روند تکمیل شد</label>
+      <label class="radio-opt"><input type="radio" name="deactivateReason" value="سایر"> سایر</label>
+    </div>
+    <input type="text" id="deactivateReasonOther" placeholder="توضیحِ کوتاه (اختیاری)…" style="margin-bottom:0">
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeDeactivateModal()">انصراف</button>
+      <button class="btn btn-primary" onclick="confirmDeactivateClient()">تایید انتقال</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="editCategoryModal" data-clarity-mask="true">
+  <div class="modal">
+    <h3>ویرایشِ دسته‌بندی</h3>
+    <p>دسته‌بندیِ <b id="editCategoryClientCode"></b> را تغییر دهید.</p>
+    <div class="cat-select" id="editCategoryCatSelect"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeEditCategoryModal()">انصراف</button>
+      <button class="btn btn-primary" onclick="confirmEditCategory()">ذخیره</button>
     </div>
   </div>
 </div>
@@ -537,7 +686,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
-<div class="modal-back" id="exitModal">
+<div class="modal-back" id="exitModal" data-clarity-mask="true">
   <div class="modal">
     <h3>مطمئن هستید؟</h3>
     <p id="exitWarningText">هنوز ذخیره نکرده‌اید.</p>
@@ -548,7 +697,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
-<div class="modal-back" id="deleteSessionModal">
+<div class="modal-back" id="deleteSessionModal" data-clarity-mask="true">
   <div class="modal">
     <h3>حذف این جلسه؟</h3>
     <p id="deleteSessionText"></p>
@@ -559,7 +708,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
-<div class="modal-back" id="editSessionModal">
+<div class="modal-back" id="editSessionModal" data-clarity-mask="true">
   <div class="modal">
     <h3>ویرایش تاریخ و ساعت جلسه</h3>
     <label>تاریخ (مثال: ۱۴۰۳/۰۵/۱۲)</label>
@@ -573,7 +722,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
-<div class="modal-back" id="deleteTherapistModal">
+<div class="modal-back" id="deleteTherapistModal" data-clarity-mask="true">
   <div class="modal">
     <h3>حذف کامل این تراپیست؟</h3>
     <p id="deleteTherapistText"></p>
@@ -586,7 +735,7 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
-<div class="modal-back" id="deleteClientModal">
+<div class="modal-back" id="deleteClientModal" data-clarity-mask="true">
   <div class="modal">
     <h3>حذف مراجع؟</h3>
     <p id="deleteClientText"></p>
@@ -598,6 +747,7 @@ button.btn svg{width:18px;height:18px;flex:none}
 </div>
 
 <script src="/feelia-rt.js"></script>
+<script src="/feelia-analytics.js"></script>
 <script>
 'use strict';
 
@@ -609,6 +759,9 @@ const IC_X='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wi
 const IC_MIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>';
 const IC_PEN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>';
 const IC_EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const IC_DOTS='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+const IC_ARCHIVE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M10 13h4"/></svg>';
+const IC_RESTORE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
 
 let currentClient=null;
 let currentSession=null;
@@ -631,6 +784,16 @@ let sessionNotes=[];
 let allClients=[];
 let deleteTargetSession=null;
 let deleteTargetClient=null;
+let clientTab='active';
+let clientCategoryFilter='all';
+let clientGenderFilter=null;
+let clientSortMode='default';
+let deactivateTargetClient=null;
+let newClientSelectedCategory=null;
+let newClientSelectedGender=null;
+let editCategoryTargetClient=null;
+let editCategorySelectedCategory=null;
+let editCategorySelectedGender=null;
 
 let currentTherapist=null;
 let authMode='login';
@@ -691,6 +854,8 @@ function pad2(n){return n<10?'0'+n:''+n;}
 function formatTimer(ms){const s=Math.floor(ms/1000);return toFa(pad2(Math.floor(s/60))+':'+pad2(s%60));}
 function showBanner(k,m){bannerBox.innerHTML='<div class="banner '+k+'">'+m+'</div>';}
 function clearBanner(){bannerBox.innerHTML='';}
+// تحلیلِ تجربه‌ی کاربری (Clarity): فقط نامِ رویداد از allowlistِ public/feelia-analytics.js — هرگز داده. fail-open.
+function uxTrack(name){try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.event(name);}catch(e){}}
 // پیامِ خطای میکروفون بر اساسِ نوعِ خطای واقعیِ مرورگر — نه یک جمله‌ی عمومی برای همه‌چیز.
 // قدم ۳ (پروژه فیلیا): افتراقی برای هر name جدا + WebView + ناامن بودن صفحه.
 // هیچ رفتار ضبطی عوض نشده؛ فقط متن راهنما دقیق‌تر شده تا کاربر بداند چه کار کند.
@@ -987,7 +1152,7 @@ async function startDirectLive(){
   directFinalText='';
   directPrefix='';
   lastSavedDirectText=null;
-  $('recStatus').textContent='در حال اتصال مستقیم به Soniox…';
+  $('recStatus').textContent='در حال برقراریِ اتصال…';
   let cred;
   try{cred=await SonioxDirect.mint(currentSession.id);}
   catch(e){
@@ -996,14 +1161,14 @@ async function startDirectLive(){
     if(e&&e.status===401){
       $('recStatus').textContent='نشست منقضی شده — دوباره وارد شوید';
       $('recStatus').classList.add('warn');
-      setLiveConnBanner('error','<b>نشست شما منقضی شده (خطای 401).</b><br>از حساب خارج و دوباره وارد شوید؛ بدون ورود معتبر، مسیر جایگزین هم رد می‌شود.');
+      setLiveConnBanner('error','<b>نشست شما منقضی شده.</b><br>از حساب خارج و دوباره وارد شوید.');
       return;
     }
     await fallbackToProxy('mint');return;
   }
   try{
     await SonioxDirect.connect(cred,{
-      onStatus:function(){wsConnected=true;$('recDot').classList.remove('paused');$('recStatus').textContent='در حال رونویسی مستقیم…';$('recStatus').classList.remove('warn');clearLiveConnBanner();startTimer();lastPreviewAt=Date.now();},
+      onStatus:function(){wsConnected=true;$('recDot').classList.remove('paused');$('recStatus').textContent='در حال رونویسیِ زنده…';$('recStatus').classList.remove('warn');clearLiveConnBanner();startTimer();lastPreviewAt=Date.now();},
       onResult:function(r){
         lastPreviewAt=Date.now();
         directFinalText=cleanDirectText(r.final);
@@ -1064,8 +1229,8 @@ async function fallbackToProxy(reason){
   directFallbackDone=true;
   try{SonioxDirect.close();}catch(e){}
   directActive=false;wsConnected=false;
-  setLiveConnBanner('warn','<b>اتصال مستقیم قطع شد ('+reason+').</b><br>به مسیر معمول برگشتیم — ضبط ادامه دارد و متن تا اینجا حفظ شده.');
-  $('recStatus').textContent='برگشت به مسیر معمول…';
+  setLiveConnBanner('warn','<b>اتصال قطع شد.</b><br>در حال اتصالِ مجدد — ضبط ادامه دارد و متن تا اینجا حفظ شده.');
+  $('recStatus').textContent='در حال اتصالِ مجدد…';
   try{await connectWS();}catch(e){}
 }
 async function endDirectLive(){
@@ -1126,7 +1291,7 @@ function updateSteps(idx){
   }
 }
 function showScreen(name){
-  ['Auth','Clients','Setup','Live','Wrapup','ClientDetail','Admin','AdminTherapist'].forEach(s=>{
+  ['Auth','Clients','Setup','Live','Wrapup','ClientDetail','Admin','AdminTherapist','AdminSessions'].forEach(s=>{
     const el=$('screen'+s);
     if(el)el.hidden=s!==name;
   });
@@ -1134,6 +1299,7 @@ function showScreen(name){
   showSteps(inFlow);
   if(inFlow)updateSteps({Setup:0,Live:1,Wrapup:2}[name]);
   window.scrollTo({top:0,behavior:'smooth'});
+  try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.screen(name);}catch(e){}
 }
 
 async function api(path,options={}){
@@ -1162,12 +1328,14 @@ function updateStartButtonState(){
 }
 function setConsent(value){
   consent=value;
+  if(value)uxTrack('client_consent_given');
   if(value){
     $('consentBox').hidden=true;
   }
   updateStartButtonState();
 }
 function declineConsentAndExit(){
+  uxTrack('client_consent_declined');
   setConsent(false);
   goBackToClients();
   showBanner('warn','چون مراجع موافق رونویسی نبود، جلسه شروع نشد.');
@@ -1183,6 +1351,7 @@ function resetConsent(){
 function toggleAuthMode(){
   authMode=authMode==='login'?'register':'login';
   $('authNameField').hidden=authMode!=='register';
+  $('authSpecialtyField').hidden=authMode!=='register';
   $('authEmailField').hidden=authMode!=='register';
   $('authTitle').textContent=authMode==='register'?'ثبت‌نام تراپیست':'ورود تراپیست';
   $('authSubmitBtn').textContent=authMode==='register'?'ثبت‌نام':'ورود';
@@ -1194,22 +1363,27 @@ async function submitAuth(){
   const email=$('authEmail').value.trim();
   const password=$('authPassword').value;
   const name=$('authName').value.trim();
+  const specialty=$('authSpecialty').value.trim();
   if(!phone||!password){showBanner('error','شماره موبایل و رمز عبور را وارد کنید.');return;}
   try{
     const path=authMode==='register'?'/api/auth/register':'/api/auth/login';
-    const body=authMode==='register'?{phone,password,name,email:email||undefined}:{phone,password};
+    const body=authMode==='register'?{phone,password,name,specialty:specialty||undefined,email:email||undefined}:{phone,password};
     const data=await api(path,{method:'POST',body});
     currentTherapist=data.therapist;
-    $('authPhone').value='';$('authEmail').value='';$('authPassword').value='';
+    uxTrack(authMode==='register'?'signup_completed':'login_completed');
+    $('authPhone').value='';$('authEmail').value='';$('authPassword').value='';$('authSpecialty').value='';
     await enterApp();
   }catch(e){showBanner('error',e.message);}
 }
 async function logout(){
+  uxTrack('logout_clicked');
   try{await api('/api/auth/logout',{method:'POST'});}catch(e){}
   currentTherapist=null;
   $('logoutBtn').hidden=true;
   $('adminBtn').hidden=true;
   showScreen('Auth');
+  // اگر Clarity در این صفحه لود شده بود، reload تا ضبط به کاربرِ بعدیِ همین تب نرسد
+  try{if(window.FeeliaAnalytics&&window.FeeliaAnalytics.onLogout())location.reload();}catch(e){}
 }
 
 // ===== Init =====
@@ -1227,6 +1401,8 @@ async function enterApp(){
   $('logoutBtn').hidden=false;
   $('adminBtn').hidden=!(currentTherapist&&currentTherapist.is_admin);
   showScreen('Clients');
+  // fire-and-forget — Clarity هیچ مسیری از ورود را منتظر نمی‌گذارد
+  try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.boot(currentTherapist);}catch(e){}
   // BUG-FIX (easy reconnect after refresh): این چک قبلاً بعد از لود کامل لیست
   // مراجعین اجرا می‌شد و بنرش با بنر «جلسه‌ی ناتمام» رونویسی (overwrite) می‌شد —
   // یعنی گاهی اصلاً دیده نمی‌شد. حالا اول از همه (بدون معطلی برای هیچ درخواست
@@ -1241,10 +1417,38 @@ async function enterApp(){
   const recoveredRes=await api('/api/recovered').catch(function(){return{recovered:[]};});
   $('skeletonList').hidden=true;
   allClients=clientsRes.clients||[];
-  renderClients(allClients);
+  applyClientFilters();
   if(!hadActiveBanner&&recoveredRes.recovered&&recoveredRes.recovered.length>0){
     showInterruptedBanner(recoveredRes.recovered[0]);
   }
+  sweepOrphanedAudioQueue(); // fire-and-forget — پایینِ همین فایل
+}
+
+// ⭐ جاروبِ سراسری: صدایِ باقی‌مانده از یه جلسه‌ی قبلی که هیچ‌وقت resume نشد (مثلاً
+// تب برای همیشه بسته شده بود، نه فقط رفرش شده) رو، مستقل از هر RTSessionِ زنده،
+// آپلود می‌کنه. بدونِ این، اون صدا فقط توی IndexedDBِ همون مرورگر می‌موند، برای همیشه.
+// ⭐ چرا purpose=archive (نه transcript): این‌جا نمی‌دونیم اون جلسه‌ی رهاشده قبل از
+// قطع‌شدن، realtime‌ش موفق بود یا نه — یعنی نمی‌دونیم این صدا از قبل توی transcript
+// هست یا نه. رونویسیِ دوباره و merge کورکورانه ریسکِ duplicate داره؛ فقط آرشیو کردن
+// امن‌تره (ادمین می‌تونه گوش بده، خودِ متن اگه لازم شد دستی اضافه می‌شه).
+async function sweepOrphanedAudioQueue(){
+  try{
+    if(!window.FeeliaRT||!window.FeeliaRT.audioQueue)return;
+    const q=window.FeeliaRT.audioQueue;
+    const sessionIds=await q.listSessionIdsWithPending();
+    for(const sid of sessionIds){
+      const pending=await q.listForSession(sid);
+      for(const rec of pending){
+        if(!rec.blob||rec.blob.size<=100){await q.remove(sid,rec.seq);continue;}
+        try{
+          const fd=new FormData();
+          fd.append('file',rec.blob,'segment-'+rec.seq+'.webm');
+          const res=await fetch('/api/sessions/'+sid+'/batch-audio?purpose=archive&seq='+rec.seq,{method:'POST',body:fd});
+          if(res.ok||res.status===400){await q.remove(sid,rec.seq);}
+        }catch(e){/* شکستِ شبکه — توی صف می‌مونه، بارِ بعدِ بازکردنِ اپ امتحان می‌شه */}
+      }
+    }
+  }catch(e){}
 }
 
 // ===== پنل ادمین =====
@@ -1419,7 +1623,6 @@ async function openAdminTherapistDetail(id){
     data.clients.forEach(function(c){
       const div=document.createElement('div');
       div.className='session-item';
-      div.style.cursor='default';
       const head=document.createElement('div');
       head.className='session-head';
       head.style.paddingLeft='0';
@@ -1430,13 +1633,14 @@ async function openAdminTherapistDetail(id){
       const delBtn=document.createElement('button');
       delBtn.className='btn btn-ghost btn-sm';
       delBtn.textContent='حذف مراجع';
-      delBtn.addEventListener('click',function(){adminDeleteClient(c.id);});
+      delBtn.addEventListener('click',function(e){e.stopPropagation();adminDeleteClient(c.id);});
       head.appendChild(delBtn);
       div.appendChild(head);
       const date=document.createElement('div');
       date.className='session-date';
       date.textContent=toFa(c.session_count||0)+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'');
       div.appendChild(date);
+      div.addEventListener('click',function(){openAdminClientSessions(c.id,c.code+(c.alias?' — '+c.alias:''));});
       box.appendChild(div);
     });
     showScreen('AdminTherapist');
@@ -1444,6 +1648,73 @@ async function openAdminTherapistDetail(id){
 }
 function closeAdminTherapistDetail(){
   showScreen('Admin');
+}
+
+// ⭐ فقط برایِ ادمین: جلساتِ یک مراجع + پخشِ صدایِ آرشیوشده (برایِ دیباگِ STT).
+// خودِ تراپیست/کاربرِ عادی به این صفحه یا این endpointها هیچ دسترسی‌ای نداره —
+// همه‌شون پشتِ requireAdmin هستن (server/src/http/admin.ts).
+async function openAdminClientSessions(clientId,title){
+  try{
+    const data=await api('/api/admin/clients/'+clientId+'/sessions');
+    $('adminSessionsTitle').textContent=title;
+    const box=$('adminSessionsList');
+    box.innerHTML='';
+    $('adminSessionsEmpty').hidden=data.sessions.length>0;
+    for(const s of data.sessions){
+      const div=document.createElement('div');
+      div.className='session-item';
+      div.style.cursor='default';
+      const head=document.createElement('div');
+      head.className='session-head';
+      head.style.paddingLeft='0';
+      const num=document.createElement('span');
+      num.className='session-num';
+      num.textContent='جلسه '+toFa(s.session_num);
+      head.appendChild(num);
+      const st=s.status==='completed'?'کامل':s.status==='in_progress'?'در جریان':'قطع‌شده';
+      const status=document.createElement('span');
+      status.className='session-status '+s.status;
+      status.textContent=st;
+      head.appendChild(status);
+      div.appendChild(head);
+      const date=document.createElement('div');
+      date.className='session-date';
+      date.textContent=toFa(s.date)+' · شروع '+toFa(s.start_time)+(s.duration_ms?' · '+toFa(Math.round(s.duration_ms/60000))+' دقیقه':'');
+      div.appendChild(date);
+      const audioCount=Number(s.audio_count||0);
+      if(audioCount>0){
+        const audioBox=document.createElement('div');
+        audioBox.style.cssText='margin-top:10px;display:flex;flex-direction:column;gap:8px';
+        const label=document.createElement('div');
+        label.style.cssText='font-size:11.5px;color:var(--muted)';
+        label.textContent=toFa(audioCount)+' سگمنتِ صوتیِ آرشیوشده:';
+        audioBox.appendChild(label);
+        try{
+          const audioData=await api('/api/admin/sessions/'+s.id+'/audio');
+          audioData.audio.forEach(function(a){
+            const row=document.createElement('div');
+            row.style.cssText='display:flex;align-items:center;gap:8px';
+            const segLabel=document.createElement('span');
+            segLabel.style.cssText='font-size:11px;color:var(--muted);flex:none;width:70px';
+            segLabel.textContent='سگمنت '+toFa(a.seq+1);
+            row.appendChild(segLabel);
+            const player=document.createElement('audio');
+            player.controls=true;
+            player.style.cssText='flex:1;height:32px';
+            player.src='/api/admin/session-audio/'+a.id+'/stream';
+            row.appendChild(player);
+            audioBox.appendChild(row);
+          });
+        }catch(e){}
+        div.appendChild(audioBox);
+      }
+      box.appendChild(div);
+    }
+    showScreen('AdminSessions');
+  }catch(e){showBanner('error',e.message);}
+}
+function closeAdminSessions(){
+  showScreen('AdminTherapist');
 }
 async function adminDeleteClient(clientId){
   adminDeleteTargetClient=clientId;
@@ -1488,6 +1759,7 @@ async function checkActiveSessionBanner(){
 }
 
 async function liveResumeSession(sessionId){
+  uxTrack('session_live_resume_clicked');
   clearBanner();
   try{
     const sessionRes=await api('/api/sessions/'+sessionId);
@@ -1548,6 +1820,7 @@ function showInterruptedBanner(s){
 }
 
 function resumeSession(sessionId){
+  uxTrack('session_interrupted_resume_clicked');
   clearBanner();
   fetch('/api/sessions/'+sessionId).then(function(r){return r.json();}).then(async function(sessionRes){
     const clientRes=await api('/api/clients/'+sessionRes.session.client_id);
@@ -1569,6 +1842,24 @@ function resumeSession(sessionId){
 }
 
 // ===== Clients =====
+const CATEGORY_LABELS={'child':'کودک','teen':'نوجوان','adult':'بزرگسال'};
+// ⭐ جنسیت یه فیلدِ مستقل و اختیاریه (نه بخشی از category) — چون قرار شد هم
+// نوجوان هم بزرگسال بتونن جنسیت داشته باشن، بدونِ تکرارِ ترکیب‌های category.
+const GENDER_OPTIONS={
+  'teen':[{v:'f',label:'دختر'},{v:'m',label:'پسر'}],
+  'adult':[{v:'f',label:'زن'},{v:'m',label:'مرد'}],
+};
+function genderLabel(cat,gender){
+  const opts=GENDER_OPTIONS[cat]||[];
+  const found=opts.find(function(o){return o.v===gender;});
+  return found?found.label:null;
+}
+function categoryBadgeLabel(cat,gender){
+  if(!cat||!CATEGORY_LABELS[cat])return null;
+  const g=genderLabel(cat,gender);
+  return g?CATEGORY_LABELS[cat]+' ('+g+')':CATEGORY_LABELS[cat];
+}
+
 async function loadClients(){
   try{
     $('skeletonList').hidden=false;
@@ -1576,19 +1867,127 @@ async function loadClients(){
     const data=await api('/api/clients');
     $('skeletonList').hidden=true;
     allClients=data.clients||[];
-    renderClients(allClients);
+    applyClientFilters();
   }catch(e){
     $('skeletonList').hidden=true;
     showBanner('error','خطا: '+e.message);
   }
 }
 
-function filterClients(){
+function switchClientTab(tab){
+  uxTrack('clients_tab_switched');
+  clientTab=tab;
+  $('clientTabActive').classList.toggle('active',tab==='active');
+  $('clientTabInactive').classList.toggle('active',tab==='inactive');
+  applyClientFilters();
+}
+
+// ⭐ کامپوننتِ مشترکِ رندرِ چیپ‌هایِ دسته‌بندی — دقیقاً همون چیپی که کلیک می‌شه
+// (اگه جنسیت داشته باشه) به یه کنترلِ دوتکه تبدیل می‌شه، نه اینکه ردیفِ جدیدی
+// زیرش باز کنه. برایِ ردیفِ فیلتر و هر دو مودالِ دسته‌بندی استفاده می‌شه.
+function renderCategoryChips(container,options,state,onPick,chipClass,activeClass){
+  container.innerHTML='';
+  options.forEach(function(opt){
+    const genderOpts=GENDER_OPTIONS[opt.value];
+    if(state.category===opt.value&&genderOpts){
+      const seg=document.createElement('div');
+      seg.className='cat-seg';
+      genderOpts.forEach(function(g){
+        const b=document.createElement('button');
+        b.type='button';
+        b.textContent=g.label;
+        if(state.gender===g.v)b.classList.add('active');
+        b.addEventListener('click',function(e){
+          e.stopPropagation();
+          onPick(opt.value,state.gender===g.v?null:g.v);
+        });
+        seg.appendChild(b);
+      });
+      container.appendChild(seg);
+    }else{
+      const chip=document.createElement('button');
+      chip.type='button';
+      chip.className=chipClass+(state.category===opt.value?(' '+activeClass):'');
+      chip.textContent=opt.label;
+      chip.addEventListener('click',function(e){
+        e.stopPropagation();
+        onPick(opt.value,null);
+      });
+      container.appendChild(chip);
+    }
+  });
+}
+
+const FILTER_CATEGORY_OPTIONS=[{value:'all',label:'همه'},{value:'child',label:'کودک'},{value:'teen',label:'نوجوان'},{value:'adult',label:'بزرگسال'}];
+function renderCatFilterRow(){
+  renderCategoryChips($('catFilterRow'),FILTER_CATEGORY_OPTIONS,{category:clientCategoryFilter,gender:clientGenderFilter},function(cat,gender){
+    clientCategoryFilter=cat;
+    clientGenderFilter=gender;
+    applyClientFilters();
+  },'cat-filter-chip','active');
+}
+
+function filterClients(){applyClientFilters();}
+
+function toggleSortMenu(e){
+  e.stopPropagation();
+  const menu=$('sortMenu');
+  const wasOpen=menu.classList.contains('open');
+  closeAllClientMenus();
+  if(!wasOpen)menu.classList.add('open');
+}
+function setSortMode(mode){
+  clientSortMode=mode;
+  $('sortDrop').querySelectorAll('button').forEach(function(b){b.classList.toggle('active',b.dataset.sort===mode);});
+  $('sortMenu').classList.remove('open');
+  applyClientFilters();
+}
+
+// ⭐ یک نقطه‌ی مرکزی برای هر شرط (تب + دسته + جنسیت + جست‌وجو + ترتیب) — تا فیلترهایِ
+// جدا روی هم سوار نشن و رفتارِ ناسازگار نسازن.
+function applyClientFilters(){
+  renderCatFilterRow();
   const q=$('searchInput').value.trim().toLowerCase();
-  if(!q){renderClients(allClients);return;}
-  renderClients(allClients.filter(function(c){
-    return (c.code||'').toLowerCase().includes(q)||(c.alias||'').toLowerCase().includes(q);
-  }),true);
+  const byTab=allClients.filter(function(c){return (c.status||'active')===clientTab;});
+
+  $('countActive').textContent=toFa(allClients.filter(function(c){return (c.status||'active')==='active';}).length);
+  $('countInactive').textContent=toFa(allClients.filter(function(c){return c.status==='inactive';}).length);
+
+  let visible=byTab.filter(function(c){
+    return clientCategoryFilter==='all'||c.category===clientCategoryFilter;
+  });
+  if(clientGenderFilter){
+    visible=visible.filter(function(c){return c.gender===clientGenderFilter;});
+  }
+  if(q){
+    visible=visible.filter(function(c){
+      return (c.code||'').toLowerCase().includes(q)||(c.alias||'').toLowerCase().includes(q);
+    });
+  }
+
+  visible=visible.slice();
+  if(clientSortMode==='alpha'){
+    const collator=new Intl.Collator('fa');
+    visible.sort(function(a,b){return collator.compare(a.alias||a.code,b.alias||b.code);});
+  }else if(clientSortMode==='recent_session'){
+    visible.sort(function(a,b){
+      if(!a.last_session_date&&!b.last_session_date)return 0;
+      if(!a.last_session_date)return 1;
+      if(!b.last_session_date)return -1;
+      return b.last_session_date.localeCompare(a.last_session_date);
+    });
+  }else if(clientTab==='inactive'){
+    // پیش‌فرضِ تبِ غیرفعال: آخرین‌جلسه — چون تراپیست می‌خواد بدونه «کیو اخیراً از
+    // دست داده»، نه «کیو دیرتر ثبت کرده». فعال‌ها پیش‌فرض همون ترتیبِ API (created_at) می‌مونه.
+    visible.sort(function(a,b){
+      if(!a.last_session_date&&!b.last_session_date)return 0;
+      if(!a.last_session_date)return 1;
+      if(!b.last_session_date)return -1;
+      return b.last_session_date.localeCompare(a.last_session_date);
+    });
+  }
+
+  renderClients(visible,!!q);
 }
 
 function renderClients(clients,isSearchResult){
@@ -1596,52 +1995,111 @@ function renderClients(clients,isSearchResult){
   const emptyFirst=$('emptyFirst');
   const emptySearch=$('emptySearch');
   grid.innerHTML='';
+  const totalInTab=allClients.filter(function(c){return (c.status||'active')===clientTab;}).length;
   if(!clients.length){
-    if(isSearchResult){emptySearch.hidden=false;emptyFirst.hidden=true;}
-    else{emptyFirst.hidden=allClients.length>0;emptySearch.hidden=true;}
+    if(isSearchResult||clientCategoryFilter!=='all'){emptySearch.hidden=false;emptyFirst.hidden=true;}
+    else{emptyFirst.hidden=totalInTab>0;emptySearch.hidden=true;}
     return;
   }
   emptyFirst.hidden=true;emptySearch.hidden=true;
   clients.forEach(function(c){
+    const isInactive=c.status==='inactive';
     const div=document.createElement('div');
-    div.className='client-card';
-    // آیکون حذف — addEventListener
+    div.className='client-card'+(isInactive?' inactive':'');
+
+    const menu=document.createElement('div');
+    menu.className='client-menu';
+    const menuBtn=document.createElement('button');
+    menuBtn.className='client-menu-btn';
+    menuBtn.type='button';
+    menuBtn.title='گزینه‌های مراجع';
+    menuBtn.innerHTML=IC_DOTS;
+    const menuDrop=document.createElement('div');
+    menuDrop.className='client-menu-drop';
+    const editCatBtn=document.createElement('button');
+    editCatBtn.type='button';
+    editCatBtn.innerHTML=IC_PEN+'ویرایشِ دسته‌بندی';
+    editCatBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();openEditCategoryModal(c);});
+    menuDrop.appendChild(editCatBtn);
+    menuDrop.appendChild(document.createElement('hr'));
+    if(isInactive){
+      const restoreBtn=document.createElement('button');
+      restoreBtn.type='button';
+      restoreBtn.innerHTML=IC_RESTORE+'بازگرداندن به فعال‌ها';
+      restoreBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();reactivateClient(c.id);});
+      menuDrop.appendChild(restoreBtn);
+    }else{
+      const deactivateBtn=document.createElement('button');
+      deactivateBtn.type='button';
+      deactivateBtn.innerHTML=IC_ARCHIVE+'انتقال به غیرفعال‌ها';
+      deactivateBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();openDeactivateModal(c);});
+      menuDrop.appendChild(deactivateBtn);
+    }
+    menuDrop.appendChild(document.createElement('hr'));
     const delBtn=document.createElement('button');
-    delBtn.className='client-delete';
-    delBtn.title='حذف مراجع';
-    delBtn.innerHTML=IC_TRSH;
-    delBtn.addEventListener('click',function(e){
+    delBtn.type='button';
+    delBtn.className='danger';
+    delBtn.innerHTML=IC_TRSH+'حذفِ کامل مراجع';
+    delBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();showDeleteClient(c.id,c.code,c.session_count||0);});
+    menuDrop.appendChild(delBtn);
+    menuBtn.addEventListener('click',function(e){
       e.stopPropagation();
-      showDeleteClient(c.id,c.code,c.session_count||0);
+      const wasOpen=menu.classList.contains('open');
+      closeAllClientMenus();
+      if(!wasOpen)menu.classList.add('open');
     });
-    div.appendChild(delBtn);
+    menu.appendChild(menuBtn);
+    menu.appendChild(menuDrop);
+    div.appendChild(menu);
 
     const top=document.createElement('div');
     top.className='client-top';
+    const name=document.createElement('div');
+    name.className='client-name';
     const alias=document.createElement('span');
     alias.className='client-alias';
     alias.textContent=c.alias||'—';
     const code=document.createElement('span');
     code.className='client-code';
     code.textContent=c.code;
-    top.appendChild(alias);
-    top.appendChild(code);
+    name.appendChild(alias);
+    name.appendChild(code);
+    top.appendChild(name);
     div.appendChild(top);
 
     const meta=document.createElement('div');
     meta.className='client-meta';
-    meta.textContent=toFa(c.session_count||'0')+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'');
+    const metaText=document.createElement('span');
+    metaText.textContent=toFa(c.session_count||'0')+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'');
+    meta.appendChild(metaText);
+    const badgeLabel=categoryBadgeLabel(c.category,c.gender);
+    if(badgeLabel){
+      const catBadge=document.createElement('span');
+      catBadge.className='cat-badge';
+      catBadge.textContent=badgeLabel;
+      meta.appendChild(catBadge);
+    }
     div.appendChild(meta);
+
+    if(isInactive&&c.status_reason){
+      const reasonEl=document.createElement('div');
+      reasonEl.className='status-reason';
+      reasonEl.textContent='دلیل: '+c.status_reason;
+      div.appendChild(reasonEl);
+    }
 
     const actions=document.createElement('div');
     actions.className='client-actions';
-    const btn1=document.createElement('button');
-    btn1.className='btn btn-primary btn-sm';
-    btn1.textContent='شروع جلسه';
-    btn1.addEventListener('click',function(e){
-      e.stopPropagation();
-      setupNewSession(c);
-    });
+    if(!isInactive){
+      const btn1=document.createElement('button');
+      btn1.className='btn btn-primary btn-sm';
+      btn1.textContent='شروع جلسه';
+      btn1.addEventListener('click',function(e){
+        e.stopPropagation();
+        setupNewSession(c);
+      });
+      actions.appendChild(btn1);
+    }
     const btn2=document.createElement('button');
     btn2.className='btn btn-ghost btn-sm';
     btn2.textContent='پرونده';
@@ -1649,13 +2107,87 @@ function renderClients(clients,isSearchResult){
       e.stopPropagation();
       openClientDetail(c.id);
     });
-    actions.appendChild(btn1);
     actions.appendChild(btn2);
     div.appendChild(actions);
 
     div.addEventListener('click',function(){openClientDetail(c.id);});
     grid.appendChild(div);
   });
+}
+
+function closeAllClientMenus(){
+  document.querySelectorAll('.client-menu.open').forEach(function(m){m.classList.remove('open');});
+  document.querySelectorAll('.sort-menu.open').forEach(function(m){m.classList.remove('open');});
+}
+document.addEventListener('click',closeAllClientMenus);
+
+function openDeactivateModal(c){
+  deactivateTargetClient=c;
+  $('deactivateClientCode').textContent=c.alias?(c.alias+' ('+c.code+')'):c.code;
+  const firstRadio=$('deactivateReasonGroup').querySelector('input[name=deactivateReason]');
+  if(firstRadio)firstRadio.checked=true;
+  $('deactivateReasonOther').value='';
+  $('deactivateClientModal').classList.add('open');
+}
+function closeDeactivateModal(){
+  $('deactivateClientModal').classList.remove('open');
+  deactivateTargetClient=null;
+}
+async function confirmDeactivateClient(){
+  if(!deactivateTargetClient)return;
+  const selected=$('deactivateReasonGroup').querySelector('input[name=deactivateReason]:checked');
+  const reasonValue=selected?selected.value:'سایر';
+  const other=$('deactivateReasonOther').value.trim();
+  const finalReason=(reasonValue==='سایر'&&other)?other:reasonValue;
+  const id=deactivateTargetClient.id;
+  try{
+    await api('/api/clients/'+id+'/status',{method:'PATCH',body:{status:'inactive',reason:finalReason}});
+    uxTrack('client_deactivated');
+    closeDeactivateModal();
+    showBanner('info','مراجع به فهرستِ غیرفعال‌ها منتقل شد.');
+    loadClients();
+  }catch(e){showBanner('error','خطا: '+e.message);}
+}
+
+async function reactivateClient(id){
+  try{
+    await api('/api/clients/'+id+'/status',{method:'PATCH',body:{status:'active'}});
+    uxTrack('client_reactivated');
+    showBanner('info','مراجع به فهرستِ فعال‌ها بازگردانده شد.');
+    loadClients();
+  }catch(e){showBanner('error','خطا: '+e.message);}
+}
+
+const EDIT_CATEGORY_OPTIONS=[{value:null,label:'نامشخص'},{value:'child',label:'کودک'},{value:'teen',label:'نوجوان'},{value:'adult',label:'بزرگسال'}];
+function renderEditCategoryCatSelect(){
+  renderCategoryChips($('editCategoryCatSelect'),EDIT_CATEGORY_OPTIONS,{category:editCategorySelectedCategory,gender:editCategorySelectedGender},function(cat,gender){
+    editCategorySelectedCategory=cat;
+    editCategorySelectedGender=gender;
+    renderEditCategoryCatSelect();
+  },'cat-opt','sel');
+}
+function openEditCategoryModal(c){
+  editCategoryTargetClient=c;
+  editCategorySelectedCategory=c.category||null;
+  editCategorySelectedGender=c.gender||null;
+  $('editCategoryClientCode').textContent=c.alias?(c.alias+' ('+c.code+')'):c.code;
+  renderEditCategoryCatSelect();
+  $('editCategoryModal').classList.add('open');
+}
+function closeEditCategoryModal(){
+  $('editCategoryModal').classList.remove('open');
+  editCategoryTargetClient=null;
+}
+async function confirmEditCategory(){
+  if(!editCategoryTargetClient)return;
+  const id=editCategoryTargetClient.id;
+  try{
+    await api('/api/clients/'+id+'/category',{method:'PATCH',body:{category:editCategorySelectedCategory,gender:editCategorySelectedGender}});
+    uxTrack('client_category_edited');
+    closeEditCategoryModal();
+    showBanner('info','دسته‌بندی به‌روزرسانی شد.');
+    loadClients();
+  }catch(e){showBanner('error','خطا: '+e.message);}
 }
 
 function showDeleteClient(id,code,sc){
@@ -1666,13 +2198,14 @@ function showDeleteClient(id,code,sc){
 function closeDeleteClient(){$('deleteClientModal').classList.remove('open');deleteTargetClient=null;}
 async function confirmDeleteClient(){
   if(!deleteTargetClient)return;
+  const id=deleteTargetClient;
   closeDeleteClient();
   try{
-    await api('/api/clients/'+deleteTargetClient,{method:'DELETE'});
+    await api('/api/clients/'+id,{method:'DELETE'});
+    uxTrack('client_deleted');
     showBanner('info','مراجع حذف شد.');
     loadClients();
   }catch(e){showBanner('error',e.message);}
-  deleteTargetClient=null;
 }
 
 function showDeleteSession(id,num){
@@ -1686,6 +2219,7 @@ async function confirmDeleteSession(){
   closeDeleteSession();
   try{
     await api('/api/sessions/'+deleteTargetSession,{method:'DELETE'});
+    uxTrack('session_deleted');
     showBanner('info','جلسه حذف شد.');
     if(currentClient)openClientDetail(currentClient.id);
   }catch(e){showBanner('error',e.message);}
@@ -1747,6 +2281,9 @@ async function viewTranscript(sessionId){
     currentViewSession=data.session;
     currentViewNotes=data.notes||[];
     $('transcriptBox').textContent=data.session.transcript||'(متنی ثبت نشده)';
+    $('resolveSpeakersBtn').hidden=(data.session.status!=='completed');
+    $('resolveSpeakersStatus').hidden=true;
+    if(resolveSpeakersPollTimer){clearInterval(resolveSpeakersPollTimer);resolveSpeakersPollTimer=null;}
     const nb=$('transcriptNotes');
     if(data.notes&&data.notes.length){
       nb.hidden=false;
@@ -1775,7 +2312,75 @@ async function viewTranscript(sessionId){
       });
     }else nb.hidden=true;
     $('sessionDetail').hidden=false;
+    uxTrack('transcript_opened');
   }catch(e){showBanner('error',e.message);}
+}
+
+// ===== بازسازیِ اختیاریِ شماره‌گذاریِ گوینده‌ها =====
+// چرا اختیاریه: رونویسیِ دوباره‌ی کلِ صدا چند دقیقه طول می‌کشه و هزینه داره — خیلی
+// از جلسات (مثلاً تک‌گوینده، یا بدونِ توقف/reconnect) اصلاً نیازش نیست.
+let resolveSpeakersPollTimer=null;
+let resolveSpeakersLatestText=null;
+async function startResolveSpeakersUI(){
+  if(!currentViewSession)return;
+  const btn=$('resolveSpeakersBtn');
+  const status=$('resolveSpeakersStatus');
+  btn.disabled=true;
+  status.hidden=false;
+  status.textContent='در حال آماده‌سازی…';
+  try{
+    await api('/api/sessions/'+currentViewSession.id+'/resolve-speakers',{method:'POST'});
+  }catch(e){
+    btn.disabled=false;
+    status.textContent='خطا: '+e.message;
+    return;
+  }
+  status.textContent='در حال رونویسیِ دوباره — ممکنه چند دقیقه طول بکشه…';
+  if(resolveSpeakersPollTimer)clearInterval(resolveSpeakersPollTimer);
+  resolveSpeakersPollTimer=setInterval(async function(){
+    if(!currentViewSession)return;
+    try{
+      const r=await api('/api/sessions/'+currentViewSession.id+'/resolve-speakers');
+      if(r.status==='processing')return;
+      clearInterval(resolveSpeakersPollTimer);resolveSpeakersPollTimer=null;
+      btn.disabled=false;
+      if(r.status==='done'){
+        status.hidden=true;
+        resolveSpeakersLatestText=r.text;
+        $('resolveSpeakersPreview').textContent=r.text;
+        $('resolveSpeakersModal').classList.add('open');
+      }else{
+        status.textContent='خطا: '+(r.error||'رونویسیِ دوباره ناموفق بود');
+      }
+    }catch(e){
+      clearInterval(resolveSpeakersPollTimer);resolveSpeakersPollTimer=null;
+      btn.disabled=false;
+      status.textContent='خطا: '+e.message;
+    }
+  },3000);
+}
+function closeResolveSpeakersModal(){
+  $('resolveSpeakersModal').classList.remove('open');
+}
+async function applyResolvedSpeakers(){
+  if(!currentViewSession||!resolveSpeakersLatestText)return;
+  const applyBtn=$('resolveSpeakersApplyBtn');
+  applyBtn.disabled=true;
+  try{
+    await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{
+      transcript:resolveSpeakersLatestText,
+      transcript_version:currentViewSession.transcript_version
+    }});
+    currentViewSession.transcript=resolveSpeakersLatestText;
+    currentViewSession.transcript_version=(currentViewSession.transcript_version||0)+1;
+    $('transcriptBox').textContent=resolveSpeakersLatestText;
+    closeResolveSpeakersModal();
+    showBanner('info','متنِ جلسه با شماره‌گذاریِ یکدستِ گوینده‌ها جایگزین شد.');
+  }catch(e){
+    showBanner('error',e.message);
+  }finally{
+    applyBtn.disabled=false;
+  }
 }
 
 // ===== ویرایش تاریخ/ساعت جلسه =====
@@ -1793,6 +2398,7 @@ async function saveSessionMeta(){
   if(!date||!start_time){showBanner('error','تاریخ و ساعت را کامل وارد کنید.');return;}
   try{
     const data=await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{date,start_time}});
+    uxTrack('session_meta_edited');
     currentViewSession=data.session;
     closeEditSessionMeta();
     showBanner('info','تاریخ و ساعت جلسه به‌روزرسانی شد.');
@@ -1803,16 +2409,32 @@ async function saveSessionMeta(){
 // ⭐ عمداً هیچ دانلود/اشتراک‌گذاریِ دیتا از سمتِ تراپیست وجود نداره — فقط ادمین
 // (توی پنلِ ادمین، با احرازِ سمتِ سرور) می‌تونه دیتا رو از پلتفرم خارج کنه.
 
-function showNewClientModal(){$('newClientAlias').value='';$('newClientModal').classList.add('open');}
+const NEW_CLIENT_CATEGORY_OPTIONS=[{value:null,label:'نامشخص'},{value:'child',label:'کودک'},{value:'teen',label:'نوجوان'},{value:'adult',label:'بزرگسال'}];
+function renderNewClientCatSelect(){
+  renderCategoryChips($('newClientCatSelect'),NEW_CLIENT_CATEGORY_OPTIONS,{category:newClientSelectedCategory,gender:newClientSelectedGender},function(cat,gender){
+    newClientSelectedCategory=cat;
+    newClientSelectedGender=gender;
+    renderNewClientCatSelect();
+  },'cat-opt','sel');
+}
+function showNewClientModal(){
+  uxTrack('client_create_opened');
+  $('newClientAlias').value='';
+  newClientSelectedCategory=null;
+  newClientSelectedGender=null;
+  renderNewClientCatSelect();
+  $('newClientModal').classList.add('open');
+}
 function closeNewClientModal(){$('newClientModal').classList.remove('open');}
 async function createNewClient(){
   const alias=$('newClientAlias').value.trim();
   try{
-    const data=await api('/api/clients',{method:'POST',body:{alias:alias}});
+    const data=await api('/api/clients',{method:'POST',body:{alias:alias,category:newClientSelectedCategory,gender:newClientSelectedGender}});
+    uxTrack('client_created');
     closeNewClientModal();
     showBanner('info','مراجع <b>'+data.client.code+'</b> ساخته شد.');
     loadClients();
-  }catch(e){showBanner('error',e.message);}
+  }catch(e){uxTrack('client_create_failed');showBanner('error',e.message);}
 }
 
 // ===== Setup =====
@@ -1845,6 +2467,7 @@ async function runPreflight(){
     $('preflightMicRow').textContent='میکروفون: آماده';
   }catch(e){
     preflightMicOk=false;
+    try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.micError(e&&e.name);}catch(_){}
     $('preflightMicRow').className='banner error';
     $('preflightMicRow').textContent=describeMicError(e);
   }
@@ -1853,19 +2476,19 @@ async function runPreflight(){
     const res=await api('/api/stt/check');
     if(res.ok){
       $('preflightSttRow').className='banner info';
-      $('preflightSttRow').textContent='اتصال رونویسی: آماده (مسیر مستقیم Browser→Soniox)';
+      $('preflightSttRow').textContent='رونویسی: آماده';
     }else{
       $('preflightSttRow').className='banner warn';
-      $('preflightSttRow').textContent='هشدار رونویسی: '+(res.error||'نامشخص')+' — جلسه بلاک نمی‌شود؛ در صورت قطعی، ضبط durable و صف batch فعال است.';
+      $('preflightSttRow').textContent='رونویسیِ زنده موقتاً در دسترس نیست — جلسه‌ی شما بدونِ مشکل شروع می‌شود و صدا بعداً پردازش خواهد شد.';
     }
   }catch(e){
     // ⭐ 401 یعنی کوکی نشست معتبر نیست (منقضی/حذف‌شده/غیرفعال) — مشکل از Soniox نیست
     if(e&&e.status===401){
       $('preflightSttRow').className='banner error';
-      $('preflightSttRow').textContent='نشست شما منقضی شده — یک‌بار خارج و دوباره وارد شوید (خطای 401).';
+      $('preflightSttRow').textContent='نشست شما منقضی شده — یک‌بار خارج و دوباره وارد شوید.';
     }else{
       $('preflightSttRow').className='banner warn';
-      $('preflightSttRow').textContent='بررسی اتصال ناموفق بود — جلسه بلاک نمی‌شود؛ failure داخل lifecycle مدیریت می‌شود.';
+      $('preflightSttRow').textContent='بررسیِ اتصالِ رونویسی ناموفق بود — جلسه‌ی شما همچنان به‌صورتِ عادی شروع می‌شود.';
     }
   }
   // عمداً غیرمسدودکننده: /api/stt/check مسیر proxy قدیم را هم می‌سنجد که dependency اصلی نیست
@@ -1877,9 +2500,11 @@ async function runPreflight(){
 async function startSession(){
   clearBanner();
   if(!consent)return;
+  uxTrack('session_start_clicked');
   try{
     const data=await api('/api/sessions',{method:'POST',body:{client_id:currentClient.id,consent:true}});
     currentSession=data.session;
+    uxTrack('session_started');
     // P3: session فعال را برای resume بعد از reload نگه دار
     try{localStorage.setItem('feelia_active_session',currentSession.id);}catch(e){}
     $('recChip').innerHTML=IC_MIC+'<span></span>';
@@ -1912,7 +2537,7 @@ async function startSession(){
     }
     if(isDirectMode()){await startDirectLive();}
     else{await connectWS();}
-  }catch(e){showBanner('error','خطا: '+e.message);}
+  }catch(e){uxTrack('session_start_failed');showBanner('error','خطا: '+e.message);}
 }
 
 // ===== Watchdog: صدا ارسال می‌شود ولی متنی برنمی‌گردد =====
@@ -1983,10 +2608,10 @@ async function startNewRTSession(){
       $('recStatus').classList.remove('warn');
     },
     onError:function(m){
-      try{setLiveConnBanner('warn','<b>realtime:</b> '+escapeHtml(m));}catch(e){}
+      try{setLiveConnBanner('warn','<b>مشکل در رونویسی:</b> '+escapeHtml(m));}catch(e){}
     }
   });
-  $('recStatus').textContent='در حال اتصال مستقیم به Soniox…';
+  $('recStatus').textContent='در حال برقراریِ اتصال…';
   let ok=false;
   try{ok=await rtSession.start();}catch(e){ok=false;}
   if(!ok){
@@ -1997,40 +2622,78 @@ async function startNewRTSession(){
   // ISSUE 4: حالت durable-only (mint ناموفق ولی میکروفون فعال) — usable است،
   // legacy proxy صدا زده نمی‌شود؛ realtime صادقانه FAILED گزارش می‌شود.
   if(rtSession.state==='FAILED'||rtSession.realtimeUp===false){
-    setLiveConnBanner('warn','<b>realtime در دسترس نیست</b> — ضبط محلی (durable) فعال است.<br>جلسه ادامه دارد؛ در پایان از صف batch استفاده می‌شود.');
-    $('recStatus').textContent='ضبط محلی فعال — realtime ناموفق';
+    setLiveConnBanner('warn','<b>رونویسیِ زنده در دسترس نیست</b> — صدا در حال ضبط است.<br>جلسه ادامه دارد؛ متن پس از پایان آماده می‌شود.');
+    $('recStatus').textContent='در حال ضبط — متن پس از پایان آماده می‌شود';
     $('recStatus').classList.add('warn');
   }
   startTimer();startSttWatchdog();startDurationAutosave();
   return true;
 }
+// ⭐ باگِ واقعی: نوارِ سطحِ صدا (levelMeter) فقط توی مسیرِ قدیمیِ proxy وصل می‌شد.
+// مسیرِ اصلیِ فعلی (FeeliaRT/rtSession) هیچ‌وقت آنالایزر رو به استریمِ خودش وصل
+// نمی‌کرد — پس نوار همیشه ثابت می‌موند. چون lastVoiceActivityAt هم فقط از همین
+// تابع پر می‌شه، واچ‌داگِ «صدا هست ولی متن برنمی‌گرده» هم بی‌اثر بود.
+function attachLevelMeterToStream(stream){
+  stopLevelMeter();
+  if(!stream)return;
+  try{
+    audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+    const src=audioCtx.createMediaStreamSource(stream);
+    analyser=audioCtx.createAnalyser();
+    analyser.fftSize=512;
+    src.connect(analyser);
+    const data=new Uint8Array(analyser.frequencyBinCount);
+    const tick=function(){
+      analyser.getByteTimeDomainData(data);
+      let sum=0;
+      for(let i=0;i<data.length;i++){const v=(data[i]-128)/128;sum+=v*v;}
+      updateLevelMeter(Math.min(1,Math.sqrt(sum/data.length)*4));
+      levelRAF=requestAnimationFrame(tick);
+    };
+    tick();
+  }catch(e){}
+}
+function stopLevelMeter(){
+  if(levelRAF){cancelAnimationFrame(levelRAF);levelRAF=null;}
+  if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
+  analyser=null;
+  updateLevelMeter(0);
+}
+
 function rtOnState(st,snap){
   if(!currentSession)return;
   snap=snap||{};
   var map={
-    STARTING:'در حال اتصال مستقیم به Soniox…',
+    STARTING:'در حال برقراریِ اتصال…',
     ACTIVE:'در حال رونویسی…',
     RECOVERED:'اتصال برقرار — ادامه…',
-    RECONNECTING:'اتصال قطع — تلاش '+toFa((snap.reconnectAttempts||0)+1)+'…',
-    NETWORK_PAUSED:'اینترنت قطع است — در انتظار…',
+    RECONNECTING:'اتصال قطع — صدا ذخیره می‌شود — تلاش '+toFa((snap.reconnectAttempts||0)+1)+'…',
+    NETWORK_PAUSED:'اینترنت قطع است — صدا به‌صورتِ محلی ذخیره می‌شود…',
     MANUAL_PAUSED:'متوقف شد — برای ادامه «ادامه» بزنید',
     FINALIZING:'در حال نهایی‌سازی…',
-    FAILED:'realtime ناموفق — ضبط durable ادامه دارد'
+    FAILED:'رونویسیِ زنده ناموفق — صدا به‌صورتِ محلی ذخیره می‌شود'
   };
   if(map[st])$('recStatus').textContent=map[st];
   if(st==='ACTIVE'||st==='RECOVERED'){
     wsConnected=true;$('recDot').classList.remove('paused');
     $('recStatus').classList.remove('warn');clearLiveConnBanner();startTimer();
+    attachLevelMeterToStream(rtSession&&rtSession.stream);
   }else if(st==='MANUAL_PAUSED'){
     // BUG-FIX: این حالت قبلاً هیچ‌جا pauseTimer() صدا نمی‌زد — تایمر جلسه در حین
     // توقف دستی همچنان می‌شمرد. طول جلسه‌ی واقعی (بدون زمان توقف) اشتباه ثبت می‌شد.
     wsConnected=false;$('recDot').classList.add('paused');pauseTimer();
+    // دکمه رو همین‌جا (همون لحظه‌ی واقعیِ تغییرِ state) عوض کن، نه بعدِ تاخیرِ flush
+    // در rtPauseLive — وگرنه دکمه‌ی «توقف موقت» چند ثانیه بعدِ توقفِ واقعی هنوز نمایانه.
+    manualPaused=true;updatePauseUI();
+    stopLevelMeter();
   }else if(st==='RECONNECTING'||st==='NETWORK_PAUSED'){
     wsConnected=false;$('recDot').classList.add('paused');pauseTimer();
-    setLiveConnBanner('warn','<b>اتصال realtime قطع شد</b> — در حال تلاش برای وصل‌شدنِ دوباره…<br>متنِ تا اینجا حفظ شده و ضبط durable ادامه دارد.');
+    setLiveConnBanner('warn','<b>اتصال قطع شد</b> — در حال تلاش برای وصل‌شدنِ دوباره…<br>متنِ تا اینجا حفظ شده؛ صدا همچنان ضبط و به‌صورتِ محلی ذخیره می‌شود.');
+    stopLevelMeter();
   }else if(st==='FAILED'){
     wsConnected=false;pauseTimer();
-    setLiveConnBanner('warn','<b>realtime ناموفق شد.</b><br>ضبط durable ادامه دارد؛ در پایان از صف batch استفاده می‌شود.');
+    setLiveConnBanner('warn','<b>رونویسیِ زنده ناموفق شد.</b><br>صدا به‌صورتِ محلی ذخیره می‌شود؛ متن پس از پایان آماده می‌شود.');
+    stopLevelMeter();
   }
 }
 async function endNewRTSession(){
@@ -2041,35 +2704,50 @@ async function endNewRTSession(){
   $('btnEndSession').disabled=true;
   $('recStatus').textContent='در حال نهایی‌سازی…';
   pauseTimer();
+  stopLevelMeter();
   let out={text:'',reliable:false,mode:'error'};
   try{out=await s.finish();}catch(e){}
   rtSession=null;
   try{window.FeeliaRT.forget(s);}catch(e){}
+  // فاصله‌ی بینِ finalizeِ واقعیِ رونویسی و کلیکِ «ذخیره و پایان» رویِ Wrapup باعث می‌شد
+  // DB تا همون لحظه هنوز in_progress بمونه — اگه دقیقاً همون‌جا رفرش/کرش می‌شد، جلسه‌ای
+  // که رونویسی‌اش کاملاً تموم شده بود، هنوز «در جریان» ثبت مونده بود. الان همین‌جا
+  // completed می‌شه؛ finishSession() روی Wrapup فقط idempotent دوباره همین رو می‌فرسته.
+  if(currentSession){
+    api('/api/sessions/'+currentSession.id,{method:'PUT',body:{status:'completed'}}).catch(function(){});
+  }
   if(out&&(out.mode==='batch-pending')){
-    showBanner('warn','رونویسی batch در صف ماند؛ متن realtime (غیرقابل‌اعتماد) ذخیره شد و با آماده‌شدن batch تکمیل می‌شود.');
+    showBanner('warn','متنِ نهایی هنوز آماده نیست؛ به‌محضِ آماده‌شدن به پرونده اضافه می‌شود.');
     // ISSUE 2: تخلیه صف در پس‌زمینه — UI بلاک نمی‌شود؛ با تکمیل، بنر اطلاع می‌دهد.
     try{
       s.awaitBatchDrain().then(function(r){
-        if(r&&r.drained&&r.ok)showBanner('info','رونویسی batch کامل شد و به پرونده اضافه شد.');
+        if(r&&r.drained&&r.ok)showBanner('info','متنِ نهایی آماده شد و به پرونده اضافه شد.');
       });
     }catch(e){}
   }
   else if(out&&!out.reliable&&out.mode==='batch')
-    showBanner('info','متن نهایی از مسیر batch آمد (realtime غیرقابل‌اعتماد بود).');
+    showBanner('info','متنِ نهایی ثبت شد.');
   handleFinished(null);
 }
 async function rtPauseLive(){
   if(!rtSession)return;
-  // ISSUE 5: UI فقط وقتی paused می‌شود که موتور واقعاً قبول کند؛
-  // در غیر این صورت (STARTING/RECONNECTING/FINALIZING/...) پیام صادقانه می‌دهد و wedge نمی‌شود.
+  // باگِ واقعی: rtSession.pause() فوراً state رو به MANUAL_PAUSED می‌بره (که یعنی
+  // rtOnState همون لحظه صدا زده می‌شه)، ولی تا همین‌جا manualPaused/updatePauseUI
+  // فقط بعدِ resolve شدنِ کاملِ promise (۲ ثانیه‌یِ PAUSE_FLUSH_MS بعد) اجرا می‌شد.
+  // یعنی دکمه‌ی «توقف موقت» تا ۲ ثانیه بعدِ کلیک هنوز نمایان و قابلِ‌کلیک بود؛ کلیکِ
+  // دوباره توی همین بازه، چون rtSession از قبل MANUAL_PAUSED بود، false برمی‌گشت و
+  // پیامِ نادرستِ «توقف اعمال نشد» رو جایگزینِ «متوقف شد» می‌کرد — با اینکه واقعاً
+  // متوقف شده بود. حالا manualPaused/updatePauseUI توی خودِ rtOnState (همون لحظه‌ی
+  // MANUAL_PAUSED) اجرا می‌شه، نه اینجا بعدِ تاخیر.
   let ok=false;
   try{ok=await rtSession.pause();}catch(e){ok=false;}
   if(!rtSession)return;
   if(ok){
-    manualPaused=true;updatePauseUI();
-    $('recStatus').textContent='متوقف شد — برای ادامه «ادامه» بزنید';
     persistDuration();
-  }else{
+  }else if(rtSession.state!=='ACTIVE'&&rtSession.state!=='RECOVERED'){
+    // اگه pause توسطِ یه resume از وسط باطل شده باشه (کاربر توی همون ۲ ثانیه «ادامه»
+    // زده)، جلسه از قبل درست در حالِ رونویسیه — نباید این پیامِ قدیمی رو روی وضعیتِ
+    // درستِ فعلی بنویسیم.
     $('recStatus').textContent='توقف اعمال نشد — وضعیت فعلی اجازه توقف نمی‌دهد';
     $('recStatus').classList.add('warn');
   }
@@ -2085,7 +2763,7 @@ async function rtResumeLive(){
 async function startVoiceNoteDirect(){
   $('textNoteBox').hidden=true;
   $('voiceNoteBox').hidden=false;
-  $('voiceStatus').textContent='در حال اتصال مستقیم…';
+  $('voiceStatus').textContent='در حال اتصال…';
   $('voiceLiveText').textContent='در حال ضبط… حرف بزنید';
   $('voiceNoteBtn').disabled=true;
   const s=window.FeeliaRT.createSession(currentSession.id,{mode:'note',
@@ -2101,7 +2779,7 @@ async function startVoiceNoteDirect(){
   rtVoice=s;
   // ISSUE 4 برای یادداشت هم: durable-only صادقانه گزارش می‌شود، نه «لایو رونویسی».
   $('voiceStatus').textContent=(s.realtimeUp===false)
-    ?'ضبط محلی فعال — realtime ناموفق؛ در پایان batch استفاده می‌شود'
+    ?'در حال ضبط — متن پس از پایان آماده می‌شود'
     :'در حال ضبط — لایو رونویسی…';
   return true;
 }
@@ -2116,21 +2794,21 @@ async function stopVoiceNoteDirect(){
   if(out.text&&out.text.trim()&&(out.reliable||out.mode==='batch')){
     wrapupNotes.push({type:'voice',text:out.text.trim(),wall_clock:nowClock()});
     renderWrapupNotes();
-    $('voiceStatus').textContent='ثبت شد'+(out.reliable?'':' (از batch)');
+    $('voiceStatus').textContent='ثبت شد'+(out.reliable?'':' (با تاخیر)');
     setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},1500);
     return;
   }
   if(out.mode==='batch-pending-note'){
     // ISSUE 3: یادداشت در صف note است (نه transcript) — تکمیل در پس‌زمینه، بعد به لیست اضافه می‌شود.
-    $('voiceStatus').textContent='realtime ناموفق — batch یادداشت در حال پردازش…';
+    $('voiceStatus').textContent='در حال پردازشِ یادداشت…';
     try{
       s.awaitBatchDrain({forNote:true}).then(function(r){
         if(r&&r.drained&&r.ok&&r.result&&r.result.text){
           wrapupNotes.push({dbId:r.result.noteId,type:'voice',text:r.result.text,wall_clock:nowClock()});
           renderWrapupNotes();
-          $('voiceStatus').textContent='ثبت شد (از batch)';
+          $('voiceStatus').textContent='ثبت شد (با تاخیر)';
         }else{
-          $('voiceStatus').textContent='batch فعلاً کامل نشد — صوت در صف ماند و با retry بعدی ثبت می‌شود';
+          $('voiceStatus').textContent='هنوز آماده نشد — صدا ذخیره شده و به‌زودی ثبت می‌شود';
         }
         setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},2500);
       });
@@ -2341,7 +3019,7 @@ function handleMsg(msg){
   }
 }
 
- $('chkLiveText').addEventListener('change',function(){$('liveText').hidden=!$('chkLiveText').checked;});
+ $('chkLiveText').addEventListener('change',function(){$('liveText').hidden=!$('chkLiveText').checked;uxTrack('live_text_toggled');});
 
 // ===== Timer =====
 function resetTimer(){clearInterval(timerInterval);elapsedMs=0;lastTickAt=null;timerRunning=false;renderTimer();}
@@ -2372,6 +3050,7 @@ function renderTimer(){$('recTimer').textContent=formatTimer(elapsedMs);}
 document.querySelectorAll('.sign-chip').forEach(function(chip){
   chip.addEventListener('click',async function(){
     if(!currentSession||!currentSession.id)return;
+    uxTrack('sign_added'); // ⚠️ نوعِ علامت هرگز ارسال نمی‌شود
     chip.classList.add('logged');
     setTimeout(function(){chip.classList.remove('logged');},2000);
     const sd={type:'sign',sign_type:chip.dataset.sign,offset_ms:elapsedMs,wall_clock:nowClock()};
@@ -2424,6 +3103,7 @@ async function addQuickNote(){
   const input=$('quickNoteInput');
   const text=input.value.trim();
   if(!text||!currentSession)return;
+  uxTrack('quick_note_added');
   const nd={type:'note_during',text:text,offset_ms:elapsedMs,wall_clock:nowClock()};
   sessionNotes.push(nd);
   renderNotesLog();
@@ -2514,14 +3194,14 @@ async function resumeDirectLive(){
   manualPaused=false;
   directPauseEpoch+=1;
   updatePauseUI();
-  $('recStatus').textContent='در حال اتصال مستقیم…';
+  $('recStatus').textContent='در حال اتصال…';
   const prefix=directPrefix||directFinalText||'';
   let cred;
   try{cred=await SonioxDirect.mint(currentSession.id);}
   catch(e){$('recStatus').textContent='ادامه اعمال نشد — دوباره «ادامه» بزنید';manualPaused=true;updatePauseUI();return;}
   try{
     await SonioxDirect.connect(cred,{
-      onStatus:function(){$('recDot').classList.remove('paused');$('recStatus').textContent='در حال رونویسی مستقیم…';startTimer();lastPreviewAt=Date.now();},
+      onStatus:function(){$('recDot').classList.remove('paused');$('recStatus').textContent='در حال رونویسیِ زنده…';startTimer();lastPreviewAt=Date.now();},
       onResult:function(r){
         lastPreviewAt=Date.now();
         const fresh=cleanDirectText(r.final);
@@ -2529,7 +3209,7 @@ async function resumeDirectLive(){
         const full=r.final+(r.interim?' '+r.interim:'');
         if(!$('liveText').hidden)$('liveText').textContent=cleanDirectText((prefix?' '+prefix:'')+' '+full);
       },
-      onError:function(){setLiveConnBanner('warn','<b>اتصال مستقیم قطع شد.</b><br>به مسیر معمول برگشتیم.');fallbackToProxy('resume-error');}
+      onError:function(){setLiveConnBanner('warn','<b>اتصال قطع شد.</b><br>در حال اتصالِ مجدد.');fallbackToProxy('resume-error');}
     });
   }catch(e){manualPaused=true;updatePauseUI();$('recStatus').textContent='ادامه اعمال نشد — دوباره «ادامه» بزنید';return;}
   directActive=true;
@@ -2547,6 +3227,7 @@ async function resumeDirectLive(){
   startTimer();
 }
 function pauseSessionLive(){
+  uxTrack('session_pause_clicked');
   if(rtSession){rtPauseLive();return;}
   if(directActive){pauseDirectLive();return;}
   if(!ws||!currentSession||manualPaused||p1Terminal)return;
@@ -2580,6 +3261,7 @@ function pauseSessionLive(){
   persistDuration(); // فوری ذخیره کن — منتظرِ تیکِ ۱۰ثانیه‌ایِ autosave نمون
 }
 async function resumeSessionLive(){
+  uxTrack('session_resume_clicked');
   if(rtSession){rtResumeLive();return;}
   if(!currentSession||!manualPaused||p1Terminal)return;
   if(directPrefix!==''||directActive||isDirectMode()){await resumeDirectLive();return;}
@@ -2609,6 +3291,7 @@ async function resumeSessionLive(){
 
 // ===== End =====
 function endSession(){
+  uxTrack('session_end_clicked');
   if(rtSession){endNewRTSession();return;}
   if(directActive&&currentSession){endDirectLive();return;}
   if(!ws||!currentSession)return;
@@ -2716,6 +3399,7 @@ function showCancelModal(){$('cancelModal').classList.add('open');}
 function closeCancelModal(){$('cancelModal').classList.remove('open');}
 async function confirmCancelSession(){
   closeCancelModal();
+  uxTrack('session_canceled');
   if(rtSession){try{rtSession.abort();}catch(e){}try{window.FeeliaRT.forget(rtSession);}catch(ee){}rtSession=null;}
   // P3: cancel → ترمینال، کلید resume پاک شود
   try{localStorage.removeItem('feelia_active_session');}catch(e){}
@@ -2749,7 +3433,7 @@ function showExitWarning(){
   $('exitModal').classList.add('open');
 }
 function closeExitWarning(){$('exitModal').classList.remove('open');}
-function confirmExitWithoutSave(){closeExitWarning();goBackToClients();}
+function confirmExitWithoutSave(){uxTrack('session_exit_without_save');closeExitWarning();goBackToClients();}
 
 // ===== Wrapup =====
 function renderWrapupNotes(){
@@ -2794,6 +3478,7 @@ async function addTextNote(){
     $('textNoteInput').value='';
     $('textNoteBox').hidden=true;
     wrapupNotes.push({dbId:d.note.id,type:'text',text:d.note.text,wall_clock:d.note.wall_clock});
+    uxTrack('text_note_added');
     renderWrapupNotes();
   }catch(e){showBanner('error','خطا در ثبت');}
 }
@@ -2801,6 +3486,7 @@ async function addTextNote(){
 // Voice Note
 async function startVoiceNote(){
   if(!currentSession)return;
+  uxTrack('voice_note_started');
   if(window.FeeliaRT&&window.FeeliaRT.isAvailable()&&!rtVoice&&!voiceWS&&(!voiceMediaRecorder||voiceMediaRecorder.state==='inactive')){
     try{
       const ok=await startVoiceNoteDirect();
@@ -2864,6 +3550,7 @@ async function startVoiceNote(){
 }
 
 function stopVoiceNote(){
+  uxTrack('voice_note_stop_clicked');
   if(rtVoice){stopVoiceNoteDirect();return;}
   if(voiceMediaRecorder&&voiceMediaRecorder.state!=='inactive'){
     $('voiceStatus').textContent='در حال نهایی‌سازی…';
@@ -2904,6 +3591,7 @@ async function finishSession(){
   showBanner('info','در حال ذخیره…');
   try{
     await api('/api/sessions/'+currentSession.id,{method:'PUT',body:{status:'completed'}});
+    uxTrack('session_saved');
     clearBanner();
     wrapupNotes=[];
     currentSession=null;

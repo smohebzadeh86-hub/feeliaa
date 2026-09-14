@@ -9,40 +9,20 @@ import {
   processBatchQueue,
   validateAudioBuffer,
 } from '../stt/batchqueue.js';
+import { getResolveJob, startResolveSpeakers } from '../stt/speakerResolve.js';
+import { listSessionAudio } from '../stt/sessionAudioArchive.js';
 
-// ⭐ پردازش صدا در background (طبق الگوی مستندات Soniox)
+// ⭐ پردازش صدا در background — با API واقعیِ async (stt-async-v5)، نه وانمودِ
+// زنده‌بودن رویِ موتورِ realtime (که طبقِ docsِ Soniox دقتِ تشخیصِ گوینده‌ی پایین‌تری داره)
 async function processVoiceNoteInBackground(sessionId: string, buffer: Buffer) {
   try {
     const sonioxKey = process.env.SONIOX_API_KEY;
     if (!sonioxKey) return;
 
-    const { SonioxEngine } = await import('../stt/soniox.js');
+    const { transcribeFileAsync } = await import('../stt/asyncTranscribe.js');
 
-    let finalText = '';
-
-    const engine = new SonioxEngine(sonioxKey, {
-      onPreview: () => {},
-      onStatus: (status) => { console.log('[voice-note] status:', status); },
-      onFinished: (text) => { finalText = text; },
-      onError: (err) => { console.log('[voice-note] Soniox error:', err); },
-    });
-
-    console.log('[voice-note] starting engine, size:', buffer.length);
-
-    await engine.start();
-
-    // ⭐ طبق مستندات: chunks of 3840 bytes + 120ms pause (شبیه streaming واقعی)
-    const CHUNK_SIZE = 3840;
-    for (let i = 0; i < buffer.length; i += CHUNK_SIZE) {
-      const chunk = buffer.subarray(i, Math.min(i + CHUNK_SIZE, buffer.length));
-      engine.sendAudioChunk(chunk.buffer.slice(chunk.byteOffset, chunk.byteOffset + chunk.byteLength));
-      await new Promise(resolve => setTimeout(resolve, 120));
-    }
-
-    console.log('[voice-note] audio sent, finalizing...');
-
-    // stop() حالا ws.send('') رو می‌فرسته — سیگنال پایان صدا
-    const text = await engine.stop();
+    console.log('[voice-note] transcribing via async API, size:', buffer.length);
+    const text = await transcribeFileAsync(buffer, `${sessionId}-note.webm`, `feelia:${sessionId}:note`);
 
     console.log('[voice-note] finished, text length:', (text || '').length);
 
@@ -161,12 +141,15 @@ export async function sessionRoutes(app: FastifyInstance) {
     let paramCount = 1;
 
     if (body.transcript !== undefined) {
+      // DIAG-TEMP: لاگ تشخیصی موقت برای ردیابی گم‌شدن مارکر discontinuity — بعد از پیدا کردن علت حذف شود.
+      console.log(`[diag-transcript] session=${id} incomingVersion=${body.transcript_version} len=${body.transcript.length} tail=${JSON.stringify(body.transcript.slice(-80))}`);
       // ✅ Compare-and-swap: اگر caller نسخه‌ی پایه بفرستد و با DB نخورد → 409، نه overwrite.
       // callerهای قدیمی (بدون transcript_version) همچنان پذیرفته‌اند (سازگاری عقبرو).
       if (typeof body.transcript_version === 'number') {
         const curV = await query('SELECT transcript_version FROM sessions WHERE id = $1', [id]);
         const cv: number = curV.rows[0]?.transcript_version ?? 0;
         if (cv !== body.transcript_version) {
+          console.log(`[diag-transcript] session=${id} VERSION-CONFLICT incoming=${body.transcript_version} current=${cv}`);
           reply.code(409);
           return {
             error: 'نسخه‌ی transcript قدیمی است؛ ابتدا تازه‌سازی کنید',
@@ -354,22 +337,31 @@ export async function sessionRoutes(app: FastifyInstance) {
     };
   });
 
-  // ===== Batch fallback (فقط مسیر شکست realtime) =====
-  // حریم خصوصی: صوت فقط وقتی به سرور می‌آید که realtime ناموفق/غیرقابل‌اعتماد باشد.
-  // بعد از رونویسی موفق، فایل صوتی حذف می‌شود. GET این فایل از هیچ مسیری سرو نمی‌شود.
+  // ===== Batch fallback + آرشیوِ صدا =====
+  // حریم خصوصی: صوت فقط وقتی به سرور می‌آید که realtime ناموفق/غیرقابل‌اعتماد باشد،
+  // یا (purpose=archive) عمداً برایِ بازبینیِ ادمین نگه داشته بشه — نه به‌صورتِ پیش‌فرض.
   // ?purpose=transcript (پیش‌فرض) → merge در sessions.transcript
   // ?purpose=note → فقط session_notes(type='voice')، هرگز transcript (ISSUE 3)
+  // ?purpose=archive → realtime موفق بود، متن دست‌نخورده می‌مونه، فقط صدا آرشیو می‌شه
   app.post('/api/sessions/:id/batch-audio', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const purpose = ((request.query as any)?.purpose === 'note' ? 'note' : 'transcript') as
-      import('../stt/batchqueue.js').BatchPurpose;
+    const q = request.query as any;
+    const purpose = (
+      q?.purpose === 'note' ? 'note' : q?.purpose === 'archive' ? 'archive' : 'transcript'
+    ) as import('../stt/batchqueue.js').BatchPurpose;
+    // seq: ترتیبِ واقعیِ ضبطِ این سگمنت (از کلاینت) — برایِ اسمِ فایل و مرتب‌سازیِ درست،
+    // چون آپلودها ممکنه به ترتیبِ رسیدن با ترتیبِ ضبط فرق کنن.
+    const seqRaw = Number(q?.seq);
+    const seq = Number.isFinite(seqRaw) && seqRaw >= 0 ? Math.floor(seqRaw) : 0;
 
     const owned = await getOwnedSession(id, request.therapistId!);
     if (!owned) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
-    if (owned.status === 'completed' || owned.status === 'canceled') {
+    // آرشیو فقط صداست، به transcript دست نمی‌زنه — پس رویِ جلسه‌ی completed هم مجازه
+    // (finish() و PUT status=completed تقریباً هم‌زمان و بدونِ ترتیبِ تضمین‌شده می‌رن).
+    if (purpose !== 'archive' && (owned.status === 'completed' || owned.status === 'canceled')) {
       reply.code(400);
       return { error: 'جلسه پایان یافته است' };
     }
@@ -386,7 +378,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: problem };
     }
 
-    const { baseVersion } = await enqueueBatch(id, buffer, purpose);
+    const { baseVersion } = await enqueueBatch(id, buffer, purpose, seq);
     // پردازش ناهمگام؛ اگر egress قطع باشد queued می‌ماند و با retry بعدی جلو می‌رود
     processBatchQueue(id, purpose).catch(() => {});
 
@@ -428,5 +420,47 @@ export async function sessionRoutes(app: FastifyInstance) {
     }
     processBatchQueue(id, purpose).catch(() => {});
     return { status: 'retrying', purpose };
+  });
+
+  // ===== بازسازیِ اختیاریِ شماره‌گذاریِ گوینده‌ها =====
+  // فقط با کلیکِ صریحِ تراپیست (نه خودکار) — چون رونویسیِ دوباره چند دقیقه طول
+  // می‌کشه و هزینه‌ی Soniox داره؛ خیلی از جلسات اصلاً نیازش نیست.
+  // POST → کارِ پس‌زمینه رو شروع می‌کنه (idempotent — اگه از قبل در حالِ اجراست، همون رو برمی‌گردونه)
+  app.post('/api/sessions/:id/resolve-speakers', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+    if (owned.status !== 'completed') {
+      reply.code(400);
+      return { error: 'فقط برایِ جلساتِ پایان‌یافته ممکن است' };
+    }
+    const audio = await listSessionAudio(id);
+    if (!audio.length) {
+      reply.code(400);
+      return { error: 'صدایی برایِ این جلسه آرشیو نشده — این قابلیت در دسترس نیست' };
+    }
+    const job = startResolveSpeakers(id);
+    reply.code(202);
+    return { status: job.status };
+  });
+
+  // GET → وضعیتِ همون جاب (preview متن، بدونِ هیچ نوشتنی رویِ transcriptِ اصلی —
+  // اعمالِ نهایی از همون PUT /api/sessions/:id با transcript_version انجام می‌شه)
+  app.get('/api/sessions/:id/resolve-speakers', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+    const job = getResolveJob(id);
+    if (!job) {
+      reply.code(404);
+      return { error: 'هنوز شروع نشده' };
+    }
+    return { status: job.status, text: job.text, error: job.error };
   });
 }

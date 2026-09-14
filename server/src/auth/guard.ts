@@ -35,19 +35,21 @@ export async function registerAuthContext(app: FastifyInstance) {
 }
 
 // preHandler برای روت‌هایی که فقط تراپیستِ واردشده باید بهشان دسترسی داشته باشد
+// ⭐ return reply بعد از send الزامی است: وگرنه Fastify هندلر را هم اجرا می‌کند
+// (double-send) و ریجکتِ upgrade وب‌سوکت (/ws/t ،/ws/voice) هم تمیز نیست —
+// در DevTools به‌صورت 401 مبهم روی همان endpoint دیده می‌شود.
 export async function requireAuth(request: FastifyRequest, reply: FastifyReply) {
   if (!request.therapistId) {
-    reply.code(401).send({ error: 'ابتدا وارد شوید' });
+    return reply.code(401).send({ error: 'ابتدا وارد شوید', code: 'unauthorized' });
   }
 }
 
 // preHandler برای روت‌های ادمین — عمداً ۴۰۳ (نه ۴۰۴) تا ادمینِ واقعی بفهمه چرا رد شد
 export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
   if (!request.therapistId) {
-    reply.code(401).send({ error: 'ابتدا وارد شوید' });
-    return;
+    return reply.code(401).send({ error: 'ابتدا وارد شوید', code: 'unauthorized' });
   }
   if (!request.isAdmin) {
-    reply.code(403).send({ error: 'دسترسی ادمین لازم است' });
+    return reply.code(403).send({ error: 'دسترسی ادمین لازم است', code: 'forbidden' });
   }
 }

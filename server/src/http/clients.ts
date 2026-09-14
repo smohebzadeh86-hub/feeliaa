@@ -4,6 +4,9 @@ import { query } from '../db/connection.js';
 import { requireAuth } from '../auth/guard.js';
 import { getOwnedClient } from '../db/ownership.js';
 
+const VALID_CATEGORIES = ['child', 'teen', 'adult'];
+const VALID_GENDERS = ['f', 'm'];
+
 // تولید کد یکتا: CL-XXXX
 function generateClientCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -22,6 +25,7 @@ export async function clientRoutes(app: FastifyInstance) {
     const result = await query(`
       SELECT
         c.id, c.code, c.alias, c.created_at,
+        c.status, c.status_reason, c.category, c.gender,
         COUNT(s.id) as session_count,
         MAX(s.date) as last_session_date
       FROM clients c
@@ -52,7 +56,19 @@ export async function clientRoutes(app: FastifyInstance) {
 
   // POST /api/clients — ساخت مراجع جدید برای همین تراپیست
   app.post('/api/clients', async (request, reply) => {
-    const { alias } = request.body as { alias?: string };
+    const { alias, category, gender } = request.body as { alias?: string; category?: string; gender?: string };
+
+    if (category && !VALID_CATEGORIES.includes(category)) {
+      reply.code(400);
+      return { error: 'دسته‌بندی نامعتبر است' };
+    }
+    if (gender && !VALID_GENDERS.includes(gender)) {
+      reply.code(400);
+      return { error: 'جنسیت نامعتبر است' };
+    }
+
+    // جنسیت فقط برایِ نوجوان/بزرگسال معنا داره
+    const finalGender = (category === 'teen' || category === 'adult') ? (gender || null) : null;
 
     let code = generateClientCode();
     for (let i = 0; i < 5; i++) {
@@ -62,8 +78,8 @@ export async function clientRoutes(app: FastifyInstance) {
     }
 
     const result = await query(
-      'INSERT INTO clients (code, alias, therapist_id) VALUES ($1, $2, $3) RETURNING *',
-      [code, alias || null, request.therapistId]
+      'INSERT INTO clients (code, alias, therapist_id, category, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [code, alias || null, request.therapistId, category || null, finalGender]
     );
 
     reply.code(201);
@@ -113,6 +129,64 @@ export async function clientRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
+
+    return { client: result.rows[0] };
+  });
+
+  // PATCH /api/clients/:id/status — انتقال فعال/غیرفعال (همیشه اقدامِ دستیِ تراپیست)
+  app.patch('/api/clients/:id/status', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { status, reason } = request.body as { status: string; reason?: string };
+
+    if (status !== 'active' && status !== 'inactive') {
+      reply.code(400);
+      return { error: 'وضعیت نامعتبر است' };
+    }
+
+    const owned = await getOwnedClient(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'مراجع یافت نشد' };
+    }
+
+    // برگشت به فعال یعنی دلیلِ قبلی دیگه معتبر نیست
+    const statusReason = status === 'inactive' ? (reason || null) : null;
+
+    const result = await query(
+      'UPDATE clients SET status = $1, status_reason = $2 WHERE id = $3 AND therapist_id = $4 RETURNING *',
+      [status, statusReason, id, request.therapistId]
+    );
+
+    return { client: result.rows[0] };
+  });
+
+  // PATCH /api/clients/:id/category — تغییرِ دسته‌بندیِ دموگرافیک (+ جنسیتِ اختیاری)
+  app.patch('/api/clients/:id/category', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { category, gender } = request.body as { category: string | null; gender?: string | null };
+
+    if (category !== null && category !== undefined && !VALID_CATEGORIES.includes(category)) {
+      reply.code(400);
+      return { error: 'دسته‌بندی نامعتبر است' };
+    }
+    if (gender !== null && gender !== undefined && !VALID_GENDERS.includes(gender)) {
+      reply.code(400);
+      return { error: 'جنسیت نامعتبر است' };
+    }
+
+    const owned = await getOwnedClient(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'مراجع یافت نشد' };
+    }
+
+    // جنسیت فقط برایِ نوجوان/بزرگسال معنا داره — با تغییرِ دسته به کودک، پاک می‌شه
+    const finalGender = (category === 'teen' || category === 'adult') ? (gender || null) : null;
+
+    const result = await query(
+      'UPDATE clients SET category = $1, gender = $2 WHERE id = $3 AND therapist_id = $4 RETURNING *',
+      [category || null, finalGender, id, request.therapistId]
+    );
 
     return { client: result.rows[0] };
   });

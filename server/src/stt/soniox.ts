@@ -145,6 +145,8 @@ export class SonioxEngine {
             language_hints: ['fa'],
             enable_language_identification: true,
             enable_speaker_diarization: true,
+            // برگردوندم به true — خاموش‌کردنش با صدایِ واقعی تاخیرِ محسوسی توی
+            // finalize‌شدنِ متنِ زنده ایجاد کرد (رگرسیونِ گزارش‌شده توسطِ کاربر).
             enable_endpoint_detection: true,
           }));
           this.flushPending();

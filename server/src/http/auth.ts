@@ -21,8 +21,8 @@ function normalizePhone(raw: string): string | null {
   return d;
 }
 
-function publicTherapist(row: { id: string; phone: string; email: string | null; name: string | null; is_admin: boolean; created_at: string }) {
-  return { id: row.id, phone: row.phone, email: row.email, name: row.name, is_admin: row.is_admin, created_at: row.created_at };
+function publicTherapist(row: { id: string; phone: string; email: string | null; name: string | null; specialty: string | null; is_admin: boolean; created_at: string }) {
+  return { id: row.id, phone: row.phone, email: row.email, name: row.name, specialty: row.specialty, is_admin: row.is_admin, created_at: row.created_at };
 }
 
 // ⭐ هش ثابتِ ساختگی — وقتی شماره پیدا نشه هم scrypt اجرا میشه تا زمان پاسخ
@@ -44,7 +44,7 @@ export async function authRoutes(app: FastifyInstance) {
 
   // POST /api/auth/register — ثبت‌نام تراپیست جدید
   app.post('/api/auth/register', async (request, reply) => {
-    const { phone, email, password, name } = request.body as { phone?: string; email?: string; password?: string; name?: string };
+    const { phone, email, password, name, specialty } = request.body as { phone?: string; email?: string; password?: string; name?: string; specialty?: string };
 
     if (!phone) {
       reply.code(400);
@@ -72,8 +72,8 @@ export async function authRoutes(app: FastifyInstance) {
 
     const normalizedEmail = email ? email.trim().toLowerCase() : null;
     const result = await query(
-      'INSERT INTO therapists (phone, email, password_hash, name) VALUES ($1, $2, $3, $4) RETURNING id, phone, email, name, is_admin, created_at',
-      [normalizedPhone, normalizedEmail, hashPassword(password), name?.trim() || null]
+      'INSERT INTO therapists (phone, email, password_hash, name, specialty) VALUES ($1, $2, $3, $4, $5) RETURNING id, phone, email, name, specialty, is_admin, created_at',
+      [normalizedPhone, normalizedEmail, hashPassword(password), name?.trim() || null, specialty?.trim() || null]
     );
     const therapist = result.rows[0];
     await ensureAdminFlag(therapist.id, normalizedPhone);
@@ -141,7 +141,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const result = await query(
-      'SELECT id, phone, email, name, is_admin, created_at FROM therapists WHERE id = $1',
+      'SELECT id, phone, email, name, specialty, is_admin, created_at FROM therapists WHERE id = $1',
       [request.therapistId]
     );
     if (result.rows.length === 0) {
