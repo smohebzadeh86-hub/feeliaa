@@ -270,6 +270,10 @@ button.btn svg{width:18px;height:18px;flex:none}
 #voiceNoteBox{text-align:center}
 
 .modal-back{position:fixed;inset:0;background:rgba(38,50,45,.45);backdrop-filter:blur(7px);display:none;align-items:center;justify-content:center;padding:18px;z-index:50}
+/* ⭐ فیکسِ باگِ واقعی (UI-07): bannerBox در جریانِ عادیِ سند است، بدونِ z-index —
+   وقتی مدالی باز بود، خطایی که همین لحظه در bannerBox نشان داده می‌شد زیرِ لایه‌ی
+   مدال (z-index:50) پنهان می‌ماند و کاربر فکر می‌کرد دکمه اصلاً کاری نکرده. */
+#bannerBox{position:relative;z-index:60}
 .modal-back.open{display:flex}
 .modal{background:var(--card);border-radius:24px;padding:26px;max-width:430px;width:100%;box-shadow:0 24px 56px rgba(0,0,0,.25);animation:rise .35s ease}
 .modal h3{margin:0 0 12px;font-size:17px;font-weight:800;color:var(--ink)}
@@ -576,7 +580,10 @@ button.btn svg{width:18px;height:18px;flex:none}
       <div class="timer" id="voiceTimer" style="font-size:26px;margin:4px 0 2px">۰۰:۰۰</div>
       <div class="rec-status" id="voiceStatus">آماده…</div>
       <div class="live-text" id="voiceLiveText" style="min-height:60px">در حال ضبط… حرف بزنید</div>
-      <button class="btn btn-danger btn-block" style="margin-top:10px" onclick="stopVoiceNote()">پایان ضبط و ثبت</button>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-ghost" onclick="cancelVoiceNote()">انصراف</button>
+        <button class="btn btn-danger" style="flex:2" onclick="stopVoiceNote()">پایان ضبط و ثبت</button>
+      </div>
     </div>
     <div id="textNoteBox" class="sub-panel" data-clarity-mask="true" hidden>
       <textarea id="textNoteInput" placeholder="متن یادداشت…"></textarea>
@@ -628,7 +635,7 @@ button.btn svg{width:18px;height:18px;flex:none}
     <div class="cat-select" id="newClientCatSelect"></div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn btn-ghost" onclick="closeNewClientModal()">انصراف</button>
-      <button class="btn btn-primary" onclick="createNewClient()">ایجاد</button>
+      <button class="btn btn-primary" id="newClientCreateBtn" onclick="createNewClient()">ایجاد</button>
     </div>
   </div>
 </div>
@@ -1375,7 +1382,27 @@ async function submitAuth(){
     await enterApp();
   }catch(e){showBanner('error',e.message);}
 }
+// ⭐ فیکسِ باگِ واقعی (UI-01): «خروج از حساب» و «پنلِ ادمین» وسطِ جلسه‌ی زنده
+// میکروفون و اتصالِ Soniox رو باز رها می‌کردن (رفتنِ به صفحه‌ی ورود، بدونِ توقفِ
+// واقعیِ ضبط) — نفرِ بعدیِ پشتِ همون دستگاه ضبط می‌شد. همون سیگنالی که
+// beforeunload برای هشدارِ خروج از مرورگر استفاده می‌کنه (ws/voiceWS/SonioxDirect/
+// FeeliaRT بازِ واقعی) اینجا هم برای مسدودکردنِ خروج استفاده می‌شه. abort() عمداً
+// صدا زده نمی‌شه چون صفِ صدایِ آفلاینِ IndexedDB رو پاک می‌کنه — کاربر باید خودش
+// جلسه رو با «پایان جلسه» یا «لغو جلسه» تموم کنه.
+function hasActiveRecording(){
+  try{
+    if(ws&&ws.readyState===WebSocket.OPEN)return true;
+    if(voiceWS&&voiceWS.readyState===WebSocket.OPEN)return true;
+    if(SonioxDirect&&SonioxDirect.ws&&SonioxDirect.ws.readyState===WebSocket.OPEN)return true;
+    if(window.FeeliaRT&&window.FeeliaRT.hasOpenConnection())return true;
+  }catch(e){}
+  return false;
+}
 async function logout(){
+  if(hasActiveRecording()){
+    showBanner('warn','ابتدا جلسه‌ی زنده را پایان دهید یا لغو کنید.');
+    return;
+  }
   uxTrack('logout_clicked');
   try{await api('/api/auth/logout',{method:'POST'});}catch(e){}
   currentTherapist=null;
@@ -1458,6 +1485,10 @@ let adminDeleteTargetClient=null;
 let currentAdminTherapistId=null;
 
 async function openAdminPanel(){
+  if(hasActiveRecording()){
+    showBanner('warn','ابتدا جلسه‌ی زنده را پایان دهید یا لغو کنید.');
+    return;
+  }
   clearBanner();
   showScreen('Admin');
   await Promise.all([loadAdminStats(),loadAdminTherapists()]);
@@ -2266,7 +2297,15 @@ async function openClientDetail(clientId){
       date.textContent=toFa(s.date)+' · شروع '+toFa(s.start_time)+(s.duration_ms?' · '+toFa(Math.round(s.duration_ms/60000))+' دقیقه':'');
       div.appendChild(date);
 
-      div.addEventListener('click',function(){viewTranscript(s.id);});
+      // ⭐ فیکسِ باگِ واقعی (UI-12): جلسه‌ی «در جریان»/«قطع‌شده» در پرونده هیچ راهِ
+      // ادامه نداشت — فقط اگر بنرِ خودکارِ همان مرورگر رد نمی‌شد قابلِ‌ادامه بود؛
+      // اگر مرورگر/دستگاه عوض می‌شد، برای همیشه ناتمام می‌ماند. الان کلیک روی
+      // چنین جلسه‌ای مستقیماً ادامه/بازیابی را شروع می‌کند، نه نمایشِ متن.
+      div.addEventListener('click',function(){
+        if(s.status==='in_progress')liveResumeSession(s.id);
+        else if(s.status==='recovered')resumeSession(s.id);
+        else viewTranscript(s.id);
+      });
       sl.appendChild(div);
     });
     showScreen('ClientDetail');
@@ -2312,6 +2351,9 @@ async function viewTranscript(sessionId){
       });
     }else nb.hidden=true;
     $('sessionDetail').hidden=false;
+    // ⭐ فیکسِ باگِ واقعی (UI-10): متنِ جلسه پایینِ فهرستِ جلسات باز می‌شد و در
+    // viewportِ کوتاه کاملاً بیرون از دید بود — کلیک روی جلسه ظاهراً کاری نمی‌کرد.
+    try{$('sessionDetail').scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}
     uxTrack('transcript_opened');
   }catch(e){showBanner('error',e.message);}
 }
@@ -2427,6 +2469,12 @@ function showNewClientModal(){
 }
 function closeNewClientModal(){$('newClientModal').classList.remove('open');}
 async function createNewClient(){
+  // ⭐ فیکسِ باگِ واقعی (UI-06): دوبار کلیکِ سریع (قبل از رسیدنِ پاسخِ اولی) دو
+  // درخواستِ POST همزمان می‌فرستاد و دو مراجعِ تکراری می‌ساخت. دکمه تا پایانِ
+  // درخواست غیرفعال می‌شود.
+  const btn=$('newClientCreateBtn');
+  if(btn.disabled)return;
+  btn.disabled=true;
   const alias=$('newClientAlias').value.trim();
   try{
     const data=await api('/api/clients',{method:'POST',body:{alias:alias,category:newClientSelectedCategory,gender:newClientSelectedGender}});
@@ -2435,6 +2483,7 @@ async function createNewClient(){
     showBanner('info','مراجع <b>'+data.client.code+'</b> ساخته شد.');
     loadClients();
   }catch(e){uxTrack('client_create_failed');showBanner('error',e.message);}
+  finally{btn.disabled=false;}
 }
 
 // ===== Setup =====
@@ -2500,6 +2549,12 @@ async function runPreflight(){
 async function startSession(){
   clearBanner();
   if(!consent)return;
+  // ⭐ فیکسِ باگِ واقعی (UI-04): دوبار کلیکِ سریع روی «شروع جلسه» قبل از رسیدنِ
+  // پاسخِ اولین POST، دو جلسه و دو ضبطِ هم‌زمان می‌ساخت. دکمه تا نتیجه (موفق یا
+  // خطا) غیرفعال می‌شود؛ روی موفقیت صفحه عوض می‌شود، روی خطا با updateStartButtonState
+  // دوباره طبقِ وضعیتِ واقعیِ consent/میکروفون فعال می‌شود (نه بی‌قیدوشرط).
+  if($('btnStartSession').disabled)return;
+  $('btnStartSession').disabled=true;
   uxTrack('session_start_clicked');
   try{
     const data=await api('/api/sessions',{method:'POST',body:{client_id:currentClient.id,consent:true}});
@@ -2537,7 +2592,7 @@ async function startSession(){
     }
     if(isDirectMode()){await startDirectLive();}
     else{await connectWS();}
-  }catch(e){uxTrack('session_start_failed');showBanner('error','خطا: '+e.message);}
+  }catch(e){uxTrack('session_start_failed');showBanner('error','خطا: '+e.message);updateStartButtonState();}
 }
 
 // ===== Watchdog: صدا ارسال می‌شود ولی متنی برنمی‌گردد =====
@@ -2777,6 +2832,12 @@ async function startVoiceNoteDirect(){
   try{ok=await s.start();}catch(e){ok=false;}
   if(!ok){try{window.FeeliaRT.forget(s);}catch(e){}return false;}
   rtVoice=s;
+  // ⭐ فیکسِ باگِ واقعی (UI-17): این مسیر (اصلی، FeeliaRT) تایمر را هیچ‌وقت شروع
+  // نمی‌کرد — فقط مسیرِ legacyِ پایینِ همین فایل این کار را می‌کرد. کاربر روی
+  // «۰۰:۰۰» ثابت می‌دید و مطمئن نبود ضبط می‌شود.
+  voiceElapsed=0;
+  renderVoiceTimer();
+  startVoiceTimer();
   // ISSUE 4 برای یادداشت هم: durable-only صادقانه گزارش می‌شود، نه «لایو رونویسی».
   $('voiceStatus').textContent=(s.realtimeUp===false)
     ?'در حال ضبط — متن پس از پایان آماده می‌شود'
@@ -2787,12 +2848,28 @@ async function stopVoiceNoteDirect(){
   const s=rtVoice;
   rtVoice=null;
   if(!s)return;
+  voiceRunning=false;
+  clearInterval(voiceTimerInt);
   $('voiceStatus').textContent='در حال نهایی‌سازی…';
   let out={text:'',reliable:true,mode:'realtime'};
   try{out=await s.finish();}catch(e){}
   try{window.FeeliaRT.forget(s);}catch(e){}
   if(out.text&&out.text.trim()&&(out.reliable||out.mode==='batch')){
-    wrapupNotes.push({type:'voice',text:out.text.trim(),wall_clock:nowClock()});
+    // ⭐ فیکسِ باگِ واقعی (UI-02): این شاخه (رونویسیِ زنده‌ی موفق) فقط به آرایه‌ی
+    // محلیِ wrapupNotes اضافه می‌کرد و هیچ‌وقت به سرور ارسال نمی‌شد — UI «ثبت شد»
+    // نشون می‌داد ولی بعدِ «ذخیره و پایان» یادداشت در پرونده نبود، از دست می‌رفت.
+    // مسیرِ batch-pending-note (پایین) از قبل درست بود چون سرور خودش در صفِ batch
+    // ذخیره می‌کند؛ اینجا (مسیرِ FeeliaRT با mode:'note') چون persist=false است،
+    // هیچ‌کس دیگه‌ای این متن رو ذخیره نمی‌کنه — پس همینجا صریح POST می‌کنیم،
+    // دقیقاً مثلِ addTextNote().
+    const voiceText=out.text.trim();
+    const voiceWallClock=nowClock();
+    let voiceDbId=null;
+    try{
+      const d=await api('/api/sessions/'+currentSession.id+'/notes',{method:'POST',body:{type:'voice',text:voiceText,wall_clock:voiceWallClock}});
+      if(d&&d.note)voiceDbId=d.note.id;
+    }catch(e){}
+    wrapupNotes.push({dbId:voiceDbId,type:'voice',text:voiceText,wall_clock:voiceWallClock});
     renderWrapupNotes();
     $('voiceStatus').textContent='ثبت شد'+(out.reliable?'':' (با تاخیر)');
     setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},1500);
@@ -3019,7 +3096,18 @@ function handleMsg(msg){
   }
 }
 
- $('chkLiveText').addEventListener('change',function(){$('liveText').hidden=!$('chkLiveText').checked;uxTrack('live_text_toggled');});
+ $('chkLiveText').addEventListener('change',function(){
+  // ⭐ فیکسِ باگِ واقعی (UI-16): قبلاً فقط hidden عوض می‌شد؛ جعبه تا رسیدنِ اولین
+  // پیامِ preview بعدی خالی می‌ماند (حتی اگر متنِ زیادی از قبل تأیید شده بود).
+  // الان روشن‌کردن بلافاصله متنِ فعلیِ rtSession را نشان می‌دهد.
+  const show=$('chkLiveText').checked;
+  $('liveText').hidden=!show;
+  if(show&&typeof rtSession!=='undefined'&&rtSession){
+    $('liveText').textContent=rtSession.confirmed+(rtSession.interim?' '+rtSession.interim:'');
+    $('liveText').scrollTop=$('liveText').scrollHeight;
+  }
+  uxTrack('live_text_toggled');
+});
 
 // ===== Timer =====
 function resetTimer(){clearInterval(timerInterval);elapsedMs=0;lastTickAt=null;timerRunning=false;renderTimer();}
@@ -3120,10 +3208,18 @@ async function addQuickNote(){
   }
 });
 
+// ⭐ فیکسِ باگِ واقعی (UI-37): یادداشتِ سریعِ حینِ جلسه (برخلافِ علامت‌ها) هیچ
+// دکمه‌ی حذف نداشت — یادداشتِ اشتباه/تکراری برای همیشه در پرونده می‌ماند.
+function removeQuickNote(idx){
+  const n=sessionNotes[idx];
+  if(n&&n.dbId)api('/api/notes/'+n.dbId,{method:'DELETE'}).catch(function(){});
+  sessionNotes.splice(idx,1);
+  renderNotesLog();
+}
 function renderNotesLog(){
   const log=$('notesLog');
   log.innerHTML='';
-  sessionNotes.forEach(function(n){
+  sessionNotes.forEach(function(n,i){
     const el=document.createElement('div');
     el.className='note-log-item';
     const tm=document.createElement('span');
@@ -3134,6 +3230,15 @@ function renderNotesLog(){
     txt.style.cssText='flex:1;min-width:0;line-height:1.7';
     txt.textContent=n.text;
     el.appendChild(txt);
+    const btn=document.createElement('button');
+    btn.className='sign-rm';
+    btn.title='حذف';
+    btn.innerHTML=IC_X;
+    btn.addEventListener('click',function(e){
+      e.stopPropagation();
+      removeQuickNote(i);
+    });
+    el.appendChild(btn);
     log.appendChild(el);
   });
 }
@@ -3422,13 +3527,13 @@ async function confirmCancelSession(){
   showBanner('info','جلسه لغو شد.');
 }
 
+// ⭐ فیکسِ باگِ واقعی (UI-19): این هشدار می‌گفت «N یادداشت از بین می‌رود» در حالی
+// که هم یادداشتِ متنی (`addTextNote`) هم یادداشتِ صوتی (بعدِ فیکسِ UI-02) همان
+// لحظه‌ی ثبت به سرور POST می‌شوند — چیزی برای «از دست رفتن» نیست. پیامِ نادرست
+// نگرانیِ بی‌دلیل ایجاد می‌کرد.
 function showExitWarning(){
-  const unsaved=wrapupNotes.length;
-  let msg='<b>این جلسه هنوز کامل نشده است.</b>';
-  msg+='<div class="exit-sub">متنِ رونویسی تا اینجا خودکار ذخیره شده و در پرونده باقی می‌ماند.<br>';
-  if(unsaved)msg+='اما <b>'+toFa(unsaved)+' یادداشتِ</b> افزوده‌شده در این صفحه ذخیره نشده و از بین می‌رود.';
-  else msg+='در این صفحه یادداشتِ ذخیره‌نشده‌ای وجود ندارد.';
-  msg+='</div>';
+  let msg='<b>این جلسه از قبل ذخیره شده است.</b>';
+  msg+='<div class="exit-sub">متنِ رونویسی و یادداشت‌های این جلسه در پرونده ثبت شده‌اند؛ خروج بدونِ زدنِ «ذخیره و پایان» چیزی را از بین نمی‌برد.</div>';
   $('exitWarningText').innerHTML=msg;
   $('exitModal').classList.add('open');
 }
@@ -3549,6 +3654,13 @@ async function startVoiceNote(){
   };
 }
 
+// ⭐ فیکسِ باگِ واقعی (UI-18): یادداشتِ صوتی راهِ انصراف نداشت — فقط «پایان ضبط و
+// ثبت» بود، یعنی ضبطِ اشتباه/بی‌ربط را نمی‌شد دور ریخت. `cleanupVoice()` از قبل
+// امن است (برای هر دو مسیرِ FeeliaRT و legacy: abort/stop + بستنِ stream/ws +
+// توقفِ تایمر + مخفی‌کردنِ جعبه) — فقط finish()/persist صدا زده نمی‌شود.
+function cancelVoiceNote(){
+  cleanupVoice();
+}
 function stopVoiceNote(){
   uxTrack('voice_note_stop_clicked');
   if(rtVoice){stopVoiceNoteDirect();return;}
@@ -3633,6 +3745,38 @@ window.addEventListener('beforeunload',function(e){
   let rtOpen=false;
   try{rtOpen=!!(window.FeeliaRT&&window.FeeliaRT.hasOpenConnection());}catch(_){}
   if(ws||voiceWS||directOpen||rtOpen){e.preventDefault();e.returnValue='';}
+});
+
+// ⭐ فیکسِ باگِ واقعی (UI-20 بخشِ مدال‌ها، UI-21): مدال‌ها فقط با دکمه‌ی «انصراف»
+// بسته می‌شدند؛ Escape و کلیک روی پس‌زمینه هیچ اثری نداشتند — رفتارِ غیرمنتظره‌ای
+// برای هر کاربرِ وب. هر مدال تابعِ closeِ مخصوصِ خودش را دارد (بعضی متغیرِ target
+// را هم ریست می‌کنند)؛ همان تابع صدا زده می‌شود، نه صرفاً حذفِ کلاس، تا رفتار با
+// کلیکِ «انصراف» دقیقاً یکسان بماند.
+const MODAL_CLOSERS={
+  newClientModal:closeNewClientModal,
+  resolveSpeakersModal:closeResolveSpeakersModal,
+  deactivateClientModal:closeDeactivateModal,
+  editCategoryModal:closeEditCategoryModal,
+  cancelModal:closeCancelModal,
+  exitModal:closeExitWarning,
+  deleteSessionModal:closeDeleteSession,
+  editSessionModal:closeEditSessionMeta,
+  deleteTherapistModal:closeDeleteTherapist,
+  deleteClientModal:closeDeleteClient
+};
+document.querySelectorAll('.modal-back').forEach(function(back){
+  back.addEventListener('click',function(e){
+    if(e.target!==back)return; // فقط کلیکِ مستقیم روی پس‌زمینه، نه محتوای مدال
+    const fn=MODAL_CLOSERS[back.id];
+    if(fn)fn();
+  });
+});
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Escape')return;
+  const openModal=document.querySelector('.modal-back.open');
+  if(!openModal)return;
+  const fn=MODAL_CLOSERS[openModal.id];
+  if(fn)fn();
 });
 
 document.addEventListener('DOMContentLoaded',function(){init();});

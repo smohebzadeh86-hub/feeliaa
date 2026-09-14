@@ -11,8 +11,15 @@ function isValidEmail(email: string): boolean {
 
 // شماره‌ی موبایلِ ایران: ورودی رو نرمال می‌کنه به فرمتِ ۰۹XXXXXXXXX
 // قبول می‌کنه: 09123456789 / +989123456789 / 00989123456789 / با فاصله یا خط‌تیره
+// ⭐ باگِ واقعی (UI-03): ارقامِ فارسی/عربی (۰۹۱۲…, ٠٩١٢…) رد می‌شدن — دقیقاً همون
+// چیزی که placeholderِ فیلدِ موبایل نشون می‌ده. قبل از حذفِ غیررقمی به لاتین تبدیل می‌شن.
+function toLatinDigits(s: string): string {
+  return s
+    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776)) // فارسی: U+06F0..U+06F9
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632)); // عربی: U+0660..U+0669
+}
 function normalizePhone(raw: string): string | null {
-  const digits = raw.replace(/[^\d+]/g, '');
+  const digits = toLatinDigits(raw).replace(/[^\d+]/g, '');
   let d = digits;
   if (d.startsWith('+98')) d = '0' + d.slice(3);
   else if (d.startsWith('0098')) d = '0' + d.slice(4);
