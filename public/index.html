@@ -722,6 +722,18 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
+<div class="modal-back" id="editAliasModal" data-clarity-mask="true">
+  <div class="modal">
+    <h3>ویرایشِ نامِ مستعار</h3>
+    <p>نامِ مستعارِ <b id="editAliasClientCode"></b> را تغییر دهید.</p>
+    <input type="text" id="editAliasInput" placeholder="مثلاً: مراجع-الف" maxlength="80">
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeEditAliasModal()">انصراف</button>
+      <button class="btn btn-primary" onclick="confirmEditAlias()">ذخیره</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-back" id="cancelModal">
   <div class="modal">
     <h3>لغو این جلسه؟</h3>
@@ -1571,6 +1583,7 @@ function renderAdminStats(s){
     ['مراجعین',s.clients],
     ['کل جلسات',s.sessions],
     ['جلساتِ امروز',s.sessions_today],
+    ['جلساتِ این هفته',s.sessions_this_week],
   ];
   $('adminStats').innerHTML=items.map(function(it){
     return '<div class="card" style="padding:14px;text-align:center">'+
@@ -2056,11 +2069,20 @@ function setSortMode(mode){
   applyClientFilters();
 }
 
+// ⭐ فیکسِ باگِ واقعی (UI-29): «ي»/«ك» عربی با «ی»/«ک» فارسی و ارقامِ فارسی/عربی با
+// لاتین یکسان نمی‌شدن — با کیبوردِ دیگر همون مراجع پیدا نمی‌شد.
+function normalizeSearchText(s){
+  return (s||'').toLowerCase()
+    .replace(/ي/g,'ی').replace(/ك/g,'ک')
+    .replace(/[۰-۹]/g,function(d){return String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d));})
+    .replace(/[٠-٩]/g,function(d){return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d));});
+}
+
 // ⭐ یک نقطه‌ی مرکزی برای هر شرط (تب + دسته + جنسیت + جست‌وجو + ترتیب) — تا فیلترهایِ
 // جدا روی هم سوار نشن و رفتارِ ناسازگار نسازن.
 function applyClientFilters(){
   renderCatFilterRow();
-  const q=$('searchInput').value.trim().toLowerCase();
+  const q=normalizeSearchText($('searchInput').value.trim());
   const byTab=allClients.filter(function(c){return (c.status||'active')===clientTab;});
 
   $('countActive').textContent=toFa(allClients.filter(function(c){return (c.status||'active')==='active';}).length);
@@ -2074,7 +2096,7 @@ function applyClientFilters(){
   }
   if(q){
     visible=visible.filter(function(c){
-      return (c.code||'').toLowerCase().includes(q)||(c.alias||'').toLowerCase().includes(q);
+      return normalizeSearchText(c.code).includes(q)||normalizeSearchText(c.alias).includes(q);
     });
   }
 
@@ -2110,8 +2132,17 @@ function renderClients(clients,isSearchResult){
   grid.innerHTML='';
   const totalInTab=allClients.filter(function(c){return (c.status||'active')===clientTab;}).length;
   if(!clients.length){
-    if(isSearchResult||clientCategoryFilter!=='all'){emptySearch.hidden=false;emptyFirst.hidden=true;}
-    else{emptyFirst.hidden=totalInTab>0;emptySearch.hidden=true;}
+    // ⭐ فیکسِ باگِ واقعی (UI-28): با فیلترِ دسته (بدونِ جست‌وجوی متنی)، پیامِ
+    // «کد یا نام دیگری را جست‌وجو کنید» گمراه‌کننده بود — جست‌وجویی نشده بود.
+    if(isSearchResult){
+      emptySearch.querySelector('p').textContent='مراجعی یافت نشد';
+      emptySearch.querySelector('span').textContent='کد یا نام دیگری را جست‌وجو کنید';
+      emptySearch.hidden=false;emptyFirst.hidden=true;
+    }else if(clientCategoryFilter!=='all'||clientGenderFilter){
+      emptySearch.querySelector('p').textContent='مراجعی در این دسته‌بندی نیست';
+      emptySearch.querySelector('span').textContent='فیلتر را عوض کنید یا «همه» را انتخاب کنید';
+      emptySearch.hidden=false;emptyFirst.hidden=true;
+    }else{emptyFirst.hidden=totalInTab>0;emptySearch.hidden=true;}
     return;
   }
   emptyFirst.hidden=true;emptySearch.hidden=true;
@@ -2134,6 +2165,11 @@ function renderClients(clients,isSearchResult){
     editCatBtn.innerHTML=IC_PEN+'ویرایشِ دسته‌بندی';
     editCatBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();openEditCategoryModal(c);});
     menuDrop.appendChild(editCatBtn);
+    const editAliasBtn=document.createElement('button');
+    editAliasBtn.type='button';
+    editAliasBtn.innerHTML=IC_PEN+'ویرایشِ نامِ مستعار';
+    editAliasBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();openEditAliasModal(c);});
+    menuDrop.appendChild(editAliasBtn);
     menuDrop.appendChild(document.createElement('hr'));
     if(isInactive){
       const restoreBtn=document.createElement('button');
@@ -2299,6 +2335,31 @@ async function confirmEditCategory(){
     uxTrack('client_category_edited');
     closeEditCategoryModal();
     showBanner('info','دسته‌بندی به‌روزرسانی شد.');
+    loadClients();
+  }catch(e){showBanner('error','خطا: '+e.message);}
+}
+
+// ⭐ فیکسِ باگِ واقعی (UI-38): API ویرایشِ alias (`PUT /api/clients/:id`) از قبل
+// وجود داشت ولی هیچ راهِ UI برایِ آن نبود؛ اشتباهِ تایپی در نامِ مراجع ماندگار می‌شد.
+let editAliasTargetClient=null;
+function openEditAliasModal(c){
+  editAliasTargetClient=c;
+  $('editAliasClientCode').textContent=c.code;
+  $('editAliasInput').value=c.alias||'';
+  $('editAliasModal').classList.add('open');
+}
+function closeEditAliasModal(){
+  $('editAliasModal').classList.remove('open');
+  editAliasTargetClient=null;
+}
+async function confirmEditAlias(){
+  if(!editAliasTargetClient)return;
+  const id=editAliasTargetClient.id;
+  const alias=$('editAliasInput').value.trim();
+  try{
+    await api('/api/clients/'+id,{method:'PUT',body:{alias:alias}});
+    closeEditAliasModal();
+    showBanner('info','نامِ مستعار به‌روزرسانی شد.');
     loadClients();
   }catch(e){showBanner('error','خطا: '+e.message);}
 }
@@ -3853,6 +3914,7 @@ const MODAL_CLOSERS={
   resolveSpeakersModal:closeResolveSpeakersModal,
   deactivateClientModal:closeDeactivateModal,
   editCategoryModal:closeEditCategoryModal,
+  editAliasModal:closeEditAliasModal,
   cancelModal:closeCancelModal,
   exitModal:closeExitWarning,
   deleteSessionModal:closeDeleteSession,
