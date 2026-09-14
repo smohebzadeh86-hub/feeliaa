@@ -1382,6 +1382,16 @@ async function submitAuth(){
     await enterApp();
   }catch(e){showBanner('error',e.message);}
 }
+// ⭐ فیکسِ باگِ واقعی (UI-20، نیمِ فرمِ ورود): بدونِ `<form>`، Enter در هیچ‌کدام از
+// فیلدهای ورود/ثبت‌نام کاری نمی‌کرد — کاربر مجبور بود هر بار با موس روی دکمه بزند
+// (روی موبایل کیبورد هم اغلب همان دکمه را می‌پوشاند). به‌جایِ تبدیلِ کاملِ بخش به
+// `<form>` (ریسکِ تغییرِ چیدمان)، همان الگوی موجودِ `quickNoteInput` تکرار شده.
+['authPhone','authName','authSpecialty','authEmail','authPassword'].forEach(function(id){
+  var el=$(id);
+  if(el)el.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();submitAuth();}
+  });
+});
 // ⭐ فیکسِ باگِ واقعی (UI-01): «خروج از حساب» و «پنلِ ادمین» وسطِ جلسه‌ی زنده
 // میکروفون و اتصالِ Soniox رو باز رها می‌کردن (رفتنِ به صفحه‌ی ورود، بدونِ توقفِ
 // واقعیِ ضبط) — نفرِ بعدیِ پشتِ همون دستگاه ضبط می‌شد. همون سیگنالی که
@@ -1567,7 +1577,16 @@ function renderAdminTherapists(list){
     const toggleInput=document.createElement('input');
     toggleInput.type='checkbox';
     toggleInput.checked=!!t.active;
-    toggleInput.addEventListener('change',function(){adminSetActive(t.id,toggleInput.checked);});
+    // ⭐ فیکسِ باگِ واقعی (UI-27): تغییرِ فعال/غیرفعال فوری و بدونِ تأیید بود — یک
+    // لمسِ اشتباه یعنی حسابِ یک تراپیست بلافاصله قفل می‌شد. `confirm()` سبک‌ترین
+    // راهِ ایمن است؛ روی انصراف، چک‌باکس به حالتِ قبل برمی‌گردد (بدونِ درخواست به سرور).
+    toggleInput.addEventListener('change',function(){
+      const msg=toggleInput.checked
+        ?'حسابِ '+(t.name||t.phone)+' دوباره فعال شود؟'
+        :'حسابِ '+(t.name||t.phone)+' غیرفعال شود؟ نشستِ فعلیِ او بلافاصله باطل می‌شود.';
+      if(!confirm(msg)){toggleInput.checked=!toggleInput.checked;return;}
+      adminSetActive(t.id,toggleInput.checked);
+    });
     toggleLabel.appendChild(toggleInput);
     toggleLabel.appendChild(document.createTextNode('فعال'));
     row.appendChild(toggleLabel);
@@ -1578,7 +1597,13 @@ function renderAdminTherapists(list){
     const adminToggleInput=document.createElement('input');
     adminToggleInput.type='checkbox';
     adminToggleInput.checked=!!t.is_admin;
-    adminToggleInput.addEventListener('change',function(){adminSetIsAdmin(t.id,adminToggleInput.checked);});
+    adminToggleInput.addEventListener('change',function(){
+      const msg=adminToggleInput.checked
+        ?(t.name||t.phone)+' ادمین شود؟ او به همه‌ی داده‌های سیستم دسترسی خواهد داشت.'
+        :'نقشِ ادمین از '+(t.name||t.phone)+' گرفته شود؟';
+      if(!confirm(msg)){adminToggleInput.checked=!adminToggleInput.checked;return;}
+      adminSetIsAdmin(t.id,adminToggleInput.checked);
+    });
     adminToggleLabel.appendChild(adminToggleInput);
     adminToggleLabel.appendChild(document.createTextNode('ادمین'));
     row.appendChild(adminToggleLabel);
@@ -1664,7 +1689,13 @@ async function openAdminTherapistDetail(id){
       const delBtn=document.createElement('button');
       delBtn.className='btn btn-ghost btn-sm';
       delBtn.textContent='حذف مراجع';
-      delBtn.addEventListener('click',function(e){e.stopPropagation();adminDeleteClient(c.id);});
+      // ⭐ فیکسِ باگِ واقعی (UI-27): حذفِ مراجع از پنلِ ادمین بدونِ هیچ تأییدی انجام
+      // می‌شد — یک لمسِ اشتباه یعنی حذفِ آبشاریِ مراجع + همه‌ی جلسات/یادداشت‌هایش.
+      delBtn.addEventListener('click',function(e){
+        e.stopPropagation();
+        if(!confirm('مراجعِ '+c.code+(c.alias?' — '+c.alias:'')+' حذف شود؟ همه‌ی جلسات و یادداشت‌هایش هم برای همیشه حذف می‌شوند.'))return;
+        adminDeleteClient(c.id);
+      });
       head.appendChild(delBtn);
       div.appendChild(head);
       const date=document.createElement('div');
@@ -2441,10 +2472,18 @@ async function saveSessionMeta(){
   try{
     const data=await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{date,start_time}});
     uxTrack('session_meta_edited');
+    const savedSessionId=data.session.id;
     currentViewSession=data.session;
     closeEditSessionMeta();
     showBanner('info','تاریخ و ساعت جلسه به‌روزرسانی شد.');
-    if(currentClient)openClientDetail(currentClient.id);
+    if(currentClient){
+      await openClientDetail(currentClient.id);
+      // ⭐ فیکسِ باگِ واقعی (UI-11): openClientDetail فهرستِ جلسات را دوباره می‌سازد
+      // و `sessionDetail` را می‌بندد (`hidden=true`) — یعنی متنی که کاربر همین الان
+      // باز کرده بود و تاریخش را ویرایش کرد، ناپدید می‌شد و باید دوباره پیدا و
+      // کلیک می‌کرد. الان همان جلسه دوباره باز می‌شود.
+      await viewTranscript(savedSessionId);
+    }
   }catch(e){showBanner('error',e.message);}
 }
 
@@ -2520,6 +2559,12 @@ async function runPreflight(){
     $('preflightMicRow').className='banner error';
     $('preflightMicRow').textContent=describeMicError(e);
   }
+  // ⭐ فیکسِ باگِ واقعی (UI-08): updateStartButtonState فقط به consent+میکروفون
+  // وابسته است، نه به STT (طبقِ کامنتِ خودِ همین کد: «عمداً غیرمسدودکننده»). ولی
+  // قبلاً بعدِ تمام‌شدنِ چکِ میکروفون دوباره صدا زده نمی‌شد — فقط در انتهای تابع،
+  // بعدِ awaitِ چکِ STT (که در production شاملِ mint است و تا ۱۰s طول می‌کشد).
+  // نتیجه: دکمه‌ی شروع با اینکه شرطش فراهم بود، بی‌دلیل قفل می‌ماند.
+  updateStartButtonState();
 
   try{
     const res=await api('/api/stt/check');
