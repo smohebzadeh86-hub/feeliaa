@@ -67,7 +67,15 @@ body{font-family:'Vazirmatn',Tahoma,sans-serif;background:radial-gradient(900px 
 
 .card{background:var(--card);border-radius:var(--r-xl);box-shadow:var(--shadow);border:1px solid var(--line-soft);padding:28px 26px;margin-bottom:18px}
 .screen{animation:rise .5s cubic-bezier(.22,.9,.36,1) both}
-@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+/* ⭐ فیکسِ باگِ واقعیِ کشف‌شده هنگامِ رفعِ UI-22/23/24: `transform` در این کیفریم —
+   حتی مقدارِ نهاییِ `none` — طبقِ اسپکِ CSS یک containing block برایِ فرزندانِ
+   `position:fixed` می‌سازد (چون در طولِ انیمیشن `transform` به‌صورتِ فعال ست
+   می‌شود). نتیجه: هر عنصرِ `position:fixed` داخلِ یک `.screen` به‌جایِ ویوپورت،
+   نسبت به همان `.screen` جای می‌گرفت — یعنی نوارِ کنترلِ ثابتِ موبایل به‌جایِ
+   پایینِ صفحه، پایینِ کلِ محتوایِ آن صفحه (خیلی پایین‌تر از دید) می‌رفت. با
+   `margin-top` به‌جایِ `transform` دقیقاً همان جلوه‌ی بصری (حرکتِ کوتاه به بالا +
+   محو) حفظ می‌شود، بدونِ ساختنِ containing block. */
+@keyframes rise{from{opacity:0;margin-top:12px}to{opacity:1;margin-top:0}}
 .card-head{margin-bottom:20px}
 .card-head h2{margin:0;font-size:19px;font-weight:800;color:var(--ink)}
 .card-head p{margin:5px 0 0;font-size:13px;color:var(--muted)}
@@ -311,6 +319,26 @@ button.btn svg{width:18px;height:18px;flex:none}
   .rec-dot svg{width:40px;height:40px}
   .clients-grid{grid-template-columns:1fr}
   #adminStats{grid-template-columns:repeat(2,1fr)!important}
+
+  /* ⭐ فیکسِ باگِ واقعی (UI-22، UI-23، UI-24): سه دکمه/نوارِ اصلیِ این صفحات در
+     موبایل زیرِ خطِ دید بودند و نیازِ اسکرول داشتند — دقیقاً همون «کلیکِ اضافه»یی
+     که طبقِ اصلِ راهنما (درخواستِ مالک) باید حذف بشه. همه با همون توکن‌ها/کلاس‌های
+     موجودِ سیستمِ طراحی (--card, --line-soft, --r-lg, --shadow, .btn-*) ثابت
+     می‌شوند؛ فقط در همین مدیاکوئری فعال است — دسکتاپ دست‌نخورده می‌ماند. */
+  #screenLive .rec-stage{padding-bottom:158px}
+  /* ⭐ left+width به‌جایِ left+right: در سندِ RTL، وقتی هر دوِ left/right همزمان
+     روی یک عنصرِ fixed ست بشن، طبقِ اسپکِ CSS مرورگر با توجه به direction یکی رو
+     نادیده می‌گیره (اینجا left) — عنصر از سمتِ چپِ صفحه بیرون می‌زد. با anchorِ
+     تکی (left) + عرضِ صریح (calc)، این ابهام اصلاً پیش نمی‌آد. */
+  #liveControls{position:fixed;left:12px;width:calc(100% - 24px);bottom:12px;z-index:40;background:var(--card);border:1px solid var(--line-soft);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:12px 14px 14px}
+  #liveControls .btn-row{margin:0 0 10px}
+  #liveControls #btnEndSession{margin-top:0}
+
+  #screenSetup{padding-bottom:86px}
+  #screenSetup #btnStartSession{position:fixed;left:12px;width:calc(100% - 24px);bottom:12px;z-index:40;margin:0}
+
+  #screenClients{padding-bottom:80px}
+  #screenClients #btnNewClient{position:fixed;left:12px;width:calc(100% - 24px);bottom:12px;z-index:40;margin:0;background:var(--card);box-shadow:var(--shadow)}
 }
 </style>
 </head>
@@ -468,7 +496,10 @@ button.btn svg{width:18px;height:18px;flex:none}
     <div class="empty" id="emptySearch" hidden>
       <p>مراجعی یافت نشد</p><span>کد یا نام دیگری را جست‌وجو کنید</span>
     </div>
-    <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="showNewClientModal()">
+    <!-- ⭐ فیکسِ باگِ واقعی (UI-24): با چند مراجع، این دکمه در موبایل زیرِ خطِ دید
+         بود و باید تا انتهای فهرست اسکرول می‌شد. id برای انتخابِ CSSِ پایینِ صفحه‌ی
+         موبایل (بدونِ تغییرِ ظاهر در دسکتاپ). -->
+    <button class="btn btn-ghost btn-block" id="btnNewClient" style="margin-top:16px" onclick="showNewClientModal()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       مراجع جدید
     </button>
@@ -548,11 +579,17 @@ button.btn svg{width:18px;height:18px;flex:none}
           <button class="btn btn-secondary" onclick="addQuickNote()">ثبت</button>
         </div>
       </div>
-      <div class="btn-row" style="margin:10px 0">
-        <button class="btn btn-secondary" id="btnPauseLive" onclick="pauseSessionLive()">توقف موقت</button>
-        <button class="btn btn-secondary" id="btnResumeLive" onclick="resumeSessionLive()" hidden>ادامه</button>
+      <!-- ⭐ فیکسِ باگِ واقعی (UI-22): در موبایل این کنترل‌ها بعدِ علائم/یادداشت‌ها
+           زیرِ خطِ دید می‌افتادند — تراپیست باید اسکرول می‌کرد. در ویوپورتِ گشاد
+           هیچ فرقی نمی‌کند (فقط در مدیاکوئریِ ≤480px ثابت می‌شود)؛ در موبایل این
+           جعبه (نه «لغو جلسه») پایینِ صفحه می‌چسبد، هم‌سبکِ .card با همان توکن‌ها. -->
+      <div id="liveControls">
+        <div class="btn-row" style="margin:10px 0">
+          <button class="btn btn-secondary" id="btnPauseLive" onclick="pauseSessionLive()">توقف موقت</button>
+          <button class="btn btn-secondary" id="btnResumeLive" onclick="resumeSessionLive()" hidden>ادامه</button>
+        </div>
+        <button class="btn btn-danger btn-xl btn-block" id="btnEndSession" style="margin-top:18px" onclick="endSession()">پایان جلسه</button>
       </div>
-      <button class="btn btn-danger btn-xl btn-block" id="btnEndSession" style="margin-top:18px" onclick="endSession()">پایان جلسه</button>
       <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="showCancelModal()">لغو جلسه</button>
     </div>
   </section>
