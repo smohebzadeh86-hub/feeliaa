@@ -245,8 +245,8 @@
     });
   }
 
-  function mintCredential(sessionId) {
-    return reqJson('/api/stt/realtime-session', { method: 'POST', body: { session_id: sessionId } });
+  function mintCredential(sessionId, purpose) {
+    return reqJson('/api/stt/realtime-session', { method: 'POST', body: { session_id: sessionId, purpose: purpose } });
   }
 
   function isAvailable() {
@@ -661,7 +661,13 @@
     var epochAlive = function () {
       return !self.aborted && !self.noNewConnections && self.connEpoch === myEpoch;
     };
-    return mintCredential(self.sessionId).then(function (cred) {
+    // ⭐ فیکسِ باگِ واقعی: بدونِ این، mint برایِ یادداشتِ صوتی (که همیشه بعدِ
+    // PUT status='completed' اتفاق می‌افتد — همون‌جا که endNewRTSession صدا می‌زند)
+    // همیشه با ۴۰۰ رد می‌شد، چون سرور جلسه‌ی completed را برای mint مسدود می‌کرد.
+    // نتیجه: یادداشتِ صوتی هیچ‌وقت credential نمی‌گرفت، همیشه fail-open به
+    // durable-only می‌رفت — نه گاه‌به‌گاه، صددرصد. جلسه‌ی زنده (mode:'live')
+    // چون هنوز completed نیست، هیچ‌وقت این مانع را نمی‌دید.
+    return mintCredential(self.sessionId, self.mode === 'note' ? 'note' : 'transcript').then(function (cred) {
       if (!epochAlive()) return false;
       return self.openDirectWS(cred).then(function (ws) {
         if (!epochAlive()) {

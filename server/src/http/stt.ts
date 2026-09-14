@@ -136,7 +136,11 @@ export async function sttRoutes(app: FastifyInstance) {
       reply.code(500);
       return { error: 'کلید Soniox روی سرور تنظیم نشده', code: 'no-key' };
     }
-    const { session_id } = (request.body ?? {}) as { session_id?: string };
+    const { session_id, purpose: rawPurpose } = (request.body ?? {}) as {
+      session_id?: string;
+      purpose?: string;
+    };
+    const purpose = rawPurpose === 'note' ? 'note' : 'transcript';
     if (!session_id) {
       reply.code(400);
       return { error: 'session_id الزامی است' };
@@ -155,13 +159,20 @@ export async function sttRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
-    if (owned.status === 'completed' || owned.status === 'canceled') {
+    // ⭐ فیکسِ باگِ واقعی: این گارد باعث می‌شد mintِ realtime برایِ یادداشتِ صوتی
+    // (purpose=note) همیشه رد بشه — چون تنها نقطه‌ی UI که یادداشتِ صوتی می‌سازد
+    // (دکمه‌ی Wrapup) همیشه *بعد* از این اجرا می‌شود که endNewRTSession() همین‌جا
+    // status=completed فرستاده. یعنی یادداشتِ صوتی هیچ‌وقت credential نمی‌گرفت و
+    // صددرصدِ مواقع fail-open به durable-only می‌رفت. purpose=transcript (پیش‌فرض،
+    // جلسه‌ی زنده‌ی اصلی) همچنان درست مسدود می‌ماند — نباید رویِ جلسه‌ی تمام‌شده
+    // realtimeِ transcript دوباره باز بشه.
+    if (purpose === 'transcript' && (owned.status === 'completed' || owned.status === 'canceled')) {
       reply.code(400);
       return { error: 'جلسه پایان یافته است' };
     }
     try {
       const minted = await mintTemporaryKey({
-        clientReferenceId: `feelia:${therapistId}:${session_id}`,
+        clientReferenceId: `feelia:${therapistId}:${session_id}:${purpose}`,
         singleUse: true,
         expiresInSeconds: TEMP_KEY_EXPIRES_IN_SECONDS,
         maxSessionDurationSeconds: TEMP_KEY_MAX_SESSION_SECONDS,
