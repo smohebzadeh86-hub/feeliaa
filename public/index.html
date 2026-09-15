@@ -2945,7 +2945,12 @@ async function startManualSessionFlow(){
   try{
     const data=await api('/api/sessions',{method:'POST',body:{client_id:clientId,mode:'manual'}});
     showBanner('info','جلسه‌ی گذشته ایجاد شد — یادداشتِ متنی یا صوتی اضافه کنید.');
-    await openClientDetail(clientId);
+    // ⭐ فیکسِ باگِ واقعی (2026-09-15): قبلاً اینجا `openClientDetail` هم صدا زده
+    // می‌شد که صفحه‌ی «پرونده» را برای یک لحظه نشان می‌داد — بی‌فایده چون
+    // `backToClientDetailFromSession` هنگامِ برگشت خودش دوباره و کامل fetch
+    // می‌کند. وقتی این تابع از فهرستِ مراجعین صدا زده می‌شد (بعدِ ساختِ مراجعِ
+    // غیرفعالِ جدید)، همین صفحه‌ی میانیِ زائد به‌شکلِ «یک صفحه سریع باز و بسته
+    // می‌شود» دیده می‌شد. حذفش رفتار را عوض نمی‌کند، فقط این فلاش را برمی‌دارد.
     await viewTranscript(data.session.id);
   }catch(e){showBanner('error','خطا: '+e.message);}
   finally{btn.disabled=false;}
