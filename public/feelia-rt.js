@@ -693,6 +693,13 @@
         return true;
       });
     }).catch(function (err) {
+      // DIAG-TEMP: قبلاً دلیلِ واقعیِ شکستِ mint/اتصال (mint-transport، direct-timeout،
+      // direct-error، رِیت‌لیمیت، …) هیچ‌جا لاگ نمی‌شد — فقط false برمی‌گشت و کاربر/توسعه‌دهنده
+      // هیچ راهی برایِ فهمیدنِ «چرا رونویسیِ زنده وصل نشد» نداشت (نه دادهٔ حساس؛ فقط status/code).
+      try {
+        console.warn('[feelia-rt] connect failed: status=' + (err && err.status) +
+          ' code=' + (err && err.code) + ' message=' + (err && err.message));
+      } catch (e) {}
       // 401 یعنی نشست Feelia مرده — reconnect بی‌فایده است
       if (err && err.status === 401) {
         self.setState(STATES.FAILED);

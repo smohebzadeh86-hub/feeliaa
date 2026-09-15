@@ -4,6 +4,13 @@ import { query } from '../db/connection.js';
 import { requireAuth } from '../auth/guard.js';
 import { getOwnedClient, getOwnedSession } from '../db/ownership.js';
 import {
+  INVALID_DATE_ERROR,
+  INVALID_TIME_ERROR,
+  normalizeSessionDate,
+  normalizeStartTime,
+  nowInTehran,
+} from './sessionDate.js';
+import {
   enqueueBatch,
   pendingAudioFor,
   processBatchQueue,
@@ -45,17 +52,54 @@ export async function sessionRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
 
   // POST /api/sessions — شروع جلسه‌ی جدید (مراجع باید مالِ همین تراپیست باشه)
+  // mode='manual': ثبتِ دستیِ جلسه‌ی گذشته (آرشیوِ پرونده‌های قبلی) — هیچ ضبط/صدایی
+  // در کار نیست، پس رضایتِ ضبط موضوعیت ندارد (LAW-009)؛ جلسه مستقیماً completed ساخته می‌شود.
   app.post('/api/sessions', async (request, reply) => {
-    const { client_id, consent, date, start_time } = request.body as {
+    const { client_id, consent, date, start_time, mode, note } = request.body as {
       client_id: string;
       consent: boolean;
       date?: string;
       start_time?: string;
+      mode?: string;
+      note?: string;
     };
 
-    if (!consent) {
+    if (mode !== undefined && mode !== 'live' && mode !== 'manual') {
+      reply.code(400);
+      return { error: 'نوعِ جلسه نامعتبر است' };
+    }
+    const isManual = mode === 'manual';
+
+    if (!isManual && !consent) {
       reply.code(400);
       return { error: 'رضایت مراجع الزامی است' };
+    }
+
+    // ⭐ برایِ ثبتِ جلسه‌ی گذشته، تاریخ اختیاری‌ست (تصمیمِ مالک، 2026-09-15): تراپیست ممکنه
+    // دقیقِ تاریخِ پرونده‌ی قدیمی رو نداشته باشه؛ اگه نفرسته، به‌جایِ fallbackِ نادرستِ «امروز»
+    // (migration 014) به‌صراحت NULL ذخیره می‌شه — «بدونِ تاریخ». جلسه‌ی زنده همچنان همیشه
+    // تاریخِ واقعی می‌گیرد (fallback به وقتِ ایران، رفتارِ قبلی دست‌نخورده). ساعت برایِ manual
+    // در UI اصلاً نمایش داده نمی‌شود؛ سرور همیشه با fallbackِ وقتِ ایران پر می‌کند.
+    const hasDate = typeof date === 'string' && date.trim() !== '';
+    const hasTime = typeof start_time === 'string' && start_time.trim() !== '';
+    // ⭐ همه‌ی تاریخ‌ها شمسیِ `YYYY/MM/DD` با ارقامِ لاتین (migration 013) — قبلاً جلسه‌ی زنده
+    // تاریخِ میلادیِ سرور می‌گرفت و «آخرین جلسه» (`MAX(date)` روی TEXT) غلط می‌شد.
+    const now = nowInTehran();
+    let sessionDate: string | null = null;
+    if (hasDate) {
+      sessionDate = normalizeSessionDate(date);
+      if (!sessionDate) {
+        reply.code(400);
+        return { error: INVALID_DATE_ERROR };
+      }
+    } else if (!isManual) {
+      sessionDate = now.date;
+    }
+    // isManual && !hasDate → sessionDate می‌ماند null («بدونِ تاریخ»، تصمیمِ مالک)
+    const sessionTime = hasTime ? normalizeStartTime(start_time) : now.time;
+    if (!sessionTime) {
+      reply.code(400);
+      return { error: INVALID_TIME_ERROR };
     }
 
     const client = await getOwnedClient(client_id, request.therapistId!);
@@ -64,21 +108,46 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
 
+    // ⭐ مراجعِ غیرفعال جلسه‌ی زنده‌ی جدید نمی‌گیرد (کارت هم دکمه‌ی شروع ندارد). ادامه‌ی
+    // جلسه‌ی نیمه‌تمامِ قبلی از این مسیر نمی‌گذرد و آزاد می‌ماند.
+    if (!isManual && client.status === 'inactive') {
+      reply.code(409);
+      return { error: 'مراجع غیرفعال است؛ ابتدا او را به فعال‌ها بازگردانید', code: 'client-inactive' };
+    }
+
     const lastNum = await query(
       'SELECT COALESCE(MAX(session_num), 0) + 1 as next FROM sessions WHERE client_id = $1',
       [client_id]
     );
     const sessionNum = lastNum.rows[0].next;
 
-    const now = new Date();
-    const defaultDate = date || `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/${String(now.getDate()).padStart(2, '0')}`;
-    const defaultTime = start_time || `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    if (isManual) {
+      const noteText = typeof note === 'string' && note.trim() ? note.trim() : null;
+      // یک statementِ اتمیک: جلسه بدونِ یادداشتش (یا برعکس) نیمه‌کاره ساخته نمی‌شود
+      const manual = await query(
+        `WITH s AS (
+           INSERT INTO sessions (client_id, session_num, date, start_time, consent, status, source)
+           VALUES ($1, $2, $3, $4, false, 'completed', 'manual')
+           RETURNING *
+         ), n AS (
+           INSERT INTO session_notes (session_id, type, text)
+           SELECT id, 'note_after', $5::text FROM s WHERE $5::text IS NOT NULL
+         )
+         SELECT * FROM s`,
+        [client_id, sessionNum, sessionDate, sessionTime, noteText]
+      );
+      reply.code(201);
+      return {
+        session: manual.rows[0],
+        client: { code: client.code, alias: client.alias },
+      };
+    }
 
     const result = await query(
       `INSERT INTO sessions (client_id, session_num, date, start_time, consent, status)
        VALUES ($1, $2, $3, $4, $5, 'in_progress')
        RETURNING *`,
-      [client_id, sessionNum, defaultDate, defaultTime, true]
+      [client_id, sessionNum, sessionDate, sessionTime, true]
     );
 
     reply.code(201);
@@ -126,7 +195,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       anchors?: Array<{ chars: number; off: number }>;
       duration_ms?: number;
       status?: string;
-      date?: string;
+      date?: string | null;
       start_time?: string;
     };
 
@@ -184,12 +253,33 @@ export async function sessionRoutes(app: FastifyInstance) {
       values.push(body.status);
     }
     if (body.date !== undefined) {
-      updates.push(`date = $${paramCount++}`);
-      values.push(body.date);
+      const dateIsEmpty = body.date === null || (typeof body.date === 'string' && body.date.trim() === '');
+      if (dateIsEmpty) {
+        // ⭐ پاک‌کردنِ تاریخ فقط برایِ جلسه‌ی دستی معنا دارد («بدونِ تاریخ» — تصمیمِ مالک،
+        // migration 014). جلسه‌ی زنده/کامل باید همیشه تاریخِ واقعی داشته باشد.
+        if (owned.source !== 'manual') {
+          reply.code(400);
+          return { error: INVALID_DATE_ERROR };
+        }
+        updates.push(`date = NULL`);
+      } else {
+        const normalizedDate = normalizeSessionDate(body.date);
+        if (!normalizedDate) {
+          reply.code(400);
+          return { error: INVALID_DATE_ERROR };
+        }
+        updates.push(`date = $${paramCount++}`);
+        values.push(normalizedDate);
+      }
     }
     if (body.start_time !== undefined) {
+      const normalizedTime = normalizeStartTime(body.start_time);
+      if (!normalizedTime) {
+        reply.code(400);
+        return { error: INVALID_TIME_ERROR };
+      }
       updates.push(`start_time = $${paramCount++}`);
-      values.push(body.start_time);
+      values.push(normalizedTime);
     }
 
     if (updates.length === 0) {

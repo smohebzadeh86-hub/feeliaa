@@ -6,6 +6,13 @@ import { getOwnedClient } from '../db/ownership.js';
 
 const VALID_CATEGORIES = ['child', 'teen', 'adult'];
 const VALID_GENDERS = ['f', 'm'];
+const VALID_STATUSES = ['active', 'inactive'];
+const MAX_STATUS_REASON_LEN = 200;
+
+// دلیلِ غیرفعال‌بودن: trim؛ خالی (مثلاً گزینه‌ی «نامشخص») = null
+function cleanStatusReason(reason: unknown): string | null {
+  return typeof reason === 'string' && reason.trim() ? reason.trim() : null;
+}
 
 // تولید کد یکتا: CL-XXXX
 function generateClientCode(): string {
@@ -56,7 +63,9 @@ export async function clientRoutes(app: FastifyInstance) {
 
   // POST /api/clients — ساخت مراجع جدید برای همین تراپیست
   app.post('/api/clients', async (request, reply) => {
-    const { alias, category, gender } = request.body as { alias?: string; category?: string; gender?: string };
+    const { alias, category, gender, status, reason } = request.body as {
+      alias?: string; category?: string; gender?: string; status?: string; reason?: string;
+    };
 
     if (category && !VALID_CATEGORIES.includes(category)) {
       reply.code(400);
@@ -65,6 +74,18 @@ export async function clientRoutes(app: FastifyInstance) {
     if (gender && !VALID_GENDERS.includes(gender)) {
       reply.code(400);
       return { error: 'جنسیت نامعتبر است' };
+    }
+    // ⭐ ساخت در تبِ «غیرفعال» (آرشیوِ پرونده‌های قبلی) — قبلاً status پذیرفته نمی‌شد و
+    // مراجع همیشه active ساخته می‌شد، یعنی از تبی که در آن ساخته شده بود ناپدید می‌شد.
+    if (status !== undefined && !VALID_STATUSES.includes(status)) {
+      reply.code(400);
+      return { error: 'وضعیت نامعتبر است' };
+    }
+    const finalStatus = status === 'inactive' ? 'inactive' : 'active';
+    const statusReason = finalStatus === 'inactive' ? cleanStatusReason(reason) : null;
+    if (statusReason && statusReason.length > MAX_STATUS_REASON_LEN) {
+      reply.code(400);
+      return { error: 'دلیل بیش از حد طولانی است' };
     }
 
     // جنسیت فقط برایِ نوجوان/بزرگسال معنا داره
@@ -78,8 +99,8 @@ export async function clientRoutes(app: FastifyInstance) {
     }
 
     const result = await query(
-      'INSERT INTO clients (code, alias, therapist_id, category, gender) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [code, alias || null, request.therapistId, category || null, finalGender]
+      'INSERT INTO clients (code, alias, therapist_id, category, gender, status, status_reason) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [code, alias || null, request.therapistId, category || null, finalGender, finalStatus, statusReason]
     );
 
     reply.code(201);
@@ -97,7 +118,7 @@ export async function clientRoutes(app: FastifyInstance) {
     }
 
     const sessionsResult = await query(`
-      SELECT id, session_num, date, start_time, duration_ms, status, created_at
+      SELECT id, session_num, date, start_time, duration_ms, status, source, created_at
       FROM sessions
       WHERE client_id = $1
       ORDER BY session_num DESC
@@ -138,9 +159,16 @@ export async function clientRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const { status, reason } = request.body as { status: string; reason?: string };
 
-    if (status !== 'active' && status !== 'inactive') {
+    if (!VALID_STATUSES.includes(status)) {
       reply.code(400);
       return { error: 'وضعیت نامعتبر است' };
+    }
+
+    // برگشت به فعال یعنی دلیلِ قبلی دیگه معتبر نیست
+    const statusReason = status === 'inactive' ? cleanStatusReason(reason) : null;
+    if (statusReason && statusReason.length > MAX_STATUS_REASON_LEN) {
+      reply.code(400);
+      return { error: 'دلیل بیش از حد طولانی است' };
     }
 
     const owned = await getOwnedClient(id, request.therapistId!);
@@ -149,13 +177,16 @@ export async function clientRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
 
-    // برگشت به فعال یعنی دلیلِ قبلی دیگه معتبر نیست
-    const statusReason = status === 'inactive' ? (reason || null) : null;
-
     const result = await query(
       'UPDATE clients SET status = $1, status_reason = $2 WHERE id = $3 AND therapist_id = $4 RETURNING *',
       [status, statusReason, id, request.therapistId]
     );
+
+    // مراجع بینِ چکِ مالکیت و UPDATE حذف شده — مثلِ PUT، نه 200 با client خالی
+    if (result.rows.length === 0) {
+      reply.code(404);
+      return { error: 'مراجع یافت نشد' };
+    }
 
     return { client: result.rows[0] };
   });

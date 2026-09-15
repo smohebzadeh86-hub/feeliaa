@@ -137,7 +137,7 @@ button.btn:disabled{cursor:not-allowed;opacity:.55}
 .btn-secondary{background:var(--sage-mist);color:var(--sage-deep);border:1.5px solid var(--sage-soft)}
 .btn-ghost{background:transparent;color:var(--ink-2);border:1.5px solid var(--line)}
 .btn-ghost:hover{border-color:var(--sage);color:var(--sage-deep)}
-.btn-sm{padding:8px 14px;font-size:12.5px;border-radius:10px}
+button.btn.btn-sm{padding:8px 14px;font-size:12.5px;border-radius:var(--r-md)}
 .btn-row{display:flex;gap:10px;flex-wrap:wrap}
 
 /* ---- chips ---- */
@@ -523,6 +523,15 @@ footer{margin-top:70px;padding-top:20px;border-top:1px solid var(--line-soft);fo
       <div class="body">
         <b>Promise ای که نه resolve می‌شه نه reject</b>
         <span>موتورِ اتصال به Soniox، وقتی اولین تلاشِ اتصال شکست می‌خورد، وارد چرخه‌ی reconnect می‌شد بدون اینکه Promiseِ اولیه رو settle کنه — یعنی «در حال اتصال...» تا ابد می‌موند، بدون هیچ خطایی. این کلاس از باگ (async state که هیچ‌وقت finalize نمی‌شه) مخصوصِ CSS نیست، ولی دقیقاً همون «چیزی نشون داده نمی‌شه» رو توی UI تولید می‌کنه.</span>
+      </div>
+    </div>
+
+    <div class="rule bad">
+      <div class="mark">✕</div>
+      <div class="body">
+        <b>Specificity برد بر کلاسِ اندازه</b>
+        <span><span class="chip-code">button.btn</span> با selectorِ (0,1,1) نوشته شده بود، ولی <span class="chip-code">.btn-sm</span> و <span class="chip-code">.btn-xl</span> فقط (0,1,0) دارن — پس هیچ‌وقت اعمال نمی‌شدن. دکمه‌ی «کوچکِ» کارتِ مراجع عملاً همون padding/radius تمام‌قدِ پیش‌فرض رو می‌گرفت. باعث شد کارتِ فعال و غیرفعال ارتفاعِ متفاوت داشته باشن (دکمه‌ی دوخطی).</span>
+        <div class="evidence">قانون: هر modifier-classِ اندازه (sm/xl/…) باید با selectorِ ترکیبی (<span class="chip-code">button.btn.btn-sm</span>) نوشته بشه، نه تکی، وگرنه هیچ‌وقت روی قاعده‌ی پایه غالب نمی‌شه.</div>
       </div>
     </div>
   </section>

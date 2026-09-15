@@ -96,10 +96,10 @@ button.btn:disabled{cursor:not-allowed;opacity:.55}
 .btn-ghost{background:transparent;color:var(--ink-2);border:1.5px solid var(--line)}
 .btn-ghost:hover{border-color:var(--sage);color:var(--sage-deep);background:var(--sage-mist)}
 .btn-block{width:100%}
-.btn-xl{padding:17px 22px;font-size:16px;border-radius:17px}
+button.btn.btn-xl{padding:17px 22px;font-size:16px;border-radius:17px}
 .btn-row{display:flex;gap:10px;margin-top:4px}
-.btn-row>button{flex:1}
-.btn-sm{padding:9px 14px;font-size:13px;border-radius:10px}
+.btn-row>button{flex:1;min-width:0}
+button.btn.btn-sm{padding:9px 14px;font-size:13px;border-radius:var(--r-md);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:none}
 button.btn svg{width:18px;height:18px;flex:none}
 
 .search-box{position:relative;margin-bottom:16px}
@@ -112,7 +112,7 @@ button.btn svg{width:18px;height:18px;flex:none}
 @keyframes shimmer{0%{opacity:.5}50%{opacity:.8}100%{opacity:.5}}
 
 .client-tabs{display:flex;gap:6px;background:var(--field);border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:4px;margin-bottom:14px}
-.client-tab{flex:1;text-align:center;padding:10px;border-radius:12px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;background:none;border:none;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
+.client-tab{flex:1;text-align:center;padding:10px;border-radius:var(--r-md);font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;background:none;border:none;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
 .client-tab.active{background:var(--card);color:var(--sage-deep);box-shadow:0 1px 3px rgba(43,58,52,.08)}
 .client-tab .count{font-size:10.5px;background:var(--sage-soft);color:var(--sage-deep);border-radius:99px;padding:1px 7px;font-variant-numeric:tabular-nums}
 .client-tab:not(.active) .count{background:var(--line-soft);color:var(--muted)}
@@ -120,18 +120,18 @@ button.btn svg{width:18px;height:18px;flex:none}
 .filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 .cat-filter-row{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;flex:1;-ms-overflow-style:none;scrollbar-width:none}
 .cat-filter-row::-webkit-scrollbar{display:none}
-.cat-filter-chip{flex:none;padding:7px 14px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);font-family:inherit;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap}
+.cat-filter-chip{flex:none;height:36px;box-sizing:border-box;padding:0 14px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);font-family:inherit;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center}
 .cat-filter-chip.active{background:var(--sage);border-color:var(--sage);color:#fff}
 /* ⭐ چیپِ دسته‌ای که جنسیت داره، به‌جایِ بازکردنِ ردیفِ دوم، خودش این‌جا
    جاش رو با یه کنترلِ دوتکه (segmented) عوض می‌کنه — همون‌جا، همون ردیف. */
 .cat-seg{flex:none;display:inline-flex;border-radius:99px;overflow:hidden;border:1.5px solid var(--sage)}
-.cat-seg button{border:none;background:var(--card);color:var(--sage-deep);font-family:inherit;font-size:12px;font-weight:600;padding:7px 12px;cursor:pointer;white-space:nowrap}
+.cat-seg button{border:none;background:var(--card);color:var(--sage-deep);font-family:inherit;font-size:12px;font-weight:600;height:36px;box-sizing:border-box;padding:0 12px;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center}
 .cat-seg button:not(:first-child){border-inline-start:1.5px solid var(--sage)}
 .cat-seg button.active{background:var(--sage);color:#fff}
 .cat-seg button:not(.active):hover{background:var(--sage-mist)}
 
 .sort-menu{position:relative;flex:none}
-.sort-btn{width:38px;height:38px;border-radius:var(--r-md);border:1.5px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:color .2s,border-color .2s}
+.sort-btn{width:36px;height:36px;border-radius:var(--r-md);border:1.5px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:color .2s,border-color .2s}
 .sort-btn:hover,.sort-btn.active{color:var(--sage-deep);border-color:var(--sage)}
 .sort-btn svg{width:16px;height:16px}
 .sort-drop{position:absolute;left:0;top:44px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);padding:5px;min-width:170px;display:none;z-index:6}
@@ -143,21 +143,18 @@ button.btn svg{width:18px;height:18px;flex:none}
 .clients-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 .client-card{border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:18px;background:var(--card);cursor:pointer;transition:border-color .2s,box-shadow .2s;position:relative;display:flex;flex-direction:column;gap:10px}
 .client-card:hover{border-color:var(--sage);box-shadow:0 4px 16px rgba(62,107,94,.08)}
-.client-card.inactive{background:var(--field)}
 .client-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;padding-left:38px}
 .client-name{display:flex;align-items:baseline;gap:8px;min-width:0;flex-wrap:wrap}
 .client-alias{font-size:15px;font-weight:700;color:var(--ink)}
 .client-code{font-size:13px;font-weight:700;color:var(--sage-deep);direction:ltr;font-variant-numeric:tabular-nums}
 .client-meta{font-size:12px;color:var(--muted);line-height:1.7;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cat-badge{font-size:10px;font-weight:600;color:var(--ink-2);background:var(--field);border:1px solid var(--line-soft);border-radius:99px;padding:2px 9px;flex:none}
-.client-card.inactive .cat-badge{background:var(--card)}
-.status-reason{font-size:11.5px;color:var(--gold-deep)}
+.status-reason{font-size:10px;font-weight:600;color:var(--gold-deep);background:var(--gold-soft);border-radius:99px;padding:2px 9px;flex:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .client-actions{display:flex;gap:8px;margin-top:auto}
-.client-actions .btn-primary{flex:1.4}
-.client-actions .btn-ghost{flex:1}
+.client-actions>.btn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 
 .client-menu{position:absolute;top:12px;left:12px}
-.client-menu-btn{width:32px;height:32px;border-radius:9px;background:none;border:none;color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:color .2s,background .2s}
+.client-menu-btn{width:32px;height:32px;border-radius:var(--r-sm);background:none;border:none;color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:color .2s,background .2s}
 .client-menu-btn:hover,.client-menu-btn:focus-visible{color:var(--sage-deep);background:var(--sage-mist)}
 .client-menu-btn svg{width:16px;height:16px}
 .client-menu-drop{position:absolute;top:38px;left:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);padding:5px;min-width:180px;display:none;z-index:5}
@@ -279,6 +276,8 @@ button.btn svg{width:18px;height:18px;flex:none}
 
 .sub-panel{border-top:1px dashed var(--line);padding-top:20px;margin-top:16px}
 #voiceNoteBox{text-align:center}
+/* ⭐ حالتِ بازبینیِ متنِ صوتی قبل از ذخیره — read-only تا ویرایش را صریح بزنند */
+#archiveTextNoteInput.readonly-preview{background:var(--field-dim,var(--field));border-style:dashed;cursor:default}
 
 .modal-back{position:fixed;inset:0;background:rgba(38,50,45,.45);backdrop-filter:blur(7px);display:none;align-items:center;justify-content:center;padding:18px;z-index:50}
 /* ⭐ فیکسِ باگِ واقعی (UI-07): bannerBox در جریانِ عادیِ سند است، بدونِ z-index —
@@ -482,7 +481,7 @@ button.btn svg{width:18px;height:18px;flex:none}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h10M3 12h7M3 18h4"/><path d="M17 4v16M17 4l-4 4M17 4l4 4"/></svg>
         </button>
         <div class="sort-drop" id="sortDrop">
-          <button type="button" class="active" data-sort="default" onclick="setSortMode('default')">پیش‌فرض</button>
+          <button type="button" class="active" data-sort="default" onclick="setSortMode('default')" id="sortDropDefaultLabel">پیش‌فرض</button>
           <button type="button" data-sort="recent_session" onclick="setSortMode('recent_session')">آخرین جلسه</button>
           <button type="button" data-sort="alpha" onclick="setSortMode('alpha')">الفبا (نام)</button>
         </div>
@@ -504,7 +503,7 @@ button.btn svg{width:18px;height:18px;flex:none}
          موبایل (بدونِ تغییرِ ظاهر در دسکتاپ). -->
     <button class="btn btn-ghost btn-block" id="btnNewClient" style="margin-top:16px" onclick="showNewClientModal()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
-      مراجع جدید
+      <span id="btnNewClientLabel">مراجع جدید</span>
     </button>
   </section>
 
@@ -644,18 +643,90 @@ button.btn svg{width:18px;height:18px;flex:none}
       <h2 id="detailTitle" data-clarity-mask="true"></h2>
       <p id="detailMeta"></p>
     </div>
+    <div class="banner warn" id="detailStatusBox" data-clarity-mask="true" hidden style="display:block;margin-bottom:14px">
+      <span id="detailStatusText"></span>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-ghost btn-sm" onclick="reactivateFromDetail()">بازگرداندن به فعال‌ها</button>
+      </div>
+    </div>
     <div id="sessionsList" data-clarity-mask="true"></div>
-    <div id="sessionDetail" data-clarity-mask="true" hidden style="margin-top:16px">
+    <button class="btn btn-primary btn-block" id="detailStartBtn" style="margin-top:14px" onclick="startFromDetail()">شروع جلسه‌ی جدید</button>
+    <button class="btn btn-primary btn-block" id="detailManualBtn" hidden style="margin-top:14px" onclick="startManualSessionFlow()">ثبت جلسات گذشته</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="goBackToClients()">بازگشت</button>
+  </section>
+
+  <!-- ⭐ فیکسِ باگِ واقعی (2026-09-15): قبلاً جزئیاتِ جلسه به‌صورتِ inline زیرِ فهرستِ
+       جلسات در همین صفحه باز می‌شد (اسکرولِ اجباری به پایین) — مالک صریحاً یک صفحه‌ی
+       مستقل خواست. حالا با showScreen('SessionDetail') واقعاً صفحه عوض می‌شود. -->
+  <section id="screenSessionDetail" class="card screen" hidden>
+    <div class="card-head">
+      <h2 id="sessionDetailTitle" data-clarity-mask="true"></h2>
+      <p id="sessionDetailMeta" data-clarity-mask="true"></p>
+    </div>
+    <div id="sessionDetail" data-clarity-mask="true">
       <div class="btn-row" style="margin-bottom:10px">
-        <button class="btn btn-ghost btn-sm" onclick="openEditSessionMeta()">ویرایش تاریخ/ساعت</button>
+        <button class="btn btn-ghost btn-sm" id="editSessionMetaBtn" onclick="openEditSessionMeta()">ویرایش تاریخ/ساعت</button>
         <button class="btn btn-ghost btn-sm" id="resolveSpeakersBtn" hidden onclick="startResolveSpeakersUI()">بازسازیِ شماره‌گذاریِ گوینده‌ها</button>
+      </div>
+      <!-- ⭐ فیکسِ باگِ واقعیِ UX (2026-09-15): برایِ جلسه‌ی دستی، دکمه‌ی «ویرایش» بی‌معنی
+           بود چون چیزی از قبل تعیین نشده — تاریخ همیشه، مستقیم و بدونِ مودال اینجاست.
+           ⭐ (2026-09-15، دورِ دوم): ساعت برایِ جلسه‌ی دستی بی‌معناست (ساعتِ واقعیِ جلسه‌ی
+           گذشته معلوم نیست) — حذف شد. تاریخ خودش با change/blur ذخیره می‌شود، بدونِ دکمه‌ی
+           جداگانه؛ می‌تواند خالی هم بماند («بدونِ تاریخ»، migration 014). -->
+      <div id="manualDateTimeRow" hidden style="margin-bottom:14px">
+        <label>تاریخِ تقریبیِ جلسه (اختیاری)</label>
+        <input type="text" id="manualDateInput" placeholder="مثال: ۱۴۰۵/۰۶/۲۳" oninput="onManualDateInput()" onblur="saveManualDate()">
+        <div id="manualDateHint" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
       </div>
       <div id="resolveSpeakersStatus" hidden style="margin-bottom:8px;font-size:12.5px;color:var(--muted)"></div>
       <div class="transcript-box" id="transcriptBox"></div>
       <div class="transcript-notes" id="transcriptNotes" hidden></div>
+      <!-- ⭐ فقط برایِ جلسه‌ی ثبت‌شده‌ی دستی (source=manual): افزودنِ یادداشتِ متنی/صوتی —
+           دقیقاً همان مسیرِ صوتیِ Wrapup (FeeliaRT یا legacy WS)، با متغیرها/DOMِ جداگانه
+           تا به جریانِ جلسه‌ی زنده دست نخورد. توقف/ادامه هم دارد (مثلِ جلسه‌ی زنده). -->
+      <div id="archiveNoteAdd" hidden style="margin-top:14px">
+        <div class="btn-row">
+          <button class="btn btn-secondary" onclick="startArchiveVoiceNote()" id="archiveVoiceNoteBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+            یادداشتِ صوتی
+          </button>
+          <button class="btn btn-secondary" id="archiveTextNoteBtn" onclick="showArchiveTextInput()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            یادداشتِ متنی
+          </button>
+        </div>
+        <div id="archiveVoiceNoteBox" class="sub-panel" data-clarity-mask="true" hidden>
+          <div class="timer" id="archiveVoiceTimer" style="font-size:26px;margin:4px 0 2px">۰۰:۰۰</div>
+          <div class="rec-status" id="archiveVoiceStatus">آماده…</div>
+          <div class="live-text" id="archiveVoiceLiveText" style="min-height:50px">در حال ضبط… حرف بزنید</div>
+          <div class="btn-row" style="margin-top:10px;flex-wrap:wrap">
+            <button class="btn btn-ghost" onclick="cancelArchiveVoiceNote()">انصراف</button>
+            <button class="btn btn-secondary" id="archiveVoicePauseBtn" onclick="pauseArchiveVoiceNote()">توقف موقت</button>
+            <button class="btn btn-secondary" id="archiveVoiceResumeBtn" hidden onclick="resumeArchiveVoiceNote()">ادامه</button>
+            <button class="btn btn-danger" style="flex:2" onclick="stopArchiveVoiceNote()">پایان ضبط</button>
+          </div>
+        </div>
+        <!-- ⭐ (2026-09-15، دورِ دوم، تصمیمِ مالک): متنِ ضبط‌شده اول همین‌جا در textarea
+             می‌آید تا تراپیست ویرایش کند، بعد صریحاً «افزودن» بزند — نه POST خودکار. -->
+        <!-- ⭐ (تصمیمِ مالک، دورِ دوم): بعدِ پایانِ ضبطِ صوتی، متن ابتدا read-only نشان داده
+             می‌شود (که این یادداشت از نوعِ صوتی است) با دو گزینه‌ی صریح: «ویرایشِ متن» (تا
+             کاربر بفهمد می‌تواند ویرایش کند) یا ذخیره‌ی مستقیم. تایپِ آزاد (بدونِ ضبط) این
+             حالت را ندارد و از ابتدا قابلِ‌ویرایش است. -->
+        <div id="archiveTextNoteBox" class="sub-panel" data-clarity-mask="true" hidden>
+          <div id="archiveTextNoteOriginHint" hidden style="font-size:12px;color:var(--muted);margin-bottom:6px">نتیجه‌ی ضبطِ صوتی — پیش از ذخیره بخوانید؛ در صورتِ نیاز ویرایش کنید.</div>
+          <textarea id="archiveTextNoteInput" placeholder="متن یادداشت…"></textarea>
+          <div class="btn-row">
+            <button class="btn btn-ghost" onclick="hideArchiveTextInput()">انصراف</button>
+            <button class="btn btn-secondary" id="archiveTextEditBtn" hidden onclick="enableArchiveTextEdit()">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              ویرایشِ متن
+            </button>
+            <button class="btn btn-primary" id="archiveTextNoteSaveBtn" onclick="addArchiveTextNote()">ذخیره‌ی یادداشت</button>
+          </div>
+        </div>
+      </div>
     </div>
-    <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="startFromDetail()">شروع جلسه‌ی جدید</button>
-    <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="goBackToClients()">بازگشت</button>
+    <button class="btn btn-ghost btn-block" style="margin-top:16px" onclick="backToClientDetailFromSession()">بازگشت به پرونده</button>
   </section>
 
   <p class="privacy-note">
@@ -667,12 +738,24 @@ button.btn svg{width:18px;height:18px;flex:none}
 
 <div class="modal-back" id="newClientModal" data-clarity-mask="true">
   <div class="modal">
-    <h3>مراجع جدید</h3>
-    <p>کد یکتا خودکار ساخته می‌شود.</p>
+    <h3 id="newClientTitle">مراجع جدید</h3>
+    <p id="newClientDesc">کد یکتا خودکار ساخته می‌شود.</p>
     <label>نام مستعار (اختیاری)</label>
     <input type="text" id="newClientAlias" placeholder="مثلاً: مراجع-الف" style="margin-bottom:14px">
     <label>دسته‌بندی (اختیاری)</label>
     <div class="cat-select" id="newClientCatSelect"></div>
+    <!-- فقط وقتی از تبِ «غیرفعال» (آرشیوِ پرونده‌های قبلی) باز شود -->
+    <div id="newClientReasonBox" hidden style="margin-top:14px">
+      <label>دلیلِ غیرفعال‌بودن</label>
+      <div class="radio-group" id="newClientReasonGroup">
+        <label class="radio-opt"><input type="radio" name="newClientReason" value="" checked> نامشخص</label>
+        <label class="radio-opt"><input type="radio" name="newClientReason" value="ناتوانی مالی"> ناتوانیِ مالی</label>
+        <label class="radio-opt"><input type="radio" name="newClientReason" value="ظرفیت روحی/زمانی"> ظرفیتِ روحی/زمانی</label>
+        <label class="radio-opt"><input type="radio" name="newClientReason" value="روند تکمیل شد"> روند تکمیل شد</label>
+        <label class="radio-opt"><input type="radio" name="newClientReason" value="سایر"> سایر</label>
+      </div>
+      <input type="text" id="newClientReasonOther" placeholder="توضیحِ کوتاه (اختیاری)…" style="margin-bottom:0">
+    </div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn btn-ghost" onclick="closeNewClientModal()">انصراف</button>
       <button class="btn btn-primary" id="newClientCreateBtn" onclick="createNewClient()">ایجاد</button>
@@ -905,9 +988,29 @@ let voiceElapsed=0;
 let voiceTimerInt=null;
 let voiceRunning=false;
 
+// ⭐ یادداشتِ صوتی/متنیِ جلسه‌ی ثبت‌شده‌ی دستی — عمداً state جدا از voice* بالا (نه
+// بازاستفاده) تا هیچ‌وقت با جریانِ جلسه‌ی زنده/Wrapup قاطی نشود؛ منطق همان است، فقط
+// روی `currentViewSession` (نه `currentSession`) و با DOMِ خودش کار می‌کند.
+let archiveVoiceMediaRecorder=null;
+let archiveVoiceStream=null;
+let archiveVoiceWS=null;
+let archiveRtVoice=null;
+let archiveVoiceElapsed=0;
+let archiveVoiceTimerInt=null;
+let archiveVoiceRunning=false;
+let archiveVoicePaused=false;
+// ⭐ رفعِ باگِ واقعی (A2): آیا الان واقعاً می‌شود متوقف/ادامه کرد؟ فقط ACTIVE/RECOVERED.
+let archiveRtPauseAllowed=false;
+// ⭐ منشأِ متنِ داخلِ archiveTextNoteInput — 'voice' (نتیجه‌ی ضبط) یا 'text' (تایپِ مستقیم).
+// برایِ اینکه با ذخیره، نوعِ یادداشت (`voice`/`note_after`) درست ثبت شود و برچسب/رنگش
+// هم در فهرست درست باشد (فیکسِ باگِ واقعی: قبلاً همیشه «متنی» ثبت می‌شد، حتی صدا).
+let archiveTextNoteOrigin=null;
+
 const $=id=>document.getElementById(id);
 const bannerBox=$('bannerBox');
-function toFa(n){return String(n).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[+d]);}
+// ⭐ فیکسِ باگِ واقعی (migration 014، تاریخِ اختیاریِ جلسه‌ی دستی): قبلاً toFa(null) رشته‌ی
+// «null» را برمی‌گرداند (String(null)) — حالا خالی می‌دهد؛ صدا‌زننده‌ها خودشان «بدونِ تاریخ» می‌نویسند.
+function toFa(n){if(n===null||n===undefined)return '';return String(n).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[+d]);}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function pad2(n){return n<10?'0'+n:''+n;}
 function formatTimer(ms){const s=Math.floor(ms/1000);return toFa(pad2(Math.floor(s/60))+':'+pad2(s%60));}
@@ -1361,7 +1464,7 @@ function updateSteps(idx){
   }
 }
 function showScreen(name){
-  ['Auth','Clients','Setup','Live','Wrapup','ClientDetail','Admin','AdminTherapist','AdminSessions'].forEach(s=>{
+  ['Auth','Clients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions'].forEach(s=>{
     const el=$('screen'+s);
     if(el)el.hidden=s!==name;
   });
@@ -1487,6 +1590,7 @@ function hasActiveRecording(){
   try{
     if(ws&&ws.readyState===WebSocket.OPEN)return true;
     if(voiceWS&&voiceWS.readyState===WebSocket.OPEN)return true;
+    if(archiveVoiceWS&&archiveVoiceWS.readyState===WebSocket.OPEN)return true;
     if(SonioxDirect&&SonioxDirect.ws&&SonioxDirect.ws.readyState===WebSocket.OPEN)return true;
     if(window.FeeliaRT&&window.FeeliaRT.hasOpenConnection())return true;
   }catch(e){}
@@ -2026,6 +2130,8 @@ function switchClientTab(tab){
   clientTab=tab;
   $('clientTabActive').classList.toggle('active',tab==='active');
   $('clientTabInactive').classList.toggle('active',tab==='inactive');
+  $('btnNewClientLabel').textContent=tab==='inactive'?'افزودنِ پرونده‌ی قبلی':'مراجع جدید';
+  $('sortDropDefaultLabel').textContent=tab==='inactive'?'پیش‌فرض (آخرین جلسه)':'پیش‌فرض';
   applyClientFilters();
 }
 
@@ -2092,11 +2198,14 @@ function setSortMode(mode){
 
 // ⭐ فیکسِ باگِ واقعی (UI-29): «ي»/«ك» عربی با «ی»/«ک» فارسی و ارقامِ فارسی/عربی با
 // لاتین یکسان نمی‌شدن — با کیبوردِ دیگر همون مراجع پیدا نمی‌شد.
-function normalizeSearchText(s){
-  return (s||'').toLowerCase()
-    .replace(/ي/g,'ی').replace(/ك/g,'ک')
+function toLatinDigits(s){
+  return String(s||'')
     .replace(/[۰-۹]/g,function(d){return String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d));})
     .replace(/[٠-٩]/g,function(d){return String('٠١٢٣٤٥٦٧٨٩'.indexOf(d));});
+}
+function normalizeSearchText(s){
+  return toLatinDigits((s||'').toLowerCase()
+    .replace(/ي/g,'ی').replace(/ك/g,'ک'));
 }
 
 // ⭐ یک نقطه‌ی مرکزی برای هر شرط (تب + دسته + جنسیت + جست‌وجو + ترتیب) — تا فیلترهایِ
@@ -2163,7 +2272,20 @@ function renderClients(clients,isSearchResult){
       emptySearch.querySelector('p').textContent='مراجعی در این دسته‌بندی نیست';
       emptySearch.querySelector('span').textContent='فیلتر را عوض کنید یا «همه» را انتخاب کنید';
       emptySearch.hidden=false;emptyFirst.hidden=true;
-    }else{emptyFirst.hidden=totalInTab>0;emptySearch.hidden=true;}
+    }else{
+      // ⭐ تبِ خالی نباید بگوید «هنوز مراجعی ثبت نشده» وقتی در تبِ دیگر مراجع هست.
+      if(clientTab==='inactive'){
+        emptyFirst.querySelector('p').textContent='مراجعِ غیرفعالی نیست';
+        emptyFirst.querySelector('span').textContent='پرونده‌های قبلی را با «مراجع جدید» در همین تب آرشیو کنید';
+      }else if(allClients.length){
+        emptyFirst.querySelector('p').textContent='مراجعِ فعالی نیست';
+        emptyFirst.querySelector('span').textContent='مراجع جدید اضافه کنید یا از غیرفعال‌ها بازگردانید';
+      }else{
+        emptyFirst.querySelector('p').textContent='هنوز مراجعی ثبت نشده';
+        emptyFirst.querySelector('span').textContent='اولین مراجع خود را اضافه کنید';
+      }
+      emptyFirst.hidden=totalInTab>0;emptySearch.hidden=true;
+    }
     return;
   }
   emptyFirst.hidden=true;emptySearch.hidden=true;
@@ -2249,17 +2371,22 @@ function renderClients(clients,isSearchResult){
       catBadge.textContent=badgeLabel;
       meta.appendChild(catBadge);
     }
-    div.appendChild(meta);
-
     if(isInactive&&c.status_reason){
-      const reasonEl=document.createElement('div');
+      const reasonEl=document.createElement('span');
       reasonEl.className='status-reason';
       reasonEl.textContent='دلیل: '+c.status_reason;
-      div.appendChild(reasonEl);
+      reasonEl.title=reasonEl.textContent;
+      meta.appendChild(reasonEl);
     }
+    div.appendChild(meta);
 
     const actions=document.createElement('div');
     actions.className='client-actions';
+    // ⭐ فیکسِ باگِ واقعیِ UI (تناقضِ ظاهری بینِ دو تب): کارتِ مراجعِ غیرفعال قبلاً فقط
+    // دکمه‌ی خاکستریِ «پرونده» داشت، برخلافِ کارتِ فعال که یک دکمه‌ی سبزِ اصلی هم دارد —
+    // الان هر دو تب یک دکمه‌ی primary/secondary + یک دکمه‌ی ghost دارند، همان چیدمان؛ فقط تبِ
+    // غیرفعال به‌جایِ رنگِ primary از secondary استفاده می‌کند چون «ثبتِ جلسه‌ی گذشته» عملِ
+    // کم‌تکرارِ آرشیوی است، نه CTAِ اصلیِ زنده (اصلِ «آرامشِ بالینی» سیستم‌دیزاین).
     if(!isInactive){
       const btn1=document.createElement('button');
       btn1.className='btn btn-primary btn-sm';
@@ -2267,6 +2394,16 @@ function renderClients(clients,isSearchResult){
       btn1.addEventListener('click',function(e){
         e.stopPropagation();
         setupNewSession(c);
+      });
+      actions.appendChild(btn1);
+    }else{
+      const btn1=document.createElement('button');
+      btn1.className='btn btn-secondary btn-sm';
+      btn1.textContent='ثبت جلسات گذشته';
+      btn1.addEventListener('click',function(e){
+        e.stopPropagation();
+        currentClient=c;
+        startManualSessionFlow();
       });
       actions.appendChild(btn1);
     }
@@ -2303,12 +2440,17 @@ function closeDeactivateModal(){
   $('deactivateClientModal').classList.remove('open');
   deactivateTargetClient=null;
 }
+// منطقِ مشترکِ خواندنِ دلیلِ غیرفعال‌بودن (مودالِ غیرفعال‌سازی + ساختِ مراجع در تبِ غیرفعال).
+// مقدارِ خالی (گزینه‌ی «نامشخص») سمتِ سرور null ذخیره می‌شود.
+function readReasonFrom(groupEl,otherEl,radioName){
+  const selected=groupEl.querySelector('input[name='+radioName+']:checked');
+  const reasonValue=selected?selected.value:'سایر';
+  const other=otherEl.value.trim();
+  return (reasonValue==='سایر'&&other)?other:reasonValue;
+}
 async function confirmDeactivateClient(){
   if(!deactivateTargetClient)return;
-  const selected=$('deactivateReasonGroup').querySelector('input[name=deactivateReason]:checked');
-  const reasonValue=selected?selected.value:'سایر';
-  const other=$('deactivateReasonOther').value.trim();
-  const finalReason=(reasonValue==='سایر'&&other)?other:reasonValue;
+  const finalReason=readReasonFrom($('deactivateReasonGroup'),$('deactivateReasonOther'),'deactivateReason');
   const id=deactivateTargetClient.id;
   try{
     await api('/api/clients/'+id+'/status',{method:'PATCH',body:{status:'inactive',reason:finalReason}});
@@ -2319,13 +2461,18 @@ async function confirmDeactivateClient(){
   }catch(e){showBanner('error','خطا: '+e.message);}
 }
 
-async function reactivateClient(id){
+async function reactivateClient(id,afterSuccess){
   try{
     await api('/api/clients/'+id+'/status',{method:'PATCH',body:{status:'active'}});
     uxTrack('client_reactivated');
     showBanner('info','مراجع به فهرستِ فعال‌ها بازگردانده شد.');
-    loadClients();
+    if(afterSuccess)afterSuccess();else loadClients();
   }catch(e){showBanner('error','خطا: '+e.message);}
+}
+function reactivateFromDetail(){
+  if(!currentClient)return;
+  const id=currentClient.id;
+  reactivateClient(id,function(){openClientDetail(id);});
 }
 
 const EDIT_CATEGORY_OPTIONS=[{value:null,label:'نامشخص'},{value:'child',label:'کودک'},{value:'teen',label:'نوجوان'},{value:'adult',label:'بزرگسال'}];
@@ -2422,14 +2569,23 @@ async function confirmDeleteSession(){
 }
 
 async function openClientDetail(clientId){
+  cleanupArchiveVoice();
   try{
     const data=await api('/api/clients/'+clientId);
     currentClient=data.client;
     $('detailTitle').textContent=data.client.code+(data.client.alias?' — '+data.client.alias:'');
     $('detailMeta').textContent=toFa(data.sessions.length)+' جلسه';
+    // ⭐ پرونده باید با کارت یکدست باشد: مراجعِ غیرفعال جلسه‌ی زنده‌ی جدید نمی‌گیرد
+    // (سرور هم 409 می‌دهد)؛ به‌جایش جلسه‌های گذشته دستی ثبت می‌شوند.
+    const inactive=data.client.status==='inactive';
+    $('detailStatusText').textContent=inactive
+      ?'این مراجع غیرفعال است'+(data.client.status_reason?' · دلیل: '+data.client.status_reason:'')+' — جلسه‌های گذشته را با «ثبت جلسات گذشته» اضافه کنید.'
+      :'';
+    $('detailStatusBox').hidden=!inactive;
+    $('detailStartBtn').hidden=inactive;
+    $('detailManualBtn').hidden=!inactive;
     const sl=$('sessionsList');
     sl.innerHTML='';
-    $('sessionDetail').hidden=true;
     data.sessions.forEach(function(s){
       const div=document.createElement('div');
       div.className='session-item';
@@ -2448,9 +2604,12 @@ async function openClientDetail(clientId){
       const num=document.createElement('span');
       num.className='session-num';
       num.textContent='جلسه '+toFa(s.session_num);
-      const st=s.status==='completed'?'کامل':s.status==='in_progress'?'در جریان':'قطع‌شده';
+      const isManualRow=s.source==='manual';
+      const st=isManualRow?'ثبتِ دستی':s.status==='completed'?'کامل':s.status==='in_progress'?'در جریان':'قطع‌شده';
       const status=document.createElement('span');
-      status.className='session-status '+s.status;
+      // ⭐ فیکسِ باگِ واقعیِ UX: «ثبتِ دستی» کلاسِ سبزِ completed می‌گرفت — انگار جلسه‌ای
+      // «کامل شده» است، نه صرفاً آرشیوِ دستی. کلاسِ خنثیِ از‌پیش‌موجود (canceled) گرفت.
+      status.className='session-status '+(isManualRow?'canceled':s.status);
       status.textContent=st;
       head.appendChild(num);
       head.appendChild(status);
@@ -2458,7 +2617,11 @@ async function openClientDetail(clientId){
 
       const date=document.createElement('div');
       date.className='session-date';
-      date.textContent=toFa(s.date)+' · شروع '+toFa(s.start_time)+(s.duration_ms?' · '+toFa(Math.round(s.duration_ms/60000))+' دقیقه':'');
+      // ⭐ فیکسِ باگِ واقعی (D1): برایِ جلسه‌ی دستی «شروع HH:MM» ساعتِ لحظه‌ی ثبت است، نه
+      // ساعتِ واقعیِ جلسه‌ی گذشته — نمایشش گمراه‌کننده است؛ اینجا هم مثلِ صفحه‌ی جلسه حذف شد.
+      date.textContent=isManualRow
+        ?(s.date?toFa(s.date):'بدونِ تاریخ')
+        :(toFa(s.date)+' · شروع '+toFa(s.start_time)+(s.duration_ms?' · '+toFa(Math.round(s.duration_ms/60000))+' دقیقه':''));
       div.appendChild(date);
 
       // ⭐ فیکسِ باگِ واقعی (UI-12): جلسه‌ی «در جریان»/«قطع‌شده» در پرونده هیچ راهِ
@@ -2476,19 +2639,60 @@ async function openClientDetail(clientId){
   }catch(e){showBanner('error',e.message);}
 }
 
-function startFromDetail(){if(currentClient)setupNewSession(currentClient);}
+function startFromDetail(){if(currentClient&&currentClient.status!=='inactive')setupNewSession(currentClient);}
 
+// ⭐ رفعِ باگِ واقعی (B3): قبلاً سوئیچِ جلسه/بازگشت وسطِ ضبط یا با متنِ ذخیره‌نشده در
+// textarea، بدونِ هیچ هشداری آن را دور می‌ریخت (cleanupArchiveVoice بی‌صدا).
+function hasUnsavedArchiveWork(){
+  if(archiveRtVoice)return true;
+  if(archiveVoiceMediaRecorder&&archiveVoiceMediaRecorder.state!=='inactive')return true;
+  if(archiveVoiceWS)return true;
+  const box=$('archiveTextNoteBox'),ta=$('archiveTextNoteInput');
+  if(box&&!box.hidden&&ta&&ta.value.trim())return true;
+  return false;
+}
+function confirmDiscardArchiveWork(){
+  if(!hasUnsavedArchiveWork())return true;
+  return confirm('یادداشتِ صوتی/متنیِ ذخیره‌نشده دور ریخته می‌شود. ادامه می‌دهید؟');
+}
 async function viewTranscript(sessionId){
+  if(currentViewSession&&currentViewSession.id!==sessionId&&!confirmDiscardArchiveWork())return;
+  // ⭐ اگر یادداشتِ صوتیِ جلسه‌ی دستیِ دیگری نیمه‌کاره مانده بود (کاربر بدونِ «پایان
+  // ضبط» به جلسه‌ی دیگری سوئیچ کرد)، امن رها می‌شود — نه ضبطِ اشتباه ادامه پیدا کند.
+  cleanupArchiveVoice();
   try{
     const data=await api('/api/sessions/'+sessionId);
     currentViewSession=data.session;
     currentViewNotes=data.notes||[];
-    $('transcriptBox').textContent=data.session.transcript||'(متنی ثبت نشده)';
-    $('resolveSpeakersBtn').hidden=(data.session.status!=='completed');
+    const isManualSession=data.session.source==='manual';
+    $('sessionDetailTitle').textContent=(currentClient?(currentClient.code+(currentClient.alias?' — '+currentClient.alias:'')+' · '):'')+'جلسه '+toFa(data.session.session_num);
+    // ⭐ (2026-09-15، دورِ دوم): برایِ جلسه‌ی دستی ساعت هیچ‌جا نمایش داده نمی‌شود (بی‌معناست)
+    // و تاریخِ خالی «بدونِ تاریخ» نوشته می‌شود، نه «null» (فیکسِ toFa).
+    $('sessionDetailMeta').textContent=isManualSession
+      ?('ثبتِ دستی · '+(data.session.date?toFa(data.session.date):'بدونِ تاریخ'))
+      :((data.session.status==='completed'?'کامل':data.session.status==='in_progress'?'در جریان':'قطع‌شده')+' · '+toFa(data.session.date)+' · '+toFa(data.session.start_time));
+    $('transcriptBox').textContent=data.session.transcript||(isManualSession?'جلسه‌ی ثبت‌شده‌ی دستی — بدونِ رونویسی.':'(متنی ثبت نشده)');
+    $('transcriptBox').hidden=isManualSession;
+    $('resolveSpeakersBtn').hidden=(data.session.status!=='completed'||isManualSession);
+    // ⭐ فیکسِ باگِ واقعیِ UX: برایِ جلسه‌ی دستی «ویرایش» بی‌معنی بود (چیزی از قبل
+    // تعیین نشده) — این‌جا تاریخ مستقیم و همیشه‌قابل‌مشاهده‌ست، نه پشتِ دکمه/مودال.
+    $('editSessionMetaBtn').hidden=isManualSession;
+    $('manualDateTimeRow').hidden=!isManualSession;
+    if(isManualSession){
+      $('manualDateInput').value=data.session.date||'';
+      $('manualDateHint').textContent='';
+    }
+    $('archiveNoteAdd').hidden=!isManualSession;
+    $('archiveTextNoteBox').hidden=true;
+    $('archiveTextNoteInput').value='';
     $('resolveSpeakersStatus').hidden=true;
     if(resolveSpeakersPollTimer){clearInterval(resolveSpeakersPollTimer);resolveSpeakersPollTimer=null;}
     const nb=$('transcriptNotes');
-    if(data.notes&&data.notes.length){
+    if(isManualSession){
+      // ⭐ برایِ جلسه‌ی دستی، یادداشت‌ها محتوایِ اصلی‌اند — با کارتِ `.note-item`ِ Wrapup
+      // (برچسبِ صوتی/متنی + حذف)، نه ردیفِ ریزِ inline که برایِ جلسه‌ی زنده طراحی شده بود.
+      renderArchiveNotesList(data.notes||[]);
+    }else if(data.notes&&data.notes.length){
       nb.hidden=false;
       let html='';
       data.notes.forEach(function(n){
@@ -2518,12 +2722,18 @@ async function viewTranscript(sessionId){
         }
       });
     }else nb.hidden=true;
-    $('sessionDetail').hidden=false;
-    // ⭐ فیکسِ باگِ واقعی (UI-10): متنِ جلسه پایینِ فهرستِ جلسات باز می‌شد و در
-    // viewportِ کوتاه کاملاً بیرون از دید بود — کلیک روی جلسه ظاهراً کاری نمی‌کرد.
-    try{$('sessionDetail').scrollIntoView({behavior:'smooth',block:'start'});}catch(e){}
+    // ⭐ فیکسِ باگِ واقعی (2026-09-15): قبلاً این‌جا داخلِ صفحه‌ی پرونده expand می‌شد
+    // (UI-10 با یک scrollIntoView دور زده شده بود) — مالک صریحاً یک صفحه‌ی مستقل
+    // خواست. showScreen خودش هم اسکرول به بالا انجام می‌دهد.
+    showScreen('SessionDetail');
     uxTrack('transcript_opened');
   }catch(e){showBanner('error',e.message);}
+}
+function backToClientDetailFromSession(){
+  if(!confirmDiscardArchiveWork())return;
+  cleanupArchiveVoice();
+  if(currentClient)openClientDetail(currentClient.id);
+  else goBackToClients();
 }
 
 // ===== بازسازیِ اختیاریِ شماره‌گذاریِ گوینده‌ها =====
@@ -2594,6 +2804,48 @@ async function applyResolvedSpeakers(){
 }
 
 // ===== ویرایش تاریخ/ساعت جلسه =====
+// ⭐ هسته‌ی مشترک برایِ هر دو مسیر: مودالِ «ویرایش» (جلسه‌ی زنده/کامل) و ردیفِ inlineِ
+// «تنظیمِ تاریخ/ساعت» (جلسه‌ی دستی — فیکسِ باگِ UX که «ویرایش» برایِ چیزی که از قبل
+// تعیین نشده بی‌معنی بود). صفحه‌ی جلسه دیگر داخلِ پرونده تو در تو نیست (screenِ مستقل)
+// پس دیگر لازم نیست بعدِ ذخیره از openClientDetail «برگردیم» — همین‌جا دوباره می‌سازیم.
+async function persistSessionDateTime(date,start_time){
+  if(!currentViewSession)return false;
+  if(!date||!start_time){showBanner('error','تاریخ و ساعت را کامل وارد کنید.');return false;}
+  try{
+    const data=await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{date,start_time}});
+    uxTrack('session_meta_edited');
+    currentViewSession=data.session;
+    return true;
+  }catch(e){showBanner('error',e.message);return false;}
+}
+// ⭐ (2026-09-15، دورِ دوم): فقط تاریخ — برایِ جلسه‌ی دستی، بدونِ ساعت، بدونِ دکمه‌ی
+// جداگانه‌ی ذخیره (change/blur خودکار). خالی هم معتبر است («بدونِ تاریخ»، migration 014).
+// عمداً viewTranscript را دوباره صدا نمی‌زند (برخلافِ persistSessionDateTime بالا) — تا
+// اگر یادداشتِ صوتی/متنیِ فعالی در حالِ ورود است، سوئیچِ صفحه/cleanup آن را قطع نکند.
+async function saveManualDate(){
+  if(!currentViewSession)return;
+  const raw=$('manualDateInput').value.trim();
+  const date=raw?toLatinDigits(raw):'';
+  const hint=$('manualDateHint');
+  try{
+    const data=await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{date:date||null}});
+    currentViewSession=data.session;
+    uxTrack('session_meta_edited');
+    $('sessionDetailMeta').textContent='ثبتِ دستی · '+(data.session.date?toFa(data.session.date):'بدونِ تاریخ');
+    hint.textContent='ذخیره شد ✓';
+    hint.style.color='var(--ok, #2e7d32)';
+    setTimeout(function(){if(hint.textContent==='ذخیره شد ✓')hint.textContent='';},2000);
+  }catch(e){
+    hint.textContent='خطا: '+e.message;
+    hint.style.color='var(--danger, #c62828)';
+  }
+}
+let manualDateHintTimer=null;
+function onManualDateInput(){
+  const hint=$('manualDateHint');
+  hint.style.color='var(--muted)';
+  hint.textContent='';
+}
 function openEditSessionMeta(){
   if(!currentViewSession)return;
   $('editSessionDate').value=currentViewSession.date||'';
@@ -2602,26 +2854,12 @@ function openEditSessionMeta(){
 }
 function closeEditSessionMeta(){$('editSessionModal').classList.remove('open');}
 async function saveSessionMeta(){
-  if(!currentViewSession)return;
-  const date=$('editSessionDate').value.trim();
+  const date=toLatinDigits($('editSessionDate').value.trim());
   const start_time=$('editSessionTime').value.trim();
-  if(!date||!start_time){showBanner('error','تاریخ و ساعت را کامل وارد کنید.');return;}
-  try{
-    const data=await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{date,start_time}});
-    uxTrack('session_meta_edited');
-    const savedSessionId=data.session.id;
-    currentViewSession=data.session;
-    closeEditSessionMeta();
-    showBanner('info','تاریخ و ساعت جلسه به‌روزرسانی شد.');
-    if(currentClient){
-      await openClientDetail(currentClient.id);
-      // ⭐ فیکسِ باگِ واقعی (UI-11): openClientDetail فهرستِ جلسات را دوباره می‌سازد
-      // و `sessionDetail` را می‌بندد (`hidden=true`) — یعنی متنی که کاربر همین الان
-      // باز کرده بود و تاریخش را ویرایش کرد، ناپدید می‌شد و باید دوباره پیدا و
-      // کلیک می‌کرد. الان همان جلسه دوباره باز می‌شود.
-      await viewTranscript(savedSessionId);
-    }
-  }catch(e){showBanner('error',e.message);}
+  if(!(await persistSessionDateTime(date,start_time)))return;
+  closeEditSessionMeta();
+  showBanner('info','تاریخ و ساعت جلسه به‌روزرسانی شد.');
+  await viewTranscript(currentViewSession.id);
 }
 
 // ⭐ عمداً هیچ دانلود/اشتراک‌گذاریِ دیتا از سمتِ تراپیست وجود نداره — فقط ادمین
@@ -2635,8 +2873,21 @@ function renderNewClientCatSelect(){
     renderNewClientCatSelect();
   },'cat-opt','sel');
 }
+// ⭐ وضعیتِ مراجعِ جدید = تبی که مودال از آن باز شده. قبلاً تب نادیده گرفته می‌شد و
+// مراجعِ ساخته‌شده در تبِ «غیرفعال» (آرشیوِ پرونده‌های قبلی) به «فعال» می‌رفت.
+let newClientTargetStatus='active';
 function showNewClientModal(){
   uxTrack('client_create_opened');
+  newClientTargetStatus=clientTab==='inactive'?'inactive':'active';
+  const archive=newClientTargetStatus==='inactive';
+  $('newClientTitle').textContent=archive?'مراجعِ غیرفعالِ جدید':'مراجع جدید';
+  $('newClientDesc').textContent=archive
+    ?'برای آرشیوِ پرونده‌های قبلی — مستقیم در فهرستِ غیرفعال‌ها ثبت می‌شود. کد یکتا خودکار ساخته می‌شود.'
+    :'کد یکتا خودکار ساخته می‌شود.';
+  $('newClientReasonBox').hidden=!archive;
+  const firstReason=$('newClientReasonGroup').querySelector('input[name=newClientReason]');
+  if(firstReason)firstReason.checked=true;
+  $('newClientReasonOther').value='';
   $('newClientAlias').value='';
   newClientSelectedCategory=null;
   newClientSelectedGender=null;
@@ -2652,13 +2903,51 @@ async function createNewClient(){
   if(btn.disabled)return;
   btn.disabled=true;
   const alias=$('newClientAlias').value.trim();
+  const status=newClientTargetStatus;
+  const body={alias:alias,category:newClientSelectedCategory,gender:newClientSelectedGender,status:status};
+  if(status==='inactive')body.reason=readReasonFrom($('newClientReasonGroup'),$('newClientReasonOther'),'newClientReason');
   try{
-    const data=await api('/api/clients',{method:'POST',body:{alias:alias,category:newClientSelectedCategory,gender:newClientSelectedGender}});
+    const data=await api('/api/clients',{method:'POST',body:body});
     uxTrack('client_created');
     closeNewClientModal();
-    showBanner('info','مراجع <b>'+data.client.code+'</b> ساخته شد.');
-    loadClients();
+    // ⭐ (تصمیمِ مالک، 2026-09-15): بعدِ ساختِ مراجع، به‌جایِ برگشتن به فهرست، مستقیم
+    // سراغِ ورودِ داده — در هر دو تب. تبِ فعال → Setup (شروعِ جلسه‌ی زنده)؛ تبِ غیرفعال →
+    // مستقیم صفحه‌ی «ثبتِ جلسه‌ی گذشته» (بازاستفاده از startManualSessionFlow، همان مسیرِ
+    // تست‌شده‌ی دکمه‌ی کارت، فقط بدونِ نیازِ کلیکِ اضافه).
+    if(status==='inactive'){
+      showBanner('info','مراجع <b>'+data.client.code+'</b> به فهرستِ غیرفعال‌ها اضافه شد — در حال بازکردنِ صفحه‌ی ثبتِ جلساتِ گذشته…');
+      currentClient=data.client;
+      await startManualSessionFlow();
+    }else{
+      showBanner('info','مراجع <b>'+data.client.code+'</b> ساخته شد.');
+      loadClients();
+      setupNewSession(data.client);
+    }
   }catch(e){uxTrack('client_create_failed');showBanner('error',e.message);}
+  finally{btn.disabled=false;}
+}
+
+// ===== ثبتِ دستیِ جلسه‌ی گذشته (آرشیوِ پرونده‌های قبلی) =====
+// ⭐ بدونِ ضبطِ زنده‌ی «جلسه» — رضایتِ ضبط موضوعیت ندارد (LAW-009). فیکسِ باگِ واقعی
+// (2026-09-14): قبلاً یک مودالِ جدا اول تاریخ/ساعت/یادداشتِ متنی می‌گرفت و فقط *بعدِ*
+// ثبت، از پرونده می‌شد یادداشتِ صوتی اضافه کرد — مالک صریحاً همین رو نمی‌خواست: «همین
+// صفحه‌ای که باز میشه هم اپشن صوتی داشته باشه هم متنی». پس مودال حذف شد: با یک کلیک
+// جلسه‌ی خالی (تاریخ/ساعت = الان، طبقِ تصمیمِ قبلیِ مالک) ساخته می‌شود و بلافاصله همان
+// صفحه‌ی جلسه باز می‌شود — که از قبل «یادداشتِ صوتی» و «یادداشتِ متنی» را کنارِ هم دارد
+// (بخشِ #archiveNoteAdd پایینِ همین فایل)، دقیقاً هم‌شکلِ Wrapup. تاریخ/ساعت هم همان‌جا
+// با دکمه‌ی «ویرایش تاریخ/ساعت» (که برایِ هر جلسه‌ای از قبل هست) قابلِ تنظیم است.
+async function startManualSessionFlow(){
+  if(!currentClient)return;
+  const btn=$('detailManualBtn');
+  if(btn.disabled)return;
+  btn.disabled=true;
+  const clientId=currentClient.id;
+  try{
+    const data=await api('/api/sessions',{method:'POST',body:{client_id:clientId,mode:'manual'}});
+    showBanner('info','جلسه‌ی گذشته ایجاد شد — یادداشتِ متنی یا صوتی اضافه کنید.');
+    await openClientDetail(clientId);
+    await viewTranscript(data.session.id);
+  }catch(e){showBanner('error','خطا: '+e.message);}
   finally{btn.disabled=false;}
 }
 
@@ -2739,7 +3028,10 @@ async function startSession(){
   $('btnStartSession').disabled=true;
   uxTrack('session_start_clicked');
   try{
-    const data=await api('/api/sessions',{method:'POST',body:{client_id:currentClient.id,consent:true}});
+    // ⭐ تاریخ/ساعت از همان ساعتِ دستگاه که صفحه‌ی Setup نشان داده (شمسی، ارقامِ لاتین) —
+    // قبلاً سرور تاریخِ میلادیِ خودش را می‌گذاشت و با نمایش و ثبتِ دستی ناهمگون بود.
+    const startedAt=new Date();
+    const data=await api('/api/sessions',{method:'POST',body:{client_id:currentClient.id,consent:true,date:toJalali(startedAt),start_time:pad2(startedAt.getHours())+':'+pad2(startedAt.getMinutes())}});
     currentSession=data.session;
     uxTrack('session_started');
     // P3: session فعال را برای resume بعد از reload نگه دار
@@ -3878,6 +4170,395 @@ function startVoiceTimer(){
 }
 function renderVoiceTimer(){$('voiceTimer').textContent=formatTimer(voiceElapsed);}
 
+// ===== یادداشتِ متنی/صوتی برایِ جلسه‌ی ثبت‌شده‌ی دستی (پرونده‌ی آرشیوی) =====
+// ⭐ عمداً کپیِ مستقلِ منطقِ بالا (نه بازاستفاده از voice*/startVoiceNote) — روی
+// `currentViewSession` کار می‌کند نه `currentSession`، تا به‌هیچ‌وجه با جریانِ جلسه‌ی
+// زنده/Wrapup قاطی نشود. همان مسیرِ صوتی (FeeliaRT مستقیم، با fallback به legacy WS
+// و صفِ آفلاینِ durable) — طبقِ تصمیمِ مالک (2026-09-14) که «مسیرِ صوتی رو مثلِ بقیه‌ی
+// جاها» بخواد. رضایتِ مراجع اینجا موضوعیت ندارد (LAW-009): این صدای خودِ تراپیستِ‌ست
+// که دارد یادداشتِ یک جلسه‌ی گذشته را دیکته می‌کند، نه ضبطِ جلسه‌ای با مراجع.
+// ⭐ کارتِ یادداشتِ جلسه‌ی دستی — عیناً `.note-item`ِ Wrapup (برچسبِ صوتی/متنی + حذف)،
+// بدونِ ساعت (D1: ساعتِ لحظه‌ی تایپ/ضبط برایِ جلسه‌ای که خودش زمانش معلوم نیست بی‌معناست).
+// روی `currentViewNotes` کار می‌کند تا بعدِ افزودن/حذف فقط همین لیست دوباره رندر شود —
+// بدونِ صدازدنِ viewTranscript (که اسکرول می‌کند و ضبطِ فعال را cleanup می‌کند، B2).
+function renderArchiveNotesList(notes){
+  const nb=$('transcriptNotes');
+  const items=(notes||[]).filter(function(n){return n.type!=='sign';});
+  if(!items.length){nb.hidden=true;nb.innerHTML='';return;}
+  nb.hidden=false;
+  nb.innerHTML='';
+  items.forEach(function(n){
+    const div=document.createElement('div');
+    div.className='note-item';
+    const tag=n.type==='voice'?'صوتی':'متنی';
+    const ic=n.type==='voice'?IC_MIC:IC_PEN;
+    const cls=n.type==='voice'?'note-tag tag-voice':'note-tag tag-text';
+    div.innerHTML='<div class="note-head"><span class="'+cls+'">'+ic+tag+'</span><button class="note-remove" data-id="'+n.id+'">'+IC_TRSH+'حذف</button></div><p></p>';
+    div.querySelector('p').textContent=n.text||'';
+    nb.appendChild(div);
+  });
+  nb.querySelectorAll('.note-remove').forEach(function(btn){
+    btn.addEventListener('click',async function(){
+      const id=btn.dataset.id;
+      btn.disabled=true;
+      try{
+        await api('/api/notes/'+id,{method:'DELETE'});
+        currentViewNotes=currentViewNotes.filter(function(n){return String(n.id)!==String(id);});
+        renderArchiveNotesList(currentViewNotes);
+      }catch(e){showBanner('error','خطا در حذفِ یادداشت');btn.disabled=false;}
+    });
+  });
+}
+
+function showArchiveTextInput(){
+  if($('archiveTextNoteBtn').disabled)return;
+  archiveTextNoteOrigin='text';
+  $('archiveVoiceNoteBox').hidden=true;
+  $('archiveTextNoteBox').hidden=false;
+  const ta=$('archiveTextNoteInput');
+  ta.readOnly=false;
+  ta.classList.remove('readonly-preview');
+  $('archiveTextEditBtn').hidden=true;
+  $('archiveTextNoteOriginHint').hidden=true;
+  $('archiveTextNoteSaveBtn').textContent='ذخیره‌ی یادداشت';
+  ta.focus();
+}
+function hideArchiveTextInput(){
+  $('archiveTextNoteBox').hidden=true;
+  $('archiveTextNoteInput').value='';
+  archiveTextNoteOrigin=null;
+}
+// ⭐ گزینه‌ی صریحِ «ویرایشِ متن» بعدِ پایانِ ضبط — قبلاً معلوم نبود که متنِ نمایش‌داده‌شده
+// را می‌شود ویرایش کرد (textarea از ابتدا قابلِ‌ویرایش بود ولی هیچ نشانه‌ای نداشت).
+function enableArchiveTextEdit(){
+  const ta=$('archiveTextNoteInput');
+  ta.readOnly=false;
+  ta.classList.remove('readonly-preview');
+  $('archiveTextEditBtn').hidden=true;
+  $('archiveTextNoteOriginHint').hidden=true;
+  ta.focus();
+  const len=ta.value.length;
+  try{ta.setSelectionRange(len,len);}catch(e){}
+}
+// ⭐ رفعِ باگِ واقعی (B2): بعدِ ثبت/تازه‌سازیِ یادداشت‌های جلسه‌ی دستی، به‌جایِ صدازدنِ
+// viewTranscript کامل (که اسکرول می‌کند و ضبطِ فعال را cleanup می‌کند) فقط همین لیست را
+// می‌خوانیم و دوباره می‌سازیم.
+async function refreshArchiveNotes(targetId){
+  if(!currentViewSession||currentViewSession.id!==targetId)return;
+  try{
+    const data=await api('/api/sessions/'+targetId);
+    currentViewNotes=data.notes||[];
+    renderArchiveNotesList(currentViewNotes);
+  }catch(e){}
+}
+async function addArchiveTextNote(){
+  const text=$('archiveTextNoteInput').value.trim();
+  if(!text||!currentViewSession)return;
+  // ⭐ فیکسِ باگِ واقعی: قبلاً همیشه با type='note_after' ذخیره می‌شد، حتی وقتی متن
+  // نتیجه‌ی یک ضبطِ صوتی بود — برچسب/رنگِ کارت در فهرست همیشه «متنی» نشان می‌داد.
+  const noteType=archiveTextNoteOrigin==='voice'?'voice':'note_after';
+  try{
+    const d=await api('/api/sessions/'+currentViewSession.id+'/notes',{
+      method:'POST',
+      body:{type:noteType,text:text,wall_clock:nowClock()}
+    });
+    $('archiveTextNoteInput').value='';
+    $('archiveTextNoteBox').hidden=true;
+    archiveTextNoteOrigin=null;
+    uxTrack('text_note_added');
+    currentViewNotes.push(d.note);
+    renderArchiveNotesList(currentViewNotes);
+  }catch(e){
+    // ⭐ فیکسِ باگِ واقعی: متن نباید گم شود — در textarea می‌ماند تا کاربر دوباره امتحان کند.
+    showBanner('error','خطا در ثبتِ یادداشت — متن هنوز در کادر است.');
+  }
+}
+
+async function startArchiveVoiceNote(){
+  if(!currentViewSession)return;
+  uxTrack('voice_note_started');
+  archiveVoicePaused=false;updateArchiveVoicePauseUI();
+  if(window.FeeliaRT&&window.FeeliaRT.isAvailable()&&!archiveRtVoice&&!archiveVoiceWS&&(!archiveVoiceMediaRecorder||archiveVoiceMediaRecorder.state==='inactive')){
+    try{
+      const ok=await startArchiveVoiceNoteDirect();
+      if(ok)return;
+    }catch(e){}
+    // fallthrough به مسیر legacy
+  }
+  $('archiveTextNoteBox').hidden=true;
+  $('archiveVoiceNoteBox').hidden=false;
+  $('archiveVoiceStatus').textContent='در حال اتصال…';
+  $('archiveVoiceLiveText').textContent='در حال ضبط… حرف بزنید';
+  archiveVoiceElapsed=0;
+  renderArchiveVoiceTimer();
+  $('archiveVoiceNoteBtn').disabled=true;
+  $('archiveTextNoteBtn').disabled=true; // B1: نمی‌شود وسطِ ضبط به یادداشتِ متنی سوئیچ کرد
+  try{
+    archiveVoiceStream=await Mic_requestStream(MicModule.LIVE_CONSTRAINTS);
+  }catch(e){
+    $('archiveVoiceStatus').textContent=describeMicError(e);
+    cleanupArchiveVoice();
+    return;
+  }
+  const proto=location.protocol==='https:'?'wss':'ws';
+  archiveVoiceWS=new WebSocket(proto+'://'+location.host+'/ws/voice/'+currentViewSession.id);
+  archiveVoiceWS.binaryType='arraybuffer';
+  archiveVoiceWS.onopen=function(){
+    const mime=Mic_pickMimeType();
+    try{
+      archiveVoiceMediaRecorder=Mic_createRecorder(archiveVoiceStream,mime);
+    }catch(e){
+      $('archiveVoiceStatus').textContent='خطا در ضبط';
+      cleanupArchiveVoice();
+      return;
+    }
+    archiveVoiceMediaRecorder.ondataavailable=function(e){
+      if(e.data&&e.data.size>0&&archiveVoiceWS&&archiveVoiceWS.readyState===WebSocket.OPEN)archiveVoiceWS.send(e.data);
+    };
+    archiveVoiceMediaRecorder.start(250);
+    $('archiveVoiceStatus').textContent='در حال ضبط — لایو رونویسی…';
+    startArchiveVoiceTimer();
+  };
+  archiveVoiceWS.onmessage=function(ev){
+    if(typeof ev.data==='string'){
+      try{
+        const msg=JSON.parse(ev.data);
+        if(msg.type==='preview')$('archiveVoiceLiveText').textContent=msg.text||'…';
+        else if(msg.type==='status')$('archiveVoiceStatus').textContent=msg.message||msg.status;
+        else if(msg.type==='finished'){
+          // ⭐ مسیرِ legacy طبقِ LAW-015 فریز است — سرور خودش یادداشت را ذخیره می‌کند،
+          // اینجا دست نمی‌زنیم؛ فقط بدونِ ریلودِ کاملِ صفحه (B2) لیست را تازه می‌کنیم.
+          const tid=currentViewSession&&currentViewSession.id;
+          if(msg.finalText&&msg.finalText.trim()){
+            $('archiveVoiceStatus').textContent='ثبت شد';
+            if(tid)refreshArchiveNotes(tid);
+          }else $('archiveVoiceStatus').textContent='متنی ثبت نشد';
+          setTimeout(cleanupArchiveVoice,1500);
+        }else if(msg.type==='error')$('archiveVoiceStatus').textContent=msg.message;
+      }catch(e){}
+    }
+  };
+  archiveVoiceWS.onclose=function(){
+    if(archiveVoiceMediaRecorder&&archiveVoiceMediaRecorder.state!=='inactive')cleanupArchiveVoice();
+  };
+}
+async function startArchiveVoiceNoteDirect(){
+  $('archiveTextNoteBox').hidden=true;
+  $('archiveVoiceNoteBox').hidden=false;
+  $('archiveVoiceStatus').textContent='در حال اتصال…';
+  $('archiveVoiceLiveText').textContent='در حال ضبط… حرف بزنید';
+  $('archiveVoiceNoteBtn').disabled=true;
+  $('archiveTextNoteBtn').disabled=true;
+  const s=window.FeeliaRT.createSession(currentViewSession.id,{mode:'note',
+    onState:archiveVoiceOnState,
+    onResult:function(r){
+      $('archiveVoiceLiveText').textContent=(r.final+(r.interim?' '+r.interim:''))||'…';
+    },
+    onError:function(m){$('archiveVoiceStatus').textContent=m;}
+  });
+  // ⭐ فیکسِ باگِ واقعی (A2): قبلاً archiveRtVoice فقط بعدِ resolveِ start() مقدار می‌گرفت،
+  // پس کلیکِ «توقف موقت» در چند ثانیه‌ی اتصال (STARTING) هیچ اثری نداشت و هیچ پیامی هم
+  // نمی‌داد. حالا از همین لحظه مقدار می‌گیرد تا archiveVoiceOnState/پاز واقعاً روی state
+  // کار کنند؛ اگر start شکست بخورد، پایین پاک می‌شود.
+  archiveRtVoice=s;
+  archiveVoicePaused=false;archiveRtPauseAllowed=false;updateArchiveVoicePauseUI();
+  let ok=false;
+  try{ok=await s.start();}catch(e){ok=false;}
+  if(!ok){
+    archiveRtVoice=null;
+    try{window.FeeliaRT.forget(s);}catch(e){}
+    return false;
+  }
+  archiveVoiceElapsed=0;
+  renderArchiveVoiceTimer();
+  startArchiveVoiceTimer();
+  $('archiveVoiceStatus').textContent=(s.realtimeUp===false)
+    ?'در حال ضبط — متن پس از پایان آماده می‌شود'
+    :'در حال ضبط — لایو رونویسی…';
+  return true;
+}
+async function stopArchiveVoiceNoteDirect(){
+  const s=archiveRtVoice;
+  archiveRtVoice=null;
+  if(!s)return;
+  archiveVoiceRunning=false;
+  clearInterval(archiveVoiceTimerInt);
+  $('archiveVoiceStatus').textContent='در حال نهایی‌سازی…';
+  let out={text:'',reliable:true,mode:'realtime'};
+  try{out=await s.finish();}catch(e){}
+  try{window.FeeliaRT.forget(s);}catch(e){}
+  const targetId=currentViewSession&&currentViewSession.id;
+  if(out.text&&out.text.trim()&&(out.reliable||out.mode==='batch')){
+    // ⭐ (تصمیمِ مالک، دورِ دوم): دیگر خودکار POST نمی‌شود — متن ابتدا read-only (با
+    // برچسبِ منشأش) نشان داده می‌شود، با دو گزینه‌ی صریح: «ویرایشِ متن» یا ذخیره‌ی
+    // مستقیم. نوعِ ذخیره هم واقعاً 'voice' می‌ماند (نه 'note_after') تا برچسب/رنگِ
+    // کارت در فهرست درست باشد.
+    archiveTextNoteOrigin='voice';
+    $('archiveVoiceNoteBox').hidden=true;
+    $('archiveVoiceNoteBtn').disabled=false;
+    $('archiveTextNoteBtn').disabled=false;
+    const ta=$('archiveTextNoteInput');
+    ta.value=out.text.trim();
+    ta.readOnly=true;
+    ta.classList.add('readonly-preview');
+    $('archiveTextEditBtn').hidden=false;
+    $('archiveTextNoteOriginHint').hidden=false;
+    $('archiveTextNoteSaveBtn').textContent='ثبت و ذخیره';
+    $('archiveTextNoteBox').hidden=false;
+    showBanner('info','متنِ ضبط‌شده آماده است — بخوانید، در صورتِ نیاز «ویرایشِ متن» بزنید، بعد ذخیره کنید.'+(out.reliable?'':' (با تاخیرِ کوتاه)'));
+    return;
+  }
+  if(out.mode==='batch-pending-note'){
+    // صدا در صفِ durable ذخیره شده (اتصال/زمان کافی نبود) — پردازش در پس‌زمینه ادامه دارد؛
+    // تا آن لحظه چیزی برایِ نمایش در textarea نداریم، پس همچنان خودکار به یادداشت‌ها
+    // اضافه می‌شود (کاربر احتمالاً تا آن موقع صفحه را ترک کرده).
+    $('archiveVoiceStatus').textContent='در حال پردازشِ یادداشت…';
+    try{
+      s.awaitBatchDrain({forNote:true}).then(function(r){
+        if(r&&r.drained&&r.ok&&r.result&&r.result.text){
+          $('archiveVoiceStatus').textContent='ثبت شد (با تاخیر)';
+          if(targetId)refreshArchiveNotes(targetId);
+        }else{
+          $('archiveVoiceStatus').textContent='هنوز آماده نشد — صدا ذخیره شده و به‌زودی ثبت می‌شود';
+        }
+        setTimeout(function(){$('archiveVoiceNoteBox').hidden=true;$('archiveVoiceNoteBtn').disabled=false;$('archiveTextNoteBtn').disabled=false;},2500);
+      });
+    }catch(e){
+      setTimeout(function(){$('archiveVoiceNoteBox').hidden=true;$('archiveVoiceNoteBtn').disabled=false;$('archiveTextNoteBtn').disabled=false;},1500);
+    }
+    return;
+  }
+  $('archiveVoiceStatus').textContent='متنی ثبت نشد';
+  setTimeout(function(){$('archiveVoiceNoteBox').hidden=true;$('archiveVoiceNoteBtn').disabled=false;$('archiveTextNoteBtn').disabled=false;},1500);
+}
+function cancelArchiveVoiceNote(){
+  cleanupArchiveVoice();
+}
+function stopArchiveVoiceNote(){
+  uxTrack('voice_note_stop_clicked');
+  if(archiveRtVoice){stopArchiveVoiceNoteDirect();return;}
+  // MediaRecorder.stop() از حالتِ paused هم مستقیماً کار می‌کند — نیازی به resume نیست
+  if(archiveVoiceMediaRecorder&&archiveVoiceMediaRecorder.state!=='inactive'){
+    $('archiveVoiceStatus').textContent='در حال نهایی‌سازی…';
+    archiveVoiceMediaRecorder.stop();
+    if(archiveVoiceWS&&archiveVoiceWS.readyState===WebSocket.OPEN)archiveVoiceWS.send(JSON.stringify({type:'finalize'}));
+  }
+}
+// ⭐ توقف/ادامه‌ی یادداشتِ صوتی (مثلِ جلسه‌ی زنده — فیکسِ باگِ UX که این‌جا نبود).
+// مسیرِ FeeliaRT: عیناً همان rtSession.pause/resume که برایِ جلسه‌ی زنده استفاده می‌شود —
+// RTSession روی mode:'note' هم دقیقاً همان state machine را طی می‌کند (فقط persist=false،
+// یعنی transcript موقتِ خودکار در sessions ذخیره نمی‌شود — همون چیزی که می‌خوایم).
+// مسیرِ legacy: MediaRecorder.pause()/.resume()ِ بومی — سرور منتظرِ chunk بعدیه، نیازی
+// به پیامِ پروتکلی نیست؛ فقط ارسالِ صدا موقتاً متوقف می‌شود.
+function archiveVoiceOnState(st){
+  if(!archiveRtVoice)return;
+  const map={
+    STARTING:'در حال برقراریِ اتصال…',
+    ACTIVE:'در حال ضبط — لایو رونویسی…',
+    RECOVERED:'اتصال برقرار — ادامه…',
+    RECONNECTING:'اتصال قطع — صدا ذخیره می‌شود…',
+    NETWORK_PAUSED:'اینترنت قطع است — صدا به‌صورتِ محلی ذخیره می‌شود…',
+    MANUAL_PAUSED:'متوقف شد — برای ادامه «ادامه» بزنید',
+    FINALIZING:'در حال نهایی‌سازی…',
+    FAILED:'رونویسیِ زنده ناموفق — صدا به‌صورتِ محلی ذخیره می‌شود',
+  };
+  if(map[st])$('archiveVoiceStatus').textContent=map[st];
+  // ⭐ رفعِ A2/A3: فعال/غیرفعال‌بودنِ دکمه‌ی «توقف موقت» دقیقاً از rooی state گرفته
+  // می‌شود، نه از وجودِ archiveRtVoice. pause() فقط در ACTIVE/RECOVERED واقعاً کار می‌کند.
+  archiveRtPauseAllowed=(st==='ACTIVE'||st==='RECOVERED');
+  if(st==='ACTIVE'||st==='RECOVERED'){
+    archiveVoicePaused=false;updateArchiveVoicePauseUI();
+    startArchiveVoiceTimer();
+  }else if(st==='MANUAL_PAUSED'){
+    // همون الگویِ rtOnState: همین لحظه (نه بعدِ تاخیرِ resolve شدنِ promise) — وگرنه
+    // دکمه‌ی «توقف» چند ثانیه بعدِ توقفِ واقعی هنوز نمایانه.
+    archiveVoicePaused=true;archiveVoiceRunning=false;updateArchiveVoicePauseUI();
+  }else{
+    updateArchiveVoicePauseUI();
+  }
+}
+async function pauseArchiveVoiceNote(){
+  if(archiveVoicePaused)return;
+  if(archiveRtVoice){
+    if(!archiveRtPauseAllowed){
+      $('archiveVoiceStatus').textContent='هنوز نمی‌شود متوقف کرد — رونویسیِ زنده وصل نشده';
+      return;
+    }
+    let ok=false;
+    try{ok=await archiveRtVoice.pause();}catch(e){ok=false;}
+    if(!archiveRtVoice)return; // بینِ این حین cleanup شده (مثلاً سوئیچِ جلسه)
+    if(!ok&&archiveRtVoice.state!=='ACTIVE'&&archiveRtVoice.state!=='RECOVERED'){
+      $('archiveVoiceStatus').textContent='توقف اعمال نشد — وضعیتِ فعلی اجازه نمی‌دهد';
+    }
+    return;
+  }
+  if(archiveVoiceMediaRecorder&&archiveVoiceMediaRecorder.state==='recording'){
+    try{archiveVoiceMediaRecorder.pause();}catch(e){return;}
+    archiveVoicePaused=true;archiveVoiceRunning=false;
+    $('archiveVoiceStatus').textContent='متوقف شد — برای ادامه «ادامه» بزنید';
+    updateArchiveVoicePauseUI();
+  }
+}
+async function resumeArchiveVoiceNote(){
+  if(!archiveVoicePaused)return;
+  if(archiveRtVoice){
+    $('archiveVoiceStatus').textContent='در حال اتصال…';
+    let ok=false;
+    try{ok=await archiveRtVoice.resume();}catch(e){ok=false;}
+    if(!archiveRtVoice)return;
+    if(!ok){archiveVoicePaused=true;updateArchiveVoicePauseUI();$('archiveVoiceStatus').textContent='ادامه اعمال نشد — دوباره «ادامه» بزنید';}
+    return;
+  }
+  if(archiveVoiceMediaRecorder&&archiveVoiceMediaRecorder.state==='paused'){
+    try{archiveVoiceMediaRecorder.resume();}catch(e){return;}
+    archiveVoicePaused=false;
+    startArchiveVoiceTimer();
+    $('archiveVoiceStatus').textContent='در حال ضبط — لایو رونویسی…';
+    updateArchiveVoicePauseUI();
+  }
+}
+function updateArchiveVoicePauseUI(){
+  const bp=$('archiveVoicePauseBtn'),br=$('archiveVoiceResumeBtn');
+  if(bp){
+    bp.hidden=archiveVoicePaused;
+    // ⭐ A2: روی مسیرِ FeeliaRT، تا وصل‌نشدنِ واقعی (STARTING/RECONNECTING/FAILED/…) دکمه
+    // غیرفعال می‌ماند — قبلاً کلیک در این حالت‌ها بی‌صدا هیچ کاری نمی‌کرد.
+    bp.disabled=!!(archiveRtVoice&&!archiveRtPauseAllowed);
+  }
+  if(br)br.hidden=!archiveVoicePaused;
+}
+function cleanupArchiveVoice(){
+  if(archiveRtVoice){try{archiveRtVoice.abort();}catch(e){}try{window.FeeliaRT.forget(archiveRtVoice);}catch(ee){}archiveRtVoice=null;}
+  archiveRtPauseAllowed=false;
+  const tb=$('archiveTextNoteBtn');if(tb)tb.disabled=false;
+  if(archiveVoiceMediaRecorder&&archiveVoiceMediaRecorder.state!=='inactive'){try{archiveVoiceMediaRecorder.stop();}catch(e){}}
+  if(archiveVoiceStream){Mic_stopStream(archiveVoiceStream);archiveVoiceStream=null;}
+  if(archiveVoiceWS){try{archiveVoiceWS.close();}catch(e){}archiveVoiceWS=null;}
+  clearInterval(archiveVoiceTimerInt);
+  archiveVoiceRunning=false;
+  archiveVoiceMediaRecorder=null;
+  archiveVoicePaused=false;
+  updateArchiveVoicePauseUI();
+  const box=$('archiveVoiceNoteBox');
+  if(box)box.hidden=true;
+  const btn=$('archiveVoiceNoteBtn');
+  if(btn)btn.disabled=false;
+}
+function startArchiveVoiceTimer(){
+  if(archiveVoiceRunning)return;
+  archiveVoiceRunning=true;
+  let last=Date.now();
+  clearInterval(archiveVoiceTimerInt);
+  archiveVoiceTimerInt=setInterval(function(){
+    if(!archiveVoiceRunning)return;
+    const now=Date.now();
+    archiveVoiceElapsed+=now-last;
+    last=now;
+    renderArchiveVoiceTimer();
+  },200);
+}
+function renderArchiveVoiceTimer(){$('archiveVoiceTimer').textContent=formatTimer(archiveVoiceElapsed);}
+
 async function finishSession(){
   if(!currentSession)return;
   // P3: completed → کلید resume پاک شود
@@ -3903,6 +4584,7 @@ function goBackToClients(){
   directActive=false;
   stopAllAudio();
   cleanupVoice();
+  cleanupArchiveVoice();
   if(ws){try{ws.close();}catch(e){}ws=null;}
   if(wsReconnectTimer)clearTimeout(wsReconnectTimer);
   clearInterval(timerInterval);
@@ -3926,7 +4608,10 @@ window.addEventListener('beforeunload',function(e){
   try{directOpen=!!(SonioxDirect.ws&&SonioxDirect.ws.readyState===WebSocket.OPEN);}catch(_){}
   let rtOpen=false;
   try{rtOpen=!!(window.FeeliaRT&&window.FeeliaRT.hasOpenConnection());}catch(_){}
-  if(ws||voiceWS||directOpen||rtOpen){e.preventDefault();e.returnValue='';}
+  // ⭐ B3: متنِ ذخیره‌نشده‌ی یادداشتِ متنیِ آرشیو هم باید هشدار بدهد، نه فقط اتصالِ باز.
+  let archiveTextPending=false;
+  try{archiveTextPending=hasUnsavedArchiveWork();}catch(_){}
+  if(ws||voiceWS||archiveVoiceWS||directOpen||rtOpen||archiveTextPending){e.preventDefault();e.returnValue='';}
 });
 
 // ⭐ فیکسِ باگِ واقعی (UI-20 بخشِ مدال‌ها، UI-21): مدال‌ها فقط با دکمه‌ی «انصراف»
