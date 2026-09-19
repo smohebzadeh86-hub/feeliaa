@@ -508,6 +508,16 @@ input::-ms-reveal{display:none}
 .case-file-doc .cf-med-row .cf-mlbl{color:var(--cf-muted);flex-shrink:0}
 .case-file-doc .cf-rel-card{margin-top:10px;background:var(--cf-soft);border:1px solid var(--cf-line);border-radius:12px;padding:12px 13px}
 .case-file-doc .cf-rel-card h4{margin:0 0 8px;font-size:14px;color:var(--cf-teal)}
+.case-file-doc .cf-couple-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.case-file-doc .cf-couple-card{background:var(--cf-card);border:1px solid var(--cf-line);border-right:4px solid var(--cf-teal);border-radius:12px;padding:11px 14px;min-width:0}
+.case-file-doc .cf-couple-title{font-size:14.5px;font-weight:800;color:var(--cf-ink);margin-bottom:6px}
+.case-file-doc .cf-couple-body{font-size:13.5px;line-height:1.95}
+.case-file-doc .cf-couple-body .cf-rich-row{padding:3px 0;border-top:1px dashed var(--cf-line)}
+.case-file-doc .cf-couple-body .cf-rich-row:first-child{border-top:none}
+.case-file-doc .cf-couple-quote{grid-column:1/-1;background:var(--cf-teal2);border-radius:0 12px 12px 0}
+.case-file-doc .cf-couple-quote .cf-couple-title{font-size:13px;color:var(--cf-teal)}
+.case-file-doc .cf-couple-quote .cf-couple-body{font-size:14px;line-height:2.05}
+.case-file-doc .cf-next{border-style:dashed}
 .case-file-doc .cf-change{display:grid;grid-template-columns:1fr 30px 1fr;align-items:center;gap:8px}
 .case-file-doc .cf-change-box{border:1px solid var(--cf-line);border-radius:12px;padding:10px 11px;background:var(--cf-card)}
 .case-file-doc .cf-change-title{font-size:11px;color:var(--cf-muted)}
@@ -3121,6 +3131,15 @@ function buildClientCard(c){
       });
       actions.appendChild(btn1);
     }
+    // «پرونده» روی هر دو کارت (فعال/غیرفعال): مستقیم به بخشِ پروندهٔ درمان در صفحهٔ مراجع می‌رود.
+    const fileBtn=document.createElement('button');
+    fileBtn.className='btn btn-ghost btn-sm';
+    fileBtn.textContent='پرونده';
+    fileBtn.addEventListener('click',function(e){
+      e.stopPropagation();
+      openClientDetail(c.id,{scrollToCaseFile:true});
+    });
+    actions.appendChild(fileBtn);
     div.appendChild(actions);
 
     div.addEventListener('click',function(){openClientDetail(c.id);});
@@ -3274,7 +3293,7 @@ async function confirmDeleteSession(){
   deleteTargetSession=null;
 }
 
-async function openClientDetail(clientId){
+async function openClientDetail(clientId,opts){
   cleanupArchiveVoice();
   try{
     const data=await api('/api/clients/'+clientId);
@@ -3290,9 +3309,10 @@ async function openClientDetail(clientId){
     $('detailStatusBox').hidden=!inactive;
     $('detailStartBtn').hidden=inactive;
     $('detailManualBtn').hidden=!inactive;
-    // ⭐ پرونده‌ی روندِ درمان — فازِ ۱: فقط برایِ مراجعینِ غیرفعال (تصمیمِ مالک؛ بک‌اند generic است)
+    // ⭐ پرونده‌ی روندِ درمان برایِ همه‌ی مراجعین (فعال و غیرفعال) — تصمیمِ مالک 2026-09-19
+    // (قبلاً فقط غیرفعال‌ها)؛ دکمه‌ی «پرونده» روی کارت با scrollToCaseFile مستقیم به این بخش می‌آید.
     caseFileEditMode=false;
-    if(inactive){loadCaseFile(clientId);}else{currentCaseFile=null;$('caseFileSection').hidden=true;$('caseFileSection').innerHTML='';}
+    const cfLoad=loadCaseFile(clientId);
     const sl=$('sessionsList');
     sl.innerHTML='';
     data.sessions.forEach(function(s){
@@ -3345,6 +3365,9 @@ async function openClientDetail(clientId){
       sl.appendChild(div);
     });
     showScreen('ClientDetail');
+    if(opts&&opts.scrollToCaseFile){
+      cfLoad.then(function(){$('caseFileSection').scrollIntoView({behavior:'smooth',block:'start'});});
+    }
   }catch(e){showBanner('error',e.message);}
 }
 
@@ -3637,9 +3660,13 @@ function renderCaseFile(){
   html+='</div></div></div>';
 
   if(c.coupleRelationship){
-    html+='<div class="cf-section">'+cfSectionHead(escapeHtml(c.coupleRelationship.title),'وضعیتِ رابطه‌ی زناشویی؛ جزئیاتِ کامل فقط همین‌جاست')+'<div class="cf-rel-card">';
+    // کارت‌هایِ همیشه‌باز (بدونِ کلیک): تیتر + متنِ ساخت‌یافته؛ «نقل‌ها» نوارِ تمام‌عرضِ نقل‌قول.
+    html+='<div class="cf-section">'+cfSectionHead(escapeHtml(c.coupleRelationship.title),'وضعیتِ رابطه‌ی زناشویی؛ جزئیاتِ کامل فقط همین‌جاست')+'<div class="cf-couple-grid">';
     c.coupleRelationship.fields.forEach(function(f){
-      html+='<div style="margin-bottom:8px"><div class="cf-k">'+escapeHtml(f.label)+'</div><div class="cf-v">'+fieldHtml('couple.'+f.key,f,true)+'</div></div>';
+      const isQuote=/نقل/.test(f.label||'')||/quote/i.test(f.key||'');
+      // نقل‌هایِ پشت‌سرهم («…»؛ «…») فقط برایِ نمایش خط‌به‌خط می‌شوند؛ متنِ ذخیره‌شده عوض نمی‌شود.
+      const shown=(isQuote&&f.value&&!caseFileEditMode)?Object.assign({},f,{value:String(f.value).replace(/»\s*[؛;]\s*«/g,'»\n«')}):f;
+      html+='<div class="cf-couple-card'+(isQuote?' cf-couple-quote':'')+'"><div class="cf-couple-title">'+escapeHtml(f.label)+'</div><div class="cf-couple-body">'+fieldHtml('couple.'+f.key,shown,true)+'</div></div>';
     });
     html+='</div></div>';
   }
@@ -3667,9 +3694,12 @@ function renderCaseFile(){
             fieldHtml('session.'+s.sessionId+'.body',s.body,true)+'</div></details>';
     });
   }
-  html+='<div class="cf-session cf-next" style="border-style:dashed"><div class="cf-session-body"><b>جلسه‌ی آینده</b>'+
-        ['موضوعات','مشاهدات و علائم','مداخله و بازخورد'].map(function(t){return '<div style="margin-top:8px"><div class="cf-k">'+t+'</div><div class="cf-v"><span class="cf-pending">در انتظار ثبت</span></div></div>';}).join('')+
-        '</div></div>';
+  html+='<details class="cf-session cf-next"'+(caseFileEditMode?' open':'')+'><summary>'+
+        '<span class="cf-session-title">جلسه‌ی آینده</span>'+
+        '<span class="cf-session-meta"><span class="cf-chip">در انتظار</span><span class="cf-toggle"><span class="cf-toggle-txt">جزئیات</span>'+CF_CHEV+'</span></span></summary>'+
+        '<div class="cf-session-body">'+
+        ['موضوعات','مشاهدات و علائم','مداخله و بازخورد'].map(function(t,i){return '<div'+(i?' style="margin-top:8px"':'')+'><div class="cf-k">'+t+'</div><div class="cf-v"><span class="cf-pending">در انتظار ثبت</span></div></div>';}).join('')+
+        '</div></details>';
   html+='</div>';
 
   html+='<div class="cf-section">'+cfSectionHead('نقشه‌راهِ جلسه‌ی بعد','پیشنهادِ ترتیبِ کار در جلسه‌ی بعد، به‌ترتیبِ اولویت — برایِ دیدنِ توضیحِ هر گام، روی آن بزنید')+'<div class="cf-roadmap">';

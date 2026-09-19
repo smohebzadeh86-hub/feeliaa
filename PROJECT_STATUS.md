@@ -307,6 +307,32 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-19 — CODE + DECISION — دکمه‌ی «پرونده» روی کارت، پرونده برای همه‌ی مراجعین، بازطراحیِ رابطه‌ی زوجین، جلسه‌ی آینده‌ی بازشو
+
+- **تصمیمِ مالک (این گفتگو):** (۱) دکمه‌ی «پرونده» روی کارتِ فعال **و** غیرفعال؛ (۲) پروندهٔ درمان برای مراجعِ **فعال** هم نمایش داده شود (تغییرِ تصمیمِ فازِ ۱ «فقط غیرفعال»)؛ (۳) رابطه‌ی زوجین بدونِ کلیک، کارتِ همیشه‌باز؛ (۴) متن اول فهمیده و بعد چیده شود، نه هم‌جمله‌بندیِ تراپیست.
+- **`public/index.html`:** `buildClientCard` دکمه‌ی ghostِ «پرونده» → `openClientDetail(id,{scrollToCaseFile:true})`؛ `openClientDetail` همیشه `loadCaseFile` می‌زند و در صورتِ گزینه به `#caseFileSection` اسکرول می‌کند؛ رابطه‌ی زوجین → `.cf-couple-grid/.cf-couple-card` (نقل‌ها تمام‌عرض و خط‌به‌خط فقط در نمایش)؛ «جلسه‌ی آینده» → `<details class="cf-session cf-next">`.
+- **`buildCaseFilePrompt.ts`:** قاعده‌ی جدید ۲۰ (فهمیدن → چیدن بر اساسِ مضمون، ۲–۴ خطِ «برچسب: متن»، بدونِ حذفِ فکت)؛ قوانینِ ۴ و ۱۴ برایِ coupleRelationship هم‌راستا شدند. فقط پرونده‌های تازه/بازتولیدشده اثر می‌گیرند (`بازتولیدِ کامل`).
+- **تست:** `cd server && npx tsc --noEmit` OK. mock backend (داده‌ی canary، scratchpad) روی مرورگرِ داخلی: کارتِ فعال دو دکمه دارد، کلیکِ «پرونده» بخشِ پرونده را لود می‌کند، ۳ کارتِ زوجین با شبکه‌ی دوستونه + نقل‌ها `1/-1`، «جلسه‌ی آینده» پیش‌فرض بسته، بدونِ خطای کنسول. **UNVERIFIED:** اسکرین‌شات (پنجره hidden بود)، تبِ غیرفعال، موبایل/dark/حالتِ ویرایش، و خروجیِ واقعیِ LLM با پرامپتِ جدید (بازتولید اجرا نشد). commit نشد.
+
+### 2026-09-19 — TEST/FINDING — smokeِ سرورِ لوکال + DB (به دستورِ صریحِ مالک)
+
+- **اجرا:** `preview_start feelia-server` (پورت ۳۰۰۰). لاگِ startup: هر ۲۰ migration «already applied»، سرور listen شد.
+- **DB:** MySQL 8.4.9، دیتابیس `feelia`، ۸ جدول، ۲۰ ردیفِ `_migrations` = ۲۰ فایلِ `server/src/db/mysql/migrations/*.sql`. `GET /api/health` → 200 با `database: "connected"`.
+- **HTTP بدونِ auth:** `/`، `/feelia-rt.js`، `/feelia-analytics.js` → 200؛ `/api/auth/me`، `/api/clients`، `/api/admin/stats`، `/api/client-config`، `/api/stt/check` → 401 (مطابقِ انتظار). صفحه‌ی ورود در مرورگرِ داخلی رندر شد؛ تنها خطای کنسول همان ۲ مورد 401 است. `/favicon.ico` → 404 (بی‌اهمیت).
+- **`cd server && npx tsc --noEmit`:** exit 0.
+- **`pnpm test:rt`: ۲۹ PASS و ۶ FAIL** — T2 (unreliable → batch fallback)، T15 (note uploaded with purpose=note، retry endpoint «صوتی در صف نیست»، note drain)، T16 (durable-only finish → batch-pending، later batch merges). همه در مسیرِ batch/durable. با ثبتِ 2026-09-15 («test:rt سبز») **تعارض دارد**؛ **follow-up (همان روز):** ۴ بار اجرا، هر بار دقیقاً همین ۶ FAIL ⇒ deterministic، نه flaky. علتِ محتمل: harness (`scripts/rt-harness.cjs`) هیچ mockی برای `indexedDB` ندارد؛ `AudioQueueDB.add` بدونِ `window.indexedDB` reject → `false` می‌دهد ([feelia-rt.js:129,194](public/feelia-rt.js)) ⇒ هیچ سگمنتی در صف نمی‌رود و `batch-audio` هرگز آپلود نمی‌شود (T2/T15/T16 دقیقاً همین مسیر). یعنی harness از بازنویسیِ durability (صفِ IndexedDB + intent، df7d86b) عقب مانده، نه لزوماً باگِ محصول. **UNVERIFIED:** با افزودنِ mock IndexedDB دوباره اجرا نشد. کدی تغییر نکرد.
+- **رفع (به دستورِ «کامل تست کن»):** mock حداقلیِ `indexedDB`/`IDBKeyRange` (~۱۵ خط) بعدِ `globalThis.window = globalThis;` به `scripts/rt-harness.cjs` اضافه شد؛ فقط فایلِ تست، کدِ محصول دست نخورد. نتیجه: `pnpm test:rt` → **۳۵ PASS، ۰ FAIL، exit 0** (قبلاً ۲۹/۶). این فقط منطقِ کلاینت را با IndexedDBِ جعلی می‌سنجد، نه IndexedDBِ واقعیِ مرورگر. commit نشد.
+- **تستِ احرازشده (مالک خودش حساب/مراجع/جلسه‌ی تستی ساخت؛ من فقط لاگِ سرور را خواندم):** `GET /api/auth/me` 200، `GET /api/clients` 200، `GET /api/recovered` 200، `POST /api/clients` 201، `POST /api/sessions` 201 (۲ جلسه)، `POST /api/stt/realtime-session` 200 (~۱.۲ ثانیه)، `PUT /api/sessions/:id` 200 (چند بار)، `POST .../batch-audio?purpose=archive` 202. هیچ ۵xx یا لاگِ warn/error نبود؛ ۴۰۴ها فقط `/favicon.ico` (و ۲ موردِ نامشخص بی‌اهمیت). **UNVERIFIED:** خواندنِ مستقیمِ DB برای تأییدِ ردیف‌های ساخته‌شده توسطِ classifier بلاک شد (دورش نزدم)؛ endpointهایِ notes/case-file/admin/voice-note/رونویسیِ زنده (WS/Soniox) در این نشست ندیدم.
+- **تستِ بدونِ auth (سرورِ ری‌استارت‌شده):** register با بدنه‌ی خالی → 400؛ login با اطلاعاتِ نادرست → 401؛ logout بدونِ نشست → 200؛ `/api/sessions/1`، `/api/recovered`، `case-file`، `/api/admin/*` → 401؛ route ناموجود → 404؛ `/ws/t/1` بدونِ کوکی → 401. هیچ حسابی ساخته نشد.
+- **انجام نشد (LAW/CLAUDE §۶):** endpointهای احرازشده (clients/sessions/notes/case-file/admin)، ثبتِ جلسه، رونویسیِ واقعی با Soniox — چون نیاز به ساختِ حساب یا داده‌ی واقعی داشت. commit انجام نشد.
+
+### 2026-09-19 — FINDING/CONFIG/TEST — MySQLِ لوکال به‌عنوانِ سرویسِ ویندوز (به دستورِ صریحِ مالک)
+
+- **audit:** مشکلِ گزارش‌شده («DB هر بار دستی ران می‌شود») migration نبود — `runMigrations()` در startup خودکار است ([index.ts:67](server/src/index.ts)) و `_migrations` هر ۲۰ فایل را نشان می‌داد. ریشه: `mysqld` سرویسِ ویندوز نبود؛ با `--no-defaults --datadir=C:\Users\Moheb\feelia-mysql\data --port=3306` از یک ترمینال بالا آمده بود ⇒ با بستنِ ترمینال/ریبوت می‌افتاد.
+- **اقدام (خارج از repo):** بکاپِ منطقی `C:\Users\Moheb\feelia-mysql-backup\feelia-2026-09-19.sql`؛ `C:\Users\Moheb\feelia-mysql\my.ini` (datadir، port، log-error)؛ `install-service.ps1` (فقط ASCII — متنِ فارسی بدونِ BOM در PowerShell 5.1 parse نمی‌شد). مالک آن را با Administrator اجرا کرد: سرویسِ `FeeliaMySQL` (Automatic) ثبت و Running شد؛ instanceِ دستی با `Stop-Process -Force` بسته شد (InnoDB crash recovery موفق: «XA crash recovery finished»).
+- **تأیید:** ۲۰ migration؛ تعدادِ ردیف‌ها بعدِ سرویس = therapists 1، clients 3، sessions 4، session_notes 5، session_audio 3، client_case_file 3، auth_sessions 3 (مطابقِ INSERTهایِ بکاپ، ۸ جدول). اتصالِ `DATABASE_URL` بدونِ تغییر کار کرد. کدِ repo تغییر نکرد.
+- **UNVERIFIED:** ریبوتِ واقعیِ ویندوز (بالاآمدنِ خودکار) تست نشده. فقط dev لوکال؛ production/VPS بررسی نشد. commit انجام نشد.
+
 ### 2026-09-19 — CODE/DOCS — هم‌ترازیِ پرونده‌ی روندِ درمان با «سندِ جامع» (به دستورِ صریحِ مالک)
 
 - **audit:** سندِ جامع با کد مقایسه شد؛ ۱۰ شکاف. مالک: جدول/آکاردئون فرقی ندارد، مهم حذف‌نشدن، بارِ شناختیِ کم و درکِ راحت است → آکاردئونِ فعلی می‌ماند.
