@@ -1,4 +1,5 @@
 // CRUD برای مراجعین — همیشه محدود به تراپیستِ واردشده
+import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
 import { query } from '../db/connection.js';
 import { requireAuth } from '../auth/guard.js';
@@ -32,12 +33,12 @@ export async function clientRoutes(app: FastifyInstance) {
     const result = await query(`
       SELECT
         c.id, c.code, c.alias, c.created_at,
-        c.status, c.status_reason, c.category, c.gender,
+        c.status, c.status_reason, c.category, c.gender, c.pinned_at,
         COUNT(s.id) as session_count,
         MAX(s.date) as last_session_date
       FROM clients c
       LEFT JOIN sessions s ON s.client_id = c.id
-      WHERE c.therapist_id = $1
+      WHERE c.therapist_id = ?
       GROUP BY c.id
       ORDER BY c.created_at DESC
     `, [request.therapistId]);
@@ -51,11 +52,11 @@ export async function clientRoutes(app: FastifyInstance) {
       SELECT
         s.id, s.client_id, s.session_num, s.date, s.start_time,
         s.duration_ms, s.status, s.transcript,
-        LENGTH(COALESCE(s.transcript, '')) as transcript_chars,
+        CHAR_LENGTH(COALESCE(s.transcript, '')) as transcript_chars,
         c.code as client_code, c.alias as client_alias
       FROM sessions s
       JOIN clients c ON c.id = s.client_id
-      WHERE s.status = 'recovered' AND c.therapist_id = $1
+      WHERE s.status = 'recovered' AND c.therapist_id = ?
       ORDER BY s.session_num DESC
     `, [request.therapistId]);
     return { recovered: result.rows };
@@ -93,15 +94,17 @@ export async function clientRoutes(app: FastifyInstance) {
 
     let code = generateClientCode();
     for (let i = 0; i < 5; i++) {
-      const exists = await query('SELECT id FROM clients WHERE code = $1', [code]);
+      const exists = await query('SELECT id FROM clients WHERE code = ?', [code]);
       if (exists.rows.length === 0) break;
       code = generateClientCode();
     }
 
-    const result = await query(
-      'INSERT INTO clients (code, alias, therapist_id, category, gender, status, status_reason) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-      [code, alias || null, request.therapistId, category || null, finalGender, finalStatus, statusReason]
+    const newId = randomUUID();
+    await query(
+      'INSERT INTO clients (id, code, alias, therapist_id, category, gender, status, status_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [newId, code, alias || null, request.therapistId, category || null, finalGender, finalStatus, statusReason]
     );
+    const result = await query('SELECT * FROM clients WHERE id = ?', [newId]);
 
     reply.code(201);
     return { client: result.rows[0] };
@@ -120,7 +123,7 @@ export async function clientRoutes(app: FastifyInstance) {
     const sessionsResult = await query(`
       SELECT id, session_num, date, start_time, duration_ms, status, source, created_at
       FROM sessions
-      WHERE client_id = $1
+      WHERE client_id = ?
       ORDER BY session_num DESC
     `, [id]);
 
@@ -141,16 +144,17 @@ export async function clientRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
 
-    const result = await query(
-      'UPDATE clients SET alias = $1 WHERE id = $2 AND therapist_id = $3 RETURNING *',
+    const update = await query(
+      'UPDATE clients SET alias = ? WHERE id = ? AND therapist_id = ?',
       [alias, id, request.therapistId]
     );
 
-    if (result.rows.length === 0) {
+    if (update.rowCount === 0) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
 
+    const result = await query('SELECT * FROM clients WHERE id = ?', [id]);
     return { client: result.rows[0] };
   });
 
@@ -177,17 +181,52 @@ export async function clientRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
 
-    const result = await query(
-      'UPDATE clients SET status = $1, status_reason = $2 WHERE id = $3 AND therapist_id = $4 RETURNING *',
+    // غیرفعال‌شدن یعنی از صفحه‌ی اول (نمای «امروز») هم می‌رود؛ سنجاقِ متناقض روی
+    // مراجعِ غیرفعال نگه داشته نمی‌شود.
+    const update = await query(
+      status === 'inactive'
+        ? 'UPDATE clients SET status = ?, status_reason = ?, pinned_at = NULL WHERE id = ? AND therapist_id = ?'
+        : 'UPDATE clients SET status = ?, status_reason = ? WHERE id = ? AND therapist_id = ?',
       [status, statusReason, id, request.therapistId]
     );
 
     // مراجع بینِ چکِ مالکیت و UPDATE حذف شده — مثلِ PUT، نه 200 با client خالی
-    if (result.rows.length === 0) {
+    if (update.rowCount === 0) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
 
+    const result = await query('SELECT * FROM clients WHERE id = ?', [id]);
+    return { client: result.rows[0] };
+  });
+
+  // PATCH /api/clients/:id/pin — سنجاق/برداشتنِ سنجاق به صفحه‌ی اول (نمای «امروز»)
+  app.patch('/api/clients/:id/pin', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { pinned } = request.body as { pinned: boolean };
+
+    if (typeof pinned !== 'boolean') {
+      reply.code(400);
+      return { error: 'pinned باید true یا false باشد' };
+    }
+
+    const owned = await getOwnedClient(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'مراجع یافت نشد' };
+    }
+
+    const update = await query(
+      'UPDATE clients SET pinned_at = ? WHERE id = ? AND therapist_id = ?',
+      [pinned ? new Date() : null, id, request.therapistId]
+    );
+
+    if (update.rowCount === 0) {
+      reply.code(404);
+      return { error: 'مراجع یافت نشد' };
+    }
+
+    const result = await query('SELECT * FROM clients WHERE id = ?', [id]);
     return { client: result.rows[0] };
   });
 
@@ -214,11 +253,12 @@ export async function clientRoutes(app: FastifyInstance) {
     // جنسیت فقط برایِ نوجوان/بزرگسال معنا داره — با تغییرِ دسته به کودک، پاک می‌شه
     const finalGender = (category === 'teen' || category === 'adult') ? (gender || null) : null;
 
-    const result = await query(
-      'UPDATE clients SET category = $1, gender = $2 WHERE id = $3 AND therapist_id = $4 RETURNING *',
+    await query(
+      'UPDATE clients SET category = ?, gender = ? WHERE id = ? AND therapist_id = ?',
       [category || null, finalGender, id, request.therapistId]
     );
 
+    const result = await query('SELECT * FROM clients WHERE id = ?', [id]);
     return { client: result.rows[0] };
   });
 
@@ -234,23 +274,23 @@ export async function clientRoutes(app: FastifyInstance) {
 
     const countResult = await query(`
       SELECT
-        (SELECT COUNT(*) FROM sessions WHERE client_id = $1) as session_count,
+        (SELECT COUNT(*) FROM sessions WHERE client_id = ?) as session_count,
         (SELECT COUNT(*) FROM session_notes WHERE session_id IN
-          (SELECT id FROM sessions WHERE client_id = $1)) as note_count
-    `, [id]);
+          (SELECT id FROM sessions WHERE client_id = ?)) as note_count
+    `, [id, id]);
 
-    const result = await query(
-      'DELETE FROM clients WHERE id = $1 AND therapist_id = $2 RETURNING code',
+    const del = await query(
+      'DELETE FROM clients WHERE id = ? AND therapist_id = ?',
       [id, request.therapistId]
     );
 
-    if (result.rows.length === 0) {
+    if (del.rowCount === 0) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
 
     return {
-      deleted: result.rows[0].code,
+      deleted: owned.code,
       cascade: countResult.rows[0],
     };
   });

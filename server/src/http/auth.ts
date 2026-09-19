@@ -1,4 +1,5 @@
 // ثبت‌نام / ورود / خروج تراپیست — شناسه‌ی اصلی: شماره‌ی موبایل (ایمیل اختیاری، برای آینده)
+import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
 import { query } from '../db/connection.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
@@ -28,8 +29,8 @@ function normalizePhone(raw: string): string | null {
   return d;
 }
 
-function publicTherapist(row: { id: string; phone: string; email: string | null; name: string | null; specialty: string | null; is_admin: boolean; created_at: string }) {
-  return { id: row.id, phone: row.phone, email: row.email, name: row.name, specialty: row.specialty, is_admin: row.is_admin, created_at: row.created_at };
+function publicTherapist(row: { id: string; phone: string; email: string | null; name: string | null; specialty: string | null; is_admin: boolean; created_at: string; case_file_auto_generate: boolean | null }) {
+  return { id: row.id, phone: row.phone, email: row.email, name: row.name, specialty: row.specialty, is_admin: row.is_admin, created_at: row.created_at, case_file_auto_generate: row.case_file_auto_generate };
 }
 
 // ⭐ هش ثابتِ ساختگی — وقتی شماره پیدا نشه هم scrypt اجرا میشه تا زمان پاسخ
@@ -44,7 +45,7 @@ async function ensureAdminFlag(therapistId: string, normalizedPhone: string): Pr
   if (!adminPhoneRaw) return;
   const adminPhone = normalizePhone(adminPhoneRaw);
   if (!adminPhone || adminPhone !== normalizedPhone) return;
-  await query('UPDATE therapists SET is_admin = true WHERE id = $1 AND is_admin = false', [therapistId]);
+  await query('UPDATE therapists SET is_admin = true WHERE id = ? AND is_admin = false', [therapistId]);
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -70,21 +71,39 @@ export async function authRoutes(app: FastifyInstance) {
       reply.code(400);
       return { error: 'رمز عبور باید حداقل ۸ کاراکتر باشد' };
     }
+    // ⭐ فیکسِ باگِ واقعی (تصمیمِ مالک D3، 2026-09-15): نام/تخصص فقط برایِ ثبت‌نامِ
+    // جدید الزامی است؛ حساب‌های قدیمی (که ممکن است null داشته باشند) دست نمی‌خورند —
+    // چک فقط اینجاست، نه در login/me.
+    const trimmedName = name?.trim() || '';
+    const trimmedSpecialty = specialty?.trim() || '';
+    if (!trimmedName || trimmedName.length > 100) {
+      reply.code(400);
+      return { error: 'نام الزامی است' };
+    }
+    if (!trimmedSpecialty || trimmedSpecialty.length > 100) {
+      reply.code(400);
+      return { error: 'تخصص الزامی است' };
+    }
 
-    const exists = await query('SELECT id FROM therapists WHERE phone = $1', [normalizedPhone]);
+    const exists = await query('SELECT id FROM therapists WHERE phone = ?', [normalizedPhone]);
     if (exists.rows.length > 0) {
       reply.code(409);
       return { error: 'این شماره قبلاً ثبت شده است' };
     }
 
     const normalizedEmail = email ? email.trim().toLowerCase() : null;
-    const result = await query(
-      'INSERT INTO therapists (phone, email, password_hash, name, specialty) VALUES ($1, $2, $3, $4, $5) RETURNING id, phone, email, name, specialty, is_admin, created_at',
-      [normalizedPhone, normalizedEmail, hashPassword(password), name?.trim() || null, specialty?.trim() || null]
+    const newId = randomUUID();
+    await query(
+      'INSERT INTO therapists (id, phone, email, password_hash, name, specialty) VALUES (?, ?, ?, ?, ?, ?)',
+      [newId, normalizedPhone, normalizedEmail, hashPassword(password), trimmedName, trimmedSpecialty]
     );
-    const therapist = result.rows[0];
+    const inserted = await query(
+      'SELECT id, phone, email, name, specialty, is_admin, created_at FROM therapists WHERE id = ?',
+      [newId]
+    );
+    const therapist = inserted.rows[0];
     await ensureAdminFlag(therapist.id, normalizedPhone);
-    therapist.is_admin = (await query('SELECT is_admin FROM therapists WHERE id = $1', [therapist.id])).rows[0].is_admin;
+    therapist.is_admin = (await query('SELECT is_admin FROM therapists WHERE id = ?', [therapist.id])).rows[0].is_admin;
 
     const token = await createSession(therapist.id);
     reply.setCookie(SESSION_COOKIE, token, {
@@ -105,7 +124,7 @@ export async function authRoutes(app: FastifyInstance) {
     const normalizedPhone = normalizePhone(phone);
 
     const result = normalizedPhone
-      ? await query('SELECT * FROM therapists WHERE phone = $1', [normalizedPhone])
+      ? await query('SELECT * FROM therapists WHERE phone = ?', [normalizedPhone])
       : { rows: [] as any[] };
     const therapist = result.rows[0];
 
@@ -123,7 +142,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     await ensureAdminFlag(therapist.id, normalizedPhone!);
-    therapist.is_admin = (await query('SELECT is_admin FROM therapists WHERE id = $1', [therapist.id])).rows[0].is_admin;
+    therapist.is_admin = (await query('SELECT is_admin FROM therapists WHERE id = ?', [therapist.id])).rows[0].is_admin;
 
     const token = await createSession(therapist.id);
     reply.setCookie(SESSION_COOKIE, token, {
@@ -148,7 +167,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const result = await query(
-      'SELECT id, phone, email, name, specialty, is_admin, created_at FROM therapists WHERE id = $1',
+      'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate FROM therapists WHERE id = ?',
       [request.therapistId]
     );
     if (result.rows.length === 0) {
@@ -157,5 +176,21 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     return { therapist: publicTherapist(result.rows[0]) };
+  });
+
+  // PATCH /api/auth/case-file-auto-generate — تنظیمِ خودکارسازیِ تولیدِ پرونده (همیشه قابلِ‌تغییر،
+  // نه یک تصمیمِ یک‌طرفه — بخشِ ۱ِ پلنِ auto-trigger)
+  app.patch('/api/auth/case-file-auto-generate', async (request, reply) => {
+    if (!request.therapistId) {
+      reply.code(401);
+      return { error: 'وارد نشده‌اید' };
+    }
+    const { enabled } = (request.body as { enabled?: unknown }) || {};
+    if (typeof enabled !== 'boolean') {
+      reply.code(400);
+      return { error: 'enabled باید boolean باشد' };
+    }
+    await query('UPDATE therapists SET case_file_auto_generate = ? WHERE id = ?', [enabled, request.therapistId]);
+    return { case_file_auto_generate: enabled };
   });
 }

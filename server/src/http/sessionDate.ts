@@ -60,6 +60,24 @@ export function normalizeSessionDate(input: unknown): string | null {
   return `${y}/${pad2(mo)}/${pad2(d)}`;
 }
 
+// معکوسِ gregorianToJalali — بدونِ پیاده‌سازیِ جداگانه‌ی الگوریتمِ جلالی، رویِ همان
+// تابعِ اعتبارسنجی‌شده جستجویِ دودویی می‌کند (بازه‌ی ~۳ سال، ~۱۱ تکرار)؛ خروجی:
+// timestampِ UTCِ نیمه‌شبِ همان روزِ میلادی، برایِ محاسبه‌ی اختلافِ روز بینِ دو تاریخِ شمسی.
+export function jalaliToTimestampMs(jy: number, jm: number, jd: number): number {
+  const DAY_MS = 86400000;
+  let lo = Date.UTC(jy + 620, 0, 1);
+  let hi = Date.UTC(jy + 623, 11, 31);
+  while (lo < hi) {
+    const midDay = lo + Math.floor((hi - lo) / 2 / DAY_MS) * DAY_MS;
+    const d = new Date(midDay);
+    const [gy2, gm2, gd2] = gregorianToJalali(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate());
+    const cmp = gy2 !== jy ? gy2 - jy : gm2 !== jm ? gm2 - jm : gd2 - jd;
+    if (cmp === 0) return midDay;
+    if (cmp < 0) lo = midDay + DAY_MS; else hi = midDay;
+  }
+  return lo;
+}
+
 // `H:MM` یا `HH:MM` (ارقامِ فارسی هم) → `HH:MM`؛ نامعتبر → null
 export function normalizeStartTime(input: unknown): string | null {
   if (typeof input !== 'string') return null;
