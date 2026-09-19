@@ -1,0 +1,9 @@
+{
+  "name": "feelia-pg-to-mysql-data-migration",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pg": "^8.23.0",
+    "mysql2": "^3.11.0"
+  }
+}

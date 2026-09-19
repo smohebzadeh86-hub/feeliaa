@@ -3,7 +3,7 @@ import { query } from './connection.js';
 
 export async function getOwnedClient(clientId: string, therapistId: string) {
   const result = await query(
-    'SELECT * FROM clients WHERE id = $1 AND therapist_id = $2',
+    'SELECT * FROM clients WHERE id = ? AND therapist_id = ?',
     [clientId, therapistId]
   );
   return result.rows[0] ?? null;
@@ -13,7 +13,7 @@ export async function getOwnedSession(sessionId: string, therapistId: string) {
   const result = await query(
     `SELECT s.* FROM sessions s
      JOIN clients c ON c.id = s.client_id
-     WHERE s.id = $1 AND c.therapist_id = $2`,
+     WHERE s.id = ? AND c.therapist_id = ?`,
     [sessionId, therapistId]
   );
   return result.rows[0] ?? null;

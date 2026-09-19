@@ -13,7 +13,7 @@ export async function createSession(therapistId: string): Promise<string> {
   const expiresAt = new Date(Date.now() + SESSION_TTL_MS);
 
   await query(
-    'INSERT INTO auth_sessions (token_hash, therapist_id, expires_at) VALUES ($1, $2, $3)',
+    'INSERT INTO auth_sessions (token_hash, therapist_id, expires_at) VALUES (?, ?, ?)',
     [hashToken(token), therapistId, expiresAt]
   );
 
@@ -35,7 +35,7 @@ export async function resolveSession(token: string | undefined): Promise<Resolve
     `SELECT t.id as therapist_id, t.is_admin, t.active
      FROM auth_sessions s
      JOIN therapists t ON t.id = s.therapist_id
-     WHERE s.token_hash = $1 AND s.expires_at > now()`,
+     WHERE s.token_hash = ? AND s.expires_at > NOW()`,
     [hashToken(token)]
   );
 
@@ -46,5 +46,5 @@ export async function resolveSession(token: string | undefined): Promise<Resolve
 
 export async function destroySession(token: string | undefined): Promise<void> {
   if (!token) return;
-  await query('DELETE FROM auth_sessions WHERE token_hash = $1', [hashToken(token)]);
+  await query('DELETE FROM auth_sessions WHERE token_hash = ?', [hashToken(token)]);
 }
