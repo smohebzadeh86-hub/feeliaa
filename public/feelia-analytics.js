@@ -5,15 +5,14 @@
  *    هیچ مسیری از اپ منتظرِ این فایل نمی‌ماند و هیچ متدی throw نمی‌کند.
  *  - هرگز داده ارسال نمی‌شود: فقط نامِ رویداد از EVENTS، نامِ صفحه از SCREENS و نامِ
  *    خطای میکروفونِ مرورگر از MIC_ERRORS. identify هرگز صدا زده نمی‌شود (نه ID تراپیست، نه مراجع).
- *  - فقط وقتی لود می‌شود که: login شده + ادمین نیست + CLARITY_PROJECT_ID روی سرور ست است
- *    + همین تراپیست در همین مرورگر صراحتاً اجازه داده است. بدونِ اجازه: هیچ درخواستی به clarity.ms.
+ *  - فقط وقتی لود می‌شود که: login شده + ادمین نیست + CLARITY_PROJECT_ID روی سرور ست است.
+ *    (تصمیمِ مالک D1، 2026-09-15: بدونِ پرسیدنِ اجازه از تراپیست — نقضِ آگاهانه‌ی LAW-011.)
  *  - پوشاندنِ محتوا (data-clarity-mask) در خودِ index.html روی عناصرِ حساس است، مستقل از
  *    تنظیمِ داشبورد. data-clarity-unmask در این پروژه ممنوع است.
  *  - مستندات: docs/analytics-clarity.md
  */
 'use strict';
 (function () {
-  var CONSENT_KEY_PREFIX = 'feelia_ux_consent_v1:';
   var CONFIG_URL = '/api/client-config';
   var CONFIG_TIMEOUT_MS = 3000;
   var TAG_URL = 'https://www.clarity.ms/tag/';
@@ -25,7 +24,7 @@
     'signup_completed', 'login_completed', 'logout_clicked',
     'client_create_opened', 'client_created', 'client_create_failed',
     'client_deactivated', 'client_reactivated', 'client_category_edited', 'client_deleted',
-    'clients_tab_switched',
+    'clients_tab_switched', 'client_pinned', 'client_unpinned', 'all_clients_opened',
     'transcript_opened', 'session_meta_edited', 'session_deleted',
     'client_consent_given', 'client_consent_declined', 'preflight_mic_failed',
     'session_start_clicked', 'session_started', 'session_start_failed',
@@ -33,12 +32,12 @@
     'session_canceled', 'session_saved', 'session_exit_without_save',
     'session_live_resume_clicked', 'session_interrupted_resume_clicked',
     'live_text_toggled', 'sign_added', 'quick_note_added', 'text_note_added',
-    'voice_note_started', 'voice_note_stop_clicked',
-    'ux_consent_granted'
+    'voice_note_started', 'voice_note_stop_clicked'
   ]);
   // نامِ screen در index.html → نامِ امن. Auth و Admin* عمداً اینجا نیستند.
   var SCREENS = {
     Clients: 'clients',
+    AllClients: 'all_clients',
     Setup: 'session_setup',
     Live: 'session_live',
     Wrapup: 'session_wrapup',
@@ -50,15 +49,17 @@
     'AbortError', 'SecurityError', 'NotSupportedError', 'TypeError'
   ]);
 
-  // off: قبل از boot / بعد از logout | pending: در حالِ گرفتنِ config | ask: منتظرِ تصمیمِ تراپیست
-  // denied: تراپیست نخواست | active: Clarity فعال | disabled: ادمین/سرور/شبکه — تا boot بعدی خاموش
+  // off: قبل از boot / بعد از logout | pending: در حالِ گرفتنِ config | active: Clarity فعال |
+  // disabled: ادمین/سرور/شبکه — تا boot بعدی خاموش
+  // ⭐ (تصمیمِ مالک D1، 2026-09-15): دیگر حالتِ ask/denied و پرسیدنِ اجازه وجود ندارد —
+  // با projectId معتبر مستقیم activate می‌شود. نقضِ آگاهانه‌ی LAW-011 («هرگز بدونِ رضایتِ
+  // ذخیره‌شده‌ی تراپیست») به دستورِ مالک؛ باقیِ LAW-011 (بدونِ identify، فقط allowlist،
+  // mask، هرگز برایِ ادمین) دست‌نخورده می‌ماند.
   var state = 'off';
-  var consentKey = null;
   var projectId = null;
   var scriptInjected = false;
   var bootSeq = 0;
   var currentScreen = null;
-  var lastScreenName = null;
   var buffer = [];
 
   function toSet(arr) {
@@ -68,16 +69,6 @@
   }
   function warn(reason) {
     try { console.warn('[feelia-analytics] ' + reason); } catch (e) {}
-  }
-
-  function readConsent() {
-    try {
-      var v = localStorage.getItem(consentKey);
-      return v === 'granted' || v === 'denied' ? v : null;
-    } catch (e) { return null; }
-  }
-  function writeConsent(v) {
-    try { localStorage.setItem(consentKey, v); } catch (e) {}
   }
 
   function callClarity() {
@@ -173,7 +164,6 @@
       bootSeq++;
       var seq = bootSeq;
       if (!therapist || !therapist.id || therapist.is_admin) { setInactive('disabled'); return; }
-      consentKey = CONSENT_KEY_PREFIX + String(therapist.id);
       if (typeof navigator !== 'undefined' && navigator.onLine === false) {
         state = 'off';
         window.addEventListener('online', function () {
@@ -187,9 +177,7 @@
         var id = cfg && cfg.clarity && cfg.clarity.projectId;
         if (typeof id !== 'string' || !PROJECT_ID_RE.test(id)) { setInactive('disabled'); return; }
         projectId = id;
-        var c = readConsent();
-        if (c === 'granted') activate();
-        else setInactive(c === 'denied' ? 'denied' : 'ask');
+        activate();
       }, function () {
         if (seq === bootSeq && state === 'pending') setInactive('disabled');
       }).catch(function () {});
@@ -220,68 +208,24 @@
     } catch (e) {}
   }
 
-  function grant() {
-    try {
-      if (!projectId || !consentKey) return;
-      writeConsent('granted');
-      activate();
-      event('ux_consent_granted');
-    } catch (e) {}
-  }
-
-  function deny() {
-    try {
-      if (!consentKey) return;
-      writeConsent('denied');
-      // API مستندِ Clarity برای پاک‌کردنِ کوکی‌ها و توقفِ ردیابی تا اجازه‌ی دوباره.
-      if (state === 'active') callClarity('consent', false);
-      setInactive('denied');
-    } catch (e) {}
-  }
-
-  function toggleConsent() {
-    if (state === 'active') deny();
-    else grant();
-  }
-
   // true یعنی اسکریپتِ Clarity در این صفحه لود شده و index.html باید reload کند تا
   // ضبط برای کاربرِ بعدیِ همین تب/دستگاه ادامه پیدا نکند.
   function onLogout() {
     try {
       bootSeq++;
-      consentKey = null;
       projectId = null;
       setInactive('off');
       return scriptInjected;
     } catch (e) { return false; }
   }
 
-  function renderUI(screenName) {
-    try {
-      if (screenName !== undefined) lastScreenName = screenName;
-      var box = document.getElementById('uxConsentBox');
-      if (box) box.hidden = !(state === 'ask' && lastScreenName === 'Clients');
-      var toggle = document.getElementById('uxConsentToggle');
-      if (toggle) {
-        var show = !!projectId && (state === 'ask' || state === 'denied' || state === 'active');
-        toggle.hidden = !show;
-        if (show) {
-          toggle.textContent = state === 'active'
-            ? 'تحلیلِ تجربه‌ی کاربری روشن است — خاموش کردن'
-            : 'تحلیلِ تجربه‌ی کاربری خاموش است — روشن کردن';
-        }
-      }
-    } catch (e) {}
-  }
+  function renderUI() {}
 
   window.FeeliaAnalytics = {
     boot: boot,
     screen: screen,
     event: event,
     micError: micError,
-    grant: grant,
-    deny: deny,
-    toggleConsent: toggleConsent,
     onLogout: onLogout,
     state: function () { return state; }
   };

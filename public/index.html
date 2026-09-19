@@ -30,13 +30,20 @@
   --card:#1c2320;--field:#171d1a;
   --ink:#e7ece8;--ink-2:#c6cfc9;--muted:#8b978f;
   --line:#2c352f;--line-soft:#242c28;
-  --sage:#4e8977;--sage-hover:#5a9783;--sage-deep:#a6cbb9;
+  /* ⭐ فیکسِ باگِ واقعیِ کنتراست (یافته‌ی جانبیِ ثبت‌شده در ۲۰۲۶-۰۹-۱۵، حالا رفع‌شده):
+     --sage/--sage-hوverِ قبلیِ تمِ تاریک (#4e8977 / #5a9783) با متنِ سفیدِ روی خودشان
+     (btn-primary، cat-filter-chip.active، cat-seg button.active، client-tab.active،
+     sign-chip.logged) کنتراستِ ۴٫۰۶:۱ و ۳٫۳۹:۱ می‌دادند — هر دو زیرِ حداقلِ ۴٫۵:۱
+     برایِ متنِ کوچک (WCAG 1.4.3). با تیره‌ترکردنِ همین دو توکن (هم‌هیو، فقط روشنایی
+     کمتر) به ۴٫۹۸:۱ و ۶٫۳۷:۱ رسید — بدونِ تغییرِ هیچ کامپوننتی، چون همه از همین دو
+     متغیر تغذیه می‌کنند. */
+  --sage:#427a68;--sage-hover:#396858;--sage-deep:#a6cbb9;
   --sage-soft:#264032;--sage-mist:#1f2b26;
   --clay:#c96f5e;--clay-hover:#d58370;--clay-deep:#e8a294;--clay-soft:#38211b;--clay-line:#4a2c24;
   --gold:#c9a56a;--gold-deep:#d9bc80;--gold-soft:#2f2817;
   --toggle-off:#39443d;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 12px 32px rgba(0,0,0,.35);
-  --glow-sage:rgba(78,137,119,.34);
+  --glow-sage:rgba(66,122,104,.34);
   --glow-clay:rgba(201,111,94,.34);
   --breathe-ring:rgba(201,111,94,.4);
 }
@@ -79,10 +86,43 @@ body{font-family:'Vazirmatn',Tahoma,sans-serif;background:radial-gradient(900px 
 .card-head{margin-bottom:20px}
 .card-head h2{margin:0;font-size:19px;font-weight:800;color:var(--ink)}
 .card-head p{margin:5px 0 0;font-size:13px;color:var(--muted)}
+.detail-section-title{margin:16px 0 8px;font-size:15px;font-weight:700;color:var(--ink)}
 label{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin-bottom:7px}
 input,textarea{width:100%;padding:13px 15px;border:1.5px solid var(--line);border-radius:var(--r-md);font-family:inherit;font-size:15px;background-color:var(--field);color:var(--ink);margin-bottom:14px}
 input:focus,textarea:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 4px rgba(62,107,94,.13)}
 textarea{min-height:100px;resize:vertical}
+
+/* ⭐ بازطراحیِ کاملِ انتخابگرِ تاریخِ شمسی (گزارشِ مالک: «به‌جایِ سه‌تا select یک تقویمِ
+   واقعی می‌خواهم») — سه <select>ِ روز/ماه/سال با یک پاپ‌آورِ تقویمِ گرید-محورِ SVG جایگزین
+   شد (renderJalaliPicker). ساختار از همان الگویِ موجودِ .sort-menu/.client-menu-drop
+   پیروی می‌کند: wrapper با position:relative + drop با position:absolute که با کلاسِ
+   .open (توسطِ closeAllClientMenus هنگامِ کلیکِ بیرون) نمایان/پنهان می‌شود. */
+.jalali-cal-menu{position:relative;display:inline-block}
+.jalali-cal-trigger svg{width:16px;height:16px;flex:none}
+.jalali-cal-drop{position:absolute;top:calc(100% + 8px);right:0;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:14px;width:min(290px,calc(100vw - 32px));z-index:20;display:none}
+.jalali-cal-menu.open .jalali-cal-drop{display:block}
+.jalali-cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.jalali-cal-nav-btn{width:30px;height:30px;border-radius:var(--r-sm);border:none;background:none;color:var(--muted);cursor:pointer;display:grid;place-items:center;flex:none}
+.jalali-cal-nav-btn svg{width:17px;height:17px}
+.jalali-cal-nav-btn:hover:not(:disabled){background:var(--sage-mist);color:var(--sage-deep)}
+.jalali-cal-nav-btn:disabled{opacity:.35;cursor:not-allowed}
+.jalali-cal-title{background:none;border:none;font-family:inherit;font-size:13.5px;font-weight:700;color:var(--ink);cursor:pointer;padding:5px 9px;border-radius:var(--r-sm)}
+.jalali-cal-title:hover{background:var(--sage-mist);color:var(--sage-deep)}
+.jalali-cal-weekdays{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:2px}
+.jalali-cal-weekdays span{text-align:center;font-size:10.5px;font-weight:600;color:var(--muted);padding:4px 0}
+.jalali-cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.jalali-cal-day{aspect-ratio:1;border:none;background:none;border-radius:var(--r-sm);font-family:inherit;font-size:12.5px;color:var(--ink);cursor:pointer;display:grid;place-items:center;font-variant-numeric:tabular-nums}
+.jalali-cal-day:hover:not(:disabled){background:var(--sage-mist);color:var(--sage-deep)}
+.jalali-cal-day:disabled{color:var(--line);cursor:not-allowed}
+.jalali-cal-day.today{box-shadow:inset 0 0 0 1.5px var(--sage)}
+.jalali-cal-day.selected{background:var(--sage);color:#fff;font-weight:700;box-shadow:none}
+.jalali-cal-day.filler{visibility:hidden;cursor:default}
+.jalali-cal-year-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin-bottom:10px;font-size:13.5px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.jalali-cal-monthgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.jalali-cal-month-btn{padding:10px 4px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:var(--field);color:var(--ink-2);font-family:inherit;font-size:12.5px;cursor:pointer}
+.jalali-cal-month-btn:hover:not(:disabled){border-color:var(--sage);color:var(--sage-deep)}
+.jalali-cal-month-btn:disabled{opacity:.4;cursor:not-allowed}
+.jalali-cal-month-btn.active{background:var(--sage);border-color:var(--sage);color:#fff;font-weight:700}
 
 button.btn{border:none;border-radius:15px;padding:14px 20px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px;transition:background .2s,transform .08s}
 button.btn:active{transform:scale(.975)}
@@ -106,16 +146,37 @@ button.btn svg{width:18px;height:18px;flex:none}
 .search-box input{padding:12px 40px 12px 15px;margin-bottom:0;font-size:14px}
 .search-box svg{position:absolute;top:50%;transform:translateY(-50%);right:13px;width:18px;height:18px;color:var(--muted);pointer-events:none}
 
+/* ⭐ فیکسِ باگِ واقعی: فیلدِ رمزِ ورود هیچ راهی برای دیدنِ متنِ تایپ‌شده نداشت.
+   الگوی .search-box (wrapper نسبی + آیکونِ absolute) تکرار شده؛ padding-left
+   روی input رزرو شده تا متن زیرِ دکمه نرود (قانونِ absolute-positioned در
+   feelia-design-system.html). */
+.pw-field{position:relative;margin-bottom:14px}
+.pw-field input{margin-bottom:0;padding-left:44px}
+.pw-toggle{position:absolute;top:50%;left:4px;transform:translateY(-50%);width:36px;height:36px;border-radius:var(--r-sm);background:none;border:none;color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:color .15s,background .15s}
+.pw-toggle:hover{color:var(--sage-deep);background:var(--sage-mist)}
+.pw-toggle svg{width:18px;height:18px}
+input::-ms-reveal{display:none}
+
 .skeleton-card{border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:16px;background:var(--card);opacity:.5;animation:shimmer 1.5s infinite}
 .skeleton-line{height:14px;border-radius:7px;background:var(--line-soft);margin:8px 0}
 .skeleton-line.short{width:60%}
 @keyframes shimmer{0%{opacity:.5}50%{opacity:.8}100%{opacity:.5}}
 
-.client-tabs{display:flex;gap:6px;background:var(--field);border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:4px;margin-bottom:14px}
-.client-tab{flex:1;text-align:center;padding:10px;border-radius:var(--r-md);font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;background:none;border:none;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px}
-.client-tab.active{background:var(--card);color:var(--sage-deep);box-shadow:0 1px 3px rgba(43,58,52,.08)}
+/* ⭐ فیکسِ باگِ واقعیِ کنتراست (UI-تب‌ها): قبلاً تبِ فعال با --card روی زمینه‌ی
+   --field مشخص می‌شد — در تمِ روشن این دو رنگ عملاً یکی‌اند (نسبتِ کنتراستِ
+   ~1.03:1)، در تمِ تاریک هم همین‌طور؛ سایه‌ی سبک هم کمکی نمی‌کرد. طبقِ قاعده‌ی
+   خودِ سیستمِ طراحی («--sage = رنگِ تأکیدی اصلی: دکمه‌ی primary، تب فعال، دایره‌ی
+   ضبط» — feelia-design-system.html) و هم‌راستا با .cat-seg button.active و
+   .step.active که همین اپ از قبل دارد: تبِ فعال با --sage پُر می‌شود، نه با
+   تفاوتِ ظریفِ دو سطحِ روشن. بوردرِ ظرف هم حذف شد؛ خودِ تفاوتِ رنگِ زمینه/تبِ فعال
+   کافی است. */
+.client-tabs{display:flex;gap:6px;background:var(--line-soft);border-radius:var(--r-lg);padding:4px;margin-bottom:14px}
+.client-tab{flex:1;text-align:center;padding:10px;border-radius:var(--r-md);font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;background:none;border:none;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;transition:background .15s,color .15s}
+.client-tab:not(.active):hover{background:var(--sage-mist);color:var(--sage-deep)}
+.client-tab.active{background:var(--sage);color:#fff;font-weight:700}
 .client-tab .count{font-size:10.5px;background:var(--sage-soft);color:var(--sage-deep);border-radius:99px;padding:1px 7px;font-variant-numeric:tabular-nums}
-.client-tab:not(.active) .count{background:var(--line-soft);color:var(--muted)}
+.client-tab:not(.active) .count{background:var(--card);color:var(--muted)}
+.client-tab.active .count{background:rgba(255,255,255,.28);color:#fff}
 
 .filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 .cat-filter-row{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;flex:1;-ms-overflow-style:none;scrollbar-width:none}
@@ -149,6 +210,11 @@ button.btn svg{width:18px;height:18px;flex:none}
 .client-code{font-size:13px;font-weight:700;color:var(--sage-deep);direction:ltr;font-variant-numeric:tabular-nums}
 .client-meta{font-size:12px;color:var(--muted);line-height:1.7;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cat-badge{font-size:10px;font-weight:600;color:var(--ink-2);background:var(--field);border:1px solid var(--line-soft);border-radius:99px;padding:2px 9px;flex:none}
+.pin-badge{font-size:10px;font-weight:600;color:var(--sage-deep);background:var(--sage-mist);border:1px solid var(--sage-soft);border-radius:99px;padding:2px 9px;flex:none;display:inline-flex;align-items:center;gap:3px}
+.pin-badge svg{width:10px;height:10px}
+.today-hint{font-size:12px;color:var(--ink-2);margin:0 0 10px}
+.history-heading{grid-column:1/-1;font-size:12.5px;font-weight:700;color:var(--ink-2);margin:18px 0 8px}
+.history-heading:first-child{margin-top:0}
 .status-reason{font-size:10px;font-weight:600;color:var(--gold-deep);background:var(--gold-soft);border-radius:99px;padding:2px 9px;flex:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .client-actions{display:flex;gap:8px;margin-top:auto}
 .client-actions>.btn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -309,9 +375,6 @@ button.btn svg{width:18px;height:18px;flex:none}
 
 .privacy-note{font-size:11.5px;color:var(--muted);text-align:center;line-height:2.1;margin-top:12px;padding:0 10px}
 .privacy-note svg{width:14px;height:14px;vertical-align:-2px;margin-left:5px}
-.link-btn{display:block;margin:2px auto 0;background:none;border:none;padding:2px 6px;font:inherit;font-size:11.5px;color:var(--sage-deep);text-decoration:underline;cursor:pointer}
-.link-btn[hidden]{display:none}
-.ux-consent .consent-actions{margin-top:10px}
 @media(max-width:480px){
   body{padding:20px 12px 40px}
   .card{padding:22px 18px}
@@ -341,6 +404,148 @@ button.btn svg{width:18px;height:18px;flex:none}
 
   #screenClients{padding-bottom:80px}
   #screenClients #btnNewClient{position:fixed;left:12px;width:calc(100% - 24px);bottom:12px;z-index:40;margin:0;background:var(--card);box-shadow:var(--shadow)}
+  #screenAllClients{padding-bottom:80px}
+  #screenAllClients #btnNewClientAll{position:fixed;left:12px;width:calc(100% - 24px);bottom:12px;z-index:40;margin:0;background:var(--card);box-shadow:var(--shadow)}
+}
+
+/* ===== پرونده‌ی روندِ درمان (AI Case File) — بلوکِ CSSِ اسکوپ‌شده =====
+   عمداً کلاس‌های خودش (پیشوندِ cf-) و توکن‌های رنگیِ خودش (--cf-*) را دارد تا با
+   بقیه‌ی اپ تداخل نکند؛ پالت از رویِ فایلِ نمونه‌ی طراحی (m4.html) گرفته شده، نه
+   رنگ‌هایِ عمومیِ Feelia — تصمیمِ صریحِ مالک. */
+.case-file-doc{
+  --cf-ink:#243238;--cf-muted:#6f7d82;--cf-line:#dfe8e8;--cf-soft:#f5f9f9;--cf-card:#fff;
+  --cf-teal:#2d6f73;--cf-teal2:#e9f3f2;--cf-blue:#3f6f91;--cf-blue2:#eef4f8;
+  --cf-amber:#b17825;--cf-amber2:#fff7e9;--cf-red:#a94742;--cf-red2:#fff1f0;
+  --cf-green:#317652;--cf-green2:#edf7f1;
+  font-size:14px;line-height:1.85;color:var(--cf-ink);
+}
+[data-theme="dark"] .case-file-doc{
+  --cf-ink:#e7ece8;--cf-muted:#93a19d;--cf-line:#2c3936;--cf-soft:#1c2320;--cf-card:#232b28;
+  --cf-teal:#5fa3a0;--cf-teal-btn:#256a67;--cf-teal2:#1c2e2c;--cf-blue:#7fa8c9;--cf-blue2:#1b2732;
+  --cf-amber:#d9ac66;--cf-amber2:#2f2817;--cf-red:#d99490;--cf-red2:#38211b;
+  --cf-green:#7fc19d;--cf-green2:#1c2e24;
+  box-shadow:0 10px 28px rgba(0,0,0,.35);
+}
+/* دکمه‌ی primary در تمِ تاریک: نسخه‌ی تیره‌ترِ teal برایِ کنتراستِ کافی با متنِ سفید
+   (--cf-teal خودش برای متن/بوردر روی کارت طراحی شده، نه به‌عنوانِ پس‌زمینه‌ی زیرِ متنِ سفید) */
+[data-theme="dark"] .case-file-doc .cf-btn.cf-primary{background:var(--cf-teal-btn);border-color:var(--cf-teal-btn)}
+.case-file-doc .cf-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.case-file-doc .cf-title{font-size:16px;font-weight:700;color:var(--cf-teal)}
+.case-file-doc .cf-toolbar-actions{display:flex;gap:8px;flex-wrap:wrap}
+.case-file-doc .cf-btn{border:1.5px solid var(--cf-line);background:var(--cf-card);color:var(--cf-ink);border-radius:999px;padding:7px 14px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.case-file-doc .cf-btn.cf-primary{background:var(--cf-teal);border-color:var(--cf-teal);color:#fff}
+.case-file-doc .cf-btn.cf-ghost{background:transparent}
+.case-file-doc .cf-auto-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--cf-muted);margin-left:6px;vertical-align:1px}
+.case-file-doc .cf-auto-dot.on{background:var(--cf-teal)}
+.case-file-doc .cf-empty{background:var(--cf-soft);border:1px dashed var(--cf-line);border-radius:14px;padding:22px 16px;text-align:center;color:var(--cf-muted);font-size:14px}
+.case-file-doc .cf-section{margin-top:18px}
+.case-file-doc .cf-section:first-child{margin-top:0}
+.case-file-doc .cf-section-head{display:flex;align-items:flex-start;gap:9px;margin-bottom:11px}
+.case-file-doc .cf-section-mark{width:4px;align-self:stretch;min-height:22px;border-radius:3px;background:var(--cf-teal);flex-shrink:0}
+.case-file-doc .cf-section-title{font-size:16px;font-weight:800;color:var(--cf-teal);line-height:1.5}
+.case-file-doc .cf-section-hint{font-size:12.5px;color:var(--cf-muted);line-height:1.7;margin-top:1px}
+.case-file-doc .cf-session-meta{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.case-file-doc .cf-chip{font-size:11px;font-weight:600;background:var(--cf-teal2);color:var(--cf-teal);border:1px solid var(--cf-line);border-radius:999px;padding:1px 9px;white-space:nowrap}
+.case-file-doc .cf-toggle{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;color:var(--cf-teal);border:1px solid var(--cf-line);background:var(--cf-card);border-radius:999px;padding:2px 9px 2px 6px;white-space:nowrap}
+.case-file-doc .cf-chev{transition:transform .18s ease}
+.case-file-doc details[open]>summary .cf-chev{transform:rotate(180deg)}
+.case-file-doc details>summary{transition:background .15s}
+.case-file-doc details>summary:hover{background:var(--cf-teal2)}
+.case-file-doc details>summary:hover .cf-toggle{border-color:var(--cf-teal)}
+.case-file-doc details>summary:focus-visible{outline:2px solid var(--cf-teal);outline-offset:-2px}
+.case-file-doc .cf-rich-row{margin-bottom:9px}
+.case-file-doc .cf-rich-row:last-child,.case-file-doc .cf-rich-p:last-child{margin-bottom:0}
+.case-file-doc .cf-rich-p{margin-bottom:6px}
+.case-file-doc .cf-rich-lbl{font-size:13.5px;font-weight:800;color:var(--cf-teal);margin-bottom:1px}
+.case-file-doc .cf-rich-txt{color:var(--cf-ink)}
+.case-file-doc .cf-rich-row.cf-role .cf-rich-lbl,.case-file-doc .cf-rich-row.cf-role .cf-rich-txt{display:inline}
+.case-file-doc .cf-rich-row.cf-role .cf-rich-lbl{margin-left:4px}
+.case-file-doc .cf-axis{border:1px solid var(--cf-line);border-right:4px solid var(--cf-amber);border-radius:12px;background:var(--cf-card);margin-bottom:8px;overflow:hidden}
+.case-file-doc .cf-axis.cf-tone-good{border-right-color:var(--cf-green)}
+.case-file-doc .cf-axis.cf-tone-sensitive{border-right-color:var(--cf-red)}
+.case-file-doc .cf-axis summary{list-style:none;cursor:pointer;padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.case-file-doc .cf-axis summary::-webkit-details-marker{display:none}
+.case-file-doc .cf-axis-main{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1}
+.case-file-doc .cf-axis-title{font-size:14.5px;font-weight:800;color:var(--cf-ink)}
+.case-file-doc .cf-axis-gist{font-size:12.5px;color:var(--cf-muted);line-height:1.7}
+.case-file-doc .cf-axis-side{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.case-file-doc .cf-tone{font-size:11px;white-space:nowrap}
+.case-file-doc .cf-axis-body{border-top:1px dashed var(--cf-line);padding:11px 13px 12px;font-size:13.5px;line-height:1.95}
+@media(max-width:520px){.case-file-doc .cf-axis summary{flex-wrap:wrap}}
+.case-file-doc .cf-add-row{margin-top:8px;text-align:center}
+.case-file-doc .cf-del{border:0;background:none;color:var(--cf-red);font-size:11px;cursor:pointer;font-family:inherit;padding:0 6px}
+.case-file-doc .cf-edit-lbl{font-size:11px;font-weight:700;color:var(--cf-muted);margin:8px 0 3px}
+.case-file-doc .cf-suggest-dot{width:7px;height:7px;border-radius:50%;background:var(--cf-amber);cursor:pointer;flex-shrink:0}
+.case-file-doc .cf-quick{background:linear-gradient(135deg,var(--cf-soft),var(--cf-teal2));border:1px solid var(--cf-line);border-radius:14px;padding:14px}
+.case-file-doc .cf-main-issue{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+.case-file-doc .cf-mi-chip{background:var(--cf-card);border:1px solid var(--cf-line);color:var(--cf-teal);font-size:11px;font-weight:700;border-radius:999px;padding:2px 9px;flex-shrink:0}
+.case-file-doc .cf-mi-text{font-size:14px;font-weight:600;color:var(--cf-ink)}
+.case-file-doc .cf-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}
+.case-file-doc .cf-cell{background:var(--cf-card);border:1px solid var(--cf-line);border-radius:10px;padding:9px 10px}
+.case-file-doc .cf-cell .cf-k{font-size:11px;color:var(--cf-muted);margin-bottom:2px}
+.case-file-doc .cf-cell .cf-v{font-weight:500;font-size:13.5px}
+.case-file-doc .cf-pill-row{margin-bottom:8px}
+.case-file-doc .cf-status-pill{display:inline-block;background:var(--cf-teal2);color:var(--cf-teal);border:1px solid var(--cf-line);border-radius:999px;padding:5px 11px;font-size:11px}
+.case-file-doc .cf-rhythm-line{font-size:11px;color:var(--cf-muted);margin-bottom:10px;line-height:1.8}
+.case-file-doc .cf-rhythm-line b{color:var(--cf-ink);font-weight:600}
+.case-file-doc .cf-banner{margin-top:10px;border-radius:10px;padding:9px 12px;font-size:13px;line-height:1.85;border-right:4px solid transparent}
+.case-file-doc .cf-banner.cf-red{background:var(--cf-red2);color:var(--cf-red);border-color:var(--cf-red)}
+.case-file-doc .cf-banner.cf-amber{background:var(--cf-amber2);color:var(--cf-amber);border-color:var(--cf-amber)}
+.case-file-doc .cf-banner .cf-lbl{font-weight:700}
+.case-file-doc .cf-table{width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--cf-line);border-radius:12px;overflow:hidden;background:var(--cf-card)}
+.case-file-doc .cf-table th{background:var(--cf-soft);color:var(--cf-ink);font-size:11px;text-align:right;padding:8px 9px;border-bottom:1px solid var(--cf-line)}
+.case-file-doc .cf-table td{padding:9px;border-bottom:1px solid var(--cf-line);vertical-align:top;font-size:13px}
+.case-file-doc .cf-table tr:last-child td{border-bottom:none}
+.case-file-doc .cf-good{color:var(--cf-green);font-weight:600}
+.case-file-doc .cf-watch{color:var(--cf-amber);font-weight:600}
+.case-file-doc .cf-sensitive{color:var(--cf-red);font-weight:600}
+.case-file-doc .cf-med-mobile{display:none}
+.case-file-doc .cf-med-item{background:var(--cf-blue2);border:1px solid var(--cf-line);border-radius:10px;padding:9px 11px;margin-bottom:8px}
+.case-file-doc .cf-med-item:last-child{margin-bottom:0}
+.case-file-doc .cf-med-name{font-weight:700;color:var(--cf-blue);font-size:13.5px;margin-bottom:5px}
+.case-file-doc .cf-med-row{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--cf-line)}
+.case-file-doc .cf-med-row:last-child{border-bottom:none}
+.case-file-doc .cf-med-row .cf-mlbl{color:var(--cf-muted);flex-shrink:0}
+.case-file-doc .cf-rel-card{margin-top:10px;background:var(--cf-soft);border:1px solid var(--cf-line);border-radius:12px;padding:12px 13px}
+.case-file-doc .cf-rel-card h4{margin:0 0 8px;font-size:14px;color:var(--cf-teal)}
+.case-file-doc .cf-change{display:grid;grid-template-columns:1fr 30px 1fr;align-items:center;gap:8px}
+.case-file-doc .cf-change-box{border:1px solid var(--cf-line);border-radius:12px;padding:10px 11px;background:var(--cf-card)}
+.case-file-doc .cf-change-title{font-size:11px;color:var(--cf-muted)}
+.case-file-doc .cf-change-value{font-size:14px;font-weight:700;margin-top:2px;color:var(--cf-ink)}
+.case-file-doc .cf-change-arrow{display:flex;align-items:center;justify-content:center;color:var(--cf-teal)}
+.case-file-doc .cf-session{border:1px solid var(--cf-line);border-radius:13px;overflow:hidden;background:var(--cf-card);margin-top:9px}
+.case-file-doc .cf-session summary{list-style:none;cursor:pointer;padding:11px 13px;display:flex;justify-content:space-between;align-items:center;gap:10px;background:var(--cf-soft)}
+.case-file-doc .cf-session summary::-webkit-details-marker{display:none}
+.case-file-doc .cf-session-title{font-size:14.5px;font-weight:700;color:var(--cf-teal);flex:1;min-width:0}
+.case-file-doc .cf-session-body{padding:11px 13px;font-size:13px;line-height:1.85}
+.case-file-doc .cf-roadmap{background:var(--cf-soft);border:1px solid var(--cf-line);border-radius:13px;padding:12px 13px}
+.case-file-doc .cf-step{background:var(--cf-card);border:1px solid var(--cf-line);border-radius:11px;margin-bottom:7px;overflow:hidden}
+.case-file-doc .cf-step:last-child{margin-bottom:0}
+.case-file-doc .cf-step summary{list-style:none;cursor:pointer;padding:9px 12px;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.case-file-doc .cf-step summary::-webkit-details-marker{display:none}
+.case-file-doc .cf-step-num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:7px;background:var(--cf-soft);color:var(--cf-muted);font-size:11px;font-weight:700;flex-shrink:0}
+.case-file-doc .cf-step-num.p1{background:var(--cf-red2);color:var(--cf-red)}
+.case-file-doc .cf-step-num.p2{background:var(--cf-amber2);color:var(--cf-amber)}
+.case-file-doc .cf-step-num.p3{background:var(--cf-blue2);color:var(--cf-blue)}
+.case-file-doc .cf-step-num.p4{background:var(--cf-soft);color:var(--cf-muted)}
+.case-file-doc .cf-step-q{font-size:13.5px;font-weight:600;color:var(--cf-ink);flex:1;min-width:160px}
+.case-file-doc .cf-step-why{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;border-radius:999px;padding:2px 9px;white-space:nowrap;background:var(--cf-soft);color:var(--cf-muted)}
+.case-file-doc .cf-step-why::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.case-file-doc .cf-step-why.p1{background:var(--cf-red2);color:var(--cf-red)}
+.case-file-doc .cf-step-why.p2{background:var(--cf-amber2);color:var(--cf-amber)}
+.case-file-doc .cf-step-why.p3{background:var(--cf-blue2);color:var(--cf-blue)}
+.case-file-doc .cf-step-why.p4{background:var(--cf-soft);color:var(--cf-muted)}
+.case-file-doc .cf-step-detail{border-top:1px dashed var(--cf-line);padding:10px 12px 11px;font-size:13.5px;color:var(--cf-ink)}
+.case-file-doc .cf-roadmap-note{margin-top:9px;padding-top:8px;border-top:1px dashed var(--cf-line);font-size:11px;color:var(--cf-muted);text-align:center}
+.case-file-doc .cf-pending{display:inline-block;background:var(--cf-soft);border:1px dashed var(--cf-line);border-radius:6px;padding:0 7px;color:var(--cf-muted);font-size:11px}
+.case-file-doc .cf-q-item{background:var(--cf-teal2);border:1px solid var(--cf-line);border-radius:10px;padding:9px 11px;margin-top:8px}
+.case-file-doc .cf-q-item .cf-q-text{font-size:13px;font-weight:600;color:var(--cf-teal);margin-bottom:6px}
+.case-file-doc .cf-q-item input,.case-file-doc .cf-q-item textarea{width:100%;font-family:inherit;font-size:13px;border:1px solid var(--cf-line);border-radius:8px;padding:7px 8px;background:var(--cf-card);color:var(--cf-ink);margin:0}
+.case-file-doc [data-cf-editable]{display:block;width:100%;line-height:1.8;font-family:inherit;font-size:inherit;color:inherit;border:1px solid var(--cf-teal);border-radius:8px;padding:5px 7px;background:var(--cf-card);resize:vertical;min-height:34px}
+@media(max-width:520px){
+  .case-file-doc .cf-grid-2{grid-template-columns:1fr}
+  .case-file-doc .cf-table.cf-med-table{display:none}
+  .case-file-doc .cf-med-mobile{display:block}
 }
 </style>
 </head>
@@ -377,18 +582,6 @@ button.btn svg{width:18px;height:18px;flex:none}
 
   <div id="bannerBox" data-clarity-mask="true"></div>
 
-  <!-- رضایتِ خودِ تراپیست برای تحلیلِ تجربه‌ی کاربری (Microsoft Clarity) — مستقل از رضایتِ بالینیِ مراجع.
-       نمایش/پنهان: public/feelia-analytics.js — مستندات: docs/analytics-clarity.md -->
-  <div class="banner info ux-consent" id="uxConsentBox" hidden>
-    <b>به بهتر شدنِ فیلیا کمک می‌کنید؟</b><br>
-    با اجازه‌ی شما، نحوه‌ی کار با رابطِ کاربری (کلیک، اسکرول و جابه‌جایی بین صفحه‌ها) با Microsoft Clarity ثبت می‌شود تا مشکلاتِ تجربه‌ی کاربری را پیدا کنیم.
-    اطلاعاتِ مراجع، متنِ جلسه، یادداشت‌ها و صدا ارسال نمی‌شوند و متن‌های حساس پیش از ارسال پوشانده می‌شوند.
-    <div class="consent-actions">
-      <button class="btn btn-ghost" onclick="FeeliaAnalytics.deny()">نه، ممنون</button>
-      <button class="btn btn-primary" onclick="FeeliaAnalytics.grant()">اجازه می‌دهم</button>
-    </div>
-  </div>
-
   <nav class="flow-steps hidden" id="stepsNav">
     <div class="step active" id="step1"><span class="step-dot">۱</span><span class="step-label">آماده‌سازی</span></div>
     <div class="step-line"></div>
@@ -403,11 +596,11 @@ button.btn svg{width:18px;height:18px;flex:none}
       <p id="authSubtitle">برای دسترسی به پرونده‌ی مراجعین وارد شوید</p>
     </div>
     <div id="authNameField" hidden>
-      <label>نام (اختیاری)</label>
+      <label>نام</label>
       <input type="text" id="authName" placeholder="نام شما" autocomplete="name">
     </div>
     <div id="authSpecialtyField" hidden>
-      <label>تخصص (اختیاری)</label>
+      <label>تخصص</label>
       <input type="text" id="authSpecialty" placeholder="مثلاً: روان‌شناسِ بالینی" autocomplete="off">
     </div>
     <label>شماره موبایل</label>
@@ -417,7 +610,10 @@ button.btn svg{width:18px;height:18px;flex:none}
       <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email" dir="ltr" style="text-align:left">
     </div>
     <label>رمز عبور</label>
-    <input type="password" id="authPassword" placeholder="حداقل ۸ کاراکتر" autocomplete="current-password">
+    <div class="pw-field">
+      <input type="password" id="authPassword" placeholder="حداقل ۸ کاراکتر" autocomplete="current-password">
+      <button type="button" class="pw-toggle" id="authPasswordToggle" aria-label="نمایشِ رمز" aria-pressed="false" onclick="togglePasswordVisibility()"></button>
+    </div>
     <button class="btn btn-primary btn-block" id="authSubmitBtn" onclick="submitAuth()">ورود</button>
     <button class="btn btn-ghost btn-block" style="margin-top:10px" id="authToggleBtn" onclick="toggleAuthMode()">حساب ندارید؟ ثبت‌نام کنید</button>
   </section>
@@ -461,32 +657,31 @@ button.btn svg{width:18px;height:18px;flex:none}
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminSessions()">بازگشت</button>
   </section>
 
+  <!-- ⭐ فیکسِ باگِ واقعی (تصمیمِ مالک D2، 2026-09-15): قبلاً ادمین متنِ رونویسی/یادداشت‌ها
+       را داخلِ پنل نمی‌دید (فقط export دانلود می‌شد). حالا فقط‌خواندنی، همین‌جا. -->
+  <section id="screenAdminSessionDetail" class="card screen" data-clarity-mask="true" hidden>
+    <div class="card-head">
+      <h2 id="adminSessionDetailTitle"></h2>
+      <p id="adminSessionDetailMeta"></p>
+    </div>
+    <div class="transcript-box" id="adminSessionDetailTranscript"></div>
+    <div id="adminSessionDetailNotes" style="margin-top:14px"></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminSessionDetail()">بازگشت</button>
+  </section>
+
   <section id="screenClients" class="card screen" hidden>
     <div class="card-head">
       <h2>مراجعین</h2>
-      <p>انتخاب مراجع یا مشاهده پرونده</p>
+      <p>مراجعینِ امروز و سنجاق‌شده‌ها</p>
     </div>
-    <div class="client-tabs">
-      <button class="client-tab active" id="clientTabActive" onclick="switchClientTab('active')">فعال <span class="count" id="countActive">۰</span></button>
-      <button class="client-tab" id="clientTabInactive" onclick="switchClientTab('inactive')">غیرفعال <span class="count" id="countInactive">۰</span></button>
-    </div>
+    <button class="btn btn-ghost btn-block" id="btnAllClients" style="margin-bottom:14px" onclick="showAllClients()">
+      <span id="btnAllClientsLabel">همه‌ی مراجعین</span>
+    </button>
     <div class="search-box">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
       <input type="text" id="searchInput" data-clarity-mask="true" placeholder="جست‌وجوی کد یا نام مستعار…" oninput="filterClients()">
     </div>
-    <div class="filter-bar">
-      <div class="cat-filter-row" id="catFilterRow"></div>
-      <div class="sort-menu" id="sortMenu">
-        <button class="sort-btn" type="button" title="ترتیبِ نمایش" onclick="toggleSortMenu(event)">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h10M3 12h7M3 18h4"/><path d="M17 4v16M17 4l-4 4M17 4l4 4"/></svg>
-        </button>
-        <div class="sort-drop" id="sortDrop">
-          <button type="button" class="active" data-sort="default" onclick="setSortMode('default')" id="sortDropDefaultLabel">پیش‌فرض</button>
-          <button type="button" data-sort="recent_session" onclick="setSortMode('recent_session')">آخرین جلسه</button>
-          <button type="button" data-sort="alpha" onclick="setSortMode('alpha')">الفبا (نام)</button>
-        </div>
-      </div>
-    </div>
+    <p class="today-hint" id="searchScopeHint" hidden>نتیجه در همه‌ی مراجعین</p>
     <div id="skeletonList" hidden>
       <div class="skeleton-card"><div class="skeleton-line short"></div><div class="skeleton-line"></div></div>
       <div class="skeleton-card"><div class="skeleton-line short"></div><div class="skeleton-line"></div></div>
@@ -504,6 +699,50 @@ button.btn svg{width:18px;height:18px;flex:none}
     <button class="btn btn-ghost btn-block" id="btnNewClient" style="margin-top:16px" onclick="showNewClientModal()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       <span id="btnNewClientLabel">مراجع جدید</span>
+    </button>
+  </section>
+
+  <section id="screenAllClients" class="card screen" hidden>
+    <div class="card-head">
+      <h2>همه‌ی مراجعین</h2>
+      <p>انتخاب مراجع یا مشاهده پرونده</p>
+    </div>
+    <button class="btn btn-ghost btn-block" style="margin-bottom:14px" onclick="goBackToClientsToday()">بازگشت به صفحه‌ی اول</button>
+    <div class="client-tabs" role="tablist" aria-label="فیلترِ وضعیتِ مراجعین">
+      <button class="client-tab active" id="clientTabActive" role="tab" aria-selected="true" onclick="switchClientTab('active')">فعال <span class="count" id="countActive">۰</span></button>
+      <button class="client-tab" id="clientTabInactive" role="tab" aria-selected="false" onclick="switchClientTab('inactive')">غیرفعال <span class="count" id="countInactive">۰</span></button>
+    </div>
+    <div class="search-box">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" id="searchInputAll" data-clarity-mask="true" placeholder="جست‌وجوی کد یا نام مستعار…" oninput="filterClients()">
+    </div>
+    <div class="filter-bar">
+      <div class="cat-filter-row" id="catFilterRow"></div>
+      <div class="sort-menu" id="sortMenu">
+        <button class="sort-btn" type="button" title="ترتیبِ نمایش" onclick="toggleSortMenu(event)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h10M3 12h7M3 18h4"/><path d="M17 4v16M17 4l-4 4M17 4l4 4"/></svg>
+        </button>
+        <div class="sort-drop" id="sortDrop">
+          <button type="button" class="active" data-sort="default" onclick="setSortMode('default')" id="sortDropDefaultLabel">پیش‌فرض</button>
+          <button type="button" data-sort="recent_session" onclick="setSortMode('recent_session')">آخرین جلسه</button>
+          <button type="button" data-sort="alpha" onclick="setSortMode('alpha')">الفبا (نام)</button>
+        </div>
+      </div>
+    </div>
+    <div id="skeletonListAll" hidden>
+      <div class="skeleton-card"><div class="skeleton-line short"></div><div class="skeleton-line"></div></div>
+      <div class="skeleton-card"><div class="skeleton-line short"></div><div class="skeleton-line"></div></div>
+    </div>
+    <div class="clients-grid" id="allClientsList" data-clarity-mask="true"></div>
+    <div class="empty" id="emptyFirstAll" hidden>
+      <p>هنوز مراجعی ثبت نشده</p><span>اولین مراجع خود را اضافه کنید</span>
+    </div>
+    <div class="empty" id="emptySearchAll" hidden>
+      <p>مراجعی یافت نشد</p><span>کد یا نام دیگری را جست‌وجو کنید</span>
+    </div>
+    <button class="btn btn-ghost btn-block" id="btnNewClientAll" style="margin-top:16px" onclick="showNewClientModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      <span id="btnNewClientLabelAll">مراجع جدید</span>
     </button>
   </section>
 
@@ -610,7 +849,7 @@ button.btn svg{width:18px;height:18px;flex:none}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
         یادداشت صوتی
       </button>
-      <button class="btn btn-secondary" onclick="showTextInput()">
+      <button class="btn btn-secondary" id="textNoteBtn" onclick="showTextInput()">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
         یادداشت متنی
       </button>
@@ -649,6 +888,10 @@ button.btn svg{width:18px;height:18px;flex:none}
         <button class="btn btn-ghost btn-sm" onclick="reactivateFromDetail()">بازگرداندن به فعال‌ها</button>
       </div>
     </div>
+    <!-- ⭐ پرونده‌ی روندِ درمان (AI Case File) — فازِ ۱: فقط برایِ مراجعینِ غیرفعال
+         نمایش داده می‌شود (تصمیمِ مالک)؛ بک‌اند/schema برایِ همه‌ی مراجعین generic است. -->
+    <div id="caseFileSection" class="case-file-doc" data-clarity-mask="true" hidden style="margin-bottom:16px"></div>
+    <h3 class="detail-section-title">جلساتِ ثبت‌شده</h3>
     <div id="sessionsList" data-clarity-mask="true"></div>
     <button class="btn btn-primary btn-block" id="detailStartBtn" style="margin-top:14px" onclick="startFromDetail()">شروع جلسه‌ی جدید</button>
     <button class="btn btn-primary btn-block" id="detailManualBtn" hidden style="margin-top:14px" onclick="startManualSessionFlow()">ثبت جلسات گذشته</button>
@@ -675,7 +918,7 @@ button.btn svg{width:18px;height:18px;flex:none}
            جداگانه؛ می‌تواند خالی هم بماند («بدونِ تاریخ»، migration 014). -->
       <div id="manualDateTimeRow" hidden style="margin-bottom:14px">
         <label>تاریخِ تقریبیِ جلسه (اختیاری)</label>
-        <input type="text" id="manualDateInput" placeholder="مثال: ۱۴۰۵/۰۶/۲۳" oninput="onManualDateInput()" onblur="saveManualDate()">
+        <div id="manualDatePicker"></div>
         <div id="manualDateHint" style="font-size:12px;color:var(--muted);margin-top:6px"></div>
       </div>
       <div id="resolveSpeakersStatus" hidden style="margin-bottom:8px;font-size:12.5px;color:var(--muted)"></div>
@@ -732,7 +975,6 @@ button.btn svg{width:18px;height:18px;flex:none}
   <p class="privacy-note">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4.5" y="10.5" width="15" height="10" rx="3"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>
     صدای خام هرگز ذخیره نمی‌شود — فقط متن رونویسی‌شده.
-    <button type="button" class="link-btn" id="uxConsentToggle" onclick="FeeliaAnalytics.toggleConsent()" hidden></button>
   </p>
 </div>
 
@@ -817,6 +1059,17 @@ button.btn svg{width:18px;height:18px;flex:none}
   </div>
 </div>
 
+<div class="modal-back" id="caseFileAutoPromptModal" data-clarity-mask="true">
+  <div class="modal">
+    <h3>پرونده‌ی روندِ درمان</h3>
+    <p>می‌خواهی از این به بعد، بعدِ پایانِ هر جلسه‌ی مراجعینِ غیرفعال، پرونده‌ی روندِ درمان خودکار به‌روز شود؟ هروقت خواستی از تنظیماتِ همین بخش می‌توانی این را عوض کنی.</p>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="answerCaseFileAutoPrompt(false)">نه، دستی می‌مانم</button>
+      <button class="btn btn-primary" onclick="answerCaseFileAutoPrompt(true)">بله، خودکار شود</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-back" id="cancelModal">
   <div class="modal">
     <h3>لغو این جلسه؟</h3>
@@ -853,8 +1106,8 @@ button.btn svg{width:18px;height:18px;flex:none}
 <div class="modal-back" id="editSessionModal" data-clarity-mask="true">
   <div class="modal">
     <h3>ویرایش تاریخ و ساعت جلسه</h3>
-    <label>تاریخ (مثال: ۱۴۰۳/۰۵/۱۲)</label>
-    <input type="text" id="editSessionDate" style="margin-bottom:14px">
+    <label>تاریخ</label>
+    <div id="editSessionDatePicker" style="margin-bottom:14px"></div>
     <label>ساعت شروع</label>
     <input type="time" id="editSessionTime" style="margin-bottom:0">
     <div class="modal-actions" style="margin-top:14px">
@@ -901,9 +1154,11 @@ const IC_X='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-wi
 const IC_MIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>';
 const IC_PEN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>';
 const IC_EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
+const IC_EYE_OFF='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.5 18.5 0 0 1 4.22-5.19M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>';
 const IC_DOTS='<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
 const IC_ARCHIVE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M10 13h4"/></svg>';
 const IC_RESTORE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
+const IC_PIN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 7 3 3v2H7v-2l3-3-1-7z"/></svg>';
 
 let currentClient=null;
 let currentSession=null;
@@ -927,6 +1182,7 @@ let allClients=[];
 let deleteTargetSession=null;
 let deleteTargetClient=null;
 let clientTab='active';
+let clientsView='today'; // 'today' | 'all' — کدامِ صفحه فعالاً رندر می‌شود
 let clientCategoryFilter='all';
 let clientGenderFilter=null;
 let clientSortMode='default';
@@ -1008,6 +1264,35 @@ let archiveTextNoteOrigin=null;
 
 const $=id=>document.getElementById(id);
 const bannerBox=$('bannerBox');
+$('authPasswordToggle').innerHTML=IC_EYE;
+// ⭐ فیکسِ باگِ واقعی (اسکرولِ خودکارِ متنِ زنده): جعبه‌های `.live-text` (#liveText،
+// #voiceLiveText، #archiveVoiceLiveText) هیچ‌وقت خودشان یا صفحه را دنبالِ متنِ رشدکننده
+// اسکرول نمی‌کردند — کاربر باید دستی پایین می‌رفت تا خطِ تازه را ببیند. این helper: (۱) اگر
+// جعبه از قبل نزدیکِ ته بود، بعد از تغییرِ متن ته آن می‌ماند؛ (۲) اگر ته‌ی جعبه زیرِ ناحیه‌ی
+// دیدِ صفحه است و کاربر در ۳ ثانیه‌ی اخیر خودش اسکرول نکرده، صفحه را به اندازه‌ی لازم پایین
+// می‌برد (با احترام به `#liveControls` که در پایینِ صفحه fixed است).
+let __lastManualScrollTs=0;
+window.addEventListener('wheel',function(){__lastManualScrollTs=Date.now();},{passive:true});
+window.addEventListener('touchmove',function(){__lastManualScrollTs=Date.now();},{passive:true});
+window.addEventListener('keydown',function(e){
+  if(['ArrowUp','ArrowDown','PageUp','PageDown','Home','End',' '].indexOf(e.key)!==-1)__lastManualScrollTs=Date.now();
+});
+let __followRAF=null;
+function setLiveTextFollow(el,text){
+  if(!el)return;
+  const wasNearBottom=(el.scrollHeight-el.scrollTop-el.clientHeight)<40;
+  el.textContent=text;
+  if(__followRAF)cancelAnimationFrame(__followRAF);
+  __followRAF=requestAnimationFrame(function(){
+    if(wasNearBottom)el.scrollTop=el.scrollHeight;
+    if(Date.now()-__lastManualScrollTs<3000)return;
+    const rect=el.getBoundingClientRect();
+    const controls=$('liveControls');
+    let bottomLimit=window.innerHeight-16;
+    if(controls&&!controls.hidden&&controls.offsetParent!==null)bottomLimit=window.innerHeight-controls.offsetHeight-16;
+    if(rect.bottom>bottomLimit)window.scrollBy({top:rect.bottom-bottomLimit,behavior:'auto'});
+  });
+}
 // ⭐ فیکسِ باگِ واقعی (migration 014، تاریخِ اختیاریِ جلسه‌ی دستی): قبلاً toFa(null) رشته‌ی
 // «null» را برمی‌گرداند (String(null)) — حالا خالی می‌دهد؛ صدا‌زننده‌ها خودشان «بدونِ تاریخ» می‌نویسند.
 function toFa(n){if(n===null||n===undefined)return '';return String(n).replace(/[0-9]/g,d=>'۰۱۲۳۴۵۶۷۸۹'[+d]);}
@@ -1335,7 +1620,7 @@ async function startDirectLive(){
         lastPreviewAt=Date.now();
         directFinalText=cleanDirectText(r.final);
         const full=r.final+(r.interim?' '+r.interim:'');
-        if(!$('liveText').hidden)$('liveText').textContent=cleanDirectText(full);
+        if(!$('liveText').hidden)setLiveTextFollow($('liveText'),cleanDirectText(full));
         $('recStatus').classList.remove('warn');
         clearLiveConnBanner();
       },
@@ -1432,6 +1717,189 @@ function toJalali(date){
   }
 }
 
+// ⭐ نمای «امروز»ِ صفحه‌ی مراجعین: برخلافِ toJalali (که با timezoneِ مرورگر کار
+// می‌کند)، اینجا باید همیشه روزِ شمسیِ تهران باشد — همان تهرانی که سرور با
+// nowInTehran() (sessionDate.ts) تاریخِ جلسه را با آن مهر می‌زند؛ وگرنه تراپیستی
+// با timezoneِ دیگر «امروز»ِ نادرستی می‌بیند.
+function jalaliDayTehran(d){
+  try{
+    const fmt=new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn',{timeZone:'Asia/Tehran',year:'numeric',month:'2-digit',day:'2-digit'});
+    const parts=fmt.formatToParts(d);
+    return parts.find(p=>p.type==='year')?.value+'/'+parts.find(p=>p.type==='month')?.value+'/'+parts.find(p=>p.type==='day')?.value;
+  }catch(e){
+    return toJalali(d);
+  }
+}
+function todayJalaliTehran(){return jalaliDayTehran(new Date());}
+function isTodayClient(c){
+  const t=todayJalaliTehran();
+  return (!!c.created_at&&jalaliDayTehran(new Date(c.created_at))===t)||c.last_session_date===t;
+}
+function isPinnedClient(c){return !!c.pinned_at;}
+
+// ⭐ فیکسِ باگِ واقعی (انتخابگرِ تاریخِ شمسی): قبلاً تاریخِ جلسه‌ی دستی/ویرایش با یک
+// input متنیِ آزاد گرفته می‌شد — می‌شد هر رشته‌ای (حتی تاریخِ آینده یا نامعتبر) تایپ کرد.
+// حالا سه <select> روز/ماه/سال با clamp روی «تا امروز» (تصمیمِ مالک D4). خروجی دقیقاً
+// همان فرمتِ YYYY/MM/DD با ارقامِ لاتین که normalizeSessionDate می‌پذیرد.
+const JALALI_MONTHS=['فروردین','اردیبهشت','خرداد','تیر','مرداد','شهریور','مهر','آبان','آذر','دی','بهمن','اسفند'];
+// قاعده‌ی چرخه‌ی ۳۳ساله برایِ کبیسه — فقط برایِ UI (تعدادِ روزهایِ اسفند)؛ سرور خودش
+// روی ورودیِ شمسی محدودیتِ کبیسه اعمال نمی‌کند (sessionDate.ts) پس دقتِ آن حیاتی نیست.
+function jalaliIsLeap(jy){
+  const c=((jy%33)+33)%33;
+  return [1,5,9,13,17,22,26,30].indexOf(c)!==-1;
+}
+function jalaliMonthLength(jy,jm){
+  if(jm<=6)return 31;
+  if(jm<=11)return 30;
+  return jalaliIsLeap(jy)?30:29;
+}
+function todayJalaliYMD(){
+  const p=toJalali(new Date()).split('/').map(Number);
+  return {y:p[0],m:p[1],d:p[2]};
+}
+// شمارشِ روزهایِ شمسیِ گذشته از ۱ فروردینِ ۱۳۰۰ (فقط برایِ محاسبه‌یِ فاصله، نه یک
+// تقویمِ مطلق) — با jalaliIsLeap/jalaliMonthلengthِ همینِ فایل، تا با بقیه‌ی UI هم‌قاعده
+// بماند (سرور خودش محدودیتِ کبیسه اعمال نمی‌کند، طبقِ کامنتِ jalaliIsLeap).
+function jalaliToOrdinal(y,m,d){
+  let days=0;
+  if(y>=1300){for(let yy=1300;yy<y;yy++)days+=jalaliIsLeap(yy)?366:365;}
+  else{for(let yy=y;yy<1300;yy++)days-=jalaliIsLeap(yy)?366:365;}
+  for(let mm=1;mm<m;mm++)days+=jalaliMonthLength(y,mm);
+  return days+d-1;
+}
+// روزِ هفته‌یِ اولِ یک ماهِ شمسی (۰=شنبه…۶=جمعه) — بدونِ پیاده‌سازیِ کاملِ تبدیلِ
+// شمسی↔میلادی: فاصله‌ی روزشمار تا «امروز» را با jalaliToOrdinal حساب می‌کند و همان
+// فاصله را به Dateِ واقعیِ امروز اضافه می‌کند؛ چون شمارِ روزهایِ هفته در هر دو تقویم
+// یکسان پیش می‌رود، getDay() نتیجه‌ی درست می‌دهد.
+function jalaliFirstWeekday(y,m){
+  const t=todayJalaliYMD();
+  const diff=jalaliToOrdinal(y,m,1)-jalaliToOrdinal(t.y,t.m,t.d);
+  const base=new Date();
+  const dt=new Date(base.getFullYear(),base.getMonth(),base.getDate()+diff);
+  return (dt.getDay()+1)%7;
+}
+const JALALI_WEEKDAY_LABELS=['ش','ی','د','س','چ','پ','ج'];
+const JALALI_CAL_SVG='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>';
+const JALALI_CHEVRON_L='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>';
+const JALALI_CHEVRON_R='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>';
+// container: عنصرِ DOM که picker داخلش ساخته می‌شود. value: 'YYYY/MM/DD' یا '' /null.
+// onChange(dateStringOrNull) با هر تغییر صدا زده می‌شود. opts.allowEmpty یعنی حالتِ
+// «هنوز تاریخی ثبت نشده» هم ممکن باشد (جلسه‌ی دستی/آرشیو، migration 014).
+//
+// ⭐ بازطراحیِ کامل (گزارشِ مالک: «به‌جایِ سه‌تا select یک تقویمِ واقعی می‌خواهم، مثلِ
+// عکسِ دوم»): سه <select>ِ روز/ماه/سال با یک دکمه‌ی «افزودنِ تاریخ» (آیکنِ SVGِ تقویم +
+// متن) جایگزین شد که یک پاپ‌آورِ گریدِ روز باز می‌کند — همان الگویِ .sort-menu/
+// .client-menu-drop که از قبل در اپ هست (closeAllClientMenus هم برایِ بستن با کلیکِ
+// بیرون گسترش یافت). ناوبریِ ماه با فلش + کلیکِ روی «شهریور ۱۴۰۵» برایِ پرشِ مستقیم به
+// ماه/سالِ دلخواه (تاریخ‌هایِ خیلی قدیمی با فلش‌به‌فلش دست‌نیافتنی بود).
+function renderJalaliPicker(container,value,onChange,opts){
+  opts=opts||{};
+  const today=todayJalaliYMD();
+  let y=today.y,m=today.m,d=today.d;
+  let hasValue=false;
+  if(value){
+    const p=toLatinDigits(String(value)).split('/').map(Number);
+    if(p.length===3&&p.every(n=>!isNaN(n))){y=p[0];m=p[1];d=p[2];hasValue=true;}
+  }
+  let viewY=y,viewM=m,navMode='days';
+  container.innerHTML='';
+  const menu=document.createElement('div');
+  menu.className='jalali-cal-menu';
+  const btnRow=document.createElement('div');
+  btnRow.className='btn-row';
+  btnRow.style.marginTop='0';
+  const triggerBtn=document.createElement('button');
+  triggerBtn.type='button';
+  triggerBtn.className='btn btn-ghost btn-sm jalali-cal-trigger';
+  const clearBtn=document.createElement('button');
+  clearBtn.type='button';
+  clearBtn.className='btn btn-ghost btn-sm';
+  clearBtn.textContent='پاک‌کردنِ تاریخ';
+  const drop=document.createElement('div');
+  drop.className='jalali-cal-drop';
+  function emit(){onChange(y+'/'+String(m).padStart(2,'0')+'/'+String(d).padStart(2,'0'));}
+  function syncTrigger(){
+    triggerBtn.innerHTML=JALALI_CAL_SVG+'<span>'+(hasValue?(toFa(String(d))+' '+JALALI_MONTHS[m-1]+' '+toFa(String(y))):'افزودنِ تاریخ')+'</span>';
+    clearBtn.hidden=!(opts.allowEmpty&&hasValue);
+  }
+  function renderDrop(){
+    drop.innerHTML='';
+    const nav=document.createElement('div');nav.className='jalali-cal-nav';
+    const prevBtn=document.createElement('button');prevBtn.type='button';prevBtn.className='jalali-cal-nav-btn';prevBtn.title='ماهِ قبل';prevBtn.innerHTML=JALALI_CHEVRON_R;
+    const nextBtn=document.createElement('button');nextBtn.type='button';nextBtn.className='jalali-cal-nav-btn';nextBtn.title='ماهِ بعد';nextBtn.innerHTML=JALALI_CHEVRON_L;
+    const titleBtn=document.createElement('button');titleBtn.type='button';titleBtn.className='jalali-cal-title';
+    titleBtn.textContent=JALALI_MONTHS[viewM-1]+'، '+toFa(String(viewY));
+    titleBtn.title='انتخابِ سریعِ ماه/سال';
+    const atMax=(viewY===today.y&&viewM===today.m);
+    nextBtn.disabled=atMax;
+    prevBtn.onclick=function(){if(viewM===1){viewM=12;viewY--;}else viewM--;renderDrop();};
+    nextBtn.onclick=function(){if(atMax)return;if(viewM===12){viewM=1;viewY++;}else viewM++;renderDrop();};
+    titleBtn.onclick=function(){navMode=navMode==='days'?'monthYear':'days';renderDrop();};
+    nav.appendChild(prevBtn);nav.appendChild(titleBtn);nav.appendChild(nextBtn);
+    drop.appendChild(nav);
+    if(navMode==='monthYear'){
+      const yearNav=document.createElement('div');yearNav.className='jalali-cal-year-nav';
+      const yPrev=document.createElement('button');yPrev.type='button';yPrev.className='jalali-cal-nav-btn';yPrev.title='سالِ قبل';yPrev.innerHTML=JALALI_CHEVRON_R;
+      const yNext=document.createElement('button');yNext.type='button';yNext.className='jalali-cal-nav-btn';yNext.title='سالِ بعد';yNext.innerHTML=JALALI_CHEVRON_L;
+      const yLabel=document.createElement('span');yLabel.textContent=toFa(String(viewY));
+      const yAtMax=viewY>=today.y;
+      yNext.disabled=yAtMax;
+      yPrev.onclick=function(){viewY--;if(viewY===today.y&&viewM>today.m)viewM=today.m;renderDrop();};
+      yNext.onclick=function(){if(yAtMax)return;viewY++;if(viewY===today.y&&viewM>today.m)viewM=today.m;renderDrop();};
+      yearNav.appendChild(yPrev);yearNav.appendChild(yLabel);yearNav.appendChild(yNext);
+      drop.appendChild(yearNav);
+      const grid=document.createElement('div');grid.className='jalali-cal-monthgrid';
+      JALALI_MONTHS.forEach(function(name,idx){
+        const mm=idx+1;
+        const btn=document.createElement('button');btn.type='button';btn.className='jalali-cal-month-btn';
+        if(viewY===today.y&&mm>today.m)btn.disabled=true;
+        if(mm===viewM)btn.classList.add('active');
+        btn.textContent=name;
+        btn.onclick=function(){viewM=mm;navMode='days';renderDrop();};
+        grid.appendChild(btn);
+      });
+      drop.appendChild(grid);
+      return;
+    }
+    const weekdays=document.createElement('div');weekdays.className='jalali-cal-weekdays';
+    JALALI_WEEKDAY_LABELS.forEach(function(w){const s=document.createElement('span');s.textContent=w;weekdays.appendChild(s);});
+    drop.appendChild(weekdays);
+    const daysGrid=document.createElement('div');daysGrid.className='jalali-cal-days';
+    const offset=jalaliFirstWeekday(viewY,viewM);
+    for(let i=0;i<offset;i++){const filler=document.createElement('span');filler.className='jalali-cal-day filler';daysGrid.appendChild(filler);}
+    const len=jalaliMonthLength(viewY,viewM);
+    const maxD=(viewY===today.y&&viewM===today.m)?today.d:len;
+    for(let dd=1;dd<=len;dd++){
+      const btn=document.createElement('button');btn.type='button';btn.className='jalali-cal-day';
+      btn.textContent=toFa(String(dd));
+      if(dd>maxD)btn.disabled=true;
+      if(viewY===today.y&&viewM===today.m&&dd===today.d)btn.classList.add('today');
+      if(hasValue&&viewY===y&&viewM===m&&dd===d)btn.classList.add('selected');
+      btn.onclick=function(){y=viewY;m=viewM;d=dd;hasValue=true;syncTrigger();closeAllClientMenus();emit();};
+      daysGrid.appendChild(btn);
+    }
+    drop.appendChild(daysGrid);
+  }
+  triggerBtn.onclick=function(e){
+    e.stopPropagation();
+    const wasOpen=menu.classList.contains('open');
+    closeAllClientMenus();
+    if(!wasOpen){
+      viewY=hasValue?y:today.y;viewM=hasValue?m:today.m;navMode='days';
+      renderDrop();
+      menu.classList.add('open');
+    }
+  };
+  clearBtn.onclick=function(e){e.stopPropagation();hasValue=false;closeAllClientMenus();syncTrigger();onChange(null);};
+  drop.onclick=function(e){e.stopPropagation();};
+  btnRow.appendChild(triggerBtn);
+  if(opts.allowEmpty)btnRow.appendChild(clearBtn);
+  menu.appendChild(btnRow);
+  menu.appendChild(drop);
+  container.appendChild(menu);
+  syncTrigger();
+}
+
 const levelMeter=$('levelMeter');
 for(let i=0;i<18;i++){const b=document.createElement('span');levelMeter.appendChild(b);}
 const levelBars=Array.from(levelMeter.children);
@@ -1464,10 +1932,16 @@ function updateSteps(idx){
   }
 }
 function showScreen(name){
-  ['Auth','Clients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions'].forEach(s=>{
+  ['Auth','Clients','AllClients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions','AdminSessionDetail'].forEach(s=>{
     const el=$('screen'+s);
     if(el)el.hidden=s!==name;
   });
+  // ⭐ صفحه‌ی «امروز» همیشه با وضعیتِ تازه باز می‌شود — بدونِ این، اگر کاربر در
+  // صفحه‌ی «همه» تبِ غیرفعال را انتخاب کرده باشد و برگردد، clientTabِ سراسری هنوز
+  // 'inactive' می‌ماند و دکمه‌ی «مراجع جدید»ِ همین صفحه (که از newClientTargetStatus
+  // می‌خواند) بی‌صدا یک مراجعِ غیرفعال می‌سازد.
+  if(name==='Clients'){clientsView='today';clientTab='active';}
+  else if(name==='AllClients'){clientsView='all';}
   const inFlow=['Setup','Live','Wrapup'].includes(name);
   showSteps(inFlow);
   if(inFlow)updateSteps({Setup:0,Live:1,Wrapup:2}[name]);
@@ -1542,6 +2016,25 @@ function resetConsent(){
 }
 
 // ===== احراز هویت =====
+// ⭐ فیکسِ باگِ واقعی: فیلدِ رمز راهی برایِ دیدنِ متنِ تایپ‌شده نداشت (کاربر نمی‌توانست
+// غلطِ تایپی را قبل از ثبت پیدا کند). با کلیک، type بینِ password/text عوض می‌شود؛
+// resetPasswordVisibility بعد از هر ورود/ثبت‌نامِ موفق و هر جابه‌جاییِ حالت، به‌حالتِ
+// مخفی برمی‌گردد تا رمز روی دستگاهِ مشترک باز نماند.
+function togglePasswordVisibility(){
+  const input=$('authPassword'),btn=$('authPasswordToggle');
+  const show=input.type==='password';
+  input.type=show?'text':'password';
+  btn.innerHTML=show?IC_EYE_OFF:IC_EYE;
+  btn.setAttribute('aria-label',show?'پنهان‌کردنِ رمز':'نمایشِ رمز');
+  btn.setAttribute('aria-pressed',show?'true':'false');
+}
+function resetPasswordVisibility(){
+  const input=$('authPassword'),btn=$('authPasswordToggle');
+  input.type='password';
+  btn.innerHTML=IC_EYE;
+  btn.setAttribute('aria-label','نمایشِ رمز');
+  btn.setAttribute('aria-pressed','false');
+}
 function toggleAuthMode(){
   authMode=authMode==='login'?'register':'login';
   $('authNameField').hidden=authMode!=='register';
@@ -1550,6 +2043,7 @@ function toggleAuthMode(){
   $('authTitle').textContent=authMode==='register'?'ثبت‌نام تراپیست':'ورود تراپیست';
   $('authSubmitBtn').textContent=authMode==='register'?'ثبت‌نام':'ورود';
   $('authToggleBtn').textContent=authMode==='register'?'حساب دارید؟ وارد شوید':'حساب ندارید؟ ثبت‌نام کنید';
+  resetPasswordVisibility();
 }
 async function submitAuth(){
   clearBanner();
@@ -1559,13 +2053,17 @@ async function submitAuth(){
   const name=$('authName').value.trim();
   const specialty=$('authSpecialty').value.trim();
   if(!phone||!password){showBanner('error','شماره موبایل و رمز عبور را وارد کنید.');return;}
+  // ⭐ فیکسِ باگِ واقعی (تصمیمِ مالک D3، 2026-09-15): نام/تخصص فقط برایِ ثبت‌نامِ جدید
+  // الزامی است (سرور هم همین را چک می‌کند، auth.ts) — بدونِ درخواستِ شبکه رد می‌شود.
+  if(authMode==='register'&&(!name||!specialty)){showBanner('error','نام و تخصص الزامی است.');return;}
   try{
     const path=authMode==='register'?'/api/auth/register':'/api/auth/login';
-    const body=authMode==='register'?{phone,password,name,specialty:specialty||undefined,email:email||undefined}:{phone,password};
+    const body=authMode==='register'?{phone,password,name,specialty,email:email||undefined}:{phone,password};
     const data=await api(path,{method:'POST',body});
     currentTherapist=data.therapist;
     uxTrack(authMode==='register'?'signup_completed':'login_completed');
-    $('authPhone').value='';$('authEmail').value='';$('authPassword').value='';$('authSpecialty').value='';
+    $('authPhone').value='';$('authEmail').value='';$('authPassword').value='';$('authName').value='';$('authSpecialty').value='';
+    resetPasswordVisibility();
     await enterApp();
   }catch(e){showBanner('error',e.message);}
 }
@@ -1642,6 +2140,7 @@ async function enterApp(){
   const recoveredRes=await api('/api/recovered').catch(function(){return{recovered:[]};});
   $('skeletonList').hidden=true;
   allClients=clientsRes.clients||[];
+  $('btnAllClientsLabel').textContent='همه‌ی مراجعین ('+toFa(allClients.length)+')';
   applyClientFilters();
   if(!hadActiveBanner&&recoveredRes.recovered&&recoveredRes.recovered.length>0){
     showInterruptedBanner(recoveredRes.recovered[0]);
@@ -1652,26 +2151,43 @@ async function enterApp(){
 // ⭐ جاروبِ سراسری: صدایِ باقی‌مانده از یه جلسه‌ی قبلی که هیچ‌وقت resume نشد (مثلاً
 // تب برای همیشه بسته شده بود، نه فقط رفرش شده) رو، مستقل از هر RTSessionِ زنده،
 // آپلود می‌کنه. بدونِ این، اون صدا فقط توی IndexedDBِ همون مرورگر می‌موند، برای همیشه.
-// ⭐ چرا purpose=archive (نه transcript): این‌جا نمی‌دونیم اون جلسه‌ی رهاشده قبل از
-// قطع‌شدن، realtime‌ش موفق بود یا نه — یعنی نمی‌دونیم این صدا از قبل توی transcript
-// هست یا نه. رونویسیِ دوباره و merge کورکورانه ریسکِ duplicate داره؛ فقط آرشیو کردن
-// امن‌تره (ادمین می‌تونه گوش بده، خودِ متن اگه لازم شد دستی اضافه می‌شه).
+// ⭐ فیکسِ باگِ واقعی (audit صدا/۲۰۲۶-۰۹-۱۶، بخشِ C): قبلاً همیشه purpose=archive
+// می‌فرستاد چون «نمی‌دونستیم این صدا قبلاً رونویسی شده یا نه» — الان دیگه لازم نیست
+// حدس بزنیم: هر رکورد intentِ خودش را از لحظه‌ی ضبط دارد (uploadQueuedSegment از
+// همون منطقِ خودِ RTSession استفاده می‌کنه) — اگه واقعاً نیاز به رونویسی داشته
+// (intent='transcript') و جلسه از قبل completed شده، سرور خودکار به purpose=late-transcript
+// برمی‌گرده و متن با برچسبِ صریح append می‌شه، نه اینکه بی‌صدا فقط آرشیو بشه.
+// ⭐ همچنین سگمنت‌هایِ جلسه‌ای که هنوز «قابلِ‌ادامه»ست (بنرِ resume، localStorage) را رد
+// می‌کنیم — مالکِ آن صف همون RTSessionِ resume‌شونده است. این یه میان‌بُرِ سریع است
+// (اکثرِ مواقع کارِ لازم را می‌کند)، ولی تضمینِ واقعیِ عدمِ تداخل حالا از طریقِ
+// window.FeeliaRT.withAudioLock است — همون قفلِ سراسری‌ای که خودِ RTSession هم برایِ
+// uploadBatchSegments/drainQueuedAudioInBackground/archiveQueuedAudioOnly می‌گیرد
+// (audit صدا/۲۰۲۶-۰۹-۱۶: قبلاً این قفل فقط per-RTSession-instance بود و جاروبِ سراسری
+// را اصلاً نمی‌دید — در تستِ زنده با اجرایِ RTSession خارج از مسیرِ UI این race واقعاً
+// دیده شد؛ الان با navigator.locks حتی بینِ چند تب هم مشترک است).
+// قبلاً این جارو فقط یک‌بار سرِ لودِ صفحه اجرا می‌شد؛ الان هر ۶۰ ثانیه + رویِ 'online' هم.
+setInterval(sweepOrphanedAudioQueue,60000);
+window.addEventListener('online',sweepOrphanedAudioQueue);
+
 async function sweepOrphanedAudioQueue(){
   try{
-    if(!window.FeeliaRT||!window.FeeliaRT.audioQueue)return;
+    if(!window.FeeliaRT||!window.FeeliaRT.audioQueue||!window.FeeliaRT.uploadQueuedSegment||!window.FeeliaRT.withAudioLock)return;
     const q=window.FeeliaRT.audioQueue;
+    let activeSid=null;
+    try{activeSid=localStorage.getItem('feelia_active_session');}catch(e){}
     const sessionIds=await q.listSessionIdsWithPending();
     for(const sid of sessionIds){
-      const pending=await q.listForSession(sid);
-      for(const rec of pending){
-        if(!rec.blob||rec.blob.size<=100){await q.remove(sid,rec.seq);continue;}
-        try{
-          const fd=new FormData();
-          fd.append('file',rec.blob,'segment-'+rec.seq+'.webm');
-          const res=await fetch('/api/sessions/'+sid+'/batch-audio?purpose=archive&seq='+rec.seq,{method:'POST',body:fd});
-          if(res.ok||res.status===400){await q.remove(sid,rec.seq);}
-        }catch(e){/* شکستِ شبکه — توی صف می‌مونه، بارِ بعدِ بازکردنِ اپ امتحان می‌شه */}
-      }
+      if(sid&&sid===activeSid)continue;
+      await window.FeeliaRT.withAudioLock(sid,async function(){
+        const pending=await q.listForSession(sid);
+        for(const rec of pending){
+          if(!rec.blob||rec.blob.size<=100){await q.remove(rec.id);continue;}
+          try{
+            const done=await window.FeeliaRT.uploadQueuedSegment(sid,rec);
+            if(done)await q.remove(rec.id);
+          }catch(e){/* شکستِ شبکه — توی صف می‌مونه، بارِ بعدِ بازکردنِ اپ امتحان می‌شه */}
+        }
+      });
     }
   }catch(e){}
 }
@@ -1755,7 +2271,7 @@ function renderAdminTherapists(list){
 
     const meta=document.createElement('div');
     meta.className='client-meta';
-    meta.textContent=toFa(t.client_count||0)+' مراجع · '+toFa(t.session_count||0)+' جلسه'+(t.email?' · '+t.email:'')+(!t.active?' · غیرفعال':'');
+    meta.textContent=(t.specialty?t.specialty+' · ':'')+toFa(t.client_count||0)+' مراجع · '+toFa(t.session_count||0)+' جلسه'+(t.email?' · '+t.email:'')+(!t.active?' · غیرفعال':'');
     div.appendChild(meta);
 
     const row=document.createElement('div');
@@ -1889,7 +2405,10 @@ async function openAdminTherapistDetail(id){
       div.appendChild(head);
       const date=document.createElement('div');
       date.className='session-date';
-      date.textContent=toFa(c.session_count||0)+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'');
+      const catLabel=categoryBadgeLabel(c.category,c.gender);
+      date.textContent=toFa(c.session_count||0)+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'')
+        +(catLabel?' · '+catLabel:'')
+        +(c.status==='inactive'?' · غیرفعال'+(c.status_reason?' ('+c.status_reason+')':''):'');
       div.appendChild(date);
       div.addEventListener('click',function(){openAdminClientSessions(c.id,c.code+(c.alias?' — '+c.alias:''));});
       box.appendChild(div);
@@ -1930,30 +2449,74 @@ async function openAdminClientSessions(clientId,title){
       div.appendChild(head);
       const date=document.createElement('div');
       date.className='session-date';
-      date.textContent=toFa(s.date)+' · شروع '+toFa(s.start_time)+(s.duration_ms?' · '+toFa(Math.round(s.duration_ms/60000))+' دقیقه':'');
+      date.textContent=toFa(s.date)+' · شروع '+toFa(s.start_time)+(s.duration_ms?' · '+toFa(Math.round(s.duration_ms/60000))+' دقیقه':'')
+        +(s.source==='manual'?' · ثبتِ دستی':' · جلسه‌ی زنده')+(s.consent?' · رضایت ✓':' · بدونِ رضایت');
       div.appendChild(date);
+      const viewBtn=document.createElement('button');
+      viewBtn.className='btn btn-ghost btn-sm';
+      viewBtn.style.marginTop='8px';
+      viewBtn.textContent='مشاهده‌ی متن و یادداشت‌ها';
+      viewBtn.addEventListener('click',function(e){e.stopPropagation();openAdminSessionDetail(s.id,title);});
+      div.appendChild(viewBtn);
       const audioCount=Number(s.audio_count||0);
+      // ⭐ بخشِ F (audit صدا/۲۰۲۶-۰۹-۱۶، تصمیمِ صریحِ مالک: «یک فایلِ کاملِ قابلِ‌دانلود،
+      // نه چانک‌چانک»): لیستِ «سگمنت ۱، سگمنت ۲، …» کاملاً حذف شد؛ به‌جایش یک <audio> و
+      // یک دکمه‌ی دانلود رویِ فایلِ به‌هم‌چسبیده‌ی سرور (concatِ ffmpeg، کش‌شده). صدایِ
+      // یادداشت‌هایِ صوتی (kind='note') از قبل یک فایلِ کوتاهِ یکپارچه‌اند — نیازی به
+      // چسباندن ندارند، همون endpointِ per-segment قبلی برایشان کافیست.
       if(audioCount>0){
         const audioBox=document.createElement('div');
         audioBox.style.cssText='margin-top:10px;display:flex;flex-direction:column;gap:8px';
-        const label=document.createElement('div');
-        label.style.cssText='font-size:11.5px;color:var(--muted)';
-        label.textContent=toFa(audioCount)+' سگمنتِ صوتیِ آرشیوشده:';
-        audioBox.appendChild(label);
         try{
           const audioData=await api('/api/admin/sessions/'+s.id+'/audio');
-          audioData.audio.forEach(function(a){
+          const sessionRows=(audioData.audio||[]).filter(function(a){return a.kind!=='note';});
+          const noteRows=(audioData.audio||[]).filter(function(a){return a.kind==='note';});
+          const pending=Number(audioData.pending_count||0);
+          if(pending>0){
+            const banner=document.createElement('div');
+            banner.style.cssText='font-size:11px;color:var(--warning,#b58105)';
+            banner.textContent=toFa(pending)+' فایل هنوز در صفِ پردازشِ سرور است — بعداً دوباره بررسی کنید.';
+            audioBox.appendChild(banner);
+          }
+          if(sessionRows.length){
+            const label=document.createElement('div');
+            label.style.cssText='font-size:11.5px;color:var(--muted)';
+            label.textContent='صدایِ کاملِ جلسه:';
+            audioBox.appendChild(label);
+            const row=document.createElement('div');
+            row.style.cssText='display:flex;align-items:center;gap:8px';
+            const player=document.createElement('audio');
+            player.controls=true;
+            player.style.cssText='flex:1;height:32px';
+            player.preload='none';
+            player.src='/api/admin/sessions/'+s.id+'/audio/full';
+            row.appendChild(player);
+            const dlBtn=document.createElement('button');
+            dlBtn.className='btn btn-ghost btn-sm';
+            dlBtn.style.cssText='flex:none;padding:4px 8px';
+            dlBtn.textContent='دانلود';
+            dlBtn.addEventListener('click',function(){window.location.href='/api/admin/sessions/'+s.id+'/audio/full?download=1';});
+            row.appendChild(dlBtn);
+            audioBox.appendChild(row);
+          }
+          noteRows.forEach(function(a){
             const row=document.createElement('div');
             row.style.cssText='display:flex;align-items:center;gap:8px';
             const segLabel=document.createElement('span');
-            segLabel.style.cssText='font-size:11px;color:var(--muted);flex:none;width:70px';
-            segLabel.textContent='سگمنت '+toFa(a.seq+1);
+            segLabel.style.cssText='font-size:11px;color:var(--muted);flex:none;min-width:90px;white-space:nowrap';
+            segLabel.textContent='یادداشتِ صوتی';
             row.appendChild(segLabel);
             const player=document.createElement('audio');
             player.controls=true;
             player.style.cssText='flex:1;height:32px';
             player.src='/api/admin/session-audio/'+a.id+'/stream';
             row.appendChild(player);
+            const dlBtn=document.createElement('button');
+            dlBtn.className='btn btn-ghost btn-sm';
+            dlBtn.style.cssText='flex:none;padding:4px 8px';
+            dlBtn.textContent='دانلود';
+            dlBtn.addEventListener('click',function(){window.location.href='/api/admin/session-audio/'+a.id+'/stream?download=1';});
+            row.appendChild(dlBtn);
             audioBox.appendChild(row);
           });
         }catch(e){}
@@ -1966,6 +2529,47 @@ async function openAdminClientSessions(clientId,title){
 }
 function closeAdminSessions(){
   showScreen('AdminTherapist');
+}
+
+// ⭐ فیکسِ باگِ واقعی (تصمیمِ مالک D2، 2026-09-15): پنلِ ادمین قبلاً فقط متادیتا/صدا
+// نشان می‌داد؛ متنِ رونویسی و یادداشت‌ها فقط از export قابلِ‌دیدن بودند. حالا همین‌جا،
+// فقط‌خواندنی — endpointِ جدیدِ GET /api/admin/sessions/:id (admin.ts).
+async function openAdminSessionDetail(sessionId,clientTitle){
+  try{
+    const data=await api('/api/admin/sessions/'+sessionId);
+    const s=data.session;
+    $('adminSessionDetailTitle').textContent=clientTitle+' · جلسه '+toFa(s.session_num);
+    $('adminSessionDetailMeta').textContent=toFa(s.date)+' · شروع '+toFa(s.start_time)
+      +(s.source==='manual'?' · ثبتِ دستی':' · جلسه‌ی زنده')+(s.consent?' · رضایت ✓':' · بدونِ رضایت');
+    $('adminSessionDetailTranscript').textContent=s.transcript||'(متنی ثبت نشده)';
+    const nb=$('adminSessionDetailNotes');
+    nb.innerHTML='';
+    (data.notes||[]).forEach(function(n){
+      const div=document.createElement('div');
+      div.className='note-item';
+      if(n.type==='sign'){
+        div.innerHTML='<div class="note-head"><span class="note-tag">علامت</span></div><p></p>';
+        div.querySelector('p').textContent=n.sign_type||'';
+      }else{
+        const tag=n.type==='voice'?'صوتی':'متنی';
+        const ic=n.type==='voice'?IC_MIC:IC_PEN;
+        const cls=n.type==='voice'?'note-tag tag-voice':'note-tag tag-text';
+        div.innerHTML='<div class="note-head"><span class="'+cls+'">'+ic+tag+'</span></div><p></p>';
+        div.querySelector('p').textContent=n.text||'';
+      }
+      nb.appendChild(div);
+    });
+    if(!(data.notes||[]).length){
+      const empty=document.createElement('p');
+      empty.style.cssText='color:var(--muted);font-size:13px';
+      empty.textContent='یادداشت/علامتی برایِ این جلسه ثبت نشده.';
+      nb.appendChild(empty);
+    }
+    showScreen('AdminSessionDetail');
+  }catch(e){showBanner('error',e.message);}
+}
+function closeAdminSessionDetail(){
+  showScreen('AdminSessions');
 }
 async function adminDeleteClient(clientId){
   adminDeleteTargetClient=clientId;
@@ -2114,13 +2718,16 @@ function categoryBadgeLabel(cat,gender){
 async function loadClients(){
   try{
     $('skeletonList').hidden=false;
-    $('clientsList').innerHTML='';
+    $('skeletonListAll').hidden=false;
     const data=await api('/api/clients');
     $('skeletonList').hidden=true;
+    $('skeletonListAll').hidden=true;
     allClients=data.clients||[];
+    $('btnAllClientsLabel').textContent='همه‌ی مراجعین ('+toFa(allClients.length)+')';
     applyClientFilters();
   }catch(e){
     $('skeletonList').hidden=true;
+    $('skeletonListAll').hidden=true;
     showBanner('error','خطا: '+e.message);
   }
 }
@@ -2130,7 +2737,9 @@ function switchClientTab(tab){
   clientTab=tab;
   $('clientTabActive').classList.toggle('active',tab==='active');
   $('clientTabInactive').classList.toggle('active',tab==='inactive');
-  $('btnNewClientLabel').textContent=tab==='inactive'?'افزودنِ پرونده‌ی قبلی':'مراجع جدید';
+  $('clientTabActive').setAttribute('aria-selected',tab==='active'?'true':'false');
+  $('clientTabInactive').setAttribute('aria-selected',tab==='inactive'?'true':'false');
+  $('btnNewClientLabelAll').textContent=tab==='inactive'?'افزودنِ پرونده‌ی قبلی':'مراجع جدید';
   $('sortDropDefaultLabel').textContent=tab==='inactive'?'پیش‌فرض (آخرین جلسه)':'پیش‌فرض';
   applyClientFilters();
 }
@@ -2210,9 +2819,87 @@ function normalizeSearchText(s){
 
 // ⭐ یک نقطه‌ی مرکزی برای هر شرط (تب + دسته + جنسیت + جست‌وجو + ترتیب) — تا فیلترهایِ
 // جدا روی هم سوار نشن و رفتارِ ناسازگار نسازن.
+// ⭐ نقطه‌ی مرکزی: بسته به clientsView به یکی از دو رندررِ زمینه‌ای می‌رود — هرکدام
+// شبکه/عناصرِ خالیِ خودشان را دارند (Today: clientsList/emptyFirst/emptySearch،
+// All: allClientsList/emptyFirstAll/emptySearchAll).
 function applyClientFilters(){
-  renderCatFilterRow();
+  if(clientsView==='all'){renderAllClientsView();}
+  else{renderTodayClientsView();}
+}
+
+function showClientsEmptyState(emptyFirst,emptySearch,kind,title,desc){
+  const target=kind==='search'?emptySearch:emptyFirst;
+  const other=kind==='search'?emptyFirst:emptySearch;
+  target.querySelector('p').textContent=title;
+  target.querySelector('span').textContent=desc;
+  target.hidden=false;other.hidden=true;
+}
+function hideClientsEmptyStates(emptyFirst,emptySearch){emptyFirst.hidden=true;emptySearch.hidden=true;}
+
+function sortByRecentSessionDesc(a,b){
+  if(!a.last_session_date&&!b.last_session_date)return 0;
+  if(!a.last_session_date)return 1;
+  if(!b.last_session_date)return -1;
+  return b.last_session_date.localeCompare(a.last_session_date);
+}
+function sortByCreatedDesc(a,b){return (b.created_at||'').localeCompare(a.created_at||'');}
+function sortByPinnedDesc(a,b){return (b.pinned_at||'').localeCompare(a.pinned_at||'');}
+
+// ⭐ صفحه‌ی اول (نمای «امروز»، تصمیمِ D-A): فقط مراجعِ فعالِ «امروز ثبت‌شده یا
+// امروز جلسه‌داشته» + سنجاق‌شده‌ها. با جست‌وجو، قاعده‌ی «امروز» و وضعیت کنار
+// می‌روند و کلِ allClients (فعال+غیرفعال) جست‌وجو می‌شود (تصمیمِ D-A/۲.۴).
+function renderTodayClientsView(){
+  const grid=$('clientsList'),emptyFirst=$('emptyFirst'),emptySearch=$('emptySearch');
   const q=normalizeSearchText($('searchInput').value.trim());
+  $('searchScopeHint').hidden=!q;
+  if(q){
+    const visible=allClients.filter(function(c){
+      return normalizeSearchText(c.code).includes(q)||normalizeSearchText(c.alias).includes(q);
+    });
+    if(!visible.length){
+      showClientsEmptyState(emptyFirst,emptySearch,'search','مراجعی یافت نشد','کد یا نام دیگری را جست‌وجو کنید');
+      grid.innerHTML='';
+      return;
+    }
+    hideClientsEmptyStates(emptyFirst,emptySearch);
+    renderClientGroups(grid,[{label:null,items:visible}]);
+    return;
+  }
+  const active=allClients.filter(function(c){return (c.status||'active')==='active';});
+  const pinned=active.filter(isPinnedClient).slice().sort(sortByPinnedDesc);
+  const todayOnly=active.filter(function(c){return isTodayClient(c)&&!isPinnedClient(c);}).slice().sort(sortByCreatedDesc);
+  if(!pinned.length&&!todayOnly.length){
+    showClientsEmptyState(emptyFirst,emptySearch,'first','امروز مراجعی ثبت یا ویزیت نشده','برای دیدنِ بقیه‌ی مراجعین «همه‌ی مراجعین» را باز کنید');
+    grid.innerHTML='';
+    return;
+  }
+  hideClientsEmptyStates(emptyFirst,emptySearch);
+  const groups=[];
+  if(pinned.length)groups.push({label:'سنجاق‌شده',items:pinned});
+  if(todayOnly.length)groups.push({label:'امروز',items:todayOnly});
+  renderClientGroups(grid,groups);
+}
+
+// ⭐ سربرگ‌های تاریخی (تصمیمِ D-E): فقط وقتی مرتب‌سازی پیش‌فرض است و جست‌وجویی
+// در جریان نیست؛ بر اساسِ created_at، با jalaliToOrdinalِ همین فایل.
+function historyBucket(c){
+  if(!c.created_at)return 'قدیمی‌تر';
+  const todayStr=todayJalaliTehran();
+  const createdStr=jalaliDayTehran(new Date(c.created_at));
+  if(createdStr===todayStr)return 'امروز';
+  const t=todayStr.split('/').map(Number),cc=createdStr.split('/').map(Number);
+  const diff=jalaliToOrdinal(t[0],t[1],t[2])-jalaliToOrdinal(cc[0],cc[1],cc[2]);
+  if(diff<=1)return 'دیروز';
+  if(diff<=6)return 'این هفته';
+  return 'قدیمی‌تر';
+}
+
+// ⭐ صفحه‌ی «همه‌ی مراجعین» (تصمیمِ D-B): همان منطقِ قبلیِ تب/دسته/جنسیت/جست‌وجو/
+// مرتب‌سازی، بدونِ تغییر، به‌علاوه‌ی گروه‌بندیِ تاریخی وقتی مرتب‌سازی پیش‌فرض است.
+function renderAllClientsView(){
+  renderCatFilterRow();
+  const grid=$('allClientsList'),emptyFirst=$('emptyFirstAll'),emptySearch=$('emptySearchAll');
+  const q=normalizeSearchText($('searchInputAll').value.trim());
   const byTab=allClients.filter(function(c){return (c.status||'active')===clientTab;});
 
   $('countActive').textContent=toFa(allClients.filter(function(c){return (c.status||'active')==='active';}).length);
@@ -2235,61 +2922,74 @@ function applyClientFilters(){
     const collator=new Intl.Collator('fa');
     visible.sort(function(a,b){return collator.compare(a.alias||a.code,b.alias||b.code);});
   }else if(clientSortMode==='recent_session'){
-    visible.sort(function(a,b){
-      if(!a.last_session_date&&!b.last_session_date)return 0;
-      if(!a.last_session_date)return 1;
-      if(!b.last_session_date)return -1;
-      return b.last_session_date.localeCompare(a.last_session_date);
-    });
+    visible.sort(sortByRecentSessionDesc);
   }else if(clientTab==='inactive'){
     // پیش‌فرضِ تبِ غیرفعال: آخرین‌جلسه — چون تراپیست می‌خواد بدونه «کیو اخیراً از
     // دست داده»، نه «کیو دیرتر ثبت کرده». فعال‌ها پیش‌فرض همون ترتیبِ API (created_at) می‌مونه.
-    visible.sort(function(a,b){
-      if(!a.last_session_date&&!b.last_session_date)return 0;
-      if(!a.last_session_date)return 1;
-      if(!b.last_session_date)return -1;
-      return b.last_session_date.localeCompare(a.last_session_date);
-    });
+    visible.sort(sortByRecentSessionDesc);
   }
 
-  renderClients(visible,!!q);
-}
-
-function renderClients(clients,isSearchResult){
-  const grid=$('clientsList');
-  const emptyFirst=$('emptyFirst');
-  const emptySearch=$('emptySearch');
-  grid.innerHTML='';
-  const totalInTab=allClients.filter(function(c){return (c.status||'active')===clientTab;}).length;
-  if(!clients.length){
+  if(!visible.length){
     // ⭐ فیکسِ باگِ واقعی (UI-28): با فیلترِ دسته (بدونِ جست‌وجوی متنی)، پیامِ
     // «کد یا نام دیگری را جست‌وجو کنید» گمراه‌کننده بود — جست‌وجویی نشده بود.
-    if(isSearchResult){
-      emptySearch.querySelector('p').textContent='مراجعی یافت نشد';
-      emptySearch.querySelector('span').textContent='کد یا نام دیگری را جست‌وجو کنید';
-      emptySearch.hidden=false;emptyFirst.hidden=true;
+    if(q){
+      showClientsEmptyState(emptyFirst,emptySearch,'search','مراجعی یافت نشد','کد یا نام دیگری را جست‌وجو کنید');
     }else if(clientCategoryFilter!=='all'||clientGenderFilter){
-      emptySearch.querySelector('p').textContent='مراجعی در این دسته‌بندی نیست';
-      emptySearch.querySelector('span').textContent='فیلتر را عوض کنید یا «همه» را انتخاب کنید';
-      emptySearch.hidden=false;emptyFirst.hidden=true;
+      showClientsEmptyState(emptyFirst,emptySearch,'search','مراجعی در این دسته‌بندی نیست','فیلتر را عوض کنید یا «همه» را انتخاب کنید');
     }else{
-      // ⭐ تبِ خالی نباید بگوید «هنوز مراجعی ثبت نشده» وقتی در تبِ دیگر مراجع هست.
+      // ⭐ تبِ خالی نباید بگوید «هنوز مراجعی ثبت نشده» وقتی در تبِ دیگر مراجع هست
+      // (اینجا چون هیچ فیلترِ دیگری فعال نیست، visible===byTab پس این شاخه یعنی
+      // خودِ تب خالی است).
       if(clientTab==='inactive'){
-        emptyFirst.querySelector('p').textContent='مراجعِ غیرفعالی نیست';
-        emptyFirst.querySelector('span').textContent='پرونده‌های قبلی را با «مراجع جدید» در همین تب آرشیو کنید';
+        showClientsEmptyState(emptyFirst,emptySearch,'first','مراجعِ غیرفعالی نیست','پرونده‌های قبلی را با «مراجع جدید» در همین تب آرشیو کنید');
       }else if(allClients.length){
-        emptyFirst.querySelector('p').textContent='مراجعِ فعالی نیست';
-        emptyFirst.querySelector('span').textContent='مراجع جدید اضافه کنید یا از غیرفعال‌ها بازگردانید';
+        showClientsEmptyState(emptyFirst,emptySearch,'first','مراجعِ فعالی نیست','مراجع جدید اضافه کنید یا از غیرفعال‌ها بازگردانید');
       }else{
-        emptyFirst.querySelector('p').textContent='هنوز مراجعی ثبت نشده';
-        emptyFirst.querySelector('span').textContent='اولین مراجع خود را اضافه کنید';
+        showClientsEmptyState(emptyFirst,emptySearch,'first','هنوز مراجعی ثبت نشده','اولین مراجع خود را اضافه کنید');
       }
-      emptyFirst.hidden=totalInTab>0;emptySearch.hidden=true;
     }
+    grid.innerHTML='';
     return;
   }
-  emptyFirst.hidden=true;emptySearch.hidden=true;
-  clients.forEach(function(c){
+  hideClientsEmptyStates(emptyFirst,emptySearch);
+  if(clientSortMode==='default'&&!q){
+    const groups=[];
+    let lastBucket=null;
+    visible.forEach(function(c){
+      const b=historyBucket(c);
+      if(b!==lastBucket){groups.push({label:b,items:[]});lastBucket=b;}
+      groups[groups.length-1].items.push(c);
+    });
+    renderClientGroups(grid,groups);
+  }else{
+    renderClientGroups(grid,[{label:null,items:visible}]);
+  }
+}
+
+function renderClientGroups(grid,groups){
+  grid.innerHTML='';
+  groups.forEach(function(group){
+    if(!group.items.length)return;
+    if(group.label){
+      const h=document.createElement('div');
+      h.className='history-heading';
+      h.textContent=group.label;
+      grid.appendChild(h);
+    }
+    group.items.forEach(function(c){grid.appendChild(buildClientCard(c));});
+  });
+}
+
+async function togglePinClient(c){
+  const nextPinned=!isPinnedClient(c);
+  try{
+    await api('/api/clients/'+c.id+'/pin',{method:'PATCH',body:{pinned:nextPinned}});
+    uxTrack(nextPinned?'client_pinned':'client_unpinned');
+    loadClients();
+  }catch(e){showBanner('error','خطا: '+e.message);}
+}
+
+function buildClientCard(c){
     const isInactive=c.status==='inactive';
     const div=document.createElement('div');
     div.className='client-card'+(isInactive?' inactive':'');
@@ -2313,6 +3013,14 @@ function renderClients(clients,isSearchResult){
     editAliasBtn.innerHTML=IC_PEN+'ویرایشِ نامِ مستعار';
     editAliasBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();openEditAliasModal(c);});
     menuDrop.appendChild(editAliasBtn);
+    if(!isInactive){
+      const pinned=isPinnedClient(c);
+      const pinBtn=document.createElement('button');
+      pinBtn.type='button';
+      pinBtn.innerHTML=IC_PIN+(pinned?'برداشتنِ سنجاق':'سنجاق به صفحه‌ی اول');
+      pinBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();togglePinClient(c);});
+      menuDrop.appendChild(pinBtn);
+    }
     menuDrop.appendChild(document.createElement('hr'));
     if(isInactive){
       const restoreBtn=document.createElement('button');
@@ -2357,6 +3065,12 @@ function renderClients(clients,isSearchResult){
     name.appendChild(alias);
     name.appendChild(code);
     top.appendChild(name);
+    if(isPinnedClient(c)){
+      const pinBadge=document.createElement('span');
+      pinBadge.className='pin-badge';
+      pinBadge.innerHTML=IC_PIN+'سنجاق‌شده';
+      top.appendChild(pinBadge);
+    }
     div.appendChild(top);
 
     const meta=document.createElement('div');
@@ -2407,24 +3121,16 @@ function renderClients(clients,isSearchResult){
       });
       actions.appendChild(btn1);
     }
-    const btn2=document.createElement('button');
-    btn2.className='btn btn-ghost btn-sm';
-    btn2.textContent='پرونده';
-    btn2.addEventListener('click',function(e){
-      e.stopPropagation();
-      openClientDetail(c.id);
-    });
-    actions.appendChild(btn2);
     div.appendChild(actions);
 
     div.addEventListener('click',function(){openClientDetail(c.id);});
-    grid.appendChild(div);
-  });
+    return div;
 }
 
 function closeAllClientMenus(){
   document.querySelectorAll('.client-menu.open').forEach(function(m){m.classList.remove('open');});
   document.querySelectorAll('.sort-menu.open').forEach(function(m){m.classList.remove('open');});
+  document.querySelectorAll('.jalali-cal-menu.open').forEach(function(m){m.classList.remove('open');});
 }
 document.addEventListener('click',closeAllClientMenus);
 
@@ -2584,6 +3290,9 @@ async function openClientDetail(clientId){
     $('detailStatusBox').hidden=!inactive;
     $('detailStartBtn').hidden=inactive;
     $('detailManualBtn').hidden=!inactive;
+    // ⭐ پرونده‌ی روندِ درمان — فازِ ۱: فقط برایِ مراجعینِ غیرفعال (تصمیمِ مالک؛ بک‌اند generic است)
+    caseFileEditMode=false;
+    if(inactive){loadCaseFile(clientId);}else{currentCaseFile=null;$('caseFileSection').hidden=true;$('caseFileSection').innerHTML='';}
     const sl=$('sessionsList');
     sl.innerHTML='';
     data.sessions.forEach(function(s){
@@ -2641,6 +3350,468 @@ async function openClientDetail(clientId){
 
 function startFromDetail(){if(currentClient&&currentClient.status!=='inactive')setupNewSession(currentClient);}
 
+// ===== پرونده‌ی روندِ درمان (AI Case File) — فازِ ۱: دکمه‌ی دستی، بدونِ auto-trigger =====
+let currentCaseFile=null; // {clientId, record}
+let caseFileEditMode=false;
+
+function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
+
+async function loadCaseFile(clientId){
+  const sec=$('caseFileSection');
+  sec.hidden=false;
+  sec.innerHTML='<div class="cf-empty">در حال بارگذاریِ پرونده…</div>';
+  try{
+    const data=await api('/api/clients/'+clientId+'/case-file');
+    currentCaseFile={clientId:clientId,record:data.case_file,rhythm:data.treatment_rhythm};
+    renderCaseFile();
+  }catch(e){
+    sec.innerHTML='<div class="cf-empty">خطا در بارگذاریِ پرونده: '+escapeHtml(e.message)+'</div>';
+  }
+}
+
+// fieldId schema: identity | mainIssue | changeOverTime.before/after | axis.<id> |
+// medication.<id>.<dose|frequency|lastChange|prescriber> | family.<key> | couple.<key> |
+// roadmap.<id>.detail | session.<sessionId>.<title|body> — هم‌راستا با applyFieldPatch.ts سرور.
+// ⭐ رفعِ باگ (2026-09-19): (۱) اگر فیلد در content نبود (پرونده‌ی قدیمی‌تر از افزودنِ
+// overallStatus/safetyRisk/…)، در حالتِ ویرایش هیچ textarea‌ای نمی‌آمد و تراپیست
+// راهی برایِ پر کردنِ دستی نداشت — حالا یک فیلدِ خالیِ pending فرض می‌شود.
+// (۲) rich=true متنِ چندخطیِ «برچسب: متن» را به بلوک‌هایِ تیتردار می‌شکند (خوانایی).
+const CF_CHEV='<svg class="cf-chev" viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+// تیترِ یک‌خطیِ یک متنِ بلند: خطِ «خلاصه: …» اگر بود، وگرنه جمله‌ی اول (بریده در ~۱۱۰ کاراکتر).
+function cfGist(val){
+  const v=String(val||'').trim();if(!v)return '';
+  const m=v.match(/^خلاصه\s*[:：]\s*(.+)$/m);
+  if(m)return m[1].trim();
+  const first=v.split(/\r?\n/)[0].replace(/^[^:：«»]{2,30}[:：]\s*/,'');
+  const cut=first.split(/(?<=[.؟!])\s/)[0];
+  return cut.length>110?cut.slice(0,108).trim()+'…':cut;
+}
+
+function cfRichHtml(val){
+  return String(val).split(/\r?\n+/).map(function(line){
+    line=line.trim();if(!line)return '';
+    if(/^خلاصه\s*[:：]/.test(line))return '';
+    const m=line.match(/^([^:：«»\r\n]{2,30})[:：]\s*([\s\S]*)$/);
+    if(!m)return '<div class="cf-rich-p">'+escapeHtml(line)+'</div>';
+    const lbl=m[1].trim();
+    const role=/^نقش در مسیر[ِ]? درمان/.test(lbl);
+    return '<div class="cf-rich-row'+(role?' cf-role':'')+'"><div class="cf-rich-lbl">'+escapeHtml(lbl)+'</div>'+
+      (m[2]?'<div class="cf-rich-txt">'+escapeHtml(m[2])+'</div>':'')+'</div>';
+  }).join('');
+}
+
+function fieldHtml(fieldId,field,rich){
+  if(!field){
+    if(!caseFileEditMode)return '';
+    field={value:'',pending:true};
+  }
+  const val=field.value||'';
+  if(caseFileEditMode){
+    return '<textarea data-cf-field="'+fieldId+'" data-cf-orig="'+escAttr(val)+'" data-cf-editable rows="'+(rich?5:2)+'" placeholder="هنوز ثبت نشده — اینجا بنویسید">'+escapeHtml(val)+'</textarea>';
+  }
+  if(!val)return '<span class="cf-pending">در انتظار ثبت</span>';
+  let html=rich?cfRichHtml(val):escapeHtml(val);
+  if(field.suggestedUpdate){
+    html+=' <span class="cf-suggest-dot" title="به‌روزرسانیِ پیشنهادی موجوده" onclick="onCfSuggestClick(event,\''+fieldId+'\')"></span>';
+  }
+  return html;
+}
+
+// افزودن/حذفِ ردیفِ دستی — فقط در حالتِ مشاهده (در ویرایش، rerender متنِ ذخیره‌نشده را می‌پرید)
+function cfAddBtn(kind,label){
+  if(caseFileEditMode)return '';
+  return '<div class="cf-add-row"><button class="cf-btn cf-ghost" onclick="addCaseFileItem(\''+kind+'\')">+ '+label+'</button></div>';
+}
+function cfDelBtn(kind,item){
+  if(caseFileEditMode||!item.addedByTherapist)return '';
+  return ' <button class="cf-del" title="حذفِ این ردیفِ دستی" onclick="event.stopPropagation();removeCaseFileItem(\''+kind+'\',\''+item.id+'\')">حذف</button>';
+}
+async function addCaseFileItem(kind){
+  if(!currentCaseFile)return;
+  const body={kind:kind};
+  if(kind==='axis'){const t=prompt('عنوانِ محور (مثلاً «خواب»):');if(!t||!t.trim())return;body.title=t.trim();}
+  else if(kind==='medication'){const t=prompt('نامِ دارو:');if(!t||!t.trim())return;body.name=t.trim();}
+  else{const t=prompt('عنوانِ گام (مثلاً «بررسیِ کیفیتِ خواب»):');if(!t||!t.trim())return;body.question=t.trim();}
+  try{
+    const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file/items',{method:'POST',body:body});
+    currentCaseFile.record=data.case_file;
+    caseFileEditMode=true; // مستقیم برایِ پرکردنِ محتوا
+    renderCaseFile();
+    showBanner('info','ردیف افزوده شد — محتوایش را بنویسید و «ذخیره» بزنید.');
+  }catch(e){showBanner('error',e.message);}
+}
+async function removeCaseFileItem(kind,id){
+  if(!currentCaseFile||!confirm('این ردیفِ افزوده‌شده حذف شود؟'))return;
+  try{
+    const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file/items/'+kind+'/'+id,{method:'DELETE'});
+    currentCaseFile.record=data.case_file;
+    renderCaseFile();
+  }catch(e){showBanner('error',e.message);}
+}
+
+// سرتیترِ بخش: عنوان + یک‌خطِ توضیحِ کارکرد (تا معلوم باشد هر بخش برایِ چیست)
+function cfSectionHead(title,hint){
+  return '<div class="cf-section-head"><span class="cf-section-mark"></span><div><div class="cf-section-title">'+title+'</div>'+
+    (hint?'<div class="cf-section-hint">'+hint+'</div>':'')+'</div></div>';
+}
+
+// شمارشِ عمومیِ فیلدهایِ pending — هر object با هر دو کلیدِ value(string)/pending(boolean)
+// یک «فیلد» حساب می‌شود؛ برایِ status-pillِ هدر (بدونِ نیاز به لیستِ دستیِ هر مسیر).
+function countCfFields(node,acc){
+  if(!node||typeof node!=='object')return;
+  if(Array.isArray(node)){node.forEach(function(x){countCfFields(x,acc);});return;}
+  if(typeof node.pending==='boolean'&&typeof node.value==='string'){
+    acc.total++;if(node.pending)acc.pending++;
+  }
+  for(var k in node){if(Object.prototype.hasOwnProperty.call(node,k))countCfFields(node[k],acc);}
+}
+
+function formatCfDaySpan(days){
+  if(days==null)return null;
+  if(days<30)return toFa(days)+' روز';
+  if(days<365)return toFa(Math.round(days/30))+' ماه';
+  var y=Math.floor(days/365),m=Math.round((days%365)/30);
+  return toFa(y)+' سال'+(m?' و '+toFa(m)+' ماه':'');
+}
+
+// دکمه‌ی toggleِ خودکارسازی — همیشه در کنارِ بقیه‌ی اکشن‌هایِ cf-toolbar، هر زمان
+// قابلِ‌تغییر (طبقِ خواسته‌ی صریحِ مالک: یک تصمیمِ یک‌طرفه‌ی سیستمی نیست).
+function cfAutoToggleHtml(){
+  const on=!!(currentTherapist&&currentTherapist.case_file_auto_generate===true);
+  return '<button class="cf-btn cf-ghost" onclick="toggleCaseFileAutoGenerate()" title="بعدِ پایانِ جلسه‌ی مراجعینِ غیرفعال، پرونده خودکار به‌روز شود">'+
+    '<span class="cf-auto-dot'+(on?' on':'')+'"></span>به‌روزرسانیِ خودکار: '+(on?'روشن':'خاموش')+'</button>';
+}
+async function toggleCaseFileAutoGenerate(){
+  const next=!(currentTherapist&&currentTherapist.case_file_auto_generate===true);
+  try{
+    await api('/api/auth/case-file-auto-generate',{method:'PATCH',body:{enabled:next}});
+    if(currentTherapist)currentTherapist.case_file_auto_generate=next;
+    renderCaseFile();
+  }catch(e){showBanner('error',e.message);}
+}
+
+// مودالِ یک‌باره — اولین باری که یک جلسه کامل می‌شود و تراپیست هنوز صراحتاً پاسخ
+// نداده (case_file_auto_generate هنوز NULL است). بعدِ پاسخ، همیشه از toggleِ کنارِ
+// دکمه‌هایِ پرونده قابلِ‌تغییر است — این مودال فقط یک بار دیده می‌شود.
+function maybeShowCaseFileAutoPrompt(){
+  if(currentTherapist&&currentTherapist.case_file_auto_generate===null){
+    $('caseFileAutoPromptModal').classList.add('open');
+  }
+}
+async function answerCaseFileAutoPrompt(enabled){
+  $('caseFileAutoPromptModal').classList.remove('open');
+  try{
+    await api('/api/auth/case-file-auto-generate',{method:'PATCH',body:{enabled:enabled}});
+    if(currentTherapist)currentTherapist.case_file_auto_generate=enabled;
+  }catch(e){showBanner('error',e.message);}
+}
+
+function renderCaseFile(){
+  const sec=$('caseFileSection');
+  const rec=currentCaseFile&&currentCaseFile.record;
+  if(!rec){
+    sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div>'+
+      '<div class="cf-toolbar-actions">'+cfAutoToggleHtml()+'<button class="cf-btn cf-primary" onclick="regenerateCaseFile(false)">تولیدِ پرونده</button></div></div>'+
+      '<div class="cf-empty">هنوز پرونده‌ای برایِ این مراجع تولید نشده — با «تولیدِ پرونده» از رویِ جلسات/یادداشت‌هایِ ثبت‌شده ساخته می‌شود.</div>';
+    return;
+  }
+  if(rec.status==='generating'){
+    sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div></div>'+
+      '<div class="cf-empty">در حالِ تولید — ممکن است چند ده ثانیه طول بکشد…</div>';
+    return;
+  }
+  if(rec.status==='error'){
+    sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div>'+
+      '<div class="cf-toolbar-actions">'+cfAutoToggleHtml()+'<button class="cf-btn cf-primary" onclick="regenerateCaseFile(false)">تلاشِ دوباره</button></div></div>'+
+      '<div class="cf-empty">خطا در تولیدِ پرونده: '+escapeHtml(rec.errorMessage||'نامشخص')+'</div>';
+    return;
+  }
+
+  const c=rec.content;
+  let html='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div><div class="cf-toolbar-actions">';
+  if(caseFileEditMode){
+    html+='<button class="cf-btn cf-primary" onclick="saveCaseFileEdits()">ذخیره</button>'+
+          '<button class="cf-btn cf-ghost" onclick="cancelCaseFileEdit()">انصراف</button>';
+  }else{
+    html+=cfAutoToggleHtml()+
+          '<button class="cf-btn cf-ghost" onclick="startCaseFileEdit()">ویرایش</button>'+
+          '<button class="cf-btn cf-ghost" onclick="regenerateCaseFile(false)">به‌روزرسانی</button>'+
+          '<button class="cf-btn cf-ghost" onclick="regenerateCaseFile(true)">بازتولیدِ کامل</button>';
+  }
+  html+='</div></div>';
+
+  // status-pill: تعدادِ جلساتِ خلاصه‌شده (از content، نه سرور) + فیلدهایِ در انتظارِ تایید +
+  // خلاصه‌ی کلیِ AI (overallStatus) — همه‌چیز از رویِ همون c که داریم، بدونِ round-trip اضافه.
+  const cfFieldAcc={total:0,pending:0};
+  countCfFields(c,cfFieldAcc);
+  // ⭐ تعدادِ واقعیِ رکوردهایِ جلسه در سامانه (rhythm.sessionCount، از DB) — نه طولِ
+  // sessionsSummary؛ و برچسب دیگر «N جلسه ثبت‌شده» نیست که با کارتِ «جلسه‌ی ۱» هم‌معنا/متناقض به‌نظر بیاید.
+  const rhythmForCount=currentCaseFile&&currentCaseFile.rhythm;
+  const sessionCountLbl='رکوردهایِ جلسه در سامانه: '+toFa(rhythmForCount&&typeof rhythmForCount.sessionCount==='number'?rhythmForCount.sessionCount:(c.sessionsSummary||[]).length);
+  const pendingLbl=cfFieldAcc.pending?' · '+toFa(cfFieldAcc.pending)+' فیلد در انتظارِ تایید':'';
+  const overallLbl=(c.overallStatus&&c.overallStatus.value)?' · '+fieldHtml('overallStatus',c.overallStatus):(caseFileEditMode?' · '+fieldHtml('overallStatus',c.overallStatus):'');
+  html+='<div class="cf-pill-row"><span class="cf-status-pill">'+sessionCountLbl+pendingLbl+overallLbl+'</span></div>';
+
+  // rhythm-line: کاملاً محاسبه‌شده از sessions.date سمتِ سرور (currentCaseFile.rhythm) — نه از content
+  const rhythm=currentCaseFile&&currentCaseFile.rhythm;
+  if(rhythm){
+    const startLbl=rhythm.startDate?toFa(rhythm.startDate):'در انتظار ثبت';
+    const gapLbl=rhythm.avgGapDays!=null?toFa(rhythm.avgGapDays)+' روز':'در انتظار ثبت';
+    const durLbl=formatCfDaySpan(rhythm.durationDays)||'در انتظار ثبت';
+    html+='<div class="cf-rhythm-line"><b>ریتمِ درمان</b> — شروع: '+startLbl+' · میانگینِ فاصله‌ی جلسات: '+gapLbl+' · طولِ دوره: '+durLbl+'</div>';
+  }
+
+  html+='<div class="cf-quick"><div class="cf-main-issue"><span class="cf-mi-chip">مسئله‌ی اصلی</span>'+
+        '<span class="cf-mi-text">'+fieldHtml('mainIssue',c.mainIssue)+'</span></div>'+
+        '<div class="cf-cell"><div class="cf-k">هویت</div><div class="cf-v">'+fieldHtml('identity',c.identity)+'</div></div></div>';
+
+  if(caseFileEditMode||(c.safetyRisk&&c.safetyRisk.value)){
+    html+='<div class="cf-banner cf-red"><span class="cf-lbl">هشدارِ ایمنی — </span>'+fieldHtml('safetyRisk',c.safetyRisk)+'</div>';
+  }
+
+  const sensitiveAxes=(c.axes||[]).filter(function(a){return a.sensitiveDoNotDiscussInFrontOfClient;});
+  if(sensitiveAxes.length){
+    html+='<div class="cf-banner cf-amber"><span class="cf-lbl">مراقب باش — </span>این نکات نباید جلویِ خودِ مراجع مطرح شوند: '+
+          sensitiveAxes.map(function(a){return escapeHtml(a.title);}).join('، ')+'</div>';
+  }
+
+  if(caseFileEditMode||(c.sensitiveContext&&c.sensitiveContext.value)){
+    html+='<div class="cf-banner cf-amber"><span class="cf-lbl">زمینه‌ی حساس — </span>'+fieldHtml('sensitiveContext',c.sensitiveContext)+'</div>';
+  }
+
+  html+='<div class="cf-section">'+cfSectionHead('دارو و سابقه‌ی درمان','داروهای مصرفی، دوز و پزشکِ تجویزکننده');
+  if(!c.medication||!c.medication.length){
+    html+='<div class="cf-empty"><span class="cf-pending">در انتظار ثبت</span> — اطلاعاتِ دارویی هنوز ثبت نشده (مصرفِ دارو مطرح نشده یا پرسیده نشده)</div>'+cfAddBtn('medication','افزودنِ دارو');
+  }else{
+    // ⭐ در حالتِ ویرایش فقط یک نسخه (کارتی) رندر می‌شود — رندرِ هم‌زمانِ جدول+کارت با
+    // یک data-cf-field مشترک باعثِ دوبار PATCH شدنِ همون فیلد در saveCaseFileEdits می‌شد.
+    if(!caseFileEditMode){
+      html+='<table class="cf-table cf-med-table"><tr><th>دارو</th><th>دوز</th><th>دفعات</th><th>آخرین تغییر</th><th>پزشک</th></tr>';
+      c.medication.forEach(function(m){
+        html+='<tr><td>'+escapeHtml(m.name)+cfDelBtn('medication',m)+'</td><td>'+fieldHtml('medication.'+m.id+'.dose',m.dose)+'</td>'+
+              '<td>'+fieldHtml('medication.'+m.id+'.frequency',m.frequency)+'</td>'+
+              '<td>'+fieldHtml('medication.'+m.id+'.lastChange',m.lastChange)+'</td>'+
+              '<td>'+fieldHtml('medication.'+m.id+'.prescriber',m.prescriber)+'</td></tr>';
+      });
+      html+='</table>';
+    }
+    html+='<div class="cf-med-mobile"'+(caseFileEditMode?' style="display:block"':'')+'>';
+    c.medication.forEach(function(m){
+      html+='<div class="cf-med-item"><div class="cf-med-name">'+escapeHtml(m.name)+cfDelBtn('medication',m)+'</div>'+
+            '<div class="cf-med-row"><span class="cf-mlbl">دوز</span><span>'+fieldHtml('medication.'+m.id+'.dose',m.dose)+'</span></div>'+
+            '<div class="cf-med-row"><span class="cf-mlbl">دفعات</span><span>'+fieldHtml('medication.'+m.id+'.frequency',m.frequency)+'</span></div>'+
+            '<div class="cf-med-row"><span class="cf-mlbl">آخرین تغییر</span><span>'+fieldHtml('medication.'+m.id+'.lastChange',m.lastChange)+'</span></div>'+
+            '<div class="cf-med-row"><span class="cf-mlbl">پزشک</span><span>'+fieldHtml('medication.'+m.id+'.prescriber',m.prescriber)+'</span></div></div>';
+    });
+    html+='</div>'+cfAddBtn('medication','افزودنِ دارو');
+  }
+  html+='</div>';
+
+  html+='<div class="cf-section">'+cfSectionHead('خلاصه‌ی قبل از جلسه — محورهای کلیدی','مرورِ سریعِ وضعیتِ هر محور و شدتِ آن، پیش از ورود به جلسه');
+  if(!c.axes||!c.axes.length){
+    html+='<div class="cf-empty">هنوز محوری ثبت نشده</div>'+cfAddBtn('axis','افزودنِ محور');
+  }else{
+    // ⭐ بارِ شناختی: هر محور یک کارتِ بسته با تیترِ یک‌خطی (gist) + برچسبِ وضعیت؛ متنِ کاملِ
+    // دسته‌بندی‌شده داخلِ کارت است، پس هیچ محتوایی حذف نمی‌شود ولی اول فقط «فهرستِ محورها» دیده می‌شود.
+    c.axes.forEach(function(a){
+      const toneClass=a.statusTone==='good'?'cf-good':a.statusTone==='sensitive'?'cf-sensitive':'cf-watch';
+      const toneLabel=a.statusTone==='good'?'مطلوب':a.statusTone==='sensitive'?'حساس':'نیازمندِ توجه';
+      const gist=cfGist(a.value);
+      html+='<details class="cf-axis cf-tone-'+(a.statusTone||'watch')+'"'+(caseFileEditMode?' open':'')+'><summary>'+
+            '<span class="cf-axis-main"><span class="cf-axis-title">'+escapeHtml(a.title)+cfDelBtn('axis',a)+'</span>'+
+            (gist?'<span class="cf-axis-gist">'+escapeHtml(gist)+'</span>':'<span class="cf-axis-gist"><span class="cf-pending">در انتظار ثبت</span></span>')+'</span>'+
+            '<span class="cf-axis-side"><span class="cf-tone '+toneClass+'">'+toneLabel+'</span>'+
+            '<span class="cf-toggle"><span class="cf-toggle-txt">جزئیات</span>'+CF_CHEV+'</span></span></summary>'+
+            '<div class="cf-axis-body">'+fieldHtml('axis.'+a.id,a,true)+'</div></details>';
+    });
+    html+=cfAddBtn('axis','افزودنِ محور');
+  }
+  html+='</div>';
+
+  html+='<div class="cf-section">'+cfSectionHead(escapeHtml(c.familyRelationship.title),/والد/.test(c.familyRelationship.title||'')?'نقشِ هر والد و خواهر/برادر در وضعیتِ فعلی؛ روایتِ کامل در جدولِ محورها':'نقشِ هر عضوِ خانواده در وضعیتِ فعلی؛ روایتِ کامل در جدولِ محورها')+
+        '<div class="cf-rel-card"><div class="cf-grid-2">';
+  c.familyRelationship.fields.forEach(function(f){
+    html+='<div class="cf-cell"><div class="cf-k">'+escapeHtml(f.label)+'</div><div class="cf-v">'+fieldHtml('family.'+f.key,f,true)+'</div></div>';
+  });
+  html+='</div></div></div>';
+
+  if(c.coupleRelationship){
+    html+='<div class="cf-section">'+cfSectionHead(escapeHtml(c.coupleRelationship.title),'وضعیتِ رابطه‌ی زناشویی؛ جزئیاتِ کامل فقط همین‌جاست')+'<div class="cf-rel-card">';
+    c.coupleRelationship.fields.forEach(function(f){
+      html+='<div style="margin-bottom:8px"><div class="cf-k">'+escapeHtml(f.label)+'</div><div class="cf-v">'+fieldHtml('couple.'+f.key,f,true)+'</div></div>';
+    });
+    html+='</div></div>';
+  }
+
+  html+='<div class="cf-section">'+cfSectionHead('چه چیزی نسبت به قبل تغییر کرده؟','مقایسه‌ی وضعیتِ شروعِ درمان با وضعیتِ فعلی'+(rec.generatedAt?' · مهرِ زمانی: '+toFa(toJalali(new Date(rec.generatedAt))):''))+
+        '<div class="cf-change"><div class="cf-change-box"><div class="cf-change-title">قبل</div><div class="cf-change-value">'+fieldHtml('changeOverTime.before',c.changeOverTime.before)+'</div></div>'+
+        '<div class="cf-change-arrow"><svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
+        '<div class="cf-change-box"><div class="cf-change-title">اکنون</div><div class="cf-change-value">'+fieldHtml('changeOverTime.after',c.changeOverTime.after)+'</div></div></div></div>';
+
+  html+='<div class="cf-section">'+cfSectionHead('روندِ جلسات','خلاصه‌ی هر رکوردِ ثبت‌شده (ممکن است یک رکورد چند جلسه را خلاصه کرده باشد) — برایِ دیدنِ جزئیات، روی هر ردیف بزنید');
+  if(!c.sessionsSummary||!c.sessionsSummary.length){
+    html+='<div class="cf-empty">هنوز خلاصه‌ای ثبت نشده</div>';
+  }else{
+    c.sessionsSummary.forEach(function(s){
+      // عنوانِ اصلیِ ردیف = خلاصه‌ی واقعیِ محتوا (title)، نه صرفاً «جلسه‌ی N»؛ شماره فقط یک
+      // چیپِ کوچک است (برایِ رکوردی که کلِ روند را تجمیع کرده، «جلسه‌ی ۱» گمراه‌کننده بود).
+      const headline=(s.title&&s.title.value)?escapeHtml(s.title.value):('خلاصه‌ی رکوردِ '+toFa(s.sessionNum));
+      html+='<details class="cf-session"'+(caseFileEditMode?' open':'')+'><summary>'+
+            '<span class="cf-session-title">'+headline+'</span>'+
+            '<span class="cf-session-meta"><span class="cf-chip">رکوردِ '+toFa(s.sessionNum)+'</span>'+
+            (s.durationIndicator?'<span class="cf-chip">'+escapeHtml(s.durationIndicator)+'</span>':'')+
+            '<span class="cf-toggle"><span class="cf-toggle-txt">جزئیات</span>'+CF_CHEV+'</span></span></summary>'+
+            '<div class="cf-session-body">'+
+            (caseFileEditMode?'<div class="cf-edit-lbl">عنوان</div>'+fieldHtml('session.'+s.sessionId+'.title',s.title)+'<div class="cf-edit-lbl">شرح</div>':'')+
+            fieldHtml('session.'+s.sessionId+'.body',s.body,true)+'</div></details>';
+    });
+  }
+  html+='<div class="cf-session cf-next" style="border-style:dashed"><div class="cf-session-body"><b>جلسه‌ی آینده</b>'+
+        ['موضوعات','مشاهدات و علائم','مداخله و بازخورد'].map(function(t){return '<div style="margin-top:8px"><div class="cf-k">'+t+'</div><div class="cf-v"><span class="cf-pending">در انتظار ثبت</span></div></div>';}).join('')+
+        '</div></div>';
+  html+='</div>';
+
+  html+='<div class="cf-section">'+cfSectionHead('نقشه‌راهِ جلسه‌ی بعد','پیشنهادِ ترتیبِ کار در جلسه‌ی بعد، به‌ترتیبِ اولویت — برایِ دیدنِ توضیحِ هر گام، روی آن بزنید')+'<div class="cf-roadmap">';
+  if(!c.roadmap||!c.roadmap.length){
+    html+='<div class="cf-empty">نقشه‌راهی ثبت نشده</div>'+cfAddBtn('roadmap','افزودنِ گام');
+  }else{
+    c.roadmap.forEach(function(r){
+      html+='<details class="cf-step"'+(caseFileEditMode?' open':'')+'><summary><span class="cf-step-num '+r.priority+'">'+r.priority.slice(1)+'</span>'+
+            '<span class="cf-step-q">'+escapeHtml(r.question)+'</span>'+(r.why?'<span class="cf-step-why '+r.priority+'">'+escapeHtml(r.why)+'</span>':'')+'<span class="cf-toggle"><span class="cf-toggle-txt">توضیح</span>'+CF_CHEV+'</span></summary>'+
+            '<div class="cf-step-detail">'+fieldHtml('roadmap.'+r.id+'.detail',r.detail,true)+cfDelBtn('roadmap',r)+'</div></details>';
+    });
+  }
+  if(c.roadmap&&c.roadmap.length)html+=cfAddBtn('roadmap','افزودنِ گام');
+  html+='<div class="cf-roadmap-note">شماره و رنگ = سطحِ اولویت · ترتیبِ پیشنهادی، نه جایگزینِ تشخیصِ شما</div>';
+  html+='</div></div>';
+
+  if(c.pendingQuestions&&c.pendingQuestions.length){
+    html+='<div class="cf-section">'+cfSectionHead('سوالاتِ باز برایِ تراپیست','اطلاعاتی که برایِ کامل‌شدنِ پرونده لازم است — پاسخِ شما ذخیره می‌شود');
+    c.pendingQuestions.forEach(function(q){
+      html+='<div class="cf-q-item"><div class="cf-q-text">'+escapeHtml(q.question)+'</div>'+
+            '<input type="text" placeholder="پاسخ…" value="'+escAttr(q.answer||'')+'" onchange="answerCaseFileQuestion(\''+q.id+'\',this.value)"></div>';
+    });
+    html+='</div>';
+  }
+
+  sec.innerHTML=html;
+}
+
+function startCaseFileEdit(){caseFileEditMode=true;renderCaseFile();}
+function cancelCaseFileEdit(){caseFileEditMode=false;renderCaseFile();}
+
+async function saveCaseFileEdits(){
+  if(!currentCaseFile)return;
+  const sec=$('caseFileSection');
+  const inputs=sec.querySelectorAll('[data-cf-field]');
+  const patches=[];
+  inputs.forEach(function(el){
+    const fieldId=el.getAttribute('data-cf-field');
+    const orig=el.getAttribute('data-cf-orig')||'';
+    const val=el.value;
+    // فیلدِ خالیِ دست‌نخورده «تایید» نمی‌شود (approveِ یک فیلدِ pending آن را برایِ همیشه
+    // یخ می‌کرد و regenerate دیگر نمی‌توانست پرش کند).
+    if(val===orig&&!orig.trim())return;
+    patches.push(val!==orig?{fieldId:fieldId,action:'edit',value:val}:{fieldId:fieldId,action:'approve'});
+  });
+  try{
+    for(const p of patches){
+      const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file',{method:'PATCH',body:p});
+      currentCaseFile.record=data.case_file;
+    }
+    caseFileEditMode=false;
+    renderCaseFile();
+    showBanner('info','پرونده ذخیره شد.');
+  }catch(e){showBanner('error',e.message);}
+}
+
+async function onCfSuggestClick(ev,fieldId){
+  ev.stopPropagation();
+  if(!confirm('به‌روزرسانیِ پیشنهادی برایِ این بخش موجود است — اعمال شود؟\n(نادیده گرفتن = بستنِ همین پیام)'))return;
+  try{
+    const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file',{method:'PATCH',body:{fieldId:fieldId,action:'accept-suggestion'}});
+    currentCaseFile.record=data.case_file;
+    renderCaseFile();
+  }catch(e){showBanner('error',e.message);}
+}
+
+async function answerCaseFileQuestion(qId,value){
+  if(!currentCaseFile)return;
+  try{
+    const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file',{method:'PATCH',body:{fieldId:'question.'+qId+'.answer',action:'edit',value:value}});
+    currentCaseFile.record=data.case_file;
+  }catch(e){showBanner('error',e.message);}
+}
+
+let regenerateCaseFilePollTimer=null;
+async function regenerateCaseFile(force){
+  if(!currentCaseFile)return;
+  let typed;
+  if(force){
+    typed=prompt('این عمل همه‌ی ویرایش‌ها و تاییدهایِ دستیِ قبلی را دور می‌ریزد و پرونده را کاملاً از نو می‌سازد.\nبرایِ ادامه، دقیقاً همین عبارت را تایپ کنید: بازتولید کامل');
+    if(typed!=='بازتولید کامل')return;
+  }
+  if(regenerateCaseFilePollTimer){clearInterval(regenerateCaseFilePollTimer);regenerateCaseFilePollTimer=null;}
+  const clientId=currentCaseFile.clientId;
+  const sec=$('caseFileSection');
+  sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div></div><div class="cf-empty">در حالِ تولید — ممکن است چند دقیقه طول بکشد…</div>';
+  try{
+    // ⭐ فیکسِ باگِ واقعیِ مرتبط (2026-09-18): بعدِ اینکه abortِ این fetch را سمتِ سرور هم
+    // واقعاً به لغوِ فراخوانیِ OpenRouter وصل کردیم (دیگر کارِ بی‌فایده در پس‌زمینه ادامه
+    // پیدا نمی‌کند)، این timeout باید به‌اندازه‌ی کافی بزرگ باشد که تولیدِ واقعی و
+    // طولانی (چند دقیقه، برایِ کورپوسِ بزرگ) را قطع نکند — والا زودتر از موعد لغو
+    // می‌شد. ۱۰ دقیقه، هم‌راستا با timeoutِ پیش‌فرضِ خودِ SDKِ OpenAI روی سرور.
+    const data=await api('/api/clients/'+clientId+'/case-file/regenerate',{method:'POST',body:{force:!!force,confirmPhrase:typed},timeoutMs:600000});
+    currentCaseFile.record=data.case_file;
+    currentCaseFile.rhythm=data.treatment_rhythm;
+    caseFileEditMode=false;
+    renderCaseFile();
+    showBanner('info',data.skipped?'داده‌ی جدیدی از آخرین تولید ثبت نشده — پرونده تغییر نکرد.':'پرونده به‌روز شد.');
+  }catch(e){
+    // ⭐ فیکسِ باگِ واقعی (2026-09-18): abortِ ۱۲۰ثانیه‌ایِ کلاینت فقط fetchِ مرورگر را
+    // قطع می‌کند؛ فراخوانیِ OpenRouter روی سرور متوقف نمی‌شود و برایِ کورپوسِ واقعیِ
+    // بزرگ معمولاً چند دقیقه بعد با موفقیت تمام می‌شود — قبلاً اینجا فوراً خطایِ کاذب
+    // نشان داده می‌شد و تراپیست هیچ راهی جز رفرشِ دستی و حدسِ اینکه چه‌کار کند نداشت
+    // (verification/2026-09-18-case-file-regenerate-client-timeout-mismatch.md).
+    // حالا به‌جایِ اعلامِ شکست، وضعیتِ واقعی از سرور poll می‌شود تا نتیجه‌ی واقعی
+    // (موفق/ناموفق) خودکار نمایش داده شود.
+    if(e.code==='timeout'){
+      sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div></div>'+
+        '<div class="cf-empty">پاسخِ اولیه دیرتر از حدِ معمول رسید، اما تولید در پس‌زمینه ادامه دارد — به‌محضِ آماده‌شدن همین‌جا نشان داده می‌شود…</div>';
+      let attempts=0;
+      regenerateCaseFilePollTimer=setInterval(async function(){
+        attempts++;
+        if(!currentCaseFile||currentCaseFile.clientId!==clientId){clearInterval(regenerateCaseFilePollTimer);regenerateCaseFilePollTimer=null;return;}
+        try{
+          const r=await api('/api/clients/'+clientId+'/case-file');
+          const st=r.case_file&&r.case_file.status;
+          if(st==='generating'&&attempts<150)return; // تا ۱۰ دقیقه (۱۵۰×۴ث) صبر کن
+          clearInterval(regenerateCaseFilePollTimer);regenerateCaseFilePollTimer=null;
+          currentCaseFile.record=r.case_file;
+          currentCaseFile.rhythm=r.treatment_rhythm;
+          caseFileEditMode=false;
+          renderCaseFile();
+          if(st==='ready'){
+            showBanner('info','پرونده با موفقیت آماده شد (پاسخِ اولیه دیر رسید، اما پردازش کامل شد).');
+          }else if(st==='error'){
+            showBanner('error','تولیدِ پرونده در نهایت ناموفق بود: '+(r.case_file.errorMessage||'نامشخص'));
+          }else{
+            showBanner('error','هنوز پاسخی از تولیدِ پرونده نرسید — چند دقیقه‌ی دیگر دوباره امتحان کنید.');
+          }
+        }catch(pollErr){
+          clearInterval(regenerateCaseFilePollTimer);regenerateCaseFilePollTimer=null;
+          showBanner('error','خطا در بررسیِ وضعیتِ پرونده: '+pollErr.message);
+          renderCaseFile();
+        }
+      },4000);
+      return;
+    }
+    showBanner('error',e.message);
+    renderCaseFile();
+  }
+}
+
 // ⭐ رفعِ باگِ واقعی (B3): قبلاً سوئیچِ جلسه/بازگشت وسطِ ضبط یا با متنِ ذخیره‌نشده در
 // textarea، بدونِ هیچ هشداری آن را دور می‌ریخت (cleanupArchiveVoice بی‌صدا).
 function hasUnsavedArchiveWork(){
@@ -2679,7 +3850,7 @@ async function viewTranscript(sessionId){
     $('editSessionMetaBtn').hidden=isManualSession;
     $('manualDateTimeRow').hidden=!isManualSession;
     if(isManualSession){
-      $('manualDateInput').value=data.session.date||'';
+      renderJalaliPicker($('manualDatePicker'),data.session.date||'',saveManualDate,{allowEmpty:true});
       $('manualDateHint').textContent='';
     }
     $('archiveNoteAdd').hidden=!isManualSession;
@@ -2822,10 +3993,8 @@ async function persistSessionDateTime(date,start_time){
 // جداگانه‌ی ذخیره (change/blur خودکار). خالی هم معتبر است («بدونِ تاریخ»، migration 014).
 // عمداً viewTranscript را دوباره صدا نمی‌زند (برخلافِ persistSessionDateTime بالا) — تا
 // اگر یادداشتِ صوتی/متنیِ فعالی در حالِ ورود است، سوئیچِ صفحه/cleanup آن را قطع نکند.
-async function saveManualDate(){
+async function saveManualDate(date){
   if(!currentViewSession)return;
-  const raw=$('manualDateInput').value.trim();
-  const date=raw?toLatinDigits(raw):'';
   const hint=$('manualDateHint');
   try{
     const data=await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{date:date||null}});
@@ -2840,21 +4009,17 @@ async function saveManualDate(){
     hint.style.color='var(--danger, #c62828)';
   }
 }
-let manualDateHintTimer=null;
-function onManualDateInput(){
-  const hint=$('manualDateHint');
-  hint.style.color='var(--muted)';
-  hint.textContent='';
-}
+let editSessionDateValue=null;
 function openEditSessionMeta(){
   if(!currentViewSession)return;
-  $('editSessionDate').value=currentViewSession.date||'';
+  editSessionDateValue=currentViewSession.date||null;
+  renderJalaliPicker($('editSessionDatePicker'),editSessionDateValue,function(v){editSessionDateValue=v;},{allowEmpty:false});
   $('editSessionTime').value=currentViewSession.start_time||'';
   $('editSessionModal').classList.add('open');
 }
 function closeEditSessionMeta(){$('editSessionModal').classList.remove('open');}
 async function saveSessionMeta(){
-  const date=toLatinDigits($('editSessionDate').value.trim());
+  const date=editSessionDateValue;
   const start_time=$('editSessionTime').value.trim();
   if(!(await persistSessionDateTime(date,start_time)))return;
   closeEditSessionMeta();
@@ -2945,6 +4110,7 @@ async function startManualSessionFlow(){
   try{
     const data=await api('/api/sessions',{method:'POST',body:{client_id:clientId,mode:'manual'}});
     showBanner('info','جلسه‌ی گذشته ایجاد شد — یادداشتِ متنی یا صوتی اضافه کنید.');
+    maybeShowCaseFileAutoPrompt();
     // ⭐ فیکسِ باگِ واقعی (2026-09-15): قبلاً اینجا `openClientDetail` هم صدا زده
     // می‌شد که صفحه‌ی «پرونده» را برای یک لحظه نشان می‌داد — بی‌فایده چون
     // `backToClientDetailFromSession` هنگامِ برگشت خودش دوباره و کامل fetch
@@ -3135,10 +4301,7 @@ async function startNewRTSession(){
     onState:rtOnState,
     onResult:function(r){
       lastPreviewAt=Date.now();
-      if(!$('liveText').hidden){
-        $('liveText').textContent=r.final+(r.interim?' '+r.interim:'');
-        $('liveText').scrollTop=$('liveText').scrollHeight;
-      }
+      if(!$('liveText').hidden)setLiveTextFollow($('liveText'),r.final+(r.interim?' '+r.interim:''));
       $('recStatus').classList.remove('warn');
     },
     onError:function(m){
@@ -3303,7 +4466,7 @@ async function startVoiceNoteDirect(){
   const s=window.FeeliaRT.createSession(currentSession.id,{mode:'note',
     onState:function(){},
     onResult:function(r){
-      $('voiceLiveText').textContent=(r.final+(r.interim?' '+r.interim:''))||'…';
+      setLiveTextFollow($('voiceLiveText'),(r.final+(r.interim?' '+r.interim:''))||'…');
     },
     onError:function(m){$('voiceStatus').textContent=m;}
   });
@@ -3351,7 +4514,7 @@ async function stopVoiceNoteDirect(){
     wrapupNotes.push({dbId:voiceDbId,type:'voice',text:voiceText,wall_clock:voiceWallClock});
     renderWrapupNotes();
     $('voiceStatus').textContent='ثبت شد'+(out.reliable?'':' (با تاخیر)');
-    setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},1500);
+    setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;$('textNoteBtn').disabled=false;},1500);
     return;
   }
   if(out.mode==='batch-pending-note'){
@@ -3366,15 +4529,15 @@ async function stopVoiceNoteDirect(){
         }else{
           $('voiceStatus').textContent='هنوز آماده نشد — صدا ذخیره شده و به‌زودی ثبت می‌شود';
         }
-        setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},2500);
+        setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;$('textNoteBtn').disabled=false;},2500);
       });
     }catch(e){
-      setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},1500);
+      setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;$('textNoteBtn').disabled=false;},1500);
     }
     return;
   }
   $('voiceStatus').textContent='متنی ثبت نشد';
-  setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;},1500);
+  setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;$('textNoteBtn').disabled=false;},1500);
 }
 
 // ===== WS =====
@@ -3561,10 +4724,7 @@ function handleMsg(msg){
       lastPreviewAt=Date.now();
       $('recStatus').classList.remove('warn');
       clearLiveConnBanner();
-      if(!$('liveText').hidden){
-        $('liveText').textContent=msg.text;
-        $('liveText').scrollTop=$('liveText').scrollHeight;
-      }
+      if(!$('liveText').hidden)setLiveTextFollow($('liveText'),msg.text);
       break;
     case 'finished':
       handleFinished(msg.finalText);
@@ -3582,8 +4742,7 @@ function handleMsg(msg){
   const show=$('chkLiveText').checked;
   $('liveText').hidden=!show;
   if(show&&typeof rtSession!=='undefined'&&rtSession){
-    $('liveText').textContent=rtSession.confirmed+(rtSession.interim?' '+rtSession.interim:'');
-    $('liveText').scrollTop=$('liveText').scrollHeight;
+    setLiveTextFollow($('liveText'),rtSession.confirmed+(rtSession.interim?' '+rtSession.interim:''));
   }
   uxTrack('live_text_toggled');
 });
@@ -3791,7 +4950,7 @@ async function resumeDirectLive(){
         const fresh=cleanDirectText(r.final);
         directFinalText=(prefix?(prefix+' '):'')+fresh;
         const full=r.final+(r.interim?' '+r.interim:'');
-        if(!$('liveText').hidden)$('liveText').textContent=cleanDirectText((prefix?' '+prefix:'')+' '+full);
+        if(!$('liveText').hidden)setLiveTextFollow($('liveText'),cleanDirectText((prefix?' '+prefix:'')+' '+full));
       },
       onError:function(){setLiveConnBanner('warn','<b>اتصال قطع شد.</b><br>در حال اتصالِ مجدد.');fallbackToProxy('resume-error');}
     });
@@ -4045,6 +5204,10 @@ function renderWrapupNotes(){
 }
 
 function showTextInput(){
+  // ⭐ فیکسِ باگِ واقعی (B1-Wrapup): این دکمه قبلاً هنگامِ ضبطِ صوتیِ فعال هم قابلِ کلیک بود؛
+  // جعبه‌ی ضبط پنهان می‌شد ولی ضبط در پس‌زمینه ادامه پیدا می‌کرد. حالا دکمه در حینِ ضبط
+  // disabled است؛ این چک هم برایِ فراخوانیِ مستقیم امن نگه‌اش می‌دارد.
+  if(rtVoice||voiceWS)return;
   $('voiceNoteBox').hidden=true;
   $('textNoteBox').hidden=false;
   $('textNoteInput').focus();
@@ -4071,6 +5234,9 @@ async function addTextNote(){
 async function startVoiceNote(){
   if(!currentSession)return;
   uxTrack('voice_note_started');
+  // ⭐ فیکسِ باگِ واقعی (B1-Wrapup): تا پایانِ ضبط/finalize نباید بشود به یادداشتِ
+  // متنی سوئیچ کرد — ضبط ادامه پیدا می‌کرد بدونِ اینکه در UI دیده شود.
+  $('textNoteBtn').disabled=true;
   if(window.FeeliaRT&&window.FeeliaRT.isAvailable()&&!rtVoice&&!voiceWS&&(!voiceMediaRecorder||voiceMediaRecorder.state==='inactive')){
     try{
       const ok=await startVoiceNoteDirect();
@@ -4115,7 +5281,7 @@ async function startVoiceNote(){
     if(typeof ev.data==='string'){
       try{
         const msg=JSON.parse(ev.data);
-        if(msg.type==='preview')$('voiceLiveText').textContent=msg.text||'…';
+        if(msg.type==='preview')setLiveTextFollow($('voiceLiveText'),msg.text||'…');
         else if(msg.type==='status')$('voiceStatus').textContent=msg.message||msg.status;
         else if(msg.type==='finished'){
           if(msg.finalText&&msg.finalText.trim()){
@@ -4159,6 +5325,7 @@ function cleanupVoice(){
   voiceMediaRecorder=null;
   $('voiceNoteBox').hidden=true;
   $('voiceNoteBtn').disabled=false;
+  $('textNoteBtn').disabled=false;
 }
 function startVoiceTimer(){
   if(voiceRunning)return;
@@ -4229,9 +5396,16 @@ function showArchiveTextInput(){
   ta.focus();
 }
 function hideArchiveTextInput(){
+  // ⭐ فیکسِ باگِ واقعی (B1-Archive): قبلاً بدونِ هشدار متنِ ذخیره‌نشده (به‌خصوص نتیجه‌ی
+  // یک ضبطِ صوتیِ کامل) دور ریخته می‌شد. الگوی confirm عیناً از hasUnsavedArchiveWork
+  // گرفته شده.
+  const ta=$('archiveTextNoteInput');
+  if(ta&&ta.value.trim()&&!confirm('یادداشتِ ذخیره‌نشده دور ریخته شود؟'))return;
   $('archiveTextNoteBox').hidden=true;
   $('archiveTextNoteInput').value='';
   archiveTextNoteOrigin=null;
+  $('archiveVoiceNoteBtn').disabled=false;
+  $('archiveTextNoteBtn').disabled=false;
 }
 // ⭐ گزینه‌ی صریحِ «ویرایشِ متن» بعدِ پایانِ ضبط — قبلاً معلوم نبود که متنِ نمایش‌داده‌شده
 // را می‌شود ویرایش کرد (textarea از ابتدا قابلِ‌ویرایش بود ولی هیچ نشانه‌ای نداشت).
@@ -4270,6 +5444,8 @@ async function addArchiveTextNote(){
     $('archiveTextNoteInput').value='';
     $('archiveTextNoteBox').hidden=true;
     archiveTextNoteOrigin=null;
+    $('archiveVoiceNoteBtn').disabled=false;
+    $('archiveTextNoteBtn').disabled=false;
     uxTrack('text_note_added');
     currentViewNotes.push(d.note);
     renderArchiveNotesList(currentViewNotes);
@@ -4328,7 +5504,7 @@ async function startArchiveVoiceNote(){
     if(typeof ev.data==='string'){
       try{
         const msg=JSON.parse(ev.data);
-        if(msg.type==='preview')$('archiveVoiceLiveText').textContent=msg.text||'…';
+        if(msg.type==='preview')setLiveTextFollow($('archiveVoiceLiveText'),msg.text||'…');
         else if(msg.type==='status')$('archiveVoiceStatus').textContent=msg.message||msg.status;
         else if(msg.type==='finished'){
           // ⭐ مسیرِ legacy طبقِ LAW-015 فریز است — سرور خودش یادداشت را ذخیره می‌کند،
@@ -4357,7 +5533,7 @@ async function startArchiveVoiceNoteDirect(){
   const s=window.FeeliaRT.createSession(currentViewSession.id,{mode:'note',
     onState:archiveVoiceOnState,
     onResult:function(r){
-      $('archiveVoiceLiveText').textContent=(r.final+(r.interim?' '+r.interim:''))||'…';
+      setLiveTextFollow($('archiveVoiceLiveText'),(r.final+(r.interim?' '+r.interim:''))||'…');
     },
     onError:function(m){$('archiveVoiceStatus').textContent=m;}
   });
@@ -4398,10 +5574,13 @@ async function stopArchiveVoiceNoteDirect(){
     // برچسبِ منشأش) نشان داده می‌شود، با دو گزینه‌ی صریح: «ویرایشِ متن» یا ذخیره‌ی
     // مستقیم. نوعِ ذخیره هم واقعاً 'voice' می‌ماند (نه 'note_after') تا برچسب/رنگِ
     // کارت در فهرست درست باشد.
+    // ⭐ فیکسِ باگِ واقعی (B1-Archive): این دو دکمه قبلاً همین‌جا دوباره فعال می‌شدند —
+    // یعنی می‌شد وسطِ بازبینیِ متنِ صوتی («ویرایش/ذخیره») روی «یادداشتِ متنی» یا
+    // «یادداشتِ صوتی» زد و متنِ آماده‌ی ذخیره‌نشده بی‌صدا از دست می‌رفت (نوعِ voice هم
+    // به text تبدیل می‌شد چون showArchiveTextInput منشأ را عوض می‌کرد). حالا هر دو
+    // disabled می‌مانند تا addArchiveTextNote (ذخیره) یا hideArchiveTextInput (انصراف).
     archiveTextNoteOrigin='voice';
     $('archiveVoiceNoteBox').hidden=true;
-    $('archiveVoiceNoteBtn').disabled=false;
-    $('archiveTextNoteBtn').disabled=false;
     const ta=$('archiveTextNoteInput');
     ta.value=out.text.trim();
     ta.readOnly=true;
@@ -4580,6 +5759,7 @@ async function finishSession(){
     sessionNotes=[];
     showScreen('Clients');
     loadClients();
+    maybeShowCaseFileAutoPrompt();
   }catch(e){showBanner('error','خطا در ذخیره: '+e.message);}
 }
 
@@ -4602,6 +5782,17 @@ function goBackToClients(){
   loadClients();
 }
 
+function showAllClients(){
+  uxTrack('all_clients_opened');
+  showScreen('AllClients');
+  $('searchInputAll').value='';
+  applyClientFilters();
+}
+function goBackToClientsToday(){
+  showScreen('Clients');
+  applyClientFilters();
+}
+
 window.addEventListener('beforeunload',function(e){
   // P1: close-hint فقط fast-path است؛ correctness به آن وابسته نیست (failure detection + timeout)
   try{
@@ -4612,7 +5803,10 @@ window.addEventListener('beforeunload',function(e){
   let directOpen=false;
   try{directOpen=!!(SonioxDirect.ws&&SonioxDirect.ws.readyState===WebSocket.OPEN);}catch(_){}
   let rtOpen=false;
-  try{rtOpen=!!(window.FeeliaRT&&window.FeeliaRT.hasOpenConnection());}catch(_){}
+  // ⭐ فیکسِ باگِ واقعی (audit صدا/۲۰۲۶-۰۹-۱۶): hasOpenConnection فقط WSِ باز را می‌بیند؛
+  // hasActiveRecording حالتِ durable-only (بدونِ WS، ولی میکروفون هنوز ضبط می‌کند) را هم
+  // پوشش می‌دهد — بدونش کاربر بدونِ هشدار تب را می‌بست و چند ثانیه‌ی آخرِ صدا از دست می‌رفت.
+  try{rtOpen=!!(window.FeeliaRT&&window.FeeliaRT.hasActiveRecording&&window.FeeliaRT.hasActiveRecording());}catch(_){}
   // ⭐ B3: متنِ ذخیره‌نشده‌ی یادداشتِ متنیِ آرشیو هم باید هشدار بدهد، نه فقط اتصالِ باز.
   let archiveTextPending=false;
   try{archiveTextPending=hasUnsavedArchiveWork();}catch(_){}

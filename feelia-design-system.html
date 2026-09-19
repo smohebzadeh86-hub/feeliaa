@@ -23,7 +23,7 @@
     --card:#1c2320;--field:#171d1a;
     --ink:#e7ece8;--ink-2:#c6cfc9;--muted:#8b978f;
     --line:#2c352f;--line-soft:#242c28;
-    --sage:#4e8977;--sage-hover:#5a9783;--sage-deep:#a6cbb9;
+    --sage:#427a68;--sage-hover:#396858;--sage-deep:#a6cbb9;
     --sage-soft:#264032;--sage-mist:#1f2b26;
     --clay:#c96f5e;--clay-hover:#d58370;--clay-deep:#e8a294;--clay-soft:#38211b;--clay-line:#4a2c24;
     --gold:#c9a56a;--gold-deep:#d9bc80;--gold-soft:#2f2817;
@@ -38,7 +38,10 @@
   --card:#1c2320;--field:#171d1a;
   --ink:#e7ece8;--ink-2:#c6cfc9;--muted:#8b978f;
   --line:#2c352f;--line-soft:#242c28;
-  --sage:#4e8977;--sage-hover:#5a9783;--sage-deep:#a6cbb9;
+  /* ⭐ فیکسِ باگِ واقعیِ کنتراست (۲۰۲۶-۰۹-۱۵): مقدارِ قبلی --sage:#4e8977 با متنِ
+     سفیدِ روی خودش کنتراستِ ۴٫۰۶:۱ داشت (زیرِ ۴٫۵:۱ برایِ متنِ کوچک، WCAG 1.4.3)؛
+     --sage-hoverِ قبلی (#5a9783، روشن‌تر از پایه) وضعش بدتر بود: ۳٫۳۹:۱. */
+  --sage:#427a68;--sage-hover:#396858;--sage-deep:#a6cbb9;
   --sage-soft:#264032;--sage-mist:#1f2b26;
   --clay:#c96f5e;--clay-hover:#d58370;--clay-deep:#e8a294;--clay-soft:#38211b;--clay-line:#4a2c24;
   --gold:#c9a56a;--gold-deep:#d9bc80;--gold-soft:#2f2817;
@@ -534,6 +537,45 @@ footer{margin-top:70px;padding-top:20px;border-top:1px solid var(--line-soft);fo
         <div class="evidence">قانون: هر modifier-classِ اندازه (sm/xl/…) باید با selectorِ ترکیبی (<span class="chip-code">button.btn.btn-sm</span>) نوشته بشه، نه تکی، وگرنه هیچ‌وقت روی قاعده‌ی پایه غالب نمی‌شه.</div>
       </div>
     </div>
+
+    <div class="rule bad">
+      <div class="mark">✕</div>
+      <div class="body">
+        <b>باگِ واقعی: حالتِ «انتخاب‌شده» فقط با دو سطحِ روشنِ تقریباً یکسان</b>
+        <span>تبِ فعال/غیرفعالِ مراجعین (<span class="chip-code">.client-tab.active</span>) با <span class="chip-code">background:var(--card)</span> روی زمینه‌ی <span class="chip-code">var(--field)</span> مشخص می‌شد — نسبتِ کنتراستِ این دو رنگ حدود ۱٫۰۳:۱ است (در تمِ تاریک هم مشابه)، یعنی تبِ انتخاب‌شده عملاً دیده نمی‌شد. سایه‌ی سبک هم روی زمینه‌ی تاریک ناپدید می‌شد.</span>
+        <div class="evidence">تعمیر: تبِ فعال با <span class="chip-code">background:var(--sage)</span> + متنِ سفید پُر می‌شه — دقیقاً همون الگویی که <span class="chip-code">.cat-seg button.active</span> و <span class="chip-code">.step.active</span> از قبل داشتن. بوردرِ ظرفِ تب‌ها هم حذف شد چون بعد از این تغییر دیگه نقشی در نشون‌دادنِ انتخاب نداره.</div>
+      </div>
+    </div>
+    <div class="rule good">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>قانون: حالتِ «انتخاب‌شده» همیشه با رنگِ پُر، نه با تفاوتِ ظریفِ دو سطحِ روشن</b>
+        <span>اگه یک کنترل (تب، چیپ، سگمنت) دو حالت دارد، فرقِ بینِ حالت‌ها باید حداقل ۳:۱ کنتراست داشته باشه (WCAG 1.4.11 برای اجزای غیرمتنی). ساده‌ترین راهِ رسیدن به این عدد در پالتِ فیلیا: حالتِ فعال = <span class="chip-code">var(--sage)</span> + متنِ سفید؛ حالتِ غیرفعال = متنِ <span class="chip-code">var(--muted)</span> روی زمینه‌ی خنثی.</span>
+      </div>
+    </div>
+    <div class="rule good">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>کامپوننتِ جدید: دکمه‌ی نمایشِ رمز (<span class="chip-code">.pw-field</span> / <span class="chip-code">.pw-toggle</span>)</b>
+        <span>فیلدِ رمزِ صفحه‌ی ورود راهی برای دیدنِ متنِ تایپ‌شده نداشت. الگوی <span class="chip-code">.search-box</span> تکرار شده: wrapper با <span class="chip-code">position:relative</span>، دکمه‌ی آیکون با <span class="chip-code">position:absolute</span> و <span class="chip-code">padding-left:44px</span> روی input برای رزروِ فضا (طبقِ قانونِ absolute-positioned بالا). آیکون بینِ <span class="chip-code">IC_EYE</span> و <span class="chip-code">IC_EYE_OFF</span> با <span class="chip-code">aria-pressed</span> عوض می‌شه؛ بعد از هر ورود/ثبت‌نامِ موفق و جابه‌جاییِ حالت، به <span class="chip-code">type="password"</span> برمی‌گرده.</span>
+      </div>
+    </div>
+
+    <div class="rule bad">
+      <div class="mark">✕</div>
+      <div class="body">
+        <b>باگِ واقعی: متنِ سفید روی --sage در تمِ تاریک، زیرِ حداقلِ کنتراست</b>
+        <span><span class="chip-code">--sage:#4e8977</span> در تمِ تاریک، با متنِ سفیدِ روی خودش، کنتراستِ ۴٫۰۶:۱ داشت — زیرِ ۴٫۵:۱ (حداقلِ WCAG 1.4.3 برایِ متنِ زیرِ ۱۸px/بولد). چون این توکن پایه‌ی <span class="chip-code">.btn-primary</span>، <span class="chip-code">.cat-filter-chip.active</span>، <span class="chip-code">.cat-seg button.active</span>، <span class="chip-code">.client-tab.active</span> و <span class="chip-code">.sign-chip.logged</span> است، یک باگِ کنتراست همه‌جا تکرار شده بود. <span class="chip-code">--sage-hover:#5a9783</span> (روشن‌تر از پایه، برایِ hover در تمِ تاریک) وضعش بدتر بود: ۳٫۳۹:۱.</span>
+        <div class="evidence">تعمیر: فقط دو توکن عوض شد — <span class="chip-code">--sage:#427a68</span> (۴٫۹۸:۱) و <span class="chip-code">--sage-hover:#396858</span> (۶٫۳۷:۱، هم‌سو با جهتِ hoverِ تمِ روشن: پررنگ‌تر=تیره‌تر). همان هیو حفظ شد، فقط روشنایی کم شد؛ هیچ کامپوننتی مستقیم لمس نشد چون همه از همین دو متغیر تغذیه می‌کنند.</div>
+      </div>
+    </div>
+    <div class="rule good">
+      <div class="mark">✓</div>
+      <div class="body">
+        <b>قانون: کنتراستِ متن‌روی‌رنگِ‌پُر را در هر دو تم جدا اندازه بگیر</b>
+        <span>یک رنگِ برند که در تمِ روشن کنتراستِ خوبی با سفید دارد، در تمِ تاریک (که خودش روشن‌تر تنظیم می‌شود تا روی زمینه‌ی تیره دیده شود) ممکن است دیگر کافی نباشد. هر توکنی که زیرِ متنِ سفید/تیره قرار می‌گیرد، باید در هر دو تم با فرمولِ WCAG (نسبتِ لومینانس) جدا حساب شود — نه با «همون رنگ، همون حس».</span>
+      </div>
+    </div>
   </section>
 
   <!-- ============ CHECKLIST ============ -->
@@ -549,6 +591,8 @@ footer{margin-top:70px;padding-top:20px;border-top:1px solid var(--line-soft);fo
         <li>هیچ <span class="chip-code">color:#hex</span> یا <span class="chip-code">background:#hex</span> بیرون از بلوکِ تعریفِ متغیرها ننوشتی؟</li>
         <li>اگه رنگی از قبل «کم‌رنگ» انتخاب شده (مثل muted)، دوباره opacity روش نذاشتی؟</li>
         <li>عنصرِ absolute-positioned، فضای رزروشده‌ی خودش رو از محتوای کناری گرفته؟</li>
+        <li>اگه یک کنترل حالتِ «انتخاب‌شده/فعال» دارد، اون حالت با رنگِ پُر (کنتراستِ حداقل ۳:۱) مشخص شده — نه فقط با تفاوتِ ظریفِ دو سطحِ روشن یا سایه؟</li>
+        <li>هر رنگِ پُری که متنِ سفید/تیره روش می‌نشیند، در <b>هر دو تم</b> جدا با فرمولِ WCAG کنتراستِ ≥۴٫۵:۱ (متنِ کوچک) رو داره — نه فقط در تمی که اول تست کردی؟</li>
         <li>در هر دو تمِ روشن و تاریک، این تغییر رو واقعاً دیدی — نه فقط فرض کردی؟</li>
         <li>پیامِ خطا، هم علت رو می‌گه هم راهِ بعدی رو؟</li>
       </ul>
