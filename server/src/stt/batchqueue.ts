@@ -2,6 +2,7 @@
 // حریم خصوصی: صوت خام فقط در این مسیرِ شکست به سرور Feelia می‌آید (نه در حالت عادی)،
 // روی دیسکِ موقتِ سرور می‌ماند تا رونویسی شود، بلافاصله بعد از موفقیت حذف می‌شود،
 // و فایل‌های قدیمی‌تر از ۲۴ ساعت در startup پاک می‌شوند. هیچ صوتی در DB ذخیره نمی‌شود.
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../db/connection.js';
@@ -21,29 +22,59 @@ export function queueDir(): string {
   return QUEUE_DIR;
 }
 
-// سه هدفِ جدا:
+// چهار هدفِ جدا:
 //   'transcript' → صوتِ fallback جلسه (realtime واقعاً شکست خورده)، رونویسی و وارد
-//                  sessions.transcript می‌شود (merge نسخه‌ای)، بعد آرشیو می‌شود.
+//                  sessions.transcript می‌شود (merge نسخه‌ای)، بعد آرشیو می‌شود. فقط
+//                  رویِ جلسه‌ی هنوز-تمام‌نشده مجاز است (چکِ سطحِ route).
+//   'late-transcript' → همون رونویسی/mergeِ 'transcript'، ولی برایِ صدایِ آفلاینی که
+//                  *بعدِ* پایانِ جلسه به صف رسیده (audit صدا/۲۰۲۶-۰۹-۱۶، تصمیمِ مالک) —
+//                  رویِ جلسه‌ی completed هم مجاز است؛ متن با یک برچسبِ صریح append می‌شود.
 //   'note' → صوتِ یادداشت صوتیِ ناموفق، فقط به‌صورت session_notes(type='voice') ثبت می‌شود.
 //   'archive' → صدایِ جلسه‌ای که realtime توش کاملاً موفق بود — نیازی به رونویسیِ
 //               دوباره نیست (متن از قبل درسته)، فقط برایِ بازبینیِ ادمین آرشیو می‌شه.
-export type BatchPurpose = 'transcript' | 'note' | 'archive';
+export type BatchPurpose = 'transcript' | 'late-transcript' | 'note' | 'archive';
+
+export const LATE_TRANSCRIPT_LABEL = '[بخشِ ضبط‌شده در زمانِ قطعیِ اینترنت — بعداً رونویسی شد]';
 
 // باگِ قبلی: فایل فقط با Date.now() نام‌گذاری می‌شد و آپلودها موازی می‌رفتن — یعنی
 // (۱) دو سگمنت در یک میلی‌ثانیه = یک اسمِ فایل = یکی رویِ دیگری می‌نوشت (صدا گم می‌شد)،
 // (۲) ترتیبِ رسیدنِ آپلود، نه ترتیبِ واقعیِ ضبط، تعیین‌کننده‌ی ترتیبِ merge بود.
 // الان seq (شماره‌ی سگمنت، از خودِ کلاینت) صریح توی اسمِ فایل zero-padded میاد —
 // هم تصادم را از بین می‌بره، هم مرتب‌سازیِ الفباییِ filesFor() رو با ترتیبِ واقعی یکی می‌کنه.
+// 'late-transcript' مارکِ فایلِ جداگانه دارد (`.late.`) — وگرنه workerِ retry
+// (`retryQueuedBatches`) که purpose را فقط از رویِ نامِ فایل حدس می‌زند، فایلِ late-transcript
+// را با 'transcript'ِ ساده اشتباه می‌گرفت و برچسبِ صریح روی متنِ merge‌شده گم می‌شد.
 function markerFor(purpose: BatchPurpose): string {
   if (purpose === 'note') return '.note.';
   if (purpose === 'archive') return '.archive.';
+  if (purpose === 'late-transcript') return '.late.';
   return '.';
 }
-export function audioPathFor(sessionId: string, purpose: BatchPurpose = 'transcript', seq = 0): string {
+
+// mimeِ واقعیِ کلاینت (audit صدا/۲۰۲۶-۰۹-۱۶، بخشِ E) — قبلاً همیشه 'audio/webm' هاردکد
+// می‌شد؛ فایرفاکس/سافاری می‌توانند ogg/mp4 بفرستند. چون فایلِ صفِ موقت فقط بایت‌های خام
+// است (بدونِ مکان‌داریِ metadata)، پسوندِ خودِ فایل تنها جایی است که این اطلاعات بینِ
+// enqueue (که mime را از درخواست دارد) و processBatchQueue (که فقط بایت‌ها را می‌خواند)
+// منتقل می‌شود.
+export const KNOWN_EXTS = ['webm', 'ogg', 'm4a'] as const;
+export function extForMime(mime: string): string {
+  const m = (mime || '').toLowerCase();
+  if (m.includes('ogg')) return 'ogg';
+  if (m.includes('mp4') || m.includes('m4a') || m.includes('aac')) return 'm4a';
+  return 'webm'; // پیش‌فرضِ امن — رفتارِ قبلی
+}
+export function mimeForExt(ext: string): string {
+  if (ext === 'ogg') return 'audio/ogg';
+  if (ext === 'm4a') return 'audio/mp4';
+  return 'audio/webm';
+}
+export function audioPathFor(sessionId: string, purpose: BatchPurpose = 'transcript', seq = 0, runId = 'legacy', mime = 'audio/webm'): string {
   ensureDir();
   const safe = String(sessionId).replace(/[^a-zA-Z0-9-]/g, '');
   const seqPadded = String(Math.max(0, Math.floor(seq))).padStart(6, '0');
-  return path.join(QUEUE_DIR, `${safe}-${seqPadded}-${Date.now()}${markerFor(purpose)}webm`);
+  const runSafe = String(runId).replace(/[^a-zA-Z0-9]/g, '').slice(0, 32) || 'legacy';
+  const ext = extForMime(mime);
+  return path.join(QUEUE_DIR, `${safe}-${seqPadded}-${runSafe}-${Date.now()}${markerFor(purpose)}${ext}`);
 }
 
 export function validateAudioBuffer(buf: Buffer): string | null {
@@ -58,15 +89,17 @@ export async function enqueueBatch(
   sessionId: string,
   buf: Buffer,
   purpose: BatchPurpose = 'transcript',
-  seq = 0
+  seq = 0,
+  runId = 'legacy',
+  mime = 'audio/webm'
 ): Promise<{ baseVersion: number }> {
-  const cur = await query('SELECT transcript_version FROM sessions WHERE id = $1', [sessionId]);
+  const cur = await query('SELECT transcript_version FROM sessions WHERE id = ?', [sessionId]);
   const baseVersion: number = cur.rows[0]?.transcript_version ?? 0;
-  const p = audioPathFor(sessionId, purpose, seq);
+  const p = audioPathFor(sessionId, purpose, seq, runId, mime);
   writeFileSync(p, buf);
-  if (purpose === 'transcript') {
+  if (purpose === 'transcript' || purpose === 'late-transcript') {
     await query(
-      `UPDATE sessions SET batch_status = 'queued', stt_mode = 'batch', updated_at = now() WHERE id = $1`,
+      `UPDATE sessions SET batch_status = 'queued', stt_mode = 'batch', updated_at = NOW() WHERE id = ?`,
       [sessionId]
     );
   }
@@ -80,13 +113,28 @@ function isNoteFile(f: string): boolean {
 function isArchiveFile(f: string): boolean {
   return f.includes('.archive.');
 }
+function isLateFile(f: string): boolean {
+  return f.includes('.late.');
+}
 
-// seq از اسمِ فایل استخراج می‌شه (فرمت: <sessionId>-<seqِ ۶رقمی>-<timestamp>[.note|.archive].webm)
-// تا موقعِ آرشیوکردن برایِ ادمین، ترتیبِ واقعیِ سگمنت حفظ بمونه.
+// seq/run/mime از اسمِ فایل استخراج می‌شه (فرمت:
+// <sessionId>-<seqِ ۶رقمی>-<runId>-<timestamp>[.note|.archive|.late].<webm|ogg|m4a>)
+// تا موقعِ آرشیوکردن برایِ ادمین، ترتیبِ واقعیِ سگمنت، runِ صاحبش، و mimeِ واقعی حفظ بمونه.
+const EXT_ALTERNATION = KNOWN_EXTS.join('|');
 function seqFromFilename(filePath: string): number {
   const base = path.basename(filePath);
-  const m = base.match(/-(\d{6})-\d+\.(?:note\.|archive\.)?webm$/);
+  const m = base.match(new RegExp(`-(\\d{6})-[a-zA-Z0-9]+-\\d+\\.(?:note\\.|archive\\.|late\\.)?(?:${EXT_ALTERNATION})$`));
   return m ? parseInt(m[1], 10) : 0;
+}
+function runIdFromFilename(filePath: string): string {
+  const base = path.basename(filePath);
+  const m = base.match(new RegExp(`-\\d{6}-([a-zA-Z0-9]+)-\\d+\\.(?:note\\.|archive\\.|late\\.)?(?:${EXT_ALTERNATION})$`));
+  return m ? m[1] : 'legacy';
+}
+function mimeFromFilename(filePath: string): string {
+  const base = path.basename(filePath);
+  const m = base.match(new RegExp(`\\.(${EXT_ALTERNATION})$`));
+  return mimeForExt(m ? m[1] : 'webm');
 }
 
 function filesFor(sessionId: string, purpose: BatchPurpose): string[] {
@@ -97,7 +145,8 @@ function filesFor(sessionId: string, purpose: BatchPurpose): string[] {
       if (!f.startsWith(safe + '-')) return false;
       if (purpose === 'note') return isNoteFile(f);
       if (purpose === 'archive') return isArchiveFile(f);
-      return !isNoteFile(f) && !isArchiveFile(f);
+      if (purpose === 'late-transcript') return isLateFile(f);
+      return !isNoteFile(f) && !isArchiveFile(f) && !isLateFile(f);
     })
     .sort()
     .map((f) => path.join(QUEUE_DIR, f));
@@ -123,17 +172,21 @@ export function removeAudioFile(p: string) {
 // با فقط متنِ تازه‌ی این سگمنت REPLACE می‌کرد — یعنی دقیقاً در رایج‌ترین حالت (هیچ‌کس
 // دیگه‌ای بینِ enqueue و merge چیزی ننوشته)، هر متنِ تاییدشده‌ی قبلی (از realtime یا
 // سگمنت‌هایِ قبلیِ همین batch) پاک می‌شد. هر دو شاخه الان دقیقاً یک کار می‌کنن: append.
-export async function mergeBatchTranscript(sessionId: string, baseVersion: number, batchText: string): Promise<void> {
+// label: برایِ purpose='late-transcript' — سگمنتِ append‌شده را صریح به‌عنوانِ صدایِ
+// آفلاینِ بعدِ پایانِ جلسه علامت می‌زند (تصمیمِ مالک، audit صدا/۲۰۲۶-۰۹-۱۶) — بدونِ این،
+// تراپیست فرقِ متنِ زنده و متنِ بازیابی‌شده‌ی دیرهنگام را در پرونده نمی‌دید.
+export async function mergeBatchTranscript(sessionId: string, baseVersion: number, batchText: string, label?: string): Promise<void> {
   const text = batchText.trim();
   if (!text) return;
-  const cur = await query('SELECT transcript, transcript_version FROM sessions WHERE id = $1', [sessionId]);
+  const cur = await query('SELECT transcript, transcript_version FROM sessions WHERE id = ?', [sessionId]);
   if (!cur.rows.length) return;
   const currentText: string = cur.rows[0]?.transcript ?? '';
   const currentVersion: number = cur.rows[0]?.transcript_version ?? 0;
-  const merged = currentText ? currentText + '\n\n' + text : text;
+  const segment = label ? `${label}\n${text}` : text;
+  const merged = currentText ? currentText + '\n\n' + segment : segment;
   await query(
-    `UPDATE sessions SET transcript = $1, transcript_version = transcript_version + 1,
-      realtime_reliable = false, batch_status = 'done', updated_at = now() WHERE id = $2`,
+    `UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1,
+      realtime_reliable = false, batch_status = 'done', updated_at = NOW() WHERE id = ?`,
     [merged, sessionId]
   );
   console.log(`[batch] merged session=${sessionId} base=${baseVersion} now=${currentVersion}+1 conflict=${currentVersion !== baseVersion}`);
@@ -147,7 +200,22 @@ export async function mergeBatchTranscript(sessionId: string, baseVersion: numbe
 // purpose=note → نتیجه فقط session_notes(type='voice') می‌شود، نه transcript.
 // purpose=archive → realtime قبلاً موفق و متن قبلاً کامل/درست بوده — نیازی به رونویسیِ
 // دوباره (و ریسکِ duplicate) نیست؛ فقط صدا برایِ ادمین آرشیو می‌شه، بدونِ صدازدنِ Soniox.
+// قفلِ per-session:queue تا دو فراخوانیِ هم‌زمانِ processBatchQueue (مثلاً یه
+// retryِ دستی درست وسطِ workerِ دوره‌ای) رویِ یک sessionId، متنِ یکسان رو دوبار
+// merge نکنن یا هر دو یه فایل رو هم‌زمان بخونن/حذف کنن.
+const queueLocks = new Map<string, Promise<unknown>>();
+function withQueueLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const prev = queueLocks.get(key) || Promise.resolve();
+  const run = prev.catch(() => {}).then(fn);
+  queueLocks.set(key, run.catch(() => {}));
+  return run;
+}
+
 export async function processBatchQueue(sessionId: string, purpose: BatchPurpose = 'transcript'): Promise<void> {
+  return withQueueLock(`${sessionId}:${purpose}`, () => processBatchQueueInner(sessionId, purpose));
+}
+
+async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose): Promise<void> {
   const files = pendingAudiosFor(sessionId, purpose);
   if (!files.length) return;
 
@@ -158,7 +226,7 @@ export async function processBatchQueue(sessionId: string, purpose: BatchPurpose
       let buffer: Buffer;
       try { buffer = readFileSync(file); } catch { continue; }
       try {
-        await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, 'audio/webm', 'durable');
+        await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, mimeFromFilename(file), 'durable', runIdFromFilename(file), 'session');
         removeAudioFile(file);
         console.log(`[batch] archived (no transcribe) session=${sessionId} seq=${seqFromFilename(file)}`);
       } catch (e) {
@@ -168,15 +236,16 @@ export async function processBatchQueue(sessionId: string, purpose: BatchPurpose
     return;
   }
 
+  const isTranscriptLike = purpose === 'transcript' || purpose === 'late-transcript';
   const sonioxKey = process.env.SONIOX_API_KEY;
   if (!sonioxKey) {
-    if (purpose === 'transcript') {
-      await query(`UPDATE sessions SET batch_status = 'failed', updated_at = now() WHERE id = $1`, [sessionId]);
+    if (isTranscriptLike) {
+      await query(`UPDATE sessions SET batch_status = 'failed', updated_at = NOW() WHERE id = ?`, [sessionId]);
     }
     return;
   }
-  if (purpose === 'transcript') {
-    await query(`UPDATE sessions SET batch_status = 'processing', updated_at = now() WHERE id = $1`, [sessionId]);
+  if (isTranscriptLike) {
+    await query(`UPDATE sessions SET batch_status = 'processing', updated_at = NOW() WHERE id = ?`, [sessionId]);
   }
   try {
     const { readFileSync } = await import('node:fs');
@@ -185,67 +254,114 @@ export async function processBatchQueue(sessionId: string, purpose: BatchPurpose
     for (const file of files) {
       let buffer: Buffer;
       try { buffer = readFileSync(file); } catch { continue; }
-      const baseRow = await query('SELECT transcript_version FROM sessions WHERE id = $1', [sessionId]);
+      // ⭐ آرشیو قبل از رونویسی: حتی اگه transcribeFileAsync بعداً شکست بخوره (egress
+      // قطع، سهمیه‌ی Soniox، …) صدا از قبل امن ذخیره شده. idempotent (sha256) —
+      // retryِ همین فایل روی این خط فقط no-op می‌کنه، ردیفِ تکراری نمی‌سازه.
+      try {
+        await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, mimeFromFilename(file), 'durable', runIdFromFilename(file), purpose === 'note' ? 'note' : 'session');
+      } catch (e) {
+        console.log('[batch] archive-for-admin failed, kept queued:', String(e).slice(0, 160));
+        continue;
+      }
+      const baseRow = await query('SELECT transcript_version FROM sessions WHERE id = ?', [sessionId]);
       const baseVersion: number = baseRow.rows[0]?.transcript_version ?? 0;
       console.log(`[batch] processing session=${sessionId} purpose=${purpose} bytes=${buffer.length} (async API)`);
       let text = '';
       try {
         text = await transcribeFileAsync(buffer, `${sessionId}.webm`, `feelia:${sessionId}:${purpose}`);
       } catch (e) {
-        console.log('[batch] async transcribe error:', String(e).slice(0, 160));
-        continue; // این فایل توی صف می‌مونه، همون‌جوری که قبلاً روی خطایِ شبکه رفتار می‌کرد
+        console.log('[batch] async transcribe error, kept queued (already archived):', String(e).slice(0, 160));
+        continue; // این فایل توی صف می‌مونه؛ صدا از قبل آرشیو شده، فقط رونویسی عقب افتاده
       }
       if (text && text.trim()) {
         if (purpose === 'note') {
           await query(
-            `INSERT INTO session_notes (session_id, type, text, wall_clock)
-             VALUES ($1, 'voice', $2, $3)`,
-            [sessionId, text.trim(), new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })]
+            `INSERT INTO session_notes (id, session_id, type, text, wall_clock)
+             VALUES (?, ?, 'voice', ?, ?)`,
+            [randomUUID(), sessionId, text.trim(), new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })]
           );
         } else {
-          await mergeBatchTranscript(sessionId, baseVersion, text);
+          await mergeBatchTranscript(sessionId, baseVersion, text, purpose === 'late-transcript' ? LATE_TRANSCRIPT_LABEL : undefined);
         }
-        // ⭐ به‌جایِ پاک‌کردنِ کامل، یه نسخه برایِ بازبینیِ ادمین آرشیو می‌شه (فقط پشتِ
-        // requireAdmin قابلِ‌شنیدنه) — فایلِ صفِ موقت همچنان حذف می‌شه.
-        try { await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, 'audio/webm', 'durable'); } catch (e) {
-          console.log('[batch] archive-for-admin failed:', String(e).slice(0, 160));
-        }
-        removeAudioFile(file);
-        console.log(`[batch] segment done session=${sessionId} purpose=${purpose}`);
       } else {
-        console.log(`[batch] empty result, kept queued session=${sessionId} purpose=${purpose}`);
+        // ⭐ سکوت هم نتیجه‌ی موفقِ رونویسیه، نه شکست — قبلاً این حالت برایِ همیشه توی
+        // صف می‌موند (و بعدِ ۲۴ ساعت بدونِ آرشیو پاک می‌شد، پایینِ همین فایل).
+        console.log(`[batch] empty result (silence, treated as success) session=${sessionId} purpose=${purpose}`);
       }
+      removeAudioFile(file);
+      console.log(`[batch] segment done session=${sessionId} purpose=${purpose}`);
     }
-    if (purpose === 'transcript') {
-      const left = pendingAudiosFor(sessionId, 'transcript');
+    if (isTranscriptLike) {
+      const left = pendingAudiosFor(sessionId, purpose);
       await query(
-        `UPDATE sessions SET batch_status = $1, updated_at = now() WHERE id = $2`,
+        `UPDATE sessions SET batch_status = ?, updated_at = NOW() WHERE id = ?`,
         [left.length ? 'queued' : 'done', sessionId]
       );
       console.log(`[batch] finished session=${sessionId} remaining=${left.length}`);
     }
   } catch (err) {
     console.log('[batch] processing failed:', String(err).slice(0, 160));
-    if (purpose === 'transcript') {
-      await query(`UPDATE sessions SET batch_status = 'queued', updated_at = now() WHERE id = $1`, [sessionId]).catch(() => {});
+    if (isTranscriptLike) {
+      await query(`UPDATE sessions SET batch_status = 'queued', updated_at = NOW() WHERE id = ?`, [sessionId]).catch(() => {});
     }
   }
 }
 
+function sessionIdFromFilename(filePath: string): string {
+  const base = path.basename(filePath);
+  const m = base.match(/^(.*)-\d{6}-[a-zA-Z0-9]+-\d+\.(?:note\.|archive\.)?webm$/);
+  return m ? m[1] : base;
+}
+
 // پاک‌سازی startup: فایل‌های قدیمی‌تر از RETENTION_MS (نشت دیسک/حریم خصوصی).
-export function sweepOldBatchFiles() {
+// ⭐ باگِ قبلی: فایل مستقیم پاک می‌شد، حتی اگه Soniox/سرور هیچ‌وقت نتونسته بود
+// آرشیوش کنه (کلیدِ نامعتبر، ری‌استارتِ مکرر) — یعنی بعدِ ۲۴ ساعت صدا برایِ همیشه
+// از بین می‌رفت. الان قبل از حذف، یه‌بار تلاش می‌کنه آرشیوش کنه (fail-open — اگه
+// این هم شکست بخوره، همچنان طبقِ سیاستِ نگهداریِ ۲۴ساعته پاک می‌شه، وگرنه فایل‌هایِ
+// خراب/یتیم برایِ همیشه می‌موندن).
+export async function sweepOldBatchFiles(): Promise<void> {
   try {
     ensureDir();
     const now = Date.now();
+    const { readFileSync } = await import('node:fs');
+    const { archiveAudioForAdmin } = await import('./sessionAudioArchive.js');
     for (const f of readdirSync(QUEUE_DIR)) {
       const p = path.join(QUEUE_DIR, f);
       try {
         const age = now - statSync(p).mtimeMs;
         if (age > RETENTION_MS) {
+          try {
+            const buffer = readFileSync(p);
+            const sessionId = sessionIdFromFilename(p);
+            await archiveAudioForAdmin(sessionId, seqFromFilename(p), buffer, mimeFromFilename(p), 'durable', runIdFromFilename(p), isNoteFile(f) ? 'note' : 'session');
+          } catch (e) {
+            console.log('[batch] pre-sweep archive failed (still sweeping):', String(e).slice(0, 160));
+          }
           rmSync(p, { force: true });
           console.log(`[batch] swept old file ${f}`);
         }
       } catch {}
+    }
+  } catch {}
+}
+
+// workerِ دوره‌ای: فایل‌هایِ صفی که موقعِ enqueue شکستِ egress/کلید داشتن (مثلاً
+// SONIOX_API_KEY وقتِ آپلود نامعتبر بود) بدونِ اون دوباره retry نمی‌شدن، فقط با
+// لودِ مجددِ صفحه یا ری‌استارتِ سرور. الان هر چند دقیقه صفِ هر sessionId/purpose
+// دوباره امتحان می‌شه.
+export async function retryQueuedBatches(): Promise<void> {
+  try {
+    ensureDir();
+    const seen = new Set<string>();
+    for (const f of readdirSync(QUEUE_DIR)) {
+      const purpose: BatchPurpose = isNoteFile(f) ? 'note' : isArchiveFile(f) ? 'archive' : isLateFile(f) ? 'late-transcript' : 'transcript';
+      const sessionId = sessionIdFromFilename(path.join(QUEUE_DIR, f));
+      const key = `${sessionId}:${purpose}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      try { await processBatchQueue(sessionId, purpose); } catch (e) {
+        console.log('[batch] retry worker failed for', key, String(e).slice(0, 160));
+      }
     }
   } catch {}
 }

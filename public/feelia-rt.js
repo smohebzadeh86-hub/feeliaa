@@ -56,13 +56,14 @@
   var BATCH_POLL_MS = 5000;
   var BATCH_TIMEOUT_MS = 15 * 60 * 1000; // explicit: سقف انتظار batch
   var MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg'];
-  // ⭐ ضبطِ durable هر ۶۰ ثانیه چرخش می‌کنه (سگمنتِ فعلی بسته، یکیِ تازه شروع) —
-  // نه فقط سرِ pause/resume. چرا: قبلاً یه ضبطِ durableِ واحد از اولِ جلسه تا اولین
-  // pause/پایان ادامه داشت — یعنی (۱) کلِ صدا توی حافظه‌یِ RAM (یه آرایه‌ی chunk)
-  // جمع می‌شد بدونِ سقف، (۲) اگه چیزی وسطِ جلسه خراب می‌شد (تب بسته/کرش)، کلِ صدایِ
-  // اون جلسه از دست می‌رفت، نه فقط چند ثانیه‌ی آخر. با چرخشِ ۶۰ثانیه‌ای، هر سگمنت یه
-  // فایلِ کاملِ مستقله که بلافاصله قابلِ‌آپلوده — این پیش‌نیازِ صفِ آفلاینِ آینده هم هست.
-  var DURABLE_ROTATE_MS = 60 * 1000;
+  // ⭐ ضبطِ durable چرخش می‌کنه (سگمنتِ فعلی بسته، یکیِ تازه شروع) — نه فقط سرِ
+  // pause/resume. چرا: قبلاً یه ضبطِ durableِ واحد از اولِ جلسه تا اولین pause/پایان
+  // ادامه داشت — یعنی (۱) کلِ صدا توی حافظه‌یِ RAM (یه آرایه‌ی chunk) جمع می‌شد
+  // بدونِ سقف، (۲) اگه چیزی وسطِ جلسه خراب می‌شد (تب بسته/کرش)، کلِ صدایِ اون جلسه
+  // از دست می‌رفت، نه فقط چند ثانیه‌ی آخر. هر سگمنت یه فایلِ کاملِ مستقله که بلافاصله
+  // قابلِ‌آپلوده. (audit صدا/۲۰۲۶-۰۹-۱۶، تصمیمِ مالک): از ۶۰ به ۱۵ ثانیه — پنجره‌ی
+  // صدایِ در-خطر (فقط در RAM، هنوز در IndexedDB نیست) به یک‌چهارم کاهش می‌یابد.
+  var DURABLE_ROTATE_MS = 15 * 1000;
   // ⭐ این فقط رویِ ضبطِ durable (نسخه‌ی پشتیبان/fallback) اعمال می‌شه، نه رویِ استریمِ
   // زنده‌ای که مستقیم به Soniox می‌ره — کیفیتِ اون نباید کم بشه چون رویِ دقتِ
   // رونویسیِ زنده اثر می‌ذاره. ۲۴kbps مونو برایِ گفتار و برایِ رونویسیِ batch/شنیدنِ
@@ -84,6 +85,13 @@
     return navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
+  }
+
+  // شناسه‌ی یکتایِ هر RTSession (هر بارِ start/resume یکی تازه می‌گیره) — کلیدِ
+  // IndexedDB و پارامترِ آپلود رو با این می‌سازیم تا دو run هیچ‌وقت رویِ seqِ
+  // یکسان تصادم نکنن (یادداشتِ صوتی هم‌زمان با جلسه، یا ادامه‌ی جلسه بعدِ رفرش).
+  function genRunId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
 
   function stopStream(s) {
@@ -161,16 +169,25 @@
       }).catch(function () { return 0; });
     }
     // اضافه‌کردنِ یه سگمنت. اگه از سقف رد بشه، false برمی‌گردونه (ذخیره نمی‌شه).
-    function add(sessionId, seq, blob, mime) {
+    // ⭐ کلید شاملِ runId هم می‌شه (نه فقط sessionId_seq) — وگرنه یادداشتِ صوتیِ
+    // هم‌زمان یا ادامه‌ی جلسه بعدِ رفرش (که هر دو seq رو از ۰ شروع می‌کنن) رکوردِ
+    // سگمنتِ آپلودنشده‌ی run قبلی رو بی‌صدا رویِ هم می‌نوشتن (store.put با کلیدِ تکراری).
+    // intent: قصدِ ضبط در همون لحظه ('archive'|'transcript'|'note') — تعیین‌کننده‌ی
+    // purposeِ آپلود در آینده است، نه وضعیتِ لحظه‌ایِ RTSession در زمانِ آپلود (audit
+    // صدا/۲۰۲۶-۰۹-۱۶، بخشِ C). رکوردهایِ قدیمی‌ترِ بدونِ این فیلد در uploadQueuedSegment
+    // با fallbackِ 'archive' هندل می‌شن.
+    function add(sessionId, runId, seq, blob, mime, intent) {
       return totalBytes().then(function (used) {
         if (used + blob.size > AUDIO_QUEUE_MAX_BYTES) return false;
         var rec = {
-          id: sessionId + '_' + seq,
+          id: sessionId + '_' + runId + '_' + seq,
           sessionId: sessionId,
+          runId: runId,
           seq: seq,
           blob: blob,
           mime: mime || 'audio/webm',
           bytes: blob.size,
+          intent: intent || 'archive',
           createdAt: Date.now(),
         };
         return withStore('readwrite', function (store) { return store.put(rec); }).then(function () { return true; });
@@ -184,15 +201,17 @@
         return (rows || []).sort(function (a, b) { return a.seq - b.seq; });
       }).catch(function () { return []; });
     }
-    function remove(sessionId, seq) {
-      return withStore('readwrite', function (store) { return store.delete(sessionId + '_' + seq); }).catch(function () {});
+    // با idِ کاملِ رکورد (نه بازسازیِ دستی) — امن‌تره چون رکوردهایِ قدیمی‌ترِ قبلِ این
+    // نسخه (فرمتِ sessionId_seq بدونِ runId) هم درست حذف می‌شن.
+    function remove(id) {
+      return withStore('readwrite', function (store) { return store.delete(id); }).catch(function () {});
     }
     // ⭐ وقتی مسیرِ realtime قابلِ‌اعتماد بود (unreliable=false)، صدایِ durable هیچ‌وقت
     // آپلود نمی‌شه (طبقِ همون قاعده‌ی حریمِ خصوصیِ همیشگی: صدایِ خام فقط توی مسیرِ
     // شکست به سرور می‌ره) — پس نسخه‌هایِ محلی‌اش دیگه لازم نیستن، همین‌جا پاک می‌شن.
     function clearForSession(sessionId) {
       return listForSession(sessionId).then(function (rows) {
-        return Promise.all(rows.map(function (r) { return remove(sessionId, r.seq); }));
+        return Promise.all(rows.map(function (r) { return remove(r.id); }));
       }).catch(function () {});
     }
     // همه‌ی sessionId هایی که هنوز صدایِ آپلودنشده دارن — برایِ جاروبِ هر بارِ لودِ صفحه
@@ -209,6 +228,68 @@
       totalBytes: totalBytes, listSessionIdsWithPending: listSessionIdsWithPending
     };
   })();
+
+  // ⭐ منطقِ یکتایِ انتخابِ purpose از رویِ intentِ خودِ رکورد + آپلود + fallback
+  // (audit صدا/۲۰۲۶-۰۹-۱۶، بخشِ C). همه‌ی مسیرهایی که صفِ IndexedDB را آپلود می‌کنند
+  // (uploadBatchSegments، drainQueuedAudioInBackground، archiveQueuedAudioOnly، و
+  // sweepOrphanedAudioQueueِ index.html) از همین یک تابع استفاده می‌کنند — قبلاً هرکدام
+  // purpose را جدا و با دانشِ لحظه‌ایِ ناقص (وضعیتِ *فعلیِ* RTSession، نه وضعیتِ واقعیِ
+  // رکورد در لحظه‌ی ضبط) حدس می‌زدند؛ چون همه‌ی صف‌ها با sessionId مشترک خونده می‌شن،
+  // ممکن بود سگمنتی از یه runِ قبلی با فرضِ اشتباهِ runِ فعلی آپلود بشه. الان هر رکورد
+  // دقیقاً با intentِ خودش (که موقعِ ضبط تعیین شده) آپلود می‌شه.
+  // برمی‌گرداند Promise<boolean> — true یعنی رکورد باید از صف حذف شود.
+  function uploadQueuedSegment(sessionId, rec) {
+    var intent = rec.intent || 'archive'; // legacy بدونِ intent → رفتارِ قبلی (فقط آرشیو)
+    var purpose = intent === 'note' ? 'note' : (intent === 'transcript' ? 'transcript' : 'archive');
+    var run = rec.runId || 'legacy';
+    var send = function (p) {
+      var fd = new FormData();
+      fd.append('file', rec.blob, 'segment-' + rec.seq + '.webm');
+      return fetch('/api/sessions/' + sessionId + '/batch-audio?purpose=' + p + '&seq=' + rec.seq + '&run=' + encodeURIComponent(run), { method: 'POST', body: fd });
+    };
+    return send(purpose).then(function (res) {
+      if (res.ok) return true;
+      if (res.status === 404) return true; // جلسه دیگه وجود نداره — نگه‌داشتن بی‌فایده‌ست
+      if (res.status === 400) {
+        return res.json().catch(function () { return {}; }).then(function (d) {
+          if (d && String(d.error || '').indexOf('کوتاه') >= 0) return true; // غیرقابلِ‌بازیابی
+          if (purpose === 'transcript') {
+            // ⭐ تصمیمِ مالک: صدایِ آفلاینی که رونویسی‌اش بعدِ پایانِ جلسه رسیده گم نمی‌شود —
+            // به‌جایِ آرشیوِ بی‌صدا، با purpose=late-transcript رونویسی و با برچسبِ صریح
+            // به انتهایِ متن append می‌شود.
+            return send('late-transcript').then(function (res2) { return res2.ok; }).catch(function () { return false; });
+          }
+          return false; // ۴۰۰ِ دیگر (نباید عادی باشه) — نگه‌دار، دفعه‌ی بعد دوباره
+        });
+      }
+      return false; // شکستِ شبکه/۵xx — توی صف بمونه، دفعه‌ی بعد دوباره امتحان می‌شه
+    }).catch(function () { return false; });
+  }
+
+  // ————————————————— قفلِ سراسریِ صف‌خوانی/آپلودِ صدا —————————————————
+  // ⭐ باگِ واقعی (audit صدا/۲۰۲۶-۰۹-۱۶، مشاهده‌شده در تستِ زنده): قبلاً هر RTSession فقط
+  // با یک قفلِ per-instance (`self._queueLock`) خودش را هماهنگ می‌کرد — این قفل هیچ
+  // ارتباطی با `sweepOrphanedAudioQueue`ِ سراسریِ index.html (که صفِ همون sessionId را
+  // مستقل می‌خواند/آپلود/پاک می‌کند) نداشت. در تستِ زنده دیده شد که اگر sweep و یک
+  // RTSessionِ فعال هم‌زمان روی یک sessionId کار کنند (مثلاً چند تبِ باز، یا مسیری که
+  // `feelia_active_session` را ست نکرده)، می‌توانند رویِ هم بیفتند — sha256/قفلِ سرور
+  // جلویِ خرابیِ داده را می‌گرفت، ولی خودِ race واقعی بود. الان یک قفلِ **مشترکِ ماژول**
+  // (`navigator.locks` اگر مرورگر پشتیبانی کند — واقعاً بینِ تب‌ها هم مشترک است؛ وگرنه
+  // یک promise-lockِ سطحِ ماژول که حداقل داخلِ همین تب هماهنگ می‌کند) کلیدشده با
+  // sessionId، همه‌جا (RTSession.prototype.*، و sweepِ index.html از طریقِ همین تابع)
+  // استفاده می‌شود — دیگر دو مسیر هیچ‌وقت هم‌زمان صفِ یک session را دست‌کاری نمی‌کنند.
+  var moduleAudioLocks = {};
+  function withAudioLock(sessionId, fn) {
+    try {
+      if (window.navigator && navigator.locks && navigator.locks.request) {
+        return navigator.locks.request('feelia-audio-' + sessionId, fn);
+      }
+    } catch (e) {}
+    var prev = moduleAudioLocks[sessionId] || Promise.resolve();
+    var run = prev.catch(function () {}).then(fn);
+    moduleAudioLocks[sessionId] = run.catch(function () {});
+    return run;
+  }
 
   // باگِ ریشه‌ای: fetch به‌خودیِ‌خود هیچ سقفِ زمانی نداره — رویِ شبکه‌ی ناپایدار
   // (مثلاً پکت‌هایی که بدونِ خطای صریح گم می‌شن)، این promise می‌تونست تا ابد معلق
@@ -260,6 +341,7 @@
   function RTSession(sessionId, opts) {
     opts = opts || {};
     this.sessionId = sessionId;
+    this.runId = genRunId();
     this.mode = opts.mode === 'note' ? 'note' : 'live'; // note: بدون persistence transcript
     this.persist = this.mode === 'live';
     this.cb = {
@@ -300,13 +382,11 @@
     this.pauseToken = 0;
     // ⭐ قفلِ صفِ IndexedDB: سه تابعِ جدا (drainQueuedAudioInBackground حینِ جلسه،
     // uploadBatchSegments و archiveQueuedAudioOnly توی finish) هر کدوم صفِ همین
-    // sessionId رو می‌خونن/آپلود می‌کنن/پاک می‌کنن. بدونِ این قفل، اگه drain حینِ
-    // یه reconnect هنوز در حالِ آپلودِ یه سگمنت باشه (قبل از حذفش از IndexedDB) و
-    // درست همون لحظه کاربر «پایان جلسه» بزنه، finish() همون سگمنتِ هنوز-حذف-نشده
-    // رو دوباره می‌بینه و دوباره آپلودش می‌کنه — همون متن دوبار merge می‌شه. همه‌ی
-    // سه تابع الان رویِ این زنجیره صف می‌کشن تا هیچ‌وقت هم‌زمان رویِ صفِ یک session
-    // کار نکنن.
-    this._queueLock = Promise.resolve();
+    // sessionId رو می‌خونن/آپلود می‌کنن/پاک می‌کنن — و از بیرون، sweepOrphanedAudioQueueِ
+    // سراسری هم می‌تونه هم‌زمان همون کار رو بکنه. بدونِ یه قفلِ مشترک، دو تا از این‌ها
+    // می‌تونستن رویِ هم بیفتن (متن دوبار merge بشه، یا هر دو یه سگمنتِ نیمه‌حذف‌شده رو
+    // ببینن). قفلِ واقعی حالا سطحِ ماژوله، نه per-instance — رجوع به withAudioLock
+    // (تعریف‌شده کنارِ uploadQueuedSegment)، که همین sessionId رو با sweep هم مشترک است.
     this.timers = [];
     this.autosaveTimer = null;
     this.finishResolver = null;
@@ -361,7 +441,48 @@
   RTSession.prototype.ensureStream = function () {
     var self = this;
     if (self.stream && self.stream.active) return Promise.resolve(self.stream);
-    return reqStream().then(function (s) { self.stream = s; return s; });
+    return reqStream().then(function (s) { self.stream = s; self.watchTrackEnded(s); return s; });
+  };
+
+  // ⭐ باگِ واقعی (audit صدا/۲۰۲۶-۰۹-۱۶): جداشدنِ فیزیکیِ میکروفون (هدست/OS/تماسِ
+  // تلفن) به MediaRecorder هیچ خطایی نمی‌ده — ضبط فقط بی‌صدا متوقف می‌شه، بدونِ
+  // هیچ نشانه‌ای برایِ کاربر یا کد. تنها رویدادِ قابلِ‌اعتماد track.onended است.
+  RTSession.prototype.watchTrackEnded = function (stream) {
+    var self = this;
+    try {
+      var tracks = stream.getAudioTracks ? stream.getAudioTracks() : [];
+      tracks.forEach(function (t) { t.onended = function () { self.handleMicLost(); }; });
+    } catch (e) {}
+  };
+
+  // بازیابیِ خودکار: میکروفونِ ازدست‌رفته را با backoff دوباره می‌گیرد و ضبطِ
+  // durable/livePusher را رویِ streamِ تازه از نو شروع می‌کند — بدونِ دست‌زدن به
+  // state machineِ اصلی (WS/finalize) که مستقل است.
+  RTSession.prototype.handleMicLost = function () {
+    var self = this;
+    if (self.aborted || self.state === STATES.COMPLETED || self.state === STATES.CANCELED ||
+        self.state === STATES.MANUAL_PAUSED || self.state === STATES.FINALIZING) return;
+    if (self._micRecovering) return;
+    self._micRecovering = true;
+    try { self.cb.onError('میکروفون قطع شد — در حال تلاش برای اتصالِ دوباره'); } catch (e) {}
+    self.stopLivePusher();
+    var wasDurable = !!(self.durableRec && self.durableRec.state === 'recording');
+    self.stopDurableSegment();
+    self.stream = null;
+    var attempt = function (n) {
+      if (self.aborted || self.state === STATES.COMPLETED || self.state === STATES.CANCELED) { self._micRecovering = false; return; }
+      self.ensureStream().then(function () {
+        self._micRecovering = false;
+        try { self.cb.onError('میکروفون دوباره وصل شد'); } catch (e) {}
+        if (self.hasOpenWS()) self.startLivePusher();
+        if (wasDurable) self.startDurable();
+      }).catch(function () {
+        if (self.aborted) { self._micRecovering = false; return; }
+        var delay = RECONNECT_BACKOFF_MS[Math.min(n, RECONNECT_BACKOFF_MS.length - 1)];
+        self.later(function () { attempt(n + 1); }, delay);
+      });
+    };
+    attempt(0);
   };
 
   RTSession.prototype.startLivePusher = function () {
@@ -420,6 +541,10 @@
         self.durableRec = mime ? new MediaRecorder(self.stream, { mimeType: mime }) : new MediaRecorder(self.stream);
       } catch (e2) { return; }
     }
+    // ⭐ mimeِ واقعیِ گزارش‌شده توسطِ خودِ MediaRecorder (audit صدا/۲۰۲۶-۰۹-۱۶، بخشِ E) —
+    // باید همین‌جا (بلافاصله بعدِ ساخت) گرفته بشه، نه داخلِ onstop: تا اون لحظه
+    // stopDurableSegment از قبل self.durableRec رو null کرده (رجوع به همون تابع).
+    var recordedMime = self.durableRec.mimeType || mime || 'audio/webm';
     self.durableRec.ondataavailable = function (e) {
       if (e.data && e.data.size > 0) self.durableChunks.push(e.data);
     };
@@ -443,9 +568,17 @@
       // بعدِ پاک‌سازیِ صف دوباره اضافه می‌شد و برایِ همیشه یتیم می‌موند.
       if (!chunks.length || self.aborted) { resolveFlush(); return; }
       var seq = self.durableSeq++;
+      // ⭐ intent تصمیمِ همین لحظه است (نه بعداً حدس‌زده‌شده در زمانِ آپلود، audit صدا/
+      // ۲۰۲۶-۰۹-۱۶، بخشِ C): یادداشتِ صوتی همیشه 'note'؛ اگه realtime همین الان غیرقابل‌اعتماد
+      // است یا وضعیتِ ناپایدار (reconnect/network-paused/failed)، این سگمنت باید رونویسی
+      // بشه ('transcript') چون شاید هنوز جایی ثبت نشده؛ وگرنه فقط برایِ بازبینیِ ادمین
+      // آرشیو کافیه ('archive'، متن از قبل از رویِ realtime درست ذخیره شده).
+      var intent = self.mode === 'note' ? 'note' :
+        (self.unreliable || self.state === STATES.RECONNECTING || self.state === STATES.NETWORK_PAUSED || self.state === STATES.FAILED)
+          ? 'transcript' : 'archive';
       try {
-        var blob = new Blob(chunks, { type: (mime || 'audio/webm') });
-        AudioQueueDB.add(self.sessionId, seq, blob, mime || 'audio/webm').then(function (ok) {
+        var blob = new Blob(chunks, { type: recordedMime });
+        AudioQueueDB.add(self.sessionId, self.runId, seq, blob, recordedMime, intent).then(function (ok) {
           if (!ok) {
             // سقفِ صفِ آفلاین رد شده — این سگمنت ذخیره نشد. صادقانه به caller اطلاع بده
             // تا UI بتونه هشدارِ واضح نشون بده، نه اینکه بی‌صدا صدا گم بشه.
@@ -467,8 +600,14 @@
   // برمی‌گردونه promiseِ «آخرین سگمنت واقعاً توی IndexedDB نوشته شد» — caller هایی
   // مثلِ finish() که بلافاصله بعدش سراغِ آرشیو/آپلودِ صف می‌رن باید صبر کنن (وگرنه
   // دقیقاً همون race که بالا توضیح داده شد رخ می‌ده). callerهایی که فقط می‌خوان
-  // durable rotation رو ببندن (چرخشِ ۶۰ثانیه‌ای، pause، cleanupAudio) نیازی به await
+  // durable rotation رو ببندن (چرخشِ دوره‌ای، pause، cleanupAudio) نیازی به await
   // ندارن — promise رو نادیده می‌گیرن، بی‌ضرره.
+  // ⭐ نگهبان از ۱۵۰۰ms به ۱۰۰۰۰ms افزایش یافت (audit صدا/۲۰۲۶-۰۹-۱۶): AudioQueueDB.add
+  // قبل از نوشتن، totalBytes() را با خواندنِ همه‌ی blobهایِ صفِ آفلاین حساب می‌کند —
+  // رویِ صفِ بزرگ (نزدیکِ سقفِ ۳۰۰MB) یا دیسکِ کندِ کاربر، این می‌تونه بیشتر از ۱.۵
+  // ثانیه طول بکشه؛ اگه نگهبان زودتر fire بشه، finish()/pause() سراغِ صفی می‌رن که
+  // آخرین سگمنت هنوز توش نیست — نه throw، فقط صدا بدونِ خبر جا می‌مونه.
+  var DURABLE_FLUSH_GUARD_MS = 10000;
   RTSession.prototype.stopDurableSegment = function () {
     if (this.durableRotateTimer) { clearTimeout(this.durableRotateTimer); this.durableRotateTimer = null; }
     if (!this.durableRec) return Promise.resolve();
@@ -482,7 +621,7 @@
       var done = false;
       var finish = function () { if (!done) { done = true; res(); } };
       flushP.then(finish);
-      setTimeout(finish, 1500);
+      setTimeout(finish, DURABLE_FLUSH_GUARD_MS);
     });
     try { rec.stop(); } catch (e) {}
     return guarded;
@@ -774,7 +913,18 @@
         }
       };
       self.onlineHandler = function () {
-        if (self.state === STATES.NETWORK_PAUSED) self.scheduleReconnect('online');
+        if (self.state === STATES.NETWORK_PAUSED) { self.scheduleReconnect('online'); return; }
+        // ⭐ باگِ واقعی (audit صدا/۲۰۲۶-۰۹-۱۶، یافته‌ی #۱۶ — با تستِ زنده‌ی قطعیِ کاملِ
+        // شبکه پیدا شد): بعد از اتمامِ MAX_RECONNECT_ATTEMPTS، state=FAILED می‌شود و این
+        // handler قبلاً فقط NETWORK_PAUSED را می‌دید — یعنی برگشتنِ اینترنت هیچ‌وقت
+        // رونویسیِ زنده را دوباره فعال نمی‌کرد (چه سشنی که واقعاً قطع شده بود، چه سشنی
+        // که از همون اول durable-only شروع شده بود، هر دو با state=FAILED به اینجا
+        // می‌رسند)؛ صدا حفظ می‌شد ولی متن تا پایانِ جلسه/batch fallback صبر می‌کرد.
+        // الان با شمارشِ تازه‌ی reconnectAttempts یک تلاشِ کاملِ دیگر می‌کند.
+        if (self.state === STATES.FAILED && !self.aborted && !self.noNewConnections) {
+          self.reconnectAttempts = 0;
+          self.scheduleReconnect('online-after-failed');
+        }
       };
       window.addEventListener('offline', self.offlineHandler);
       window.addEventListener('online', self.onlineHandler);
@@ -1080,39 +1230,30 @@
   // همون sessionId صدا زده بشه). بعدِ آپلودِ موفقِ هر سگمنت، از IndexedDB پاک می‌شه.
   RTSession.prototype.uploadBatchSegments = function () {
     var self = this;
-    var run = self._queueLock.then(function () { return AudioQueueDB.listForSession(self.sessionId); }).then(function (pending) {
-      var segs = pending.filter(function (r) { return r.blob && r.blob.size > 100; });
-      if (!segs.length) {
-        if (self.persist) {
-          self.persistConfirmed().catch(function () {});
-          reqJson('/api/sessions/' + self.sessionId, {
-            method: 'PUT', body: { realtime_reliable: false, stt_mode: 'realtime-unreliable-noaudio' }
-          }).catch(function () {});
+    return withAudioLock(self.sessionId, function () {
+      return AudioQueueDB.listForSession(self.sessionId).then(function (pending) {
+        var segs = pending.filter(function (r) { return r.blob && r.blob.size > 100; });
+        if (!segs.length) {
+          if (self.persist) {
+            self.persistConfirmed().catch(function () {});
+            reqJson('/api/sessions/' + self.sessionId, {
+              method: 'PUT', body: { realtime_reliable: false, stt_mode: 'realtime-unreliable-noaudio' }
+            }).catch(function () {});
+          }
+          return false;
         }
-        return false;
-      }
-      var purpose = self.mode === 'note' ? 'note' : 'transcript';
-      var uploadOne = function (rec) {
-        var fd = new FormData();
-        fd.append('file', rec.blob, 'segment-' + rec.seq + '.webm');
-        return fetch('/api/sessions/' + self.sessionId + '/batch-audio?purpose=' + purpose + '&seq=' + rec.seq, { method: 'POST', body: fd })
-          .then(function (res) { return res.json().catch(function () { return {}; }).then(function (d) {
-            if (!res.ok) throw new Error((d && d.error) || 'upload failed');
-            return d;
-          }); })
-          .then(function (d) { return AudioQueueDB.remove(self.sessionId, rec.seq).then(function () { return d; }); });
-      };
-      var anyOk = false;
-      var chain = Promise.resolve();
-      segs.forEach(function (rec) {
-        chain = chain.then(function () {
-          return uploadOne(rec).then(function () { anyOk = true; }).catch(function () {});
+        var anyOk = false;
+        var chain = Promise.resolve();
+        segs.forEach(function (rec) {
+          chain = chain.then(function () {
+            return uploadQueuedSegment(self.sessionId, rec).then(function (done) {
+              if (done) { anyOk = true; return AudioQueueDB.remove(rec.id); }
+            }).catch(function () {});
+          });
         });
-      });
-      return chain.then(function () { return anyOk; });
-    }).catch(function () { return false; });
-    self._queueLock = run.catch(function () {});
-    return run;
+        return chain.then(function () { return anyOk; });
+      }).catch(function () { return false; });
+    });
   };
 
   // ⭐ تخلیه‌ی فرصت‌طلبانه: هر بار که اتصال واقعاً برقرار شد (ACTIVE/RECOVERED)، اگه
@@ -1127,63 +1268,55 @@
     var self = this;
     if (self._draining) return;
     self._draining = true;
-    var run = self._queueLock.then(function () { return AudioQueueDB.listForSession(self.sessionId); }).then(function (pending) {
-      if (!pending.length) return;
-      // باگِ واقعی (پیدا شده با کلیکِ واقعیِ دکمه‌های «توقف موقت»/«ادامه» توی مرورگر):
-      // این تابع رویِ هر ACTIVE/RECOVERED صدا زده می‌شه — یعنی رویِ یه توقف/ادامه‌ی
-      // کاملاً عادی هم (نه فقط یه قطعیِ واقعیِ شبکه). سگمنتِ durableِ بسته‌شده‌ی همون
-      // توقف، دقیقاً همون بازه‌ایه که realtime (وقتی self.unreliable هنوز false بود)
-      // از قبل درست رونویسی و persist کرده. بدونِ این چک، همیشه با purpose=transcript
-      // آپلود می‌شد — یعنی همون متن یه‌بارِ دیگه رونویسی و به transcript append می‌شد:
-      // دوپلیکیت‌شدنِ متن رویِ هر توقف/ادامه‌ی معمولی، نه فقط رویِ خطایِ واقعی.
-      // الان: اگه تا این لحظه realtime قابلِ‌اعتماد بوده (unreliable=false)، این سگمنت
-      // فقط آرشیو می‌شه (نه رونویسیِ دوباره)؛ فقط وقتی واقعاً یه گپِ نامطمئن پیش اومده
-      // (unreliable=true، مثلِ reconnectِ خودکارِ بعدِ قطعیِ شبکه)، با purpose=transcript
-      // batch fallback واقعی انجام می‌شه.
-      var purpose = self.mode === 'note' ? 'note' : (self.unreliable ? 'transcript' : 'archive');
-      var chain = Promise.resolve();
-      pending.forEach(function (rec) {
-        if (!rec.blob || rec.blob.size <= 100) { chain = chain.then(function () { return AudioQueueDB.remove(self.sessionId, rec.seq); }); return; }
-        chain = chain.then(function () {
-          var fd = new FormData();
-          fd.append('file', rec.blob, 'segment-' + rec.seq + '.webm');
-          return fetch('/api/sessions/' + self.sessionId + '/batch-audio?purpose=' + purpose + '&seq=' + rec.seq, { method: 'POST', body: fd })
-            .then(function (res) {
-              if (res.ok || res.status === 400) {
-                // 400 (جلسه پایان یافته) یعنی دیگه جایی برای اضافه‌کردنِ این صدا نیست —
-                // نگه‌داشتنش توی صف بی‌فایده‌ست، پس همون‌جا هم پاکش کن.
-                return AudioQueueDB.remove(self.sessionId, rec.seq);
-              }
-            })
-            .catch(function () {}); // شکستِ شبکه: توی صف می‌مونه، دفعه‌ی بعد دوباره امتحان می‌شه
+    withAudioLock(self.sessionId, function () {
+      return AudioQueueDB.listForSession(self.sessionId).then(function (pending) {
+        if (!pending.length) return;
+        // باگِ واقعی (پیدا شده با کلیکِ واقعیِ دکمه‌های «توقف موقت»/«ادامه» توی مرورگر):
+        // این تابع رویِ هر ACTIVE/RECOVERED صدا زده می‌شه — یعنی رویِ یه توقف/ادامه‌ی
+        // کاملاً عادی هم (نه فقط یه قطعیِ واقعیِ شبکه). سگمنتِ durableِ بسته‌شده‌ی همون
+        // توقف، دقیقاً همون بازه‌ایه که realtime (وقتی self.unreliable هنوز false بود)
+        // از قبل درست رونویسی و persist کرده. بدونِ این چک، همیشه با purpose=transcript
+        // آپلود می‌شد — یعنی همون متن یه‌بارِ دیگه رونویسی و به transcript append می‌شد:
+        // دوپلیکیت‌شدنِ متن رویِ هر توقف/ادامه‌ی معمولی، نه فقط رویِ خطایِ واقعی.
+        // ⭐ الان دیگه این تابع purpose را حدس نمی‌زنه — هر رکورد intentِ خودش (که موقعِ
+        // ضبطِ همون سگمنت تعیین شده، نه وضعیتِ *فعلیِ* self.unreliable) را با
+        // uploadQueuedSegment دنبال می‌کنه؛ رفعِ همون ریسکِ duplicate از ریشه.
+        var chain = Promise.resolve();
+        pending.forEach(function (rec) {
+          if (!rec.blob || rec.blob.size <= 100) { chain = chain.then(function () { return AudioQueueDB.remove(rec.id); }); return; }
+          chain = chain.then(function () {
+            return uploadQueuedSegment(self.sessionId, rec).then(function (done) {
+              if (done) return AudioQueueDB.remove(rec.id);
+            }).catch(function () {});
+          });
         });
-      });
-      return chain.catch(function () {});
-    }).catch(function () {}).then(function () { self._draining = false; });
-    self._queueLock = run.catch(function () {});
+        return chain.catch(function () {});
+      }).catch(function () {});
+    }).then(function () { self._draining = false; });
   };
 
   // ⭐ وقتی realtime کاملاً موفق بود: متنِ تاییدشده از قبل کامل و درسته، پس رونویسیِ
-  // دوباره‌ی صدا لازم نیست (و ریسکِ duplicate هم داره). فقط صدا رو (purpose=archive)
-  // برایِ بازبینیِ ادمین می‌فرسته — سرور بدونِ صدازدنِ Soniox مستقیم آرشیوش می‌کنه.
+  // دوباره‌ی صدا لازم نیست (و ریسکِ duplicate هم داره) — این تابع فقط سرِ راه است؛
+  // هر سگمنت طبقِ intentِ خودش می‌رود (uploadQueuedSegment). اگه سگمنتی از یه runِ
+  // قبلیِ همین session که هنوز intent='transcript' مونده باشه (مثلاً crashِ قبل از
+  // آپلود)، درست رونویسی می‌شه، نه فقط آرشیو — به‌جایِ فرضِ کورکورانه‌ی archive.
   RTSession.prototype.archiveQueuedAudioOnly = function () {
     var self = this;
-    var run = self._queueLock.then(function () { return AudioQueueDB.listForSession(self.sessionId); }).then(function (pending) {
-      if (!pending.length) return;
-      var chain = Promise.resolve();
-      pending.forEach(function (rec) {
-        if (!rec.blob || rec.blob.size <= 100) { chain = chain.then(function () { return AudioQueueDB.remove(self.sessionId, rec.seq); }); return; }
-        chain = chain.then(function () {
-          var fd = new FormData();
-          fd.append('file', rec.blob, 'segment-' + rec.seq + '.webm');
-          return fetch('/api/sessions/' + self.sessionId + '/batch-audio?purpose=archive&seq=' + rec.seq, { method: 'POST', body: fd })
-            .then(function (res) { if (res.ok) return AudioQueueDB.remove(self.sessionId, rec.seq); })
-            .catch(function () {}); // شکستِ شبکه: توی صف می‌مونه، sweepِ سراسریِ بعدی امتحان می‌کنه
+    withAudioLock(self.sessionId, function () {
+      return AudioQueueDB.listForSession(self.sessionId).then(function (pending) {
+        if (!pending.length) return;
+        var chain = Promise.resolve();
+        pending.forEach(function (rec) {
+          if (!rec.blob || rec.blob.size <= 100) { chain = chain.then(function () { return AudioQueueDB.remove(rec.id); }); return; }
+          chain = chain.then(function () {
+            return uploadQueuedSegment(self.sessionId, rec).then(function (done) {
+              if (done) return AudioQueueDB.remove(rec.id);
+            }).catch(function () {}); // شکستِ شبکه: توی صف می‌مونه، sweepِ سراسریِ بعدی امتحان می‌کنه
+          });
         });
-      });
-      chain.catch(function () {});
-    }).catch(function () {});
-    self._queueLock = run.catch(function () {});
+        return chain.catch(function () {});
+      }).catch(function () {});
+    });
   };
 
   // تخلیه صف در پس‌زمینه: poll مستقل از finalize؛ merge امن سمت سرور با CAS انجام می‌شود.
@@ -1255,8 +1388,10 @@
     this.cleanupAudio();
     this.unwatchOnline();
     // سگمنت‌های durable (هم RAM هم IndexedDB) دور ریخته می‌شوند — abort یعنی این
-    // جلسه اصلاً ذخیره نمی‌شه، پس نسخه‌ی پشتیبانِ صداش هم دیگه لازم نیست.
-    AudioQueueDB.clearForSession(this.sessionId);
+    // جلسه اصلاً ذخیره نمی‌شه، پس نسخه‌ی پشتیبانِ صداش هم دیگه لازم نیست. زیرِ همون
+    // قفلِ سراسری تا با sweep/drainِ هم‌زمانِ همین sessionId تداخل نکنه.
+    var sid = this.sessionId;
+    withAudioLock(sid, function () { return AudioQueueDB.clearForSession(sid); });
     if (this.state !== STATES.COMPLETED) this.setState(STATES.CANCELED);
   };
 
@@ -1274,20 +1409,64 @@
   function hasOpenConnection() {
     return live.some(function (s) { return s.hasOpenWS(); });
   }
+  // ⭐ باگِ واقعی (audit صدا/۲۰۲۶-۰۹-۱۶): beforeunload فقط WSِ باز را چک می‌کرد —
+  // در حالتِ durable-only/آفلاین (mint شکست خورده یا reconnect تمام شد، FAILED) هیچ
+  // WSای باز نیست ولی میکروفون هنوز دارد ضبط می‌کند؛ کاربر بدونِ هیچ هشداری تب را
+  // می‌بست و چند ثانیه‌ی آخرِ صدا (هنوز flush نشده به IndexedDB) از دست می‌رفت.
+  function hasActiveRecording() {
+    return live.some(function (s) {
+      if (s.aborted || s.state === STATES.COMPLETED || s.state === STATES.CANCELED) return false;
+      return s.hasOpenWS() || (s.durableRec && s.durableRec.state === 'recording');
+    });
+  }
   function forget(s) {
     live = live.filter(function (x) { return x !== s; });
   }
+
+  // ⭐ فلاشِ فوریِ سگمنتِ durableِ جاری وقتی صفحه پنهان/بسته می‌شود (audit صدا/۲۰۲۶-۰۹-۱۶):
+  // بدونِ این، تا ۱۵ ثانیه‌ی آخرِ صدا فقط در RAM (self.durableChunks) است — رفرش/بستنِ
+  // تب/کرش همان چند ثانیه را از بین می‌برد. stopDurableSegment سگمنتِ جاری را به
+  // IndexedDB می‌نویسد؛ اگر صفحه فقط پنهان شده (نه واقعاً بسته)، بلافاصله سگمنتِ
+  // بعدی شروع می‌شود تا ضبطِ زنده قطع نشود.
+  function flushAllDurable() {
+    live.forEach(function (s) {
+      try {
+        if (!s.durableRec || s.durableRec.state !== 'recording') return;
+        s.stopDurableSegment().then(function () {
+          if (!s.aborted && s.state !== STATES.COMPLETED && s.state !== STATES.CANCELED &&
+              s.stream && s.stream.active) {
+            s.startDurable();
+          }
+        });
+      } catch (e) {}
+    });
+  }
+  try {
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') flushAllDurable();
+    });
+    window.addEventListener('pagehide', function () { flushAllDurable(); });
+  } catch (e) {}
 
   window.FeeliaRT = {
     STATES: STATES,
     isAvailable: isAvailable,
     createSession: createSession,
     hasOpenConnection: hasOpenConnection,
+    hasActiveRecording: hasActiveRecording,
     forget: forget,
     cleanText: cleanText,
     MAX_RECONNECT_ATTEMPTS: MAX_RECONNECT_ATTEMPTS,
     // ⭐ برایِ جاروبِ سراسری (index.html) — آپلودِ صداهایِ باقی‌مانده از جلساتِ قبلی
     // که هیچ‌وقت resume نشدن (مثلاً تب برای همیشه بسته شده بود).
-    audioQueue: AudioQueueDB
+    audioQueue: AudioQueueDB,
+    // ⭐ همون منطقِ intent→purpose که RTSession خودش برایِ صفِ فعال استفاده می‌کنه —
+    // sweepOrphanedAudioQueueِ index.html هم باید دقیقاً همین رفتار را داشته باشد،
+    // نه purpose=archive کورکورانه (audit صدا/۲۰۲۶-۰۹-۱۶، بخشِ C).
+    uploadQueuedSegment: uploadQueuedSegment,
+    // ⭐ قفلِ سراسریِ صف/session (audit صدا/۲۰۲۶-۰۹-۱۶) — sweepOrphanedAudioQueueِ index.html
+    // باید همین قفل را بگیرد، وگرنه ممکن است با درایني‌کردنِ همزمانِ RTSession رویِ همون
+    // sessionId تداخل کند (رجوع به تعریفِ withAudioLock بالای همین فایل).
+    withAudioLock: withAudioLock
   };
 })();

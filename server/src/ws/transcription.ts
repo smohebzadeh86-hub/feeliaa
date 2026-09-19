@@ -5,6 +5,7 @@
 //   ACK = تحویل به transport سونی‌کس (نه processed، نه durable) — بعد از forward موفق.
 //   Dedup با (sessionId, seq) + nextExpected + reorder buffer محدود؛ max به‌تنهایی ملاک نیست.
 //   old generation هرگز state نسل جدید را mutate نمی‌کند (check در هر timer/callback/write).
+import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
 import websocket from '@fastify/websocket';
 import { query } from '../db/connection.js';
@@ -66,7 +67,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
       let initialTranscript = '';
       let dbStatus = 'in_progress';
       try {
-        const t = await query('SELECT transcript, status FROM sessions WHERE id = $1', [sessionId]);
+        const t = await query('SELECT transcript, status FROM sessions WHERE id = ?', [sessionId]);
         initialTranscript = t.rows[0]?.transcript ?? '';
         dbStatus = t.rows[0]?.status ?? 'in_progress';
       } catch (e) {}
@@ -155,7 +156,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
           if (rec.terminal) return;
           // فقط in_progress → recovered (با finalize/cancel مسابقه نده)
           query(
-            `UPDATE sessions SET status = 'recovered', updated_at = now() WHERE id = $1 AND status = 'in_progress'`,
+            `UPDATE sessions SET status = 'recovered', updated_at = NOW() WHERE id = ? AND status = 'in_progress'`,
             [sessionId]
           ).catch(() => {});
           rec.connectionState = 'CLOSED';
@@ -278,7 +279,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
             const lastLen = (rec as any).lastConfirmedLen ?? 0;
             if (finalText.length < lastLen) return;
             (rec as any).lastConfirmedLen = finalText.length;
-            query('UPDATE sessions SET transcript = $1, updated_at = now() WHERE id = $2',
+            query('UPDATE sessions SET transcript = ?, updated_at = NOW() WHERE id = ?',
               [finalText, sessionId]).catch(() => {});
           }
         },
@@ -301,7 +302,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
           // کلاینت reconnect کند (نسل جدید با prefix=DB). recovered فقط با grace timeout.
           if (!manuallyFinalized) {
             if (rec.terminal) return;
-            query(`UPDATE sessions SET transcript = $1, updated_at = now() WHERE id = $2`,
+            query(`UPDATE sessions SET transcript = ?, updated_at = NOW() WHERE id = ?`,
               [finalText, sessionId]).catch(() => {});
             if (rec.engineGeneration === gen) rec.engine = null;
             clearReorderTimer(rec);
@@ -313,7 +314,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
                 rec.graceTimer = null;
                 if (!isCurrentGeneration(rec, rec.graceGeneration) || rec.generation !== rec.graceGeneration) return;
                 if (rec.connectionState !== 'INTERRUPTED' || rec.terminal) return;
-                query(`UPDATE sessions SET status = 'recovered', updated_at = now() WHERE id = $1 AND status = 'in_progress'`,
+                query(`UPDATE sessions SET status = 'recovered', updated_at = NOW() WHERE id = ? AND status = 'in_progress'`,
                   [sessionId]).catch(() => {});
                 rec.connectionState = 'CLOSED';
                 rec.hint = null;
@@ -329,7 +330,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
           rec.terminal = 'completed';
           console.log(`[ws] session ${sessionId} gen ${gen} → status: ${newStatus}`);
           query(
-            `UPDATE sessions SET transcript = $1, status = $2, updated_at = now() WHERE id = $3`,
+            `UPDATE sessions SET transcript = ?, status = ?, updated_at = NOW() WHERE id = ?`,
             [finalText, newStatus, sessionId]
           ).then(() => {
             releaseEngineIfCurrent();
@@ -432,7 +433,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
               const myEpoch = rec.pauseEpoch;
               // Resume صریح: prefix تازه از DB؛ صف‌های معتبر (buffer/unacked) replay می‌شوند، نه skip
               try {
-                const t = await query('SELECT transcript FROM sessions WHERE id = $1', [sessionId]);
+                const t = await query('SELECT transcript FROM sessions WHERE id = ?', [sessionId]);
                 const fresh = t.rows[0]?.transcript ?? '';
                 (rec as any).lastConfirmedLen = Math.max((rec as any).lastConfirmedLen ?? 0, fresh.length);
                 // P1-F2: pause جدیدتر در حین await برنده است؛ نسل/ترمینال هم ممکن است عوض شده باشد
@@ -457,7 +458,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
                       const lastLen = (rec as any).lastConfirmedLen ?? 0;
                       if (finalText.length < lastLen) return;
                       (rec as any).lastConfirmedLen = finalText.length;
-                      query('UPDATE sessions SET transcript = $1, updated_at = now() WHERE id = $2', [finalText, sessionId]).catch(() => {});
+                      query('UPDATE sessions SET transcript = ?, updated_at = NOW() WHERE id = ?', [finalText, sessionId]).catch(() => {});
                     }
                   },
                   onStatus: (status, message) => {
@@ -474,7 +475,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
                     safeSend({ type: 'finished', finalText });
                     if (!manuallyFinalized) {
                       if (rec.terminal) return;
-                      query(`UPDATE sessions SET transcript = $1, updated_at = now() WHERE id = $2`,
+                      query(`UPDATE sessions SET transcript = ?, updated_at = NOW() WHERE id = ?`,
                         [finalText, sessionId]).catch(() => {});
                       if (rec.engineGeneration === gen) rec.engine = null;
                       try { socket.close(); } catch {}
@@ -483,7 +484,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
                     const ns = 'completed';
                     if (rec.terminal === 'canceled' || rec.terminal === 'completed') return;
                     rec.terminal = 'completed';
-                    query(`UPDATE sessions SET transcript = $1, status = $2, updated_at = now() WHERE id = $3`,
+                    query(`UPDATE sessions SET transcript = ?, status = ?, updated_at = NOW() WHERE id = ?`,
                       [finalText, ns, sessionId]).then(() => {
                         if (rec.engineGeneration === gen) rec.engine = null;
                         rec.connectionState = 'CLOSED';
@@ -526,9 +527,9 @@ export async function transcriptionRoutes(app: FastifyInstance) {
               else {
                 // موتوری نیست — مستقیم complete کن با DB فعلی
                 try {
-                  const t = await query('SELECT transcript FROM sessions WHERE id = $1', [sessionId]);
+                  const t = await query('SELECT transcript FROM sessions WHERE id = ?', [sessionId]);
                   const cur = t.rows[0]?.transcript ?? '';
-                  await query(`UPDATE sessions SET transcript = $1, status = 'completed', updated_at = now() WHERE id = $2`, [cur, sessionId]);
+                  await query(`UPDATE sessions SET transcript = ?, status = 'completed', updated_at = NOW() WHERE id = ?`, [cur, sessionId]);
                 } catch {}
                 rec.terminal = 'completed';
                 rec.connectionState = 'CLOSED';
@@ -550,7 +551,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
               rec.connectionState = 'CLOSED';
               rec.hint = null;
               rec.buffer.clear();
-              query(`UPDATE sessions SET status = 'canceled', updated_at = now() WHERE id = $1 AND status = 'in_progress'`,
+              query(`UPDATE sessions SET status = 'canceled', updated_at = NOW() WHERE id = ? AND status = 'in_progress'`,
                 [sessionId]).catch(() => {});
               try { socket.close(); } catch {}
             } else if (msg.type === 'close-hint') {
@@ -636,9 +637,9 @@ export async function transcriptionRoutes(app: FastifyInstance) {
           } catch (e) {}
           if (finalText && finalText.trim()) {
             query(
-              `INSERT INTO session_notes (session_id, type, text, wall_clock)
-               VALUES ($1, 'voice', $2, $3)`,
-              [sessionId, finalText.trim(), new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })]
+              `INSERT INTO session_notes (id, session_id, type, text, wall_clock)
+               VALUES (?, ?, 'voice', ?, ?)`,
+              [randomUUID(), sessionId, finalText.trim(), new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })]
             ).then(() => {
               try { socket.close(); } catch (e) {}
             }).catch(() => {
