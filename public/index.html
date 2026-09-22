@@ -458,6 +458,40 @@ input::-ms-reveal{display:none}
 .case-file-doc .cf-rich-p{margin-bottom:6px}
 .case-file-doc .cf-rich-lbl{font-size:13.5px;font-weight:800;color:var(--cf-teal);margin-bottom:1px}
 .case-file-doc .cf-rich-txt{color:var(--cf-ink)}
+.case-file-doc .cf-prov{display:inline-block;font-size:10.5px;font-weight:500;border-radius:999px;padding:1px 8px;margin-right:7px;vertical-align:1px;border:1px solid var(--cf-line);color:var(--cf-muted);background:var(--cf-soft)}
+.case-file-doc .cf-prov-o{color:var(--cf-blue);background:var(--cf-blue2)}
+.case-file-doc .cf-prov-i{color:var(--cf-amber);background:var(--cf-amber2)}
+.case-file-doc .cf-about{color:var(--cf-teal);background:var(--cf-teal2)}
+.case-file-doc .cf-role-head{font-size:11px;font-weight:700;color:var(--cf-muted);margin:10px 0 3px;padding-bottom:2px;border-bottom:1px dashed var(--cf-line)}
+.case-file-doc .cf-role-head:first-child{margin-top:0}
+.case-file-doc .cf-axes-tools{display:flex;justify-content:flex-end;margin:0 0 6px}
+.case-file-doc .cf-kp-card{background:var(--cf-card);border:1px solid var(--cf-line);border-right:4px solid var(--cf-teal);border-radius:12px;padding:10px 14px;margin-bottom:8px}
+.case-file-doc .cf-kp-where{font-size:11px;color:var(--cf-muted);margin-top:4px}
+.case-file-doc .cf-kp-ref{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--cf-muted);padding:3px 0}
+.case-file-doc .cf-kp-ref .cf-star{flex:none;color:var(--cf-teal)}
+.case-file-doc .cf-star-btn{background:none;border:none;cursor:pointer;color:var(--cf-muted);padding:2px 4px;margin-right:4px;border-radius:6px;vertical-align:middle;line-height:0}
+.case-file-doc .cf-star-btn:hover{color:var(--cf-teal)}
+.case-file-doc .cf-star-btn.on{color:var(--cf-teal)}
+.case-file-doc .cf-star-btn.on .cf-star path{fill:currentColor}
+.case-file-doc .cf-xrefs{margin-top:6px;display:flex;flex-direction:column;gap:2px}
+.case-file-doc .cf-xref{background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;font-family:inherit;font-size:12px;color:var(--cf-muted);padding:3px 0;text-align:right}
+.case-file-doc .cf-xref:hover{color:var(--cf-teal)}
+.case-file-doc .cf-xref .cf-arrow{flex:none}
+.case-file-doc .cf-flash{background:var(--cf-teal2);border-radius:8px;transition:background .3s}
+.case-file-doc .cf-change-row{margin-bottom:10px}
+.case-file-doc .cf-change-row:last-child{margin-bottom:0}
+.case-file-doc .cf-change-label{font-size:12.5px;font-weight:700;color:var(--cf-muted);margin-bottom:4px}
+.case-file-doc .cf-change-row.main .cf-change-label{color:var(--cf-teal);font-size:13.5px;font-weight:800}
+.case-file-doc .cf-change-note{font-size:11px;color:var(--cf-muted);margin-top:6px}
+.case-file-doc .cf-move{display:inline-block;position:relative;vertical-align:middle;margin-right:2px}
+.case-file-doc .cf-move>summary{list-style:none;cursor:pointer;color:var(--cf-muted);padding:2px 4px;border-radius:6px;line-height:0}
+.case-file-doc .cf-move>summary::-webkit-details-marker{display:none}
+.case-file-doc .cf-move>summary:hover,.case-file-doc .cf-move[open]>summary{color:var(--cf-teal)}
+.case-file-doc .cf-move-panel{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 2px;padding:8px;background:var(--cf-soft);border:1px solid var(--cf-line);border-radius:10px}
+.case-file-doc .cf-move-panel select{font-family:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--cf-line);border-radius:8px;background:var(--cf-card);color:var(--cf-ink);max-width:100%}
+.case-file-doc .cf-rich-s{position:relative;padding-right:14px;margin-bottom:4px;color:var(--cf-ink)}
+.case-file-doc .cf-rich-s::before{content:"";position:absolute;right:2px;top:.95em;width:5px;height:5px;border-radius:50%;background:var(--cf-teal);opacity:.55}
+.case-file-doc .cf-rich-s:last-child{margin-bottom:0}
 .case-file-doc .cf-rich-row.cf-role .cf-rich-lbl,.case-file-doc .cf-rich-row.cf-role .cf-rich-txt{display:inline}
 .case-file-doc .cf-rich-row.cf-role .cf-rich-lbl{margin-left:4px}
 .case-file-doc .cf-axis{border:1px solid var(--cf-line);border-right:4px solid var(--cf-amber);border-radius:12px;background:var(--cf-card);margin-bottom:8px;overflow:hidden}
@@ -514,7 +548,7 @@ input::-ms-reveal{display:none}
 .case-file-doc .cf-couple-body{font-size:13.5px;line-height:1.95}
 .case-file-doc .cf-couple-body .cf-rich-row{padding:3px 0;border-top:1px dashed var(--cf-line)}
 .case-file-doc .cf-couple-body .cf-rich-row:first-child{border-top:none}
-.case-file-doc .cf-couple-quote{grid-column:1/-1;background:var(--cf-teal2);border-radius:0 12px 12px 0}
+.case-file-doc .cf-couple-quote{grid-column:1/-1;background:var(--cf-teal2)}
 @media (min-width:640px){
   .case-file-doc .cf-couple-card.cf-couple-wide{grid-column:span 2}
   .case-file-doc .cf-couple-card.cf-couple-wide .cf-couple-body{column-count:2;column-gap:22px}
@@ -1082,6 +1116,17 @@ input::-ms-reveal{display:none}
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn btn-ghost" onclick="answerCaseFileAutoPrompt(false)">نه، دستی می‌مانم</button>
       <button class="btn btn-primary" onclick="answerCaseFileAutoPrompt(true)">بله، خودکار شود</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="cfAddItemModal" data-clarity-mask="true">
+  <div class="modal">
+    <h3 id="cfAddItemTitle"></h3>
+    <div id="cfAddItemFields" onkeydown="cfAddItemKeydown(event)"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeCfAddItemModal()">انصراف</button>
+      <button class="btn btn-primary" onclick="submitCfAddItem()">ذخیره</button>
     </div>
   </div>
 </div>
@@ -3382,6 +3427,7 @@ function startFromDetail(){if(currentClient&&currentClient.status!=='inactive')s
 // ===== پرونده‌ی روندِ درمان (AI Case File) — فازِ ۱: دکمه‌ی دستی، بدونِ auto-trigger =====
 let currentCaseFile=null; // {clientId, record}
 let caseFileEditMode=false;
+let cfPendingNewItem=null; // {kind,id} — فقط همین یک ردیفِ تازه‌افزوده، نه کلِ سند، در حالتِ ویرایشِ درجا
 // تولیدِ پرونده ممکن است چند دقیقه طول بکشد. این watcher مستقل از همان درخواستِ POST است:
 // تراپیست می‌تواند در اپ کارِ دیگری کند و با آماده‌شدن/خطا، نتیجه را ببیند یا notification بگیرد.
 let regenerateCaseFilePollTimer=null;
@@ -3502,17 +3548,184 @@ function cfGist(val){
   return cut.length>110?cut.slice(0,108).trim()+'…':cut;
 }
 
+// شبکه‌یِ اطمینان برایِ خوانایی: متنِ بلندِ بدونِ ساختار (مثلاً پرونده‌های قدیمی یا خروجیِ
+// نامرتبِ مدل) فقط در «نمایش» به جمله‌هایِ جدا شکسته می‌شود؛ متنِ ذخیره‌شده دست نمی‌خورد.
+// داخلِ « » شکسته نمی‌شود تا نقل‌قول نصفه نشود؛ جمله‌هایِ خیلی کوتاه به قبلی می‌چسبند.
+function cfSplitSentences(text){
+  const t=String(text).trim();
+  if(t.length<110)return [t];
+  const out=[];let cur='',depth=0;
+  for(let i=0;i<t.length;i++){
+    const ch=t[i];cur+=ch;
+    if(ch==='«')depth++;else if(ch==='»'&&depth>0)depth--;
+    if(depth===0&&/[.؟!?]/.test(ch)&&(i===t.length-1||/\s/.test(t[i+1]))){
+      if(cur.trim().length<25&&out.length)out[out.length-1]+=' '+cur.trim();else out.push(cur.trim());
+      cur='';
+    }
+  }
+  if(cur.trim()){if(cur.trim().length<25&&out.length)out[out.length-1]+=' '+cur.trim();else out.push(cur.trim());}
+  return out.length?out:[t];
+}
+function cfSentencesHtml(text,cls){
+  const parts=cfSplitSentences(text);
+  if(parts.length<2)return '<div class="'+cls+'">'+escapeHtml(parts[0]||'')+'</div>';
+  return parts.map(function(s){return '<div class="cf-rich-s">'+escapeHtml(s)+'</div>';}).join('');
+}
+
+const CF_PROV=[
+  {re:/^(به گفته‌ی مراجع|به روایت مراجع)\s*[،:—-]?\s*/,cls:'cf-prov-c'},
+  {re:/^(مشاهده در جلسه|مشاهده‌ی درمانگر)\s*[،:—-]?\s*/,cls:'cf-prov-o'},
+  {re:/^(به توصیف درمانگر)\s*[،:—-]?\s*/,cls:'cf-prov-i'}
+];
+function cfProv(text){
+  const t=String(text||'').trim();
+  for(let i=0;i<CF_PROV.length;i++){
+    const m=t.match(CF_PROV[i].re);
+    if(m)return {chip:'<span class="cf-prov '+CF_PROV[i].cls+'">'+escapeHtml(m[1])+'</span>',rest:t.slice(m[0].length).trim()};
+  }
+  return null;
+}
+
 function cfRichHtml(val){
   return String(val).split(/\r?\n+/).map(function(line){
     line=line.trim();if(!line)return '';
     if(/^خلاصه\s*[:：]/.test(line))return '';
     const m=line.match(/^([^:：«»\r\n]{2,30})[:：]\s*([\s\S]*)$/);
-    if(!m)return '<div class="cf-rich-p">'+escapeHtml(line)+'</div>';
+    if(!m)return cfSentencesHtml(line,'cf-rich-p');
     const lbl=m[1].trim();
     const role=/^نقش در مسیر[ِ]? درمان/.test(lbl);
-    return '<div class="cf-rich-row'+(role?' cf-role':'')+'"><div class="cf-rich-lbl">'+escapeHtml(lbl)+'</div>'+
-      (m[2]?'<div class="cf-rich-txt">'+escapeHtml(m[2])+'</div>':'')+'</div>';
+    // منبعِ گزاره («به گفته‌ی مراجع» / «مشاهده در جلسه» / «به توصیف درمانگر») به‌صورتِ چیپ کنارِ برچسب
+    const pv=role?null:cfProv(m[2]);
+    const body=pv?pv.rest:m[2];
+    return '<div class="cf-rich-row'+(role?' cf-role':'')+'"><div class="cf-rich-lbl">'+escapeHtml(lbl)+(pv?pv.chip:'')+'</div>'+
+      (body?(role?'<div class="cf-rich-txt">'+escapeHtml(body)+'</div>':cfSentencesHtml(body,'cf-rich-txt')):'')+'</div>';
   }).join('');
+}
+
+// «یافته‌ها» (فقط رابطه‌ی زوجین): منبع از فیلدِ source می‌آید، نه regex روی متن؛ متنِ هر یافته کامل است.
+// چیپِ «فرد» فقط وقتی about پر باشد؛ نقل‌ها (label خالی) خط‌به‌خط با « ».
+const CF_SRC={client_report:['به گفته‌ی مراجع','cf-prov-c'],therapist_observation:['مشاهده در جلسه','cf-prov-o'],therapist_inference:['به توصیف درمانگر','cf-prov-i']};
+// نقشِ بالینیِ یافته در محور (واژگانِ ثابت — هم‌راستا با FINDING_ROLE_LABEL سرور)؛ نقش‌هایِ بدونِ داده نمایش داده نمی‌شوند.
+const CF_ROLE={state:'وضعیتِ فعلی',evidence:'نشانه‌ها و شواهد',impact:'تأثیر بر عملکرد',cognition:'افکار و باورها',predisposing:'عوامل زمینه‌ای',precipitating:'محرک‌ها',maintaining:'عوامل نگه‌دارنده و تشدیدکننده',coping:'راهبردهای مقابله',protective:'عوامل محافظتی',treatment_history:'سابقه‌ی درمان',treatment_response:'پاسخ به مداخله',goals:'اهداف و ارزش‌ها',change:'تغییر نسبت به قبل',unknown:'ابهام و اطلاعاتِ ناکافی',session_note:'نکته برای جلسه',other:'سایر'};
+// ===== نکات کلیدی (سطحِ orientation): اشاره‌گر به یافته. متنِ کامل فقط بالایِ پرونده می‌آید و در محورش فقط یک سطرِ ارجاع
+// می‌ماند (هر فکت یک خانه‌ی کامل). ستاره‌گذاری = PATCH finding.<id> با pin/unpin؛ سقفِ ۳ را سرور اجرا می‌کند. =====
+let cfPinned=new Set();
+const CF_STAR='<svg class="cf-star" viewBox="0 0 24 24" width="14" height="14" fill="none" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9L12 3.5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+function cfStarBtn(id,on){
+  return '<button class="cf-star-btn'+(on?' on':'')+'" data-cf-fid="finding.'+id+'" title="'+(on?'برداشتن از نکات کلیدی':'افزودن به نکات کلیدی')+'" aria-label="نکته‌ی کلیدی" onclick="toggleKeyPoint(this)">'+CF_STAR+'</button>';
+}
+function cfChips(it){
+  const s=CF_SRC[it.source];
+  return (s?'<span class="cf-prov '+s[1]+'">'+s[0]+'</span>':'')+(it.about&&it.about!==it.label?'<span class="cf-prov cf-about">'+escapeHtml(it.about)+'</span>':'');
+}
+// انتقالِ یافته‌ی محور به نقش/محورِ دیگر: پنلِ کوچکِ بسته‌شده تا بارِ بصریِ هر ردیف زیاد نشود (خطایِ طبقه‌بندیِ مدل قابلِ اصلاح است).
+const CF_DOTS='<svg class="cf-dots" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
+function cfMoveHtml(it,axis){
+  const c=currentCaseFile&&currentCaseFile.record&&currentCaseFile.record.content;
+  if(!c||!axis||!axis.id)return '';
+  const axOpts=(c.axes||[]).map(function(a){return '<option value="'+escAttr(a.id)+'"'+(a.id===axis.id?' selected':'')+'>'+escapeHtml(a.title)+'</option>';}).join('');
+  const roleOpts=Object.keys(CF_ROLE).map(function(k){return '<option value="'+k+'"'+(k===it.role?' selected':'')+'>'+escapeHtml(CF_ROLE[k])+'</option>';}).join('');
+  return '<details class="cf-move"><summary title="انتقال به نقش یا محورِ دیگر" aria-label="انتقال">'+CF_DOTS+'</summary>'+
+    '<div class="cf-move-panel"><select data-cf-mv="axis" aria-label="محورِ مقصد">'+axOpts+'</select><select data-cf-mv="role" aria-label="نقشِ مقصد">'+roleOpts+'</select>'+
+    '<button class="cf-btn cf-ghost" data-cf-fid="finding.'+escAttr(it.id)+'" onclick="cfMove(this)">انتقال</button></div></details>';
+}
+async function cfMove(btn){
+  if(!currentCaseFile)return;
+  const panel=btn.parentNode;
+  const axisId=panel.querySelector('select[data-cf-mv="axis"]').value;
+  const role=panel.querySelector('select[data-cf-mv="role"]').value;
+  const cid=currentCaseFile.clientId;
+  try{
+    const data=await api('/api/clients/'+cid+'/case-file',{method:'PATCH',body:{fieldId:btn.getAttribute('data-cf-fid'),action:'move',value:axisId+':'+role}});
+    if(!currentCaseFile||currentCaseFile.clientId!==cid)return;
+    currentCaseFile.record=data.case_file;
+    renderCaseFile();
+  }catch(e){showBanner('error',e.message);}
+}
+function cfNeedsUpgrade(c){
+  const up=function(f){return f&&!f.items&&f.source==='ai'&&!f.reviewedByTherapist&&!f.pending&&String(f.value||'').trim()!=='';};
+  if((c.axes||[]).some(up))return true;
+  if([c.coupleRelationship,c.familyRelationship].some(function(g){return g&&(g.fields||[]).some(up);} ))return true;
+  // پرونده‌ی قدیمی ممکن است فقط نمایِ دو-جعبه‌ایِ «قبل/اکنون» داشته باشد. endpoint آن را
+  // به changeRows ارتقا می‌دهد؛ پس نبودِ محور/رابطه نباید دکمه‌ی ارتقا را پنهان کند.
+  const co=c.changeOverTime;
+  return c.changeRows===undefined&&!!co&&(up(co.before)||up(co.after));
+}
+async function cfUpgrade(){
+  if(!currentCaseFile)return;
+  if(!confirm('ساختارِ این پرونده به شکلِ جدید (یافته‌ها با منبع، نکاتِ کلیدی و ارجاع) ارتقا یابد؟ بازتولید نمی‌شود و ویرایش‌ها/تاییدهایِ شما دست‌نخورده می‌ماند. (فقط چینشِ نمایش عوض می‌شود.)'))return;
+  const cid=currentCaseFile.clientId;
+  try{
+    const data=await api('/api/clients/'+cid+'/case-file/upgrade',{method:'POST',body:{}});
+    if(!currentCaseFile||currentCaseFile.clientId!==cid)return;
+    currentCaseFile.record=data.case_file;
+    renderCaseFile();
+    showBanner('info',data.upgraded?('ساختار ارتقا یافت ('+toFa(data.upgraded)+' بخش)'):'موردِ قابلِ ارتقایی نبود.');
+  }catch(e){showBanner('error',e.message);}
+}
+function cfFindingsHtml(f){
+  let lastRole=null;
+  return f.items.map(function(it){
+    let head='';
+    if(it.role&&it.role!==lastRole){lastRole=it.role;head='<div class="cf-role-head">'+escapeHtml(CF_ROLE[it.role]||it.role)+'</div>';}
+    if(cfPinned.has(it.id))return head+'<div class="cf-kp-ref" data-cf-id="'+it.id+'">'+CF_STAR+'<span>'+escapeHtml(it.label||'نقلِ عینی')+' — در «نکات کلیدی»</span></div>';
+    if(!it.label)return head+'<div class="cf-rich-s" data-cf-id="'+it.id+'">«'+escapeHtml(it.text)+'»'+cfStarBtn(it.id,false)+'</div>';
+    return head+'<div class="cf-rich-row" data-cf-id="'+it.id+'"><div class="cf-rich-lbl">'+escapeHtml(it.label)+cfChips(it)+cfStarBtn(it.id,false)+(f.statusTone!==undefined?cfMoveHtml(it,f):'')+'</div>'+cfSentencesHtml(it.text,'cf-rich-txt')+'</div>';
+  }).join('');
+}
+function cfKeyPointsHtml(c){
+  const ids=(c.keyPoints&&c.keyPoints.ids)||[];
+  cfPinned=new Set(ids);
+  if(!ids.length||caseFileEditMode)return '';
+  const idx={};
+  (c.axes||[]).forEach(function(a){(a.items||[]).forEach(function(it){idx[it.id]={it:it,where:'محور: '+a.title};});});
+  [c.coupleRelationship,c.familyRelationship].forEach(function(g){
+    if(!g)return;
+    (g.fields||[]).forEach(function(f){(f.items||[]).forEach(function(it){idx[it.id]={it:it,where:g.title+' — '+f.label};});});
+  });
+  const cards=ids.map(function(id){
+    const e=idx[id];if(!e)return '';
+    const it=e.it;
+    return '<div class="cf-kp-card" data-cf-id="'+id+'"><div class="cf-rich-lbl">'+(it.label?escapeHtml(it.label):'نقلِ عینی')+cfChips(it)+cfStarBtn(id,true)+'</div>'+
+      (it.label?cfSentencesHtml(it.text,'cf-rich-txt'):'<div class="cf-rich-txt">«'+escapeHtml(it.text)+'»</div>')+
+      '<div class="cf-kp-where">'+escapeHtml(e.where)+'</div></div>';
+  }).join('');
+  if(!cards)return '';
+  return '<div class="cf-section cf-kp">'+cfSectionHead('نکات کلیدی','مهم‌ترین چیزهایی که هنگامِ ورود به جلسه باید در ذهن باشد (حداکثر ۳)')+cards+'</div>';
+}
+// ارجاعِ متقاطع: یافته‌ای که فکتش خانه‌ی کاملِ دیگری دارد این‌جا حذف شده و فقط یک سطرِ کوچک به خانه‌اش اشاره می‌کند.
+const CF_ARROW='<svg class="cf-arrow" viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true"><path d="M8 16L16 8M9 8h7v7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function cfRefsHtml(refs){
+  if(!refs||!refs.length)return '';
+  return '<div class="cf-xrefs">'+refs.map(function(r){
+    return '<button class="cf-xref" data-cf-goto="'+escAttr(r.findingId)+'" onclick="cfGoto(this)">'+CF_ARROW+'<span>'+escapeHtml(r.label)+' — '+escapeHtml(r.where)+'</span></button>';
+  }).join('')+'</div>';
+}
+function cfGoto(btn){
+  const id=btn.getAttribute('data-cf-goto');
+  cfFocusNewItem('[data-cf-id="'+id+'"]');
+}
+// اسکرول+فلشِ یک عنصر — بازکردنِ <details>ِ بسته‌ی دربرگیرنده در صورتِ نیاز
+function cfFocusNewItem(selector){
+  const el=document.querySelector(selector);
+  if(!el)return;
+  const d=el.closest('details');
+  if(d&&!d.open){d.open=true;const k=d.getAttribute('data-cf-k');if(k){cfSaveOpen(k,true);}setTimeout(cfSyncAllBtn,0);}
+  el.scrollIntoView({block:'center',behavior:'smooth'});
+  el.classList.add('cf-flash');
+  setTimeout(function(){el.classList.remove('cf-flash');},1800);
+}
+async function toggleKeyPoint(btn){
+  if(!currentCaseFile)return;
+  const fid=btn.getAttribute('data-cf-fid');
+  const id=fid.slice(8);
+  const cid=currentCaseFile.clientId;
+  try{
+    const data=await api('/api/clients/'+cid+'/case-file',{method:'PATCH',body:{fieldId:fid,action:cfPinned.has(id)?'unpin':'pin'}});
+    if(!currentCaseFile||currentCaseFile.clientId!==cid)return;
+    currentCaseFile.record=data.case_file;
+    renderCaseFile();
+  }catch(e){showBanner('error',e.message);}
 }
 
 function fieldHtml(fieldId,field,rich){
@@ -3525,7 +3738,7 @@ function fieldHtml(fieldId,field,rich){
     return '<textarea data-cf-field="'+fieldId+'" data-cf-orig="'+escAttr(val)+'" data-cf-editable rows="'+(rich?5:2)+'" placeholder="هنوز ثبت نشده — اینجا بنویسید">'+escapeHtml(val)+'</textarea>';
   }
   if(!val)return '<span class="cf-pending">در انتظار ثبت</span>';
-  let html=rich?cfRichHtml(val):escapeHtml(val);
+  let html=(field.items&&field.items.length)?cfFindingsHtml(field)+cfRefsHtml(field.refs):(rich?cfRichHtml(val):escapeHtml(val));
   if(field.suggestedUpdate){
     html+=' <span class="cf-suggest-dot" title="به‌روزرسانیِ پیشنهادی موجوده" onclick="onCfSuggestClick(event,\''+fieldId+'\')"></span>';
   }
@@ -3535,33 +3748,179 @@ function fieldHtml(fieldId,field,rich){
 // افزودن/حذفِ ردیفِ دستی — فقط در حالتِ مشاهده (در ویرایش، rerender متنِ ذخیره‌نشده را می‌پرید)
 function cfAddBtn(kind,label){
   if(caseFileEditMode)return '';
-  return '<div class="cf-add-row"><button class="cf-btn cf-ghost" onclick="addCaseFileItem(\''+kind+'\')">+ '+label+'</button></div>';
+  return '<div class="cf-add-row"><button class="cf-btn cf-ghost" onclick="openCfAddItemModal(\''+kind+'\')">+ '+label+'</button></div>';
 }
 function cfDelBtn(kind,item){
   if(caseFileEditMode||!item.addedByTherapist)return '';
   return ' <button class="cf-del" title="حذفِ این ردیفِ دستی" onclick="event.stopPropagation();removeCaseFileItem(\''+kind+'\',\''+item.id+'\')">حذف</button>';
 }
-async function addCaseFileItem(kind){
+// ویرایشِ نامِ دارو فقط برایِ ردیفِ افزوده‌شده‌ی دستی — نامِ داروی AI بخشی از یک CaseFileField نیست
+function cfRenameBtn(item){
+  if(caseFileEditMode||!item.addedByTherapist)return '';
+  return ' <button class="cf-del" title="ویرایشِ نامِ دارو" onclick="event.stopPropagation();openCfRenameMedModal(this)" data-cf-med-id="'+escAttr(item.id)+'" data-cf-med-name="'+escAttr(item.name)+'">ویرایشِ نام</button>';
+}
+
+let cfAddItemMode=null; // 'axis' | 'medication' | 'roadmap' | 'medication-rename'
+let cfAddItemRenameId=null;
+function openCfAddItemModal(kind){
+  cfAddItemMode=kind;
+  cfAddItemRenameId=null;
+  const titles={axis:'افزودنِ محور',medication:'افزودنِ دارو',roadmap:'افزودنِ گام'};
+  $('cfAddItemTitle').textContent=titles[kind]||'افزودن';
+  let f='';
+  if(kind==='axis'){
+    f='<label>عنوانِ محور</label><input type="text" id="cfai_title" maxlength="80" placeholder="مثلاً: خواب">';
+  }else if(kind==='medication'){
+    f='<label>نامِ دارو</label><input type="text" id="cfai_name" maxlength="80">'+
+      '<label>دوز</label><input type="text" id="cfai_dose" maxlength="120">'+
+      '<label>تناوبِ مصرف</label><input type="text" id="cfai_frequency" maxlength="120">'+
+      '<label>آخرین تغییر</label><input type="text" id="cfai_lastChange" maxlength="120">'+
+      '<label>تجویزکننده</label><input type="text" id="cfai_prescriber" maxlength="120">';
+  }else{
+    f='<label>عنوانِ گام</label><input type="text" id="cfai_question" maxlength="200" placeholder="مثلاً: بررسیِ کیفیتِ خواب">';
+  }
+  $('cfAddItemFields').innerHTML=f;
+  $('cfAddItemModal').classList.add('open');
+}
+function openCfRenameMedModal(btn){
+  cfAddItemMode='medication-rename';
+  cfAddItemRenameId=btn.getAttribute('data-cf-med-id');
+  $('cfAddItemTitle').textContent='ویرایشِ نامِ دارو';
+  $('cfAddItemFields').innerHTML='<label>نامِ دارو</label><input type="text" id="cfai_name" maxlength="80" value="'+escAttr(btn.getAttribute('data-cf-med-name')||'')+'">';
+  $('cfAddItemModal').classList.add('open');
+}
+function closeCfAddItemModal(){
+  $('cfAddItemModal').classList.remove('open');
+  cfAddItemMode=null;
+  cfAddItemRenameId=null;
+}
+// آیتمِ تازه را با تفاضلِ id بینِ آرایه‌یِ قبل/بعد پیدا می‌کند — roadmap بعدِ افزودن sort می‌شود، پس «آخرینِ آرایه» درست نیست
+function findNewItemId(oldList,newList){
+  const oldIds=new Set((oldList||[]).map(function(x){return x.id;}));
+  const added=(newList||[]).find(function(x){return !oldIds.has(x.id);});
+  return added?added.id:null;
+}
+// Enterِ داخلِ فیلدهایِ مودالِ افزودن: در مودالِ تک‌فیلدی (axis/roadmap) فوراً submit می‌کند؛
+// در مودالِ چندفیلدیِ دارو فقط رویِ آخرین فیلد (تجویزکننده) submit می‌کند — وگرنه Enterِ
+// طبیعیِ بینِ فیلدها (مثلاً بعدِ تایپِ نام) یک ردیفِ ناقص می‌ساخت و مودال را زودهنگام می‌بست.
+function cfAddItemKeydown(event){
+  if(event.key!=='Enter')return;
+  event.preventDefault();
+  if(cfAddItemMode==='medication'&&(!event.target||event.target.id!=='cfai_prescriber'))return;
+  submitCfAddItem();
+}
+async function submitCfAddItem(){
   if(!currentCaseFile)return;
-  const body={kind:kind};
-  if(kind==='axis'){const t=prompt('عنوانِ محور (مثلاً «خواب»):');if(!t||!t.trim())return;body.title=t.trim();}
-  else if(kind==='medication'){const t=prompt('نامِ دارو:');if(!t||!t.trim())return;body.name=t.trim();}
-  else{const t=prompt('عنوانِ گام (مثلاً «بررسیِ کیفیتِ خواب»):');if(!t||!t.trim())return;body.question=t.trim();}
+  const mode=cfAddItemMode;
+  const cid=currentCaseFile.clientId;
   try{
-    const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file/items',{method:'POST',body:body});
+    if(mode==='medication-rename'){
+      const name=($('cfai_name').value||'').trim();
+      if(!name){showBanner('error','نامِ دارو الزامی است');return;}
+      const data=await api('/api/clients/'+cid+'/case-file',{method:'PATCH',body:{fieldId:'medication.'+cfAddItemRenameId+'.name',action:'edit',value:name}});
+      currentCaseFile.record=data.case_file;
+      closeCfAddItemModal();
+      renderCaseFile();
+      cfFocusNewItem('[data-cf-id="medication.'+cfAddItemRenameId+'"]');
+      return;
+    }
+    const body={kind:mode};
+    let oldList;
+    if(mode==='axis'){
+      const t=($('cfai_title').value||'').trim();
+      if(!t){showBanner('error','عنوانِ محور الزامی است');return;}
+      body.title=t;
+      oldList=(currentCaseFile.record.content.axes||[]).slice();
+    }else if(mode==='medication'){
+      const n=($('cfai_name').value||'').trim();
+      if(!n){showBanner('error','نامِ دارو الزامی است');return;}
+      body.name=n;
+      body.dose=($('cfai_dose').value||'').trim();
+      body.frequency=($('cfai_frequency').value||'').trim();
+      body.lastChange=($('cfai_lastChange').value||'').trim();
+      body.prescriber=($('cfai_prescriber').value||'').trim();
+      oldList=(currentCaseFile.record.content.medication||[]).slice();
+    }else{
+      const q=($('cfai_question').value||'').trim();
+      if(!q){showBanner('error','عنوانِ گام الزامی است');return;}
+      body.question=q;
+      oldList=(currentCaseFile.record.content.roadmap||[]).slice();
+    }
+    const data=await api('/api/clients/'+cid+'/case-file/items',{method:'POST',body:body});
     currentCaseFile.record=data.case_file;
-    caseFileEditMode=true; // مستقیم برایِ پرکردنِ محتوا
+    const newList=mode==='axis'?data.case_file.content.axes:mode==='medication'?data.case_file.content.medication:data.case_file.content.roadmap;
+    const newId=findNewItemId(oldList,newList);
+    closeCfAddItemModal();
+    // دارو با همه‌ی زیرفیلدها پر شده — نیازی به حالتِ ویرایشِ درجا نیست؛ محور/گام فقط عنوان دارند
+    if(mode!=='medication'&&newId)cfPendingNewItem={kind:mode,id:newId};
     renderCaseFile();
-    showBanner('info','ردیف افزوده شد — محتوایش را بنویسید و «ذخیره» بزنید.');
+    if(newId)cfFocusNewItem('[data-cf-id="'+mode+'.'+newId+'"]');
   }catch(e){showBanner('error',e.message);}
+}
+function cfInlineEditHtml(fieldId,field,rich){
+  const val=(field&&field.value)||'';
+  return '<textarea data-cf-field="'+fieldId+'" rows="'+(rich?5:2)+'" placeholder="متن را بنویسید">'+escapeHtml(val)+'</textarea>'+
+    '<div class="cf-add-row"><button class="cf-btn cf-primary" onclick="saveCfNewItemField(\''+fieldId+'\')">ذخیره</button>'+
+    ' <button class="cf-btn cf-ghost" onclick="dismissCfNewItem()">فعلاً نه</button></div>';
+}
+async function saveCfNewItemField(fieldId){
+  if(!currentCaseFile)return;
+  const sec=$('caseFileSection');
+  const el=sec.querySelector('[data-cf-field="'+fieldId+'"]');
+  const value=el?el.value:'';
+  // متنِ خالی «تایید» نمی‌شود — approveِ فیلدِ خالی آن را برایِ همیشه یخ می‌کرد و regenerate دیگر نمی‌توانست پرش کند (مثلِ saveCaseFileEdits)
+  if(!value.trim()){dismissCfNewItem();return;}
+  try{
+    const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file',{method:'PATCH',body:{fieldId:fieldId,action:'edit',value:value}});
+    currentCaseFile.record=data.case_file;
+    cfPendingNewItem=null;
+    renderCaseFile();
+  }catch(e){showBanner('error',e.message);}
+}
+function dismissCfNewItem(){
+  cfPendingNewItem=null;
+  renderCaseFile();
 }
 async function removeCaseFileItem(kind,id){
   if(!currentCaseFile||!confirm('این ردیفِ افزوده‌شده حذف شود؟'))return;
   try{
     const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file/items/'+kind+'/'+id,{method:'DELETE'});
     currentCaseFile.record=data.case_file;
+    if(cfPendingNewItem&&cfPendingNewItem.kind===kind&&cfPendingNewItem.id===id)cfPendingNewItem=null;
     renderCaseFile();
   }catch(e){showBanner('error',e.message);}
+}
+
+// حالتِ باز/بسته: پیش‌فرض بر اساسِ «اهمیتِ بالینی» (محورِ حساس/نیازمندِ توجه باز تا سقفِ ۴، مطلوب بسته؛ فقط آخرین
+// جلسه باز) تا برایِ دیدنِ چیزِ لازم کلیکِ اضافه نباشد. انتخابِ دستیِ تراپیست (فقط در همین مرورگر، به‌ازایِ هر مراجع)
+// بر پیش‌فرض غالب است. ذخیره با کلیک روی summary است، نه رویدادِ toggle، تا بازشدنِ پیش‌فرض «انتخابِ کاربر» حساب نشود.
+const CF_MAX_OPEN_AXES=4;
+function cfOpenKey(k){return 'feelia-cf-open:'+(currentCaseFile?currentCaseFile.clientId:'')+':'+k;}
+function cfOpenState(k,def){try{const v=localStorage.getItem(cfOpenKey(k));if(v==='1')return true;if(v==='0')return false;}catch(e){}return def;}
+function cfSaveOpen(k,open){try{localStorage.setItem(cfOpenKey(k),open?'1':'0');}catch(e){}}
+function cfSummaryClick(summaryEl){const d=summaryEl.parentNode;cfSaveOpen(d.getAttribute('data-cf-k'),!d.open);setTimeout(cfSyncAllBtn,0);}
+function cfSyncAllBtn(){
+  const b=document.getElementById('cfAxesAllBtn');if(!b)return;
+  const ds=document.querySelectorAll('details.cf-axis');
+  const allOpen=ds.length>0&&Array.prototype.every.call(ds,function(d){return d.open;});
+  b.textContent=allOpen?'جمع‌کردنِ همه':'بازکردنِ همه';
+}
+function cfAxesAll(){
+  const ds=document.querySelectorAll('details.cf-axis');
+  const allOpen=Array.prototype.every.call(ds,function(d){return d.open;});
+  Array.prototype.forEach.call(ds,function(d){d.open=!allOpen;cfSaveOpen(d.getAttribute('data-cf-k'),!allOpen);});
+  cfSyncAllBtn();
+}
+// ترتیبِ محورها: حساس ← نیازمندِ توجه ← مطلوب، «سایر موارد» آخر (سرور برایِ پرونده‌هایِ جدید همین را می‌سازد؛
+// این‌جا برایِ پرونده‌هایِ قدیمی). sort پایدار: ترتیبِ هم‌لحن‌ها حفظ می‌شود.
+function cfSortAxes(axes){
+  const rank={sensitive:0,watch:1,good:2};
+  return axes.map(function(a,i){return {a:a,i:i};}).sort(function(x,y){
+    const ox=x.a.title==='سایر موارد'?1:0,oy=y.a.title==='سایر موارد'?1:0;
+    if(ox!==oy)return ox-oy;
+    const rx=rank[x.a.statusTone]!==undefined?rank[x.a.statusTone]:1,ry=rank[y.a.statusTone]!==undefined?rank[y.a.statusTone]:1;
+    return rx-ry||x.i-y.i;
+  }).map(function(o){return o.a;});
 }
 
 // حداقلِ تعدادِ یافته/خط برایِ دوستونه‌شدنِ کارتِ زوجین (بدونِ جمع‌شدن — فقط تقسیمِ عرض)
@@ -3651,6 +4010,7 @@ function renderCaseFile(){
           '<button class="cf-btn cf-ghost" onclick="cancelCaseFileEdit()">انصراف</button>';
   }else{
     html+=cfAutoToggleHtml()+
+          (cfNeedsUpgrade(c)?'<button class="cf-btn cf-ghost" onclick="cfUpgrade()" title="بدونِ بازتولید؛ فقط چینشِ نمایش ساخت‌یافته می‌شود">ارتقای ساختار</button>':'')+
           '<button class="cf-btn cf-ghost" onclick="startCaseFileEdit()">ویرایش</button>'+
           '<button class="cf-btn cf-ghost" onclick="regenerateCaseFile(false)">به‌روزرسانی</button>'+
           '<button class="cf-btn cf-ghost" onclick="regenerateCaseFile(true)">بازتولیدِ کامل</button>';
@@ -3696,6 +4056,8 @@ function renderCaseFile(){
     html+='<div class="cf-banner cf-amber"><span class="cf-lbl">زمینه‌ی حساس — </span>'+fieldHtml('sensitiveContext',c.sensitiveContext)+'</div>';
   }
 
+  html+=cfKeyPointsHtml(c);
+
   html+='<div class="cf-section">'+cfSectionHead('دارو و سابقه‌ی درمان','داروهای مصرفی، دوز و پزشکِ تجویزکننده');
   if(!c.medication||!c.medication.length){
     html+='<div class="cf-empty"><span class="cf-pending">در انتظار ثبت</span> — اطلاعاتِ دارویی هنوز ثبت نشده (مصرفِ دارو مطرح نشده یا پرسیده نشده)</div>'+cfAddBtn('medication','افزودنِ دارو');
@@ -3705,7 +4067,7 @@ function renderCaseFile(){
     if(!caseFileEditMode){
       html+='<table class="cf-table cf-med-table"><tr><th>دارو</th><th>دوز</th><th>دفعات</th><th>آخرین تغییر</th><th>پزشک</th></tr>';
       c.medication.forEach(function(m){
-        html+='<tr><td>'+escapeHtml(m.name)+cfDelBtn('medication',m)+'</td><td>'+fieldHtml('medication.'+m.id+'.dose',m.dose)+'</td>'+
+        html+='<tr data-cf-id="medication.'+m.id+'"><td>'+escapeHtml(m.name)+cfRenameBtn(m)+cfDelBtn('medication',m)+'</td><td>'+fieldHtml('medication.'+m.id+'.dose',m.dose)+'</td>'+
               '<td>'+fieldHtml('medication.'+m.id+'.frequency',m.frequency)+'</td>'+
               '<td>'+fieldHtml('medication.'+m.id+'.lastChange',m.lastChange)+'</td>'+
               '<td>'+fieldHtml('medication.'+m.id+'.prescriber',m.prescriber)+'</td></tr>';
@@ -3714,7 +4076,7 @@ function renderCaseFile(){
     }
     html+='<div class="cf-med-mobile"'+(caseFileEditMode?' style="display:block"':'')+'>';
     c.medication.forEach(function(m){
-      html+='<div class="cf-med-item"><div class="cf-med-name">'+escapeHtml(m.name)+cfDelBtn('medication',m)+'</div>'+
+      html+='<div class="cf-med-item" data-cf-id="medication.'+m.id+'"><div class="cf-med-name">'+escapeHtml(m.name)+cfRenameBtn(m)+cfDelBtn('medication',m)+'</div>'+
             '<div class="cf-med-row"><span class="cf-mlbl">دوز</span><span>'+fieldHtml('medication.'+m.id+'.dose',m.dose)+'</span></div>'+
             '<div class="cf-med-row"><span class="cf-mlbl">دفعات</span><span>'+fieldHtml('medication.'+m.id+'.frequency',m.frequency)+'</span></div>'+
             '<div class="cf-med-row"><span class="cf-mlbl">آخرین تغییر</span><span>'+fieldHtml('medication.'+m.id+'.lastChange',m.lastChange)+'</span></div>'+
@@ -3730,16 +4092,26 @@ function renderCaseFile(){
   }else{
     // ⭐ بارِ شناختی: هر محور یک کارتِ بسته با تیترِ یک‌خطی (gist) + برچسبِ وضعیت؛ متنِ کاملِ
     // دسته‌بندی‌شده داخلِ کارت است، پس هیچ محتوایی حذف نمی‌شود ولی اول فقط «فهرستِ محورها» دیده می‌شود.
-    c.axes.forEach(function(a){
+    const axesSorted=cfSortAxes(c.axes);
+    let openCount=0;
+    if(axesSorted.length>1&&!caseFileEditMode){
+      html+='<div class="cf-axes-tools"><button class="cf-btn cf-ghost" id="cfAxesAllBtn" onclick="cfAxesAll()">بازکردنِ همه</button></div>';
+    }
+    axesSorted.forEach(function(a){
       const toneClass=a.statusTone==='good'?'cf-good':a.statusTone==='sensitive'?'cf-sensitive':'cf-watch';
       const toneLabel=a.statusTone==='good'?'مطلوب':a.statusTone==='sensitive'?'حساس':'نیازمندِ توجه';
       const gist=cfGist(a.value);
-      html+='<details class="cf-axis cf-tone-'+(a.statusTone||'watch')+'"'+(caseFileEditMode?' open':'')+'><summary>'+
+      const k='axis.'+a.id;
+      let def=a.statusTone!=='good'&&openCount<CF_MAX_OPEN_AXES;
+      if(def)openCount++;
+      const pendingHere=cfPendingNewItem&&cfPendingNewItem.kind==='axis'&&cfPendingNewItem.id===a.id;
+      const isOpen=caseFileEditMode||pendingHere||cfOpenState(k,def);
+      html+='<details class="cf-axis cf-tone-'+(a.statusTone||'watch')+'" data-cf-k="'+k+'" data-cf-id="'+k+'"'+(isOpen?' open':'')+'><summary onclick="cfSummaryClick(this)">'+
             '<span class="cf-axis-main"><span class="cf-axis-title">'+escapeHtml(a.title)+cfDelBtn('axis',a)+'</span>'+
             (gist?'<span class="cf-axis-gist">'+escapeHtml(gist)+'</span>':'<span class="cf-axis-gist"><span class="cf-pending">در انتظار ثبت</span></span>')+'</span>'+
             '<span class="cf-axis-side"><span class="cf-tone '+toneClass+'">'+toneLabel+'</span>'+
             '<span class="cf-toggle"><span class="cf-toggle-txt">جزئیات</span>'+CF_CHEV+'</span></span></summary>'+
-            '<div class="cf-axis-body">'+fieldHtml('axis.'+a.id,a,true)+'</div></details>';
+            '<div class="cf-axis-body">'+(pendingHere?cfInlineEditHtml('axis.'+a.id,a,true):fieldHtml('axis.'+a.id,a,true))+'</div></details>';
     });
     html+=cfAddBtn('axis','افزودنِ محور');
   }
@@ -3768,10 +4140,25 @@ function renderCaseFile(){
     html+='</div></div>';
   }
 
-  html+='<div class="cf-section">'+cfSectionHead('چه چیزی نسبت به قبل تغییر کرده؟','مقایسه‌ی وضعیتِ شروعِ درمان با وضعیتِ فعلی'+(rec.generatedAt?' · مهرِ زمانی: '+toFa(toJalali(new Date(rec.generatedAt))):''))+
-        '<div class="cf-change"><div class="cf-change-box"><div class="cf-change-title">قبل</div><div class="cf-change-value">'+fieldHtml('changeOverTime.before',c.changeOverTime.before)+'</div></div>'+
-        '<div class="cf-change-arrow"><svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
-        '<div class="cf-change-box"><div class="cf-change-title">اکنون</div><div class="cf-change-value">'+fieldHtml('changeOverTime.after',c.changeOverTime.after)+'</div></div></div></div>';
+  if(c.changeRows&&c.changeRows.length&&!caseFileEditMode){
+    // قبل/اکنون به‌صورتِ ردیف‌هایِ موازی: ردیفِ اول مهم‌ترین و اخیرترین تغییر است (خانه‌ی کاملِ تغییر؛ فکتِ همین در محور تکرار نمی‌شود)
+    const side=function(t){return t?'<span>'+escapeHtml(t)+'</span>':'<span class="cf-pending">در انتظار ثبت</span>';};
+    html+='<div class="cf-section">'+cfSectionHead('چه چیزی نسبت به قبل تغییر کرده؟','مقایسه‌ی وضعیتِ شروعِ درمان با وضعیتِ فعلی'+(rec.generatedAt?' · مهرِ زمانی: '+toFa(toJalali(new Date(rec.generatedAt))):''))+
+      c.changeRows.map(function(r,i){
+        return '<div class="cf-change-row'+(i===0?' main':'')+'" data-cf-id="'+escAttr(r.id)+'"><div class="cf-change-label">'+escapeHtml(r.label)+'</div>'+
+          '<div class="cf-change"><div class="cf-change-box"><div class="cf-change-title">قبل</div><div class="cf-change-value">'+side(r.before)+'</div></div>'+
+          '<div class="cf-change-arrow"><svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
+          '<div class="cf-change-box"><div class="cf-change-title">اکنون</div><div class="cf-change-value">'+side(r.after)+'</div></div></div></div>';
+      }).join('')+'</div>';
+  }else{
+    html+='<div class="cf-section">'+cfSectionHead('چه چیزی نسبت به قبل تغییر کرده؟','مقایسه‌ی وضعیتِ شروعِ درمان با وضعیتِ فعلی'+(rec.generatedAt?' · مهرِ زمانی: '+toFa(toJalali(new Date(rec.generatedAt))):''))+
+          '<div class="cf-change"><div class="cf-change-box"><div class="cf-change-title">قبل</div><div class="cf-change-value">'+fieldHtml('changeOverTime.before',c.changeOverTime.before,true)+'</div></div>'+
+          '<div class="cf-change-arrow"><svg viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>'+
+          '<div class="cf-change-box"><div class="cf-change-title">اکنون</div><div class="cf-change-value">'+fieldHtml('changeOverTime.after',c.changeOverTime.after,true)+'</div></div></div></div>';
+    if(caseFileEditMode&&c.changeRows&&c.changeRows.length>1){
+      html+='<div class="cf-change-note">در حالتِ ویرایش فقط ردیفِ اصلی ویرایش می‌شود؛ با «ذخیره»، ردیف‌هایِ موازیِ دیگر برداشته می‌شوند و فقط همین دو جعبه می‌ماند.</div>';
+    }
+  }
 
   html+='<div class="cf-section">'+cfSectionHead('روندِ جلسات','خلاصه‌ی هر رکوردِ ثبت‌شده (ممکن است یک رکورد چند جلسه را خلاصه کرده باشد) — برایِ دیدنِ جزئیات، روی هر ردیف بزنید');
   if(!c.sessionsSummary||!c.sessionsSummary.length){
@@ -3781,7 +4168,9 @@ function renderCaseFile(){
       // عنوانِ اصلیِ ردیف = خلاصه‌ی واقعیِ محتوا (title)، نه صرفاً «جلسه‌ی N»؛ شماره فقط یک
       // چیپِ کوچک است (برایِ رکوردی که کلِ روند را تجمیع کرده، «جلسه‌ی ۱» گمراه‌کننده بود).
       const headline=(s.title&&s.title.value)?escapeHtml(s.title.value):('خلاصه‌ی رکوردِ '+toFa(s.sessionNum));
-      html+='<details class="cf-session"'+(caseFileEditMode?' open':'')+'><summary>'+
+      const sk='session.'+(s.sessionId||s.sessionNum);
+      const latestNum=c.sessionsSummary.reduce(function(m,x){return Math.max(m,x.sessionNum||0);},0);
+      html+='<details class="cf-session" data-cf-k="'+sk+'"'+((caseFileEditMode||cfOpenState(sk,s.sessionNum===latestNum))?' open':'')+'><summary onclick="cfSummaryClick(this)">'+
             '<span class="cf-session-title">'+headline+'</span>'+
             '<span class="cf-session-meta"><span class="cf-chip">رکوردِ '+toFa(s.sessionNum)+'</span>'+
             (s.durationIndicator?'<span class="cf-chip">'+escapeHtml(s.durationIndicator)+'</span>':'')+
@@ -3804,9 +4193,10 @@ function renderCaseFile(){
     html+='<div class="cf-empty">نقشه‌راهی ثبت نشده</div>'+cfAddBtn('roadmap','افزودنِ گام');
   }else{
     c.roadmap.forEach(function(r){
-      html+='<details class="cf-step"'+(caseFileEditMode?' open':'')+'><summary><span class="cf-step-num '+r.priority+'">'+r.priority.slice(1)+'</span>'+
+      const pendingHere=cfPendingNewItem&&cfPendingNewItem.kind==='roadmap'&&cfPendingNewItem.id===r.id;
+      html+='<details class="cf-step" data-cf-id="roadmap.'+r.id+'"'+((caseFileEditMode||pendingHere)?' open':'')+'><summary><span class="cf-step-num '+r.priority+'">'+r.priority.slice(1)+'</span>'+
             '<span class="cf-step-q">'+escapeHtml(r.question)+'</span>'+(r.why?'<span class="cf-step-why '+r.priority+'">'+escapeHtml(r.why)+'</span>':'')+'<span class="cf-toggle"><span class="cf-toggle-txt">توضیح</span>'+CF_CHEV+'</span></summary>'+
-            '<div class="cf-step-detail">'+fieldHtml('roadmap.'+r.id+'.detail',r.detail,true)+cfDelBtn('roadmap',r)+'</div></details>';
+            '<div class="cf-step-detail">'+(pendingHere?cfInlineEditHtml('roadmap.'+r.id+'.detail',r.detail,true):fieldHtml('roadmap.'+r.id+'.detail',r.detail,true))+cfDelBtn('roadmap',r)+'</div></details>';
     });
   }
   if(c.roadmap&&c.roadmap.length)html+=cfAddBtn('roadmap','افزودنِ گام');
@@ -5941,7 +6331,8 @@ const MODAL_CLOSERS={
   deleteSessionModal:closeDeleteSession,
   editSessionModal:closeEditSessionMeta,
   deleteTherapistModal:closeDeleteTherapist,
-  deleteClientModal:closeDeleteClient
+  deleteClientModal:closeDeleteClient,
+  cfAddItemModal:closeCfAddItemModal
 };
 document.querySelectorAll('.modal-back').forEach(function(back){
   back.addEventListener('click',function(e){
