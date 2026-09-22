@@ -515,6 +515,12 @@ input::-ms-reveal{display:none}
 .case-file-doc .cf-couple-body .cf-rich-row{padding:3px 0;border-top:1px dashed var(--cf-line)}
 .case-file-doc .cf-couple-body .cf-rich-row:first-child{border-top:none}
 .case-file-doc .cf-couple-quote{grid-column:1/-1;background:var(--cf-teal2);border-radius:0 12px 12px 0}
+@media (min-width:640px){
+  .case-file-doc .cf-couple-card.cf-couple-wide{grid-column:span 2}
+  .case-file-doc .cf-couple-card.cf-couple-wide .cf-couple-body{column-count:2;column-gap:22px}
+}
+.case-file-doc .cf-couple-body .cf-rich-row,.case-file-doc .cf-couple-body .cf-rich-s,.case-file-doc .cf-couple-body .cf-rich-p{break-inside:avoid-column;-webkit-column-break-inside:avoid}
+.case-file-doc .cf-couple-body .cf-role-head{break-after:avoid-column;-webkit-column-break-after:avoid}
 .case-file-doc .cf-couple-quote .cf-couple-title{font-size:13px;color:var(--cf-teal)}
 .case-file-doc .cf-couple-quote .cf-couple-body{font-size:14px;line-height:2.05}
 .case-file-doc .cf-next{border-style:dashed}
@@ -3473,6 +3479,8 @@ async function removeCaseFileItem(kind,id){
   }catch(e){showBanner('error',e.message);}
 }
 
+// حداقلِ تعدادِ یافته/خط برایِ دوستونه‌شدنِ کارتِ زوجین (بدونِ جمع‌شدن — فقط تقسیمِ عرض)
+const CF_COUPLE_WIDE_MIN_ITEMS=5;
 // سرتیترِ بخش: عنوان + یک‌خطِ توضیحِ کارکرد (تا معلوم باشد هر بخش برایِ چیست)
 function cfSectionHead(title,hint){
   return '<div class="cf-section-head"><span class="cf-section-mark"></span><div><div class="cf-section-title">'+title+'</div>'+
@@ -3666,7 +3674,11 @@ function renderCaseFile(){
       const isQuote=/نقل/.test(f.label||'')||/quote/i.test(f.key||'');
       // نقل‌هایِ پشت‌سرهم («…»؛ «…») فقط برایِ نمایش خط‌به‌خط می‌شوند؛ متنِ ذخیره‌شده عوض نمی‌شود.
       const shown=(isQuote&&f.value&&!caseFileEditMode)?Object.assign({},f,{value:String(f.value).replace(/»\s*[؛;]\s*«/g,'»\n«')}):f;
-      html+='<div class="cf-couple-card'+(isQuote?' cf-couple-quote':'')+'"><div class="cf-couple-title">'+escapeHtml(f.label)+'</div><div class="cf-couple-body">'+fieldHtml('couple.'+f.key,shown,true)+'</div></div>';
+      // کارتِ پرمحتوا (چند یافته/چند خط) بستهٔ جمع‌شونده نمی‌شود (خواستِ مالک)؛ به‌جایش دو ستونه می‌شود
+      // (CSS column-count + break-inside:avoid رویِ هر ردیف) تا بلندیِ کارت را نصف کند بدونِ بریدنِ وسطِ یک یافته.
+      const itemCount=(f.items&&f.items.length)||(f.value?String(f.value).split(/\r?\n+/).filter(function(l){return l.trim();}).length:0);
+      const isWide=!isQuote&&!caseFileEditMode&&itemCount>=CF_COUPLE_WIDE_MIN_ITEMS;
+      html+='<div class="cf-couple-card'+(isQuote?' cf-couple-quote':'')+(isWide?' cf-couple-wide':'')+'"><div class="cf-couple-title">'+escapeHtml(f.label)+'</div><div class="cf-couple-body">'+fieldHtml('couple.'+f.key,shown,true)+'</div></div>';
     });
     html+='</div></div>';
   }
