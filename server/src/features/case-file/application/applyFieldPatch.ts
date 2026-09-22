@@ -65,6 +65,12 @@ export function applyFieldPatch(
     const med = next.medication.find(m => m.id === parts[1]);
     if (!med) throw new CaseFileValidationError('دارو یافت نشد');
     const key = parts[2];
+    if (key === 'name') {
+      if (!med.addedByTherapist) throw new CaseFileValidationError('فقط نامِ دارویِ افزوده‌شده‌یِ دستی قابلِ ویرایش است');
+      if (action !== 'edit') throw new CaseFileValidationError('برایِ نامِ دارو فقط عملیاتِ edit مجاز است');
+      med.name = cleanText(value, 80, 'نامِ دارو');
+      return next;
+    }
     if (key !== 'dose' && key !== 'frequency' && key !== 'lastChange' && key !== 'prescriber') {
       throw new CaseFileValidationError('فیلدِ دارو نامعتبر');
     }
@@ -130,6 +136,12 @@ function cleanText(v: unknown, max: number, what: string): string {
   return v.trim();
 }
 
+// برخلافِ cleanText، مقدارِ خالی خطا نمی‌دهد — برایِ زیرفیلدهایِ اختیاریِ دارو هنگامِ افزودن
+function optionalText(v: unknown, max: number): string {
+  if (typeof v !== 'string') return '';
+  return v.trim().slice(0, max);
+}
+
 export function addCaseFileItem(content: CaseFileContent, kind: AddableKind, input: Record<string, unknown>): CaseFileContent {
   const next: CaseFileContent = JSON.parse(JSON.stringify(content));
   if (kind === 'axis') {
@@ -143,7 +155,10 @@ export function addCaseFileItem(content: CaseFileContent, kind: AddableKind, inp
     next.medication = next.medication || [];
     next.medication.push({
       id: randomUUID(), name: cleanText(input.name, 80, 'نامِ دارو'), addedByTherapist: true,
-      dose: therapistField(''), frequency: therapistField(''), lastChange: therapistField(''), prescriber: therapistField(''),
+      dose: therapistField(optionalText(input.dose, 120)),
+      frequency: therapistField(optionalText(input.frequency, 120)),
+      lastChange: therapistField(optionalText(input.lastChange, 120)),
+      prescriber: therapistField(optionalText(input.prescriber, 120)),
     });
   } else if (kind === 'roadmap') {
     const pr = ['p2', 'p3', 'p4'].includes(input.priority as string) ? (input.priority as RoadmapPriority) : 'p3';
