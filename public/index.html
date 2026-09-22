@@ -555,6 +555,7 @@ input::-ms-reveal{display:none}
 }
 .case-file-doc .cf-couple-body .cf-rich-row,.case-file-doc .cf-couple-body .cf-rich-s,.case-file-doc .cf-couple-body .cf-rich-p{break-inside:avoid-column;-webkit-column-break-inside:avoid}
 .case-file-doc .cf-couple-body .cf-role-head{break-after:avoid-column;-webkit-column-break-after:avoid}
+.case-file-doc .cf-auto-note{font-size:11px;color:var(--cf-muted);align-self:center}
 .case-file-doc .cf-couple-quote .cf-couple-title{font-size:13px;color:var(--cf-teal)}
 .case-file-doc .cf-couple-quote .cf-couple-body{font-size:14px;line-height:2.05}
 .case-file-doc .cf-next{border-style:dashed}
@@ -3953,6 +3954,11 @@ function formatCfDaySpan(days){
 // دکمه‌ی toggleِ خودکارسازی — همیشه در کنارِ بقیه‌ی اکشن‌هایِ cf-toolbar، هر زمان
 // قابلِ‌تغییر (طبقِ خواسته‌ی صریحِ مالک: یک تصمیمِ یک‌طرفه‌ی سیستمی نیست).
 function cfAutoToggleHtml(){
+  // سرور auto-generate را فقط برایِ مراجعِ غیرفعال اجرا می‌کند (sessions.ts)؛ برایِ فعال‌ها
+  // کلیدِ «روشن» گمراه‌کننده است (پرونده خودکار به‌روز نمی‌شود).
+  if(currentClient&&currentClient.status!=='inactive'){
+    return '<span class="cf-auto-note">به‌روزرسانیِ خودکار فقط برایِ مراجعینِ غیرفعال است</span>';
+  }
   const on=!!(currentTherapist&&currentTherapist.case_file_auto_generate===true);
   return '<button class="cf-btn cf-ghost" onclick="toggleCaseFileAutoGenerate()" title="بعدِ پایانِ جلسه‌ی مراجعینِ غیرفعال، پرونده خودکار به‌روز شود">'+
     '<span class="cf-auto-dot'+(on?' on':'')+'"></span>به‌روزرسانیِ خودکار: '+(on?'روشن':'خاموش')+'</button>';
