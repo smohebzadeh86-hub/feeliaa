@@ -3382,6 +3382,85 @@ function startFromDetail(){if(currentClient&&currentClient.status!=='inactive')s
 // ===== پرونده‌ی روندِ درمان (AI Case File) — فازِ ۱: دکمه‌ی دستی، بدونِ auto-trigger =====
 let currentCaseFile=null; // {clientId, record}
 let caseFileEditMode=false;
+// تولیدِ پرونده ممکن است چند دقیقه طول بکشد. این watcher مستقل از همان درخواستِ POST است:
+// تراپیست می‌تواند در اپ کارِ دیگری کند و با آماده‌شدن/خطا، نتیجه را ببیند یا notification بگیرد.
+let regenerateCaseFilePollTimer=null;
+let regenerateCaseFilePollClientId=null;
+let regenerateCaseFilePollSawGenerating=false;
+let regenerateCaseFilePollNotified=false;
+const CASE_FILE_DOCUMENT_TITLE=document.title;
+
+function requestCaseFileNotificationPermission(){
+  try{
+    if('Notification' in window&&Notification.permission==='default')void Notification.requestPermission();
+  }catch(e){}
+}
+function enableCaseFileNotifications(){
+  if(!('Notification' in window)){showBanner('warn','این مرورگر از نوتیفیکیشن پشتیبانی نمی‌کند؛ نتیجه همین‌جا نشان داده می‌شود.');return;}
+  if(Notification.permission==='granted'){showBanner('info','نوتیفیکیشنِ آماده‌شدن پرونده فعال است.');return;}
+  if(Notification.permission==='denied'){showBanner('warn','اجازه‌ی نوتیفیکیشن در مرورگر رد شده است؛ نتیجه همین‌جا نشان داده می‌شود.');return;}
+  Notification.requestPermission().then(function(permission){
+    showBanner(permission==='granted'?'info':'warn',permission==='granted'?'نوتیفیکیشنِ آماده‌شدن پرونده فعال شد.':'بدونِ اجازه‌ی مرورگر، نتیجه همین‌جا نشان داده می‌شود.');
+  }).catch(function(){showBanner('warn','امکان فعال‌کردن نوتیفیکیشن نبود؛ نتیجه همین‌جا نشان داده می‌شود.');});
+}
+function notifyCaseFileGeneration(kind){
+  const ready=kind==='ready';
+  const title=ready?'پرونده آماده شد':'تولید پرونده ناموفق بود';
+  const body=ready?'پرونده‌ی روند درمان آماده‌ی مرور است.':'برای دیدن جزئیات، به پرونده‌ی روند درمان برگردید.';
+  // notification مرورگر در حالتِ تبِ پس‌زمینه مفید است؛ banner همیشه fallback درونِ اپ است.
+  try{
+    if('Notification' in window&&Notification.permission==='granted')new Notification(title,{body,tag:'feelia-case-file'});
+  }catch(e){}
+  if(document.hidden){
+    document.title=(ready?'✓ ':'⚠ ')+title+' — فیلیا';
+    setTimeout(function(){document.title=CASE_FILE_DOCUMENT_TITLE;},12000);
+  }
+}
+function stopCaseFileGenerationPolling(){
+  if(regenerateCaseFilePollTimer)clearInterval(regenerateCaseFilePollTimer);
+  regenerateCaseFilePollTimer=null;
+  regenerateCaseFilePollClientId=null;
+  regenerateCaseFilePollSawGenerating=false;
+}
+function completeCaseFileGenerationPolling(data){
+  const clientId=regenerateCaseFilePollClientId;
+  const record=data&&data.case_file;
+  const status=record&&record.status;
+  stopCaseFileGenerationPolling();
+  if(currentCaseFile&&currentCaseFile.clientId===clientId){
+    currentCaseFile.record=record;
+    currentCaseFile.rhythm=data.treatment_rhythm;
+    caseFileEditMode=false;
+    renderCaseFile();
+  }
+  if(!regenerateCaseFilePollNotified&&(status==='ready'||status==='error')){
+    regenerateCaseFilePollNotified=true;
+    notifyCaseFileGeneration(status);
+    showBanner(status==='ready'?'info':'error',status==='ready'?'پرونده با موفقیت آماده شد.':('تولیدِ پرونده ناموفق بود: '+(record.errorMessage||'نامشخص')));
+  }
+}
+function startCaseFileGenerationPolling(clientId){
+  if(regenerateCaseFilePollTimer&&regenerateCaseFilePollClientId===clientId)return;
+  stopCaseFileGenerationPolling();
+  regenerateCaseFilePollClientId=clientId;
+  regenerateCaseFilePollSawGenerating=false;
+  regenerateCaseFilePollNotified=false;
+  const poll=async function(){
+    try{
+      const data=await api('/api/clients/'+clientId+'/case-file');
+      const status=data.case_file&&data.case_file.status;
+      if(status==='generating'){regenerateCaseFilePollSawGenerating=true;return;}
+      // ممکن است نخستین poll پیش از ثبتِ generating برسد؛ تا زمانی که آن وضعیت را ندیده‌ایم
+      // پرونده‌ی آماده‌ی قبلی را پایانِ کارِ جدید تلقی نکن.
+      if(!regenerateCaseFilePollSawGenerating)return;
+      completeCaseFileGenerationPolling(data);
+    }catch(e){
+      // خطای گذرای شبکه نباید watcher را متوقف کند؛ درخواست بعدی وضعیت واقعی را می‌گیرد.
+    }
+  };
+  regenerateCaseFilePollTimer=setInterval(poll,5000);
+  setTimeout(poll,1200);
+}
 
 function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;');}
 
@@ -3389,11 +3468,17 @@ async function loadCaseFile(clientId){
   const sec=$('caseFileSection');
   sec.hidden=false;
   sec.innerHTML='<div class="cf-empty">در حال بارگذاریِ پرونده…</div>';
+  // پاسخِ دیررسیدِ مراجعِ قبلی نباید روی صفحه‌ی مراجعِ فعلی بنشیند (نمایشِ پروندهٔ یک مراجع
+  // در صفحه‌ی مراجعِ دیگر + ویرایشِ اشتباهی)؛ فقط اگر همان مراجع هنوز باز است اعمال می‌شود.
+  const stillOpen=function(){return currentClient&&String(currentClient.id)===String(clientId);};
   try{
     const data=await api('/api/clients/'+clientId+'/case-file');
+    if(!stillOpen())return;
     currentCaseFile={clientId:clientId,record:data.case_file,rhythm:data.treatment_rhythm};
+    if(data.case_file&&data.case_file.status==='generating')startCaseFileGenerationPolling(clientId);
     renderCaseFile();
   }catch(e){
+    if(!stillOpen())return;
     sec.innerHTML='<div class="cf-empty">خطا در بارگذاریِ پرونده: '+escapeHtml(e.message)+'</div>';
   }
 }
@@ -3549,7 +3634,7 @@ function renderCaseFile(){
   }
   if(rec.status==='generating'){
     sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div></div>'+
-      '<div class="cf-empty">در حالِ تولید — ممکن است چند ده ثانیه طول بکشد…</div>';
+      '<div class="cf-empty">در حالِ تولید — ممکن است چند دقیقه طول بکشد. پس از آماده‌شدن، همین‌جا و در صورتِ اجازه با نوتیفیکیشن اطلاع می‌دهیم.<div style="margin-top:10px"><button class="cf-btn cf-ghost" onclick="enableCaseFileNotifications()">فعال‌کردن اعلان</button></div></div>';
     return;
   }
   if(rec.status==='error'){
@@ -3786,7 +3871,6 @@ async function answerCaseFileQuestion(qId,value){
   }catch(e){showBanner('error',e.message);}
 }
 
-let regenerateCaseFilePollTimer=null;
 async function regenerateCaseFile(force){
   if(!currentCaseFile)return;
   let typed;
@@ -3794,10 +3878,11 @@ async function regenerateCaseFile(force){
     typed=prompt('این عمل همه‌ی ویرایش‌ها و تاییدهایِ دستیِ قبلی را دور می‌ریزد و پرونده را کاملاً از نو می‌سازد.\nبرایِ ادامه، دقیقاً همین عبارت را تایپ کنید: بازتولید کامل');
     if(typed!=='بازتولید کامل')return;
   }
-  if(regenerateCaseFilePollTimer){clearInterval(regenerateCaseFilePollTimer);regenerateCaseFilePollTimer=null;}
   const clientId=currentCaseFile.clientId;
+  requestCaseFileNotificationPermission();
+  startCaseFileGenerationPolling(clientId);
   const sec=$('caseFileSection');
-  sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div></div><div class="cf-empty">در حالِ تولید — ممکن است چند دقیقه طول بکشد…</div>';
+  sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div></div><div class="cf-empty">در حالِ تولید — ممکن است چند دقیقه طول بکشد. می‌توانید کار دیگری انجام دهید؛ پس از آماده‌شدن اطلاع می‌دهیم.</div>';
   try{
     // ⭐ فیکسِ باگِ واقعیِ مرتبط (2026-09-18): بعدِ اینکه abortِ این fetch را سمتِ سرور هم
     // واقعاً به لغوِ فراخوانیِ OpenRouter وصل کردیم (دیگر کارِ بی‌فایده در پس‌زمینه ادامه
@@ -3805,11 +3890,16 @@ async function regenerateCaseFile(force){
     // طولانی (چند دقیقه، برایِ کورپوسِ بزرگ) را قطع نکند — والا زودتر از موعد لغو
     // می‌شد. ۱۰ دقیقه، هم‌راستا با timeoutِ پیش‌فرضِ خودِ SDKِ OpenAI روی سرور.
     const data=await api('/api/clients/'+clientId+'/case-file/regenerate',{method:'POST',body:{force:!!force,confirmPhrase:typed},timeoutMs:600000});
-    currentCaseFile.record=data.case_file;
-    currentCaseFile.rhythm=data.treatment_rhythm;
-    caseFileEditMode=false;
-    renderCaseFile();
-    showBanner('info',data.skipped?'داده‌ی جدیدی از آخرین تولید ثبت نشده — پرونده تغییر نکرد.':'پرونده به‌روز شد.');
+    if(data.skipped){
+      stopCaseFileGenerationPolling();
+      currentCaseFile.record=data.case_file;
+      currentCaseFile.rhythm=data.treatment_rhythm;
+      caseFileEditMode=false;
+      renderCaseFile();
+      showBanner('info','داده‌ی جدیدی از آخرین تولید ثبت نشده — پرونده تغییر نکرد.');
+    }else{
+      completeCaseFileGenerationPolling(data);
+    }
   }catch(e){
     // ⭐ فیکسِ باگِ واقعی (2026-09-18): abortِ ۱۲۰ثانیه‌ایِ کلاینت فقط fetchِ مرورگر را
     // قطع می‌کند؛ فراخوانیِ OpenRouter روی سرور متوقف نمی‌شود و برایِ کورپوسِ واقعیِ
@@ -3820,35 +3910,15 @@ async function regenerateCaseFile(force){
     // (موفق/ناموفق) خودکار نمایش داده شود.
     if(e.code==='timeout'){
       sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div></div>'+
-        '<div class="cf-empty">پاسخِ اولیه دیرتر از حدِ معمول رسید، اما تولید در پس‌زمینه ادامه دارد — به‌محضِ آماده‌شدن همین‌جا نشان داده می‌شود…</div>';
-      let attempts=0;
-      regenerateCaseFilePollTimer=setInterval(async function(){
-        attempts++;
-        if(!currentCaseFile||currentCaseFile.clientId!==clientId){clearInterval(regenerateCaseFilePollTimer);regenerateCaseFilePollTimer=null;return;}
-        try{
-          const r=await api('/api/clients/'+clientId+'/case-file');
-          const st=r.case_file&&r.case_file.status;
-          if(st==='generating'&&attempts<150)return; // تا ۱۰ دقیقه (۱۵۰×۴ث) صبر کن
-          clearInterval(regenerateCaseFilePollTimer);regenerateCaseFilePollTimer=null;
-          currentCaseFile.record=r.case_file;
-          currentCaseFile.rhythm=r.treatment_rhythm;
-          caseFileEditMode=false;
-          renderCaseFile();
-          if(st==='ready'){
-            showBanner('info','پرونده با موفقیت آماده شد (پاسخِ اولیه دیر رسید، اما پردازش کامل شد).');
-          }else if(st==='error'){
-            showBanner('error','تولیدِ پرونده در نهایت ناموفق بود: '+(r.case_file.errorMessage||'نامشخص'));
-          }else{
-            showBanner('error','هنوز پاسخی از تولیدِ پرونده نرسید — چند دقیقه‌ی دیگر دوباره امتحان کنید.');
-          }
-        }catch(pollErr){
-          clearInterval(regenerateCaseFilePollTimer);regenerateCaseFilePollTimer=null;
-          showBanner('error','خطا در بررسیِ وضعیتِ پرونده: '+pollErr.message);
-          renderCaseFile();
-        }
-      },4000);
+        '<div class="cf-empty">پاسخِ اولیه دیرتر از حدِ معمول رسیده، اما تولید در پس‌زمینه ادامه دارد. لازم نیست منتظر بمانید؛ با آماده‌شدن اطلاع می‌دهیم.</div>';
       return;
     }
+    if(e.code==='busy'){
+      sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div></div>'+
+        '<div class="cf-empty">تولیدِ قبلی هنوز در حال انجام است. لازم نیست منتظر بمانید؛ با آماده‌شدن اطلاع می‌دهیم.</div>';
+      return;
+    }
+    stopCaseFileGenerationPolling();
     showBanner('error',e.message);
     renderCaseFile();
   }
