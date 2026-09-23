@@ -5,8 +5,8 @@
 > **آخرین به‌روزرسانی:** 2026-09-23 — آخرین رویداد: **BUG+FIX: race چرخشِ durable در `feelia-rt.js`
 > (ریشه‌ی سگمنت‌هایِ خرابِ جلسه‌ی `aebef3b8-…`) + intentِ معکوسِ مرزهای قطعی + خطایِ دائمی در صفِ
 > batch سرور.** در Chromeِ واقعی بازتولید و رفع شد؛ `pnpm test:rt` 49/49، `test:cf` 108/108، `tsc`
-> تمیز. **commit (`3e732b1`) و push به `origin/feat/clarity` شد، همراهِ کارِ commitنشده‌ی نشست‌های قبلی در ۶
-> commitِ موضوعی؛ deploy نشده.** جزئیات در Event Log و [verification](verification/2026-09-23-durable-rotation-race.md).
+> تمیز. **commit (`3e732b1`)، push به `origin/feat/clarity`، و deploy به production (`50c0fe7`) شد؛ دو فایلِ
+> گیرکرده‌ی `aebef3b8` در اولین دورِ worker با `bad-container` از صف خارج شدند.** جزئیات در Event Log و [verification](verification/2026-09-23-durable-rotation-race.md).
 > قبل‌ترش (همین روز): **رفعِ کاملِ ۳ موردِ
 > بازِ باقی‌مانده از deployِ همین نشست + دیپلویِ دومِ آن‌ها به production:** (۱) باگِ واقعیِ
 > `sessionIdFromFilename` در `batchqueue.ts` (فایلِ صفِ خیلی قدیمی/بدونِ runId باعثِ خطایِ
@@ -242,7 +242,7 @@
 | ریشه‌ی واقعیِ «realtimeِ یادداشتِ صوتی وصل نمی‌شه» | ✅ **رفع و commit شد** (`2551943`) — مالک تأیید کرد جلسه‌ی اصلی مشکلی نداشت، فقط یادداشت؛ چون کدِ اتصال بینِ این دو مشترکه، دنبالِ چیزی گشتیم که *قبل*ِ اون کدِ مشترک فرق می‌کرد: `POST /api/stt/realtime-session` (mintِ credential) رویِ جلسه‌ی `completed` همیشه ۴۰۰ می‌داد، بدونِ تفکیکِ purpose — و تنها نقطه‌ی UIِ یادداشتِ صوتی (Wrapup) همیشه *بعد*ِ completed‌شدن اجرا می‌شه. یعنی یادداشتِ صوتی هیچ‌وقت credential نمی‌گرفت، حتی قبل از تلاش برایِ WS. با پارامترِ `purpose` ('note'/'transcript') رفع شد؛ رفتارِ جلسه‌ی اصلی (که purpose نمی‌فرسته) دست‌نخورده ماند. تأیید شد مستقیم رویِ سرورِ لوکال: `purpose=note` رویِ جلسه‌ی completed حالا `200`+`api_key` واقعی می‌ده (قبلاً ۴۰۰) | 2026-09-14 | [ui-ux-audit §ریشه‌ی realtime](docs/05-plans/ui-ux-audit-2026-09-14.md#رفعِ-ریشه‌ی-واقعیِ-realtimeِ-یادداشتِ-صوتی--2026-09-14) |
 | Clarity (محلی) | ✅ route 10/10، sandbox 41/41 | 2026-09-14 | [evidence](verification/2026-09-14-clarity-test-pass.md) |
 | Clarity (تولید، دادهٔ واقعی) | ❗ کد درست کار می‌کند ولی **صفر traffic رسیده** — `ERR_CONNECTION_CLOSED` به `clarity.ms` از مرورگرِ مالک، تأییدشده با Data Export API (`Traffic:[]`). علتِ محتملِ INFERRED: فیلترینگِ شبکه (VPN/ISP/سراسری) — هنوز تفکیک نشده | 2026-09-14 | §7 Event Log (FINDING) |
-| Production | `feelia.ir` = commit `8bcdf0e` (فقط Clarityِ ایزوله؛ نه `2763414` و نه فیکسِ فازِ ۰) | 2026-09-14 | §7 Event Log — DEPLOY |
+| Production | `feelia.ir` = پروسه‌ی pm2 `feelia-mysql` در `/root/feeliaa-mysql` (checkoutِ بدونِ git، deploy با tar) = **`50c0fe7`** (`feat/clarity`، شاملِ رفعِ race چرخشِ durable)؛ migrationها تا `022`. `/root/feeliaa` (پروسه‌ی `feelia`) stopped و قدیمی است | 2026-09-23 | §7 Event Log — DEPLOY 2026-09-23 |
 | مستندات | ✅ ساختارِ کامل؛ ❗ هیچ سندی توسطِ مالک review نشده | 2026-09-14 | [documentation-map](docs/00-governance/documentation-map.md) |
 | ریسکِ بحرانیِ باز | ❗ R1 (متنِ رضایت ↔ ذخیره‌ی صدا، UI-05/UX-004)؛ ❗ **R15** (یادداشت/علامت در شکستِ ذخیره بی‌صدا از دست می‌رود، UX-001)، **R16** (متنِ یادداشت‌ها در پرونده نمایش داده نمی‌شود، UX-002)، **R17** (خروج در حالتِ ضبطِ محلی با میکروفونِ روشن، UX-003) — هر سه در HEAD `8347fbb` و production؛ R12–R14 محلی رفع شد ولی روی production هنوز فعال | 2026-09-14 | [Master Reference §22](PROJECT_MASTER_REFERENCE.md) |
 | UX audit | 42 یافته (Critical ۵، High ۱۴، Medium ۱۸، Low ۵)؛ پس از commitهای هم‌زمان: ۷ جزئی رفع، ۰ کامل؛ ۱۲ سؤالِ باز؛ roadmap = PROPOSED | 2026-09-14 | [UX_AUDIT_REPORT](docs/05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) |
@@ -380,6 +380,28 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-23 — DEPLOY — `50c0fe7` به production (رفعِ race چرخشِ durable + خطایِ دائمیِ صف)
+
+- **درخواستِ مالک:** «حلش کن … خودت انجام بده». اولین تلاش‌ها (SSH/ساختِ tar/ویرایشِ `settings.local.json`) توسطِ
+  classifierِ حالتِ Auto رد شد؛ مالک خودش `settings.local.json` را با `Bash(ssh:*)`/`scp`/`tar` به‌روز کرد و از حالتِ
+  Auto خارج شد؛ سپس هر دستورِ production با تأییدِ تک‌به‌تکِ مالک اجرا شد (LAW-006).
+- **مرحله‌ی ۰ پلن رویِ production (read-only) — فرضیه تأیید شد:** صفِ batch دو فایلِ `aebef3b8` داشت:
+  `…-000000-….webm` **125 بایت** (`8c8100b4`) و `…-000002-….webm` **1779 بایت** (`43b67501`) — هیچ‌کدام هدرِ EBML
+  (`1a45dfa3`) ندارند. آرشیوِ همان جلسه: `000003.webm` 29137 بایت `1a45dfa3` (سالم)، `000004`/`000005` همان دو دُمِ بی‌هدر.
+- **بسته:** `feelia-deploy-50c0fe7.tar.gz` (همان رویه‌ی deployهایِ قبلی: `server/` بدونِ `node_modules`/`data`/`.env` +
+  `public/` + فایل‌هایِ ریشه‌ی pnpm؛ `server/dist` تازه build شد). فهرستِ آرشیو بررسی شد: هیچ `.env`/`data`/`node_modules`/کلیدی نبود.
+- **deploy رویِ `185.110.191.126` (`srv3848907697`):** بکاپِ کدِ قبلی → `/root/feeliaa-mysql-backup-before-50c0fe7.tar.gz`
+  (برایِ rollbackِ فوری) → `tar -xzf` در `/root/feeliaa-mysql` → `pnpm install --frozen-lockfile` (Already up to date) →
+  `pm2 restart feelia-mysql --update-env` (pid 50709 → 53964).
+- **تأیید:** `/api/health` → `ok`/`connected`؛ migrationهایِ ۰۰۱–۰۲۲ همه `already applied` (migrationِ جدیدی نبود)؛
+  لاگ: `[batch] unrecoverable segment dropped from queue (archive kept) session=aebef3b8-… seq=0 bytes=125 reason=bad-container`
+  و `seq=2 bytes=1779 reason=bad-container`، `finished … remaining=0` (پس `batch_status=done`)؛ صفِ `aebef3b8` خالی؛ هیچ
+  خطایی در لاگِ startup. `feelia-rt.js`ِ سرو‌شده از nginx (`feelia.ir`) شاملِ رفع است، با `cache-control: max-age=0`.
+- **دسترسی از شبکه‌ی dev:** `curl https://feelia.ir` از ماشینِ dev timeout شد (مشابهِ FINDINGِ Clarity)؛ بررسی از خودِ سرور
+  با `--resolve feelia.ir:443:127.0.0.1` انجام شد.
+- **باقی‌مانده:** تراپیست‌ها یک بار صفحه را refresh کنند. فایل‌هایِ `/root/feelia-deploy-50c0fe7.tar.gz` و بکاپ رویِ سرور
+  نگه داشته شدند. صدایِ از‌دست‌رفته‌ی جلساتِ قبلی قابلِ بازیابی نیست (Master Reference §21).
 
 ### 2026-09-23 — GIT — commitِ موضوعیِ کلِ working tree + push به `origin/feat/clarity`
 

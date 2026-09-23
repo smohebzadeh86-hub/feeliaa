@@ -1,15 +1,18 @@
 # 2026-09-23 — race چرخشِ durable (سگمنت‌های بی‌هدر) + intentِ معکوسِ مرزهای قطعی
 
-> Evidence (مشاهده در همین تاریخ). وضعیت: commit در `3e732b1` (push به `origin/feat/clarity`)، **deploy نشده**.
+> Evidence (مشاهده در همین تاریخ). وضعیت: commit در `3e732b1`، push، و **deploy به production (`50c0fe7`)**.
 
 ## زمینه
 جلسه‌ی واقعی `aebef3b8-7910-493f-bf47-d50277ba951c`: چند سگمنت (مثلاً `000005.webm`) را هم ffmpeg
 (`Invalid data found`) و هم Soniox async (`Invalid audio file`) رد کردند؛ این فایل‌ها با purpose=`transcript`
 در `data/batch-queue` مانده بودند و worker هر ۵ دقیقه دوباره امتحانشان می‌کرد.
 
-## مرحله‌ی ۰ — تأییدِ روی سرور
-**انجام نشد** (نیازمندِ اجرایِ دستوراتِ read-only توسطِ مالک رویِ production). پیش‌بینیِ فرضیه برایِ
-بررسیِ بعدی: فایل‌هایِ خراب ~۱–۴KB، ۴ بایتِ اول ≠ `1a45dfa3`، `duration_ms = NULL`.
+## مرحله‌ی ۰ — تأییدِ روی سرور (پیش از deploy، read-only)
+صفِ batch: `…-000000-….webm` 125 بایت `8c8100b4` و `…-000002-….webm` 1779 بایت `43b67501` (بی‌هدر). آرشیو:
+`000003.webm` 29137 بایت `1a45dfa3` (سالم)، `000004`/`000005` همان دو دُم. **فرضیه تأیید شد.**
+
+## پس از deploy (`50c0fe7`)
+لاگِ اولین دورِ worker: هر دو فایل `reason=bad-container` از صف خارج شدند، `remaining=0`؛ صف خالی؛ health `ok`.
 
 ## مرحله‌ی ۱ — بازتولید در Chromeِ واقعی (Browser pane)
 صفحه‌ی مستقل در scratchpad (سرورِ استاتیکِ موقتِ `python -m http.server`؛ نه در `public/`) که
