@@ -667,7 +667,9 @@
   // ثانیه طول بکشه؛ اگه نگهبان زودتر fire بشه، finish()/pause() سراغِ صفی می‌رن که
   // آخرین سگمنت هنوز توش نیست — نه throw، فقط صدا بدونِ خبر جا می‌مونه.
   var DURABLE_FLUSH_GUARD_MS = 10000;
-  RTSession.prototype.stopDurableSegment = function () {
+  // stateOverride: فقط finish() — که پیش از بستنِ آخرین سگمنت به FINALIZING رفته — stateِ واقعیِ
+  // لحظه‌ی «پایانِ جلسه» را می‌دهد تا intentِ همان سگمنت درست حساب شود.
+  RTSession.prototype.stopDurableSegment = function (stateOverride) {
     if (this.durableRotateTimer) { clearTimeout(this.durableRotateTimer); this.durableRotateTimer = null; }
     if (!this.durableRec) return Promise.resolve();
     var rec = this.durableRec;
@@ -675,7 +677,7 @@
     if (rec.state === 'inactive') return Promise.resolve();
     // seq و state همین حالا (همگام) ثبت می‌شوند — onstop بعداً اجرا می‌شود (توضیحِ startDurable).
     rec._seqAtStop = this.durableSeq++;
-    rec._stateAtStop = this.state;
+    rec._stateAtStop = stateOverride || this.state;
     var flushP = rec._flushPromise || Promise.resolve();
     // نگهبان: اگه onstop به هر دلیلی (خطای مرورگر/state عجیب) هیچ‌وقت fire نشه،
     // finish() تا ابد قفل نمونه.
@@ -1281,6 +1283,10 @@
     }
     self.noNewConnections = true; // ابطال همه mint/WS/reconnect در-flight
     self.connEpoch++;
+    // ⭐ stateِ لحظه‌ی پایان — آخرین سگمنتِ durable پایین‌تر (بعد از FINALIZING) بسته می‌شود؛ بدونِ این،
+    // پایان در FAILED/RECONNECTING/NETWORK_PAUSED آن سگمنت را archive می‌کرد و صدایش هرگز رونویسی
+    // نمی‌شد (در جلسه‌ی durable-only کوتاه‌تر از ۱۵ث یعنی کلِ متن). ۲۰۲۶-۰۹-۲۳، T16x/T16y.
+    var stateAtFinish = self.state;
     self.setState(STATES.FINALIZING);
     self.clearTimers();
     self.stopKeepalive(); // اگه از MANUAL_PAUSED مستقیم finish شده، تایمرِ keepalive نشتی نمونه
@@ -1306,7 +1312,7 @@
       // ⭐ باید صبر کرد تا آخرین سگمنتِ durable واقعاً توی IndexedDB نوشته بشه — وگرنه
       // archiveQueuedAudioOnly/uploadBatchSegments (پایین همین زنجیره) صفِ خالی
       // می‌دیدن و برایِ جلساتِ کوتاه‌تر از ۶۰ثانیه هیچ صدایی آرشیو نمی‌شد.
-      return self.stopDurableSegment().then(function () {
+      return self.stopDurableSegment(stateAtFinish).then(function () {
         var realtimeText = cleanText(self.confirmed);
         if (!self.unreliable) {
           // مسیر موفق: persist نهایی و تمام

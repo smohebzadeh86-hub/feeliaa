@@ -85,9 +85,11 @@ globalThis.fetch = async (url, opts = {}) => {
   if (m && method === 'POST') {
     const q = new URLSearchParams(url.split('?')[1] || '');
     sentBlobs.push({ sessionId: m[1], purpose: q.get('purpose'), seq: Number(q.get('seq')), blob: opts.body && opts.body.f ? opts.body.f[0] : null });
-    const purpose = url.includes('purpose=note') ? 'note' : 'transcript';
-    (purpose === 'note' ? noteQueue : batchQueue).push({ sessionId: m[1] });
-    return json(202, { status: 'queued', purpose });
+    const purpose = q.get('purpose') || 'transcript';
+    // ⭐ archive فقط آرشیو می‌شود، هرگز رونویسی — قبلاً mock آن را هم در batchQueue می‌گذاشت و
+    // سگمنتی که اشتباهاً archive گرفته بود (مثلاً آخرین سگمنتِ finish در FAILED) تست را سبز نگه می‌داشت.
+    if (purpose !== 'archive') (purpose === 'note' ? noteQueue : batchQueue).push({ sessionId: m[1] });
+    return json(202, { status: purpose === 'archive' ? 'archived' : 'queued', purpose });
   }
   m = url.match(/^\/api\/sessions\/([^/?]+)\/batch-status$/);
   if (m) {
@@ -447,10 +449,27 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     'started=' + started16 + ' state=' + s16.state);
   mintFailMode = false;
   const out16 = await s16.finish();
+  // T16x/T16y (2026-09-23): آخرین سگمنتِ جلسه‌ای که در FAILED/RECONNECTING تمام می‌شود باید رونویسی شود —
+  // finish() پیش از stopDurableSegment به FINALIZING می‌رود، پس بدونِ override این سگمنت archive می‌گرفت.
+  { const u = sentBlobs.filter((b) => b.sessionId === 's16'); ok('T16x durable-only final segment uploaded as transcript (not archive)', u.length >= 1 && u.every((b) => b.purpose === 'transcript'), u.map((b) => b.seq + ':' + b.purpose).join(',')); }
   ok('T16 durable-only finish → batch-pending, queued', out16.mode === 'batch-pending' && batchQueue.some((q) => q.sessionId === 's16'), out16.mode);
   batchPolls = 0;
   const drain16 = await s16.awaitBatchDrain({ timeoutMs: 15000 });
   ok('T16 later batch merges', drain16.drained && drain16.ok && sessions.s16.transcript.includes('BATCH FULL TEXT'));
+
+  newSession('s16r');
+  const s16r = RT.createSession('s16r', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+  const p16r = s16r.start(); await sleep(5); serverOpen(FakeWS.last); await p16r; await sleep(5);
+  serverClose(FakeWS.last); await sleep(5);
+  const st16r = s16r.state;
+  await s16r.finish(); await sleep(20);
+  { const u = sentBlobs.filter((b) => b.sessionId === 's16r').sort((a, b) => a.seq - b.seq); ok('T16y finish during ' + st16r + ': last (outage) segment → transcript', st16r === 'RECONNECTING' && u.length >= 1 && u[u.length - 1].purpose === 'transcript', u.map((b) => b.seq + ':' + b.purpose).join(',')); }
+  // کنترلِ منفی: finish از ACTIVEِ سالم همچنان archive (بدونِ رونویسیِ تکراری)
+  newSession('s16a');
+  const s16a = RT.createSession('s16a', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+  const p16a = s16a.start(); await sleep(5); serverOpen(FakeWS.last); await p16a; await sleep(5);
+  await s16a.finish(); await sleep(20);
+  { const u = sentBlobs.filter((b) => b.sessionId === 's16a'); ok('T16z finish from ACTIVE: final segment stays archive', u.length >= 1 && u.every((b) => b.purpose === 'archive'), u.map((b) => b.seq + ':' + b.purpose).join(',')); }
 
   // T17: قرارداد pause — فقط ACTIVE/RECOVERED قبول می‌کند
   newSession('s17');
