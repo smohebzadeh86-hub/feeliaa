@@ -395,6 +395,7 @@
     this.confirmed = '';
     this.interim = '';
     this.baseVersion = 0; // transcript_version پایه برای CAS
+    this.persistedText = ''; // آخرین متنی که با همین baseVersion رویِ سرور است (rebaseِ 409 در persistConfirmed)
     this.dirty = false;
     this.autosaveFailStreak = 0;
     this.unreliable = false;
@@ -531,9 +532,16 @@
     try {
       self.liveRec = mime ? new MediaRecorder(self.stream, { mimeType: mime }) : new MediaRecorder(self.stream);
     } catch (e) { return; }
+    // ⭐ باگِ واقعی (گزارشِ مالک ۲۰۲۶-۰۹-۲۳: «بعدِ وصل‌شدنِ دوباره رونویسی نشد» + «Audio decode error»):
+    // هر recorder فقط به همان WSی می‌فرستد که هنگامِ ساختش self.ws بوده. قبلاً ondataavailable
+    // همیشه به self.wsِ *لحظه‌ی* رسیدنِ chunk می‌فرستاد — liveRecِ اتصالِ قبلی تا reconnect روشن
+    // می‌ماند و stop()ش ناهمگام است، پس دُمِ بی‌هدرش اولین بایت‌هایِ WSِ تازه می‌شد؛ Soniox
+    // (audio_format:auto) با «Audio decode error» می‌بست و همین چرخه بعد از هر reconnect تکرار
+    // می‌شد (فقط برچسبِ «اتصال دوباره برقرار شد»، بدونِ هیچ متن). T21 در scripts/rt-harness.cjs.
+    var targetWs = self.ws;
     self.liveRec.ondataavailable = function (e) {
-      if (e.data && e.data.size > 0 && self.ws && self.ws.readyState === WebSocket.OPEN) {
-        try { self.ws.send(e.data); } catch (err) {}
+      if (e.data && e.data.size > 0 && targetWs && self.ws === targetWs && targetWs.readyState === WebSocket.OPEN) {
+        try { targetWs.send(e.data); } catch (err) {}
       }
     };
     try { self.liveRec.start(250); } catch (e) {}
@@ -860,6 +868,7 @@
     self.interim = ''; // interim قبلی discard — از نقطه امن ادامه
     try { if (self.ws) self.ws.close(); } catch (e) {}
     self.ws = null;
+    self.stopLivePusher(); // WSش رفته؛ اتصالِ تازه recorderِ تازه (با هدر) می‌سازد — startLivePusher
     self.setState(STATES.RECONNECTING);
     // از همین‌جا تا resolveِ connectWithFreshMint (چه موفق چه ناموفق) «در حالِ کار» است.
     self.reconnectInFlight = true;
@@ -989,6 +998,7 @@
       ? reqJson('/api/sessions/' + self.sessionId).then(function (r) {
           var t = (r.session && r.session.transcript) || '';
           if (t && t.length > self.confirmed.length) self.confirmed = t;
+          self.persistedText = t;
           self.baseVersion = (r.session && r.session.transcript_version) || 0;
         }).catch(function () {})
       : Promise.resolve();
@@ -1117,6 +1127,7 @@
       body: { transcript: text, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' }
     }).then(function () {
       self.baseVersion++;
+      self.persistedText = text;
       return text;
     }).catch(function (err) {
       if (err && err.status === 409) {
@@ -1124,15 +1135,34 @@
         return reqJson('/api/sessions/' + self.sessionId).then(function (r) {
           var serverText = (r.session && r.session.transcript) || '';
           self.baseVersion = (r.session && r.session.transcript_version) || 0;
+          // ⭐ باگِ واقعی (گزارشِ مالک ۲۰۲۶-۰۹-۲۳: «نوشت متنش بعداً اضافه می‌شه، ولی متنی ذخیره نشد»):
+          // صدایِ دوره‌ی قطعی حینِ جلسه آپلود و سمتِ سرور به انتهایِ transcript *append* می‌شود
+          // (mergeBatchTranscript) و نسخه بالا می‌رود. اینجا قبلاً فقط طول مقایسه می‌شد: اگر متنِ
+          // زنده‌ی مرورگر از آخرین ذخیره بیشتر از متنِ batch رشد کرده بود، کلِ متنِ سرور — همراهِ
+          // متنِ بازیابی‌شده‌ی قطعی — با متنِ مرورگر بازنویسی و برای همیشه گم می‌شد (LAW-008).
+          // اگر هر دو طرف فقط به همان آخرین متنِ ذخیره‌شده اضافه کرده‌اند، هر دو افزوده حفظ می‌شوند.
+          var base = self.persistedText || '';
+          var nowText = cleanText(self.confirmed);
+          if (serverText.length > base.length && serverText.indexOf(base) === 0 && nowText.indexOf(base) === 0) {
+            var tail = nowText.slice(base.length).replace(/^\s+/, '');
+            self.confirmed = serverText + (tail ? '\n\n' + tail : '');
+            self.curSpeaker = null; // بعد از بلوکِ batch، گفته‌ی بعدی دوباره برچسبِ گوینده بگیرد
+            var merged = cleanText(self.confirmed);
+            return reqJson('/api/sessions/' + self.sessionId, {
+              method: 'PUT',
+              body: { transcript: merged, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' }
+            }).then(function () { self.baseVersion++; self.persistedText = merged; return merged; });
+          }
           if (serverText.length >= text.length) {
             if (serverText.length > self.confirmed.length) self.confirmed = serverText;
+            self.persistedText = serverText;
             return serverText;
           }
           // سرور کوتاه‌تر است (مثلاً قدیمی) — یک بار با نسخه تازه تلاش کن
           return reqJson('/api/sessions/' + self.sessionId, {
             method: 'PUT',
             body: { transcript: text, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' }
-          }).then(function () { self.baseVersion++; return text; });
+          }).then(function () { self.baseVersion++; self.persistedText = text; return text; });
         });
       }
       throw err;

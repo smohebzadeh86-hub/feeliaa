@@ -237,6 +237,44 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('T18 finish still honestly reports unreliable/batch', out18.reliable === false && out18.mode === 'batch');
   ok('T18 confirmed realtime text kept both parts, no drop', s18.confirmed.includes('قبل از قطعی') && s18.confirmed.includes('بعد از بازگشت'));
 
+  // Test 21 (گزارشِ مالک ۲۰۲۶-۰۹-۲۳: «بعدِ وصل‌شدنِ دوباره‌ی نت دیگه رونویسی نشد» + «Audio decode error»):
+  // liveRecِ اتصالِ قبلی تا reconnect روشن می‌ماند و stop()ش ناهمگام است — دُمِ بی‌هدرِ آن نباید
+  // رویِ WSِ *تازه* برود. اولین بایت‌هایِ صوتیِ WSِ تازه باید هدرِ container باشند، وگرنه Soniox
+  // (audio_format:auto) «Audio decode error» می‌دهد و رونویسی بعد از هر reconnect دوباره می‌میرد.
+  newSession('s21');
+  const s21 = RT.createSession('s21', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+  const p21 = s21.start(); await sleep(5); serverOpen(FakeWS.last); await p21;
+  await sleep(5);
+  serverClose(FakeWS.last);
+  await sleep(1200);
+  const ws21 = FakeWS.last;
+  serverOpen(ws21);
+  await sleep(20);
+  const bin21 = ws21.sent.filter((d) => typeof d !== 'string');
+  const bin21Txt = await Promise.all(bin21.map((b) => b.text()));
+  ok('T21 first audio on the fresh WS after reconnect is a container header (no stale tail from old liveRec)',
+    bin21Txt.length >= 1 && bin21Txt[0].startsWith('HDR') && !bin21Txt.includes('TAIL'), bin21Txt.map((t) => t.slice(0, 4)).join(','));
+  s21.abort();
+
+  // Test 22 (گزارشِ مالک ۲۰۲۶-۰۹-۲۳: «نوشت متنش بعداً اضافه می‌شه، ولی متنی ذخیره نشد»): متنِ batchِ
+  // دوره‌ی قطعی که حینِ جلسه سمتِ سرور append شده، نباید با ذخیره‌ی بعدیِ مرورگر (409 → rebase)
+  // بازنویسی شود — حتی وقتی متنِ زنده‌ی مرورگر از آخرین ذخیره بیشتر از متنِ batch رشد کرده.
+  newSession('s22');
+  const s22 = RT.createSession('s22', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+  const p22 = s22.start(); await sleep(5); serverOpen(FakeWS.last); await p22;
+  serverTokens(FakeWS.last, [{ text: 'پیش از قطعی', is_final: true }]);
+  await s22.persistConfirmed();
+  sessions.s22.transcript += '\n\nOUTAGE BATCH'; sessions.s22.transcript_version++; // mergeBatchTranscript سمتِ سرور
+  serverTokens(FakeWS.last, [{ text: ' ' + 'بعد از بازگشت '.repeat(10), is_final: true }]);
+  await s22.persistConfirmed();
+  ok('T22 409 rebase keeps server-appended batch text AND new realtime text (no overwrite)',
+    sessions.s22.transcript.includes('OUTAGE BATCH') && sessions.s22.transcript.includes('پیش از قطعی') && sessions.s22.transcript.includes('بعد از بازگشت') &&
+    sessions.s22.transcript.indexOf('OUTAGE BATCH') < sessions.s22.transcript.indexOf('بعد از بازگشت'), JSON.stringify(sessions.s22.transcript.slice(0, 60)));
+  serverTokens(FakeWS.last, [{ text: ' ادامه', is_final: true }]);
+  await s22.persistConfirmed();
+  ok('T22b later saves keep the batch text', sessions.s22.transcript.includes('OUTAGE BATCH') && sessions.s22.transcript.endsWith('ادامه'));
+  s22.abort();
+
   // Test 20 (race چرخشِ durable، ۲۰۲۶-۰۹-۲۳): stop و *بلافاصله* start (بدونِ await — دقیقاً
   // مثلِ تایمرِ چرخش و مرزهای قطعی). با FakeRecorderِ ناهمگام، قبلاً (الف) onstopِ recorderِ
   // قبلی فقط دُمِ بی‌هدر را ذخیره می‌کرد و (ب/ج) intentِ سگمنت‌های مرزی برعکس بود.
