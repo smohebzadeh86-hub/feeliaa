@@ -242,7 +242,7 @@
 | ریشه‌ی واقعیِ «realtimeِ یادداشتِ صوتی وصل نمی‌شه» | ✅ **رفع و commit شد** (`2551943`) — مالک تأیید کرد جلسه‌ی اصلی مشکلی نداشت، فقط یادداشت؛ چون کدِ اتصال بینِ این دو مشترکه، دنبالِ چیزی گشتیم که *قبل*ِ اون کدِ مشترک فرق می‌کرد: `POST /api/stt/realtime-session` (mintِ credential) رویِ جلسه‌ی `completed` همیشه ۴۰۰ می‌داد، بدونِ تفکیکِ purpose — و تنها نقطه‌ی UIِ یادداشتِ صوتی (Wrapup) همیشه *بعد*ِ completed‌شدن اجرا می‌شه. یعنی یادداشتِ صوتی هیچ‌وقت credential نمی‌گرفت، حتی قبل از تلاش برایِ WS. با پارامترِ `purpose` ('note'/'transcript') رفع شد؛ رفتارِ جلسه‌ی اصلی (که purpose نمی‌فرسته) دست‌نخورده ماند. تأیید شد مستقیم رویِ سرورِ لوکال: `purpose=note` رویِ جلسه‌ی completed حالا `200`+`api_key` واقعی می‌ده (قبلاً ۴۰۰) | 2026-09-14 | [ui-ux-audit §ریشه‌ی realtime](docs/05-plans/ui-ux-audit-2026-09-14.md#رفعِ-ریشه‌ی-واقعیِ-realtimeِ-یادداشتِ-صوتی--2026-09-14) |
 | Clarity (محلی) | ✅ route 10/10، sandbox 41/41 | 2026-09-14 | [evidence](verification/2026-09-14-clarity-test-pass.md) |
 | Clarity (تولید، دادهٔ واقعی) | ❗ کد درست کار می‌کند ولی **صفر traffic رسیده** — `ERR_CONNECTION_CLOSED` به `clarity.ms` از مرورگرِ مالک، تأییدشده با Data Export API (`Traffic:[]`). علتِ محتملِ INFERRED: فیلترینگِ شبکه (VPN/ISP/سراسری) — هنوز تفکیک نشده | 2026-09-14 | §7 Event Log (FINDING) |
-| Production | `feelia.ir` = پروسه‌ی pm2 `feelia-mysql` در `/root/feeliaa-mysql` (checkoutِ بدونِ git، deploy با tar) = **`50c0fe7`** (`feat/clarity`، شاملِ رفعِ race چرخشِ durable)؛ migrationها تا `022`. `/root/feeliaa` (پروسه‌ی `feelia`) stopped و قدیمی است | 2026-09-23 | §7 Event Log — DEPLOY 2026-09-23 |
+| Production | `feelia.ir` = پروسه‌ی pm2 `feelia-mysql` در `/root/feeliaa-mysql` (checkoutِ بدونِ git، deploy با tar) = **`50c0fe7`** برایِ سرور + **`public/feelia-rt.js` از `d514111`** (رفعِ race چرخشِ durable + intentِ آخرین سگمنتِ finish)؛ migrationها تا `022`. `/root/feeliaa` (پروسه‌ی `feelia`) stopped و قدیمی است | 2026-09-23 | §7 Event Log — DEPLOY 2026-09-23 |
 | مستندات | ✅ ساختارِ کامل؛ ❗ هیچ سندی توسطِ مالک review نشده | 2026-09-14 | [documentation-map](docs/00-governance/documentation-map.md) |
 | ریسکِ بحرانیِ باز | ❗ R1 (متنِ رضایت ↔ ذخیره‌ی صدا، UI-05/UX-004)؛ ❗ **R15** (یادداشت/علامت در شکستِ ذخیره بی‌صدا از دست می‌رود، UX-001)، **R16** (متنِ یادداشت‌ها در پرونده نمایش داده نمی‌شود، UX-002)، **R17** (خروج در حالتِ ضبطِ محلی با میکروفونِ روشن، UX-003) — هر سه در HEAD `8347fbb` و production؛ R12–R14 محلی رفع شد ولی روی production هنوز فعال | 2026-09-14 | [Master Reference §22](PROJECT_MASTER_REFERENCE.md) |
 | UX audit | 42 یافته (Critical ۵، High ۱۴، Medium ۱۸، Low ۵)؛ پس از commitهای هم‌زمان: ۷ جزئی رفع، ۰ کامل؛ ۱۲ سؤالِ باز؛ roadmap = PROPOSED | 2026-09-14 | [UX_AUDIT_REPORT](docs/05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) |
@@ -380,6 +380,16 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-23 — DEPLOY — `public/feelia-rt.js` از `d514111` (intentِ آخرین سگمنتِ finish در FAILED/RECONNECTING)
+
+- **درخواستِ مالک:** «آره رفعش کن و دیپلوی کن». commitها: `d514111` (کد + harness)، `b85a5e5` (docs)؛ push شد.
+- بینِ `50c0fe7` (deployِ قبلی) و `HEAD` تنها فایلِ runtime که عوض شد `public/feelia-rt.js` است (بقیه docs/harness)؛
+  پس فقط همین فایلِ استاتیک جایگزین شد — بدونِ build، `pnpm install` یا ری‌استارت.
+- بکاپ: `/root/feelia-rt.js.before-d514111`. `scp` به `/root/feeliaa-mysql/public/feelia-rt.js`.
+- **تأیید:** فایل رویِ دیسک و فایلِ سرو‌شده از nginx (`feelia.ir`، از خودِ سرور با `--resolve`) هر دو شاملِ `stateAtFinish`؛
+  صفحه‌ی اصلی `200`؛ `/api/health` → `ok`/`connected`؛ `feelia-mysql` همان pid 53964 (بدونِ ری‌استارت).
+- تراپیست‌ها با یک refresh نسخه‌ی تازه را می‌گیرند (`cache-control: max-age=0`).
 
 ### 2026-09-23 — FINDING — آخرین سگمنتِ جلسه‌ای که در FAILED/RECONNECTING تمام می‌شود هرگز رونویسی نمی‌شود
 
