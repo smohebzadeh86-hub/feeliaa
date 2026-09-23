@@ -8,7 +8,7 @@
 // ⚠️ هیچ‌جا payload/response کامل لاگ نمی‌شود — ممکن است داده‌ی بالینی (LAW-001) داشته باشد.
 import OpenAI from 'openai';
 import type { LLMProvider, CaseFilePromptInput } from '../../ports/llmProvider.port.js';
-import type { CaseFileDraft, CaseFileDigest } from '../../domain/types.js';
+import type { RawCaseFileDraft, CaseFileDigest } from '../../domain/types.js';
 import { CaseFileGenerationError } from '../../domain/errors.js';
 import { CASE_FILE_SYSTEM_PROMPT, CASE_FILE_DIGEST_SYSTEM_PROMPT, describeClientMeta } from '../../application/buildCaseFilePrompt.js';
 import { CASE_FILE_JSON_SCHEMA } from './caseFileJsonSchema.js';
@@ -44,12 +44,12 @@ ${input.corpusText}`;
     );
   }
 
-  async generateCaseFile(input: CaseFilePromptInput): Promise<CaseFileDraft> {
+  async generateCaseFile(input: CaseFilePromptInput): Promise<RawCaseFileDraft> {
     const userPrompt = `${describeClientMeta(input.clientMeta)}
 
 خلاصه‌ی تصحیح‌شده‌ی جلسات ثبت‌شده:
 ${input.corpusText}`;
-    return callStructured<CaseFileDraft>(
+    return callStructured<RawCaseFileDraft>(
       this.client, this.model, 'OpenAI', CASE_FILE_SYSTEM_PROMPT, userPrompt, CASE_FILE_JSON_SCHEMA
     );
   }

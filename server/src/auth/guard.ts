@@ -10,6 +10,7 @@ declare module 'fastify' {
   interface FastifyRequest {
     therapistId: string | null;
     isAdmin: boolean;
+    caseFileEnabled: boolean;
   }
 }
 
@@ -19,6 +20,7 @@ export async function registerAuthContext(app: FastifyInstance) {
 
   app.decorateRequest('therapistId', null);
   app.decorateRequest('isAdmin', false);
+  app.decorateRequest('caseFileEnabled', false);
 
   app.addHook('onRequest', async (request) => {
     const token = request.cookies[SESSION_COOKIE];
@@ -27,10 +29,12 @@ export async function registerAuthContext(app: FastifyInstance) {
     if (!resolved || !resolved.active) {
       request.therapistId = null;
       request.isAdmin = false;
+      request.caseFileEnabled = false;
       return;
     }
     request.therapistId = resolved.therapistId;
     request.isAdmin = resolved.isAdmin;
+    request.caseFileEnabled = resolved.caseFileEnabled;
   });
 }
 
@@ -51,5 +55,16 @@ export async function requireAdmin(request: FastifyRequest, reply: FastifyReply)
   }
   if (!request.isAdmin) {
     return reply.code(403).send({ error: 'دسترسی ادمین لازم است', code: 'forbidden' });
+  }
+}
+
+// preHandler برای روت‌های Case File — فازِ اولِ deploy فقط برایِ یک تراپیستِ مشخص فعال است
+// (تصمیمِ صریحِ مالک، ۲۰۲۶-۰۹-۲۳؛ `therapists.case_file_enabled`، migration 022).
+export async function requireCaseFileAccess(request: FastifyRequest, reply: FastifyReply) {
+  if (!request.therapistId) {
+    return reply.code(401).send({ error: 'ابتدا وارد شوید', code: 'unauthorized' });
+  }
+  if (!request.caseFileEnabled) {
+    return reply.code(403).send({ error: 'این قابلیت برایِ حسابِ شما فعال نیست', code: 'forbidden' });
   }
 }

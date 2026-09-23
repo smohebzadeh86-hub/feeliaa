@@ -9,7 +9,9 @@ export async function callStructured<T>(
   providerLabel: string,
   system: string,
   user: string,
-  schema: unknown
+  schema: unknown,
+  // پارامترهایِ اضافیِ خاصِ provider (مثلاً reasoning در OpenRouter)؛ به بدنه‌ی درخواست اضافه می‌شود
+  extraBody?: Record<string, unknown>
 ): Promise<T> {
   let raw: string | null | undefined;
   try {
@@ -20,7 +22,8 @@ export async function callStructured<T>(
         { role: 'user', content: user },
       ],
       response_format: { type: 'json_schema', json_schema: schema } as any,
-    });
+      ...(extraBody ?? {}),
+    } as any);
     raw = response.choices[0]?.message?.content;
   } catch (err) {
     throw new CaseFileGenerationError(

@@ -1,11 +1,12 @@
 // فقط I/O — بدونِ منطقِ provider-specific این‌جا. صدا زدنِ application/* و map کردنِ
 // خطایِ دامنه‌ای به HTTP.
 import type { FastifyInstance } from 'fastify';
-import { requireAuth } from '../../../auth/guard.js';
+import { requireAuth, requireCaseFileAccess } from '../../../auth/guard.js';
 import { getOwnedClient } from '../../../db/ownership.js';
 import { generateCaseFile } from '../application/generateCaseFile.js';
 import { computeTreatmentRhythm } from '../application/computeTreatmentRhythm.js';
-import { applyFieldPatch, addCaseFileItem, removeCaseFileItem, type FieldPatchAction, type AddableKind } from '../application/applyFieldPatch.js';
+import { applyFieldPatch, addCaseFileItem, removeCaseFileItem, dropGhostMedication, migrateAnsweredQuestions, type FieldPatchAction, type AddableKind } from '../application/applyFieldPatch.js';
+import { upgradeLegacyContent } from '../application/upgradeLegacyContent.js';
 import { SqlCaseFileRepository } from '../adapters/repository/caseFileRepository.sql.js';
 import { resolveLLMProvider } from '../adapters/llm/registry.js';
 import { CaseFileGenerationError, CaseFileValidationError } from '../domain/errors.js';
@@ -14,6 +15,7 @@ const caseFileRepo = new SqlCaseFileRepository();
 
 export async function caseFileRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
+  app.addHook('preHandler', requireCaseFileAccess);
 
   // GET /api/clients/:id/case-file — وضعیتِ فعلی، بدونِ تولیدِ دوباره
   app.get('/api/clients/:id/case-file', async (request, reply) => {
@@ -24,6 +26,7 @@ export async function caseFileRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
     const record = await caseFileRepo.get(id);
+    if (record) { dropGhostMedication(record.content); migrateAnsweredQuestions(record.content); }
     const treatment_rhythm = await computeTreatmentRhythm(id);
     return { case_file: record, treatment_rhythm };
   });
@@ -83,6 +86,8 @@ export async function caseFileRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'پرونده هنوز ساخته نشده — ابتدا آن را تولید کنید' };
     }
+    dropGhostMedication(record.content);
+    migrateAnsweredQuestions(record.content);
 
     try {
       const nextContent = applyFieldPatch(record.content, fieldId, action, value);
@@ -100,6 +105,21 @@ export async function caseFileRoutes(app: FastifyInstance) {
     }
   });
 
+  // POST /api/clients/:id/case-file/upgrade — ارتقایِ پرونده‌یِ قدیمی به ساختارِ «یافته» بدونِ بازتولید (خالص، بدونِ LLM).
+  // فقط کارِ دست‌نخورده‌یِ AI ارتقا می‌یابد؛ کارِ تراپیست و therapistEditedAt دست‌نخورده می‌ماند. ایدمپوتنت.
+  app.post('/api/clients/:id/case-file/upgrade', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const client = await getOwnedClient(id, request.therapistId!);
+    if (!client) { reply.code(404); return { error: 'مراجع یافت نشد' }; }
+    const record = await caseFileRepo.get(id);
+    if (!record) { reply.code(404); return { error: 'پرونده هنوز ساخته نشده — ابتدا آن را تولید کنید' }; }
+    dropGhostMedication(record.content);
+    const { content, upgraded } = upgradeLegacyContent(record.content);
+    if (!upgraded) return { case_file: record, upgraded: 0 };
+    const updated = await caseFileRepo.upsert(id, { content });
+    return { case_file: updated, upgraded };
+  });
+
   // POST /api/clients/:id/case-file/items — افزودنِ ردیفِ دستی (axis | medication | roadmap)
   app.post('/api/clients/:id/case-file/items', async (request, reply) => {
     const { id } = request.params as { id: string };
@@ -108,6 +128,7 @@ export async function caseFileRoutes(app: FastifyInstance) {
     if (!client) { reply.code(404); return { error: 'مراجع یافت نشد' }; }
     const record = await caseFileRepo.get(id);
     if (!record) { reply.code(404); return { error: 'پرونده هنوز ساخته نشده — ابتدا آن را تولید کنید' }; }
+    dropGhostMedication(record.content);
     try {
       const nextContent = addCaseFileItem(record.content, kind as AddableKind, input);
       const updated = await caseFileRepo.upsert(id, { content: nextContent, therapistEditedAt: new Date() });
@@ -125,6 +146,7 @@ export async function caseFileRoutes(app: FastifyInstance) {
     if (!client) { reply.code(404); return { error: 'مراجع یافت نشد' }; }
     const record = await caseFileRepo.get(id);
     if (!record) { reply.code(404); return { error: 'پرونده هنوز ساخته نشده' }; }
+    dropGhostMedication(record.content);
     try {
       const nextContent = removeCaseFileItem(record.content, kind, itemId);
       const updated = await caseFileRepo.upsert(id, { content: nextContent, therapistEditedAt: new Date() });

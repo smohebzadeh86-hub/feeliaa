@@ -5,6 +5,7 @@ import { query } from '../db/connection.js';
 import { hashPassword, verifyPassword } from '../auth/password.js';
 import { createSession, destroySession } from '../auth/session.js';
 import { SESSION_COOKIE, SESSION_COOKIE_MAX_AGE } from '../auth/guard.js';
+import { logEvent } from '../obs/eventLog.js';
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -29,8 +30,8 @@ function normalizePhone(raw: string): string | null {
   return d;
 }
 
-function publicTherapist(row: { id: string; phone: string; email: string | null; name: string | null; specialty: string | null; is_admin: boolean; created_at: string; case_file_auto_generate: boolean | null }) {
-  return { id: row.id, phone: row.phone, email: row.email, name: row.name, specialty: row.specialty, is_admin: row.is_admin, created_at: row.created_at, case_file_auto_generate: row.case_file_auto_generate };
+function publicTherapist(row: { id: string; phone: string; email: string | null; name: string | null; specialty: string | null; is_admin: boolean; created_at: string; case_file_auto_generate: boolean | null; case_file_enabled: boolean }) {
+  return { id: row.id, phone: row.phone, email: row.email, name: row.name, specialty: row.specialty, is_admin: row.is_admin, created_at: row.created_at, case_file_auto_generate: row.case_file_auto_generate, case_file_enabled: row.case_file_enabled };
 }
 
 // ⭐ هش ثابتِ ساختگی — وقتی شماره پیدا نشه هم scrypt اجرا میشه تا زمان پاسخ
@@ -98,7 +99,7 @@ export async function authRoutes(app: FastifyInstance) {
       [newId, normalizedPhone, normalizedEmail, hashPassword(password), trimmedName, trimmedSpecialty]
     );
     const inserted = await query(
-      'SELECT id, phone, email, name, specialty, is_admin, created_at FROM therapists WHERE id = ?',
+      'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate, case_file_enabled FROM therapists WHERE id = ?',
       [newId]
     );
     const therapist = inserted.rows[0];
@@ -133,10 +134,14 @@ export async function authRoutes(app: FastifyInstance) {
     const passwordOk = verifyPassword(password, therapist?.password_hash || DUMMY_PASSWORD_HASH);
 
     if (!therapist || !passwordOk) {
+      // ⭐ هرگز شماره/شناسه در detail نمی‌رود (LAW-001 — شماره‌ی موبایل PII است، نه
+      // متادیتایِ امن)؛ فقط اینکه یک تلاشِ ورودِ ناموفق رخ داد.
+      logEvent({ event: 'auth.login_failed', severity: 'warn' });
       reply.code(401);
       return { error: 'شماره موبایل یا رمز عبور اشتباه است' };
     }
     if (!therapist.active) {
+      logEvent({ event: 'auth.login_failed', therapistId: therapist.id, severity: 'warn', code: 'inactive' });
       reply.code(403);
       return { error: 'این حساب غیرفعال شده است' };
     }
@@ -148,12 +153,14 @@ export async function authRoutes(app: FastifyInstance) {
     reply.setCookie(SESSION_COOKIE, token, {
       path: '/', httpOnly: true, sameSite: 'lax', maxAge: SESSION_COOKIE_MAX_AGE,
     });
+    logEvent({ event: 'auth.login_ok', therapistId: therapist.id });
 
     return { therapist: publicTherapist(therapist) };
   });
 
   // POST /api/auth/logout
   app.post('/api/auth/logout', async (request, reply) => {
+    logEvent({ event: 'auth.logout', therapistId: request.therapistId });
     await destroySession(request.cookies[SESSION_COOKIE]);
     reply.clearCookie(SESSION_COOKIE, { path: '/' });
     return { ok: true };
@@ -167,7 +174,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const result = await query(
-      'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate FROM therapists WHERE id = ?',
+      'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate, case_file_enabled FROM therapists WHERE id = ?',
       [request.therapistId]
     );
     if (result.rows.length === 0) {
@@ -184,6 +191,10 @@ export async function authRoutes(app: FastifyInstance) {
     if (!request.therapistId) {
       reply.code(401);
       return { error: 'وارد نشده‌اید' };
+    }
+    if (!request.caseFileEnabled) {
+      reply.code(403);
+      return { error: 'این قابلیت برایِ حسابِ شما فعال نیست', code: 'forbidden' };
     }
     const { enabled } = (request.body as { enabled?: unknown }) || {};
     if (typeof enabled !== 'boolean') {

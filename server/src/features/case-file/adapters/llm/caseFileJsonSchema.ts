@@ -11,16 +11,32 @@ const fieldSchema = {
   additionalProperties: false,
 } as const;
 
+// محور: یک سطرِ خلاصه‌ی اسکن‌پذیر + یافته‌ها با نقشِ بالینی (انتخابِ مدل بر اساسِ محتوا؛ نقشِ بدونِ داده نمی‌آید)
+const axisFindingSchema = {
+  type: 'object',
+  properties: {
+    role: { type: 'string', enum: ['state', 'evidence', 'impact', 'cognition', 'predisposing', 'precipitating', 'maintaining', 'coping', 'protective', 'treatment_history', 'treatment_response', 'goals', 'change', 'unknown', 'session_note', 'other'] },
+    label: { type: 'string' },
+    text: { type: 'string' },
+    source: { type: 'string', enum: ['client_report', 'therapist_observation', 'therapist_inference', 'unspecified'] },
+    about: { type: 'string' },
+    factIds: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['role', 'label', 'text', 'source', 'about', 'factIds'],
+  additionalProperties: false,
+} as const;
+
 const axisSchema = {
   type: 'object',
   properties: {
     title: { type: 'string' },
-    body: { type: 'string' },
+    summary: { type: 'string' },
     pending: { type: 'boolean' },
     statusTone: { type: 'string', enum: ['good', 'watch', 'sensitive'] },
     sensitiveDoNotDiscussInFrontOfClient: { type: 'boolean' },
+    items: { type: 'array', items: axisFindingSchema },
   },
-  required: ['title', 'body', 'pending', 'statusTone', 'sensitiveDoNotDiscussInFrontOfClient'],
+  required: ['title', 'summary', 'pending', 'statusTone', 'sensitiveDoNotDiscussInFrontOfClient', 'items'],
   additionalProperties: false,
 } as const;
 
@@ -43,6 +59,58 @@ const relationshipGroupSchema = {
     fields: { type: 'array', items: relationshipFieldSchema },
   },
   required: ['title', 'fields'],
+  additionalProperties: false,
+} as const;
+
+// رابطه‌ی زوجین: هر نقشِ بالینی یک فهرست از «یافته» است (نه رشته‌ی چندخطی)؛ منبع یک فیلدِ داده است.
+const findingSchema = {
+  type: 'object',
+  properties: {
+    label: { type: 'string' },
+    text: { type: 'string' },
+    source: { type: 'string', enum: ['client_report', 'therapist_observation', 'therapist_inference', 'unspecified'] },
+    about: { type: 'string' },
+    factIds: { type: 'array', items: { type: 'string' } },
+  },
+  required: ['label', 'text', 'source', 'about', 'factIds'],
+  additionalProperties: false,
+} as const;
+
+const coupleFieldSchema = {
+  type: 'object',
+  properties: {
+    key: { type: 'string' },
+    label: { type: 'string' },
+    pending: { type: 'boolean' },
+    items: { type: 'array', items: findingSchema },
+  },
+  required: ['key', 'label', 'pending', 'items'],
+  additionalProperties: false,
+} as const;
+
+const coupleGroupSchema = {
+  type: 'object',
+  properties: {
+    title: { type: 'string' },
+    fields: { type: 'array', items: coupleFieldSchema },
+  },
+  required: ['title', 'fields'],
+  additionalProperties: false,
+} as const;
+
+// ۱ تا ۳ نکته‌ی کلیدی: فقط ارجاع به شناسه‌ی فکت‌ها (کد آن را به یافته‌ی نهایی وصل می‌کند)
+const keyPointSchema = {
+  type: 'object',
+  properties: { factIds: { type: 'array', items: { type: 'string' } } },
+  required: ['factIds'],
+  additionalProperties: false,
+} as const;
+
+// ردیفِ قبل/اکنون: دو جمله‌ی کوتاه + ارجاع به فکت‌ها
+const changeSchema = {
+  type: 'object',
+  properties: { label: { type: 'string' }, before: { type: 'string' }, after: { type: 'string' }, factIds: { type: 'array', items: { type: 'string' } } },
+  required: ['label', 'before', 'after', 'factIds'],
   additionalProperties: false,
 } as const;
 
@@ -107,22 +175,18 @@ export const CASE_FILE_JSON_SCHEMA = {
       sensitiveContext: fieldSchema,
       medication: { type: 'array', items: medicationSchema },
       axes: { type: 'array', items: axisSchema },
-      familyRelationship: relationshipGroupSchema,
-      coupleRelationship: { anyOf: [relationshipGroupSchema, { type: 'null' }] },
-      changeOverTime: {
-        type: 'object',
-        properties: { before: fieldSchema, after: fieldSchema },
-        required: ['before', 'after'],
-        additionalProperties: false,
-      },
+      familyRelationship: coupleGroupSchema,
+      coupleRelationship: { anyOf: [coupleGroupSchema, { type: 'null' }] },
+      changes: { type: 'array', items: changeSchema },
       sessionsSummary: { type: 'array', items: sessionSummarySchema },
       roadmap: { type: 'array', items: roadmapSchema },
       pendingQuestions: { type: 'array', items: pendingQuestionSchema },
+      keyPoints: { type: 'array', items: keyPointSchema },
     },
     required: [
       'identity', 'mainIssue', 'overallStatus', 'safetyRisk', 'sensitiveContext',
       'medication', 'axes', 'familyRelationship',
-      'coupleRelationship', 'changeOverTime', 'sessionsSummary', 'roadmap', 'pendingQuestions',
+      'coupleRelationship', 'changes', 'sessionsSummary', 'roadmap', 'pendingQuestions', 'keyPoints',
     ],
     additionalProperties: false,
   },

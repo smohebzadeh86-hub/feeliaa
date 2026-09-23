@@ -9,10 +9,11 @@ import type {
   CaseFileMedicationEntry, DraftMedicationEntry,
   CaseFileRelationshipGroup, DraftRelationshipGroup,
   CaseFileRoadmapStep, DraftRoadmapStep,
-  CaseFilePendingQuestion, DraftPendingQuestion,
+  CaseFilePendingQuestion, DraftPendingQuestion, CaseFileAnsweredQuestion,
   CaseFileSessionSummaryEntry, DraftSessionSummaryEntry,
 } from '../domain/types.js';
 import type { ClientCorpus } from './aggregateClientCorpus.js';
+import { rebuildAxisValue } from '../domain/findings.js';
 
 function normKey(s: string): string {
   return s.trim().toLowerCase();
@@ -43,6 +44,10 @@ function mergeAxes(existing: CaseFileAxis[] | undefined, draft: DraftAxis[]): Ca
   return keepManual(existing, draft.map(d => {
     const prev = byTitle.get(normKey(d.title));
     const field = mergeField(prev, { value: d.body, pending: d.pending });
+    // محورِ تاییدشده‌ی تراپیست یخ می‌زند (مثلِ mergeField)؛ یافته‌هایش با متنش می‌مانند
+    const frozen = !!prev && prev.reviewedByTherapist && !prev.pending;
+    const items = frozen ? prev!.items : d.items;
+    const refs = frozen ? prev!.refs : d.refs;
     return {
       id: prev?.id || randomUUID(),
       title: d.title,
@@ -50,6 +55,8 @@ function mergeAxes(existing: CaseFileAxis[] | undefined, draft: DraftAxis[]): Ca
       sensitiveDoNotDiscussInFrontOfClient: d.sensitiveDoNotDiscussInFrontOfClient,
       ...(prev?.addedByTherapist ? { addedByTherapist: true } : {}),
       ...field,
+      ...(items ? { items } : {}),
+      ...(refs ? { refs } : {}),
     };
   }), a => normKey(a.title));
 }
@@ -58,16 +65,33 @@ function mergeRelationshipGroup(
   existing: CaseFileRelationshipGroup | null | undefined,
   draft: DraftRelationshipGroup | null
 ): CaseFileRelationshipGroup | null {
-  if (!draft) return null;
+  // فیلدی که تراپیست ویرایش/تأیید کرده و مدل (با کلیدِ دیگر یا null‌بودنِ کلِ گروه) نیاورده، نباید
+  // بی‌صدا گم شود — مثلاً پرونده‌هایِ قدیمی با کلیدِ آزاد وقتی به کلیدهایِ نقشِ ثابت مهاجرت می‌کنند.
+  const isTherapistWork = (f: { source: string; reviewedByTherapist: boolean; value: string }) =>
+    (f.source === 'therapist' || f.reviewedByTherapist) && f.value.trim() !== '';
+  if (!draft) {
+    const kept = (existing?.fields || []).filter(isTherapistWork);
+    return existing && kept.length ? { title: existing.title, fields: kept } : null;
+  }
   const byKey = new Map((existing?.fields || []).map(f => [f.key, f]));
-  return {
-    title: draft.title,
-    fields: draft.fields.map(d => ({
+  const merged = draft.fields.map(d => {
+    const prev = byKey.get(d.key);
+    // فیلدِ تاییدشده‌ی تراپیست یخ می‌زند (مثلِ mergeField)؛ یافته‌هایش هم با متنش می‌مانند و
+    // تازه‌ی مدل فقط در suggestedUpdate می‌نشیند. در غیر این صورت یافته‌هایِ تازه جایگزین می‌شوند.
+    const frozen = !!prev && prev.reviewedByTherapist && !prev.pending;
+    const items = frozen ? prev!.items : d.items;
+    const refs = frozen ? prev!.refs : d.refs;
+    return {
       key: d.key,
       label: d.label,
-      ...mergeField(byKey.get(d.key), { value: d.value, pending: d.pending }),
-    })),
-  };
+      ...mergeField(prev, { value: d.value, pending: d.pending }),
+      ...(items ? { items } : {}),
+      ...(refs ? { refs } : {}),
+    };
+  });
+  const have = new Set(merged.map(f => f.key));
+  const orphans = (existing?.fields || []).filter(f => !have.has(f.key) && isTherapistWork(f));
+  return { title: draft.title, fields: [...merged, ...orphans] };
 }
 
 function mergeMedication(existing: CaseFileMedicationEntry[] | undefined, draft: DraftMedicationEntry[]): CaseFileMedicationEntry[] {
@@ -101,15 +125,14 @@ function mergeRoadmap(existing: CaseFileRoadmapStep[] | undefined, draft: DraftR
   }), r => normKey(r.question));
 }
 
-function mergePendingQuestions(existing: CaseFilePendingQuestion[] | undefined, draft: DraftPendingQuestion[]): CaseFilePendingQuestion[] {
-  // سوال‌هایی که تراپیست جواب داده حفظ می‌شوند (پاک نمی‌شوند)؛ سوال‌هایِ تازه‌ای که
-  // متنِ یکسان دارند دوباره اضافه نمی‌شوند.
-  const answered = (existing || []).filter(q => q.answer && q.answer.trim());
-  const answeredKeys = new Set(answered.map(q => normKey(q.question)));
-  const fresh = draft
+function mergePendingQuestions(answeredExisting: CaseFileAnsweredQuestion[] | undefined, draft: DraftPendingQuestion[]): CaseFilePendingQuestion[] {
+  // سوالی که تراپیست قبلاً پاسخ داده (در answeredQuestions) دیگر به‌عنوانِ «باز» دوباره
+  // اضافه نمی‌شود — چون پاسخش هم‌اکنون به‌عنوانِ دیتا به همین regenerate رسیده (buildCaseFilePrompt)
+  // و مدل باید آن اطلاعات را در بخش‌هایِ مربوط (axes/medication/...) جا داده باشد.
+  const answeredKeys = new Set((answeredExisting || []).map(q => normKey(q.question)));
+  return draft
     .filter(d => !answeredKeys.has(normKey(d.question)))
     .map(d => ({ id: randomUUID(), question: d.question, relatedAxis: d.relatedAxis ?? null, answer: null }));
-  return [...answered, ...fresh];
 }
 
 function mergeSessionsSummary(
@@ -133,6 +156,29 @@ function mergeSessionsSummary(
   });
 }
 
+// جابه‌جاییِ دستیِ تراپیست (movedTo) بعد از regenerate دوباره اعمال می‌شود (شناسه‌ی یافته پایدار است: hash). اگر یافته در
+// خروجیِ تازه نیست (متنش عوض شده/حذف شده)، جابه‌جایی بی‌اثر می‌ماند و چیزی گم نمی‌شود.
+function reapplyMoves(existing: CaseFileAxis[] | undefined, merged: CaseFileAxis[]): CaseFileAxis[] {
+  const moves = new Map<string, NonNullable<CaseFileAxis['items']>[number]['movedTo']>();
+  for (const a of existing ?? []) for (const i of a.items ?? []) if (i.movedTo) moves.set(i.id, i.movedTo);
+  if (!moves.size) return merged;
+  const touched = new Set<CaseFileAxis>();
+  for (const [id, mv] of moves) {
+    if (!mv) continue;
+    const src = merged.find(a => (a.items ?? []).some(i => i.id === id));
+    const target = merged.find(a => normKey(a.title) === normKey(mv.axisTitle));
+    if (!src || !target) continue;
+    const item = src.items!.find(i => i.id === id)!;
+    if (src === target && item.role === mv.role) { item.movedTo = mv; continue; }
+    src.items = src.items!.filter(i => i.id !== id);
+    item.role = mv.role; item.movedTo = mv;
+    target.items = [...(target.items ?? []), item];
+    touched.add(src); touched.add(target);
+  }
+  for (const a of touched) rebuildAxisValue(a);
+  return merged;
+}
+
 // existing=null یعنی merge کامل بدونِ حفظِ هیچ‌چیزی — دقیقاً همان چیزی که «بازتولیدِ
 // کامل» (force=true) می‌خواهد.
 export function mergeCaseFileDraft(
@@ -147,7 +193,7 @@ export function mergeCaseFileDraft(
     safetyRisk: mergeField(existing?.safetyRisk, draft.safetyRisk),
     sensitiveContext: mergeField(existing?.sensitiveContext, draft.sensitiveContext),
     medication: mergeMedication(existing?.medication, draft.medication),
-    axes: mergeAxes(existing?.axes, draft.axes),
+    axes: reapplyMoves(existing?.axes, mergeAxes(existing?.axes, draft.axes)),
     familyRelationship: mergeRelationshipGroup(existing?.familyRelationship, draft.familyRelationship) as CaseFileRelationshipGroup,
     coupleRelationship: mergeRelationshipGroup(existing?.coupleRelationship, draft.coupleRelationship),
     changeOverTime: {
@@ -156,6 +202,13 @@ export function mergeCaseFileDraft(
     },
     sessionsSummary: mergeSessionsSummary(existing?.sessionsSummary, draft.sessionsSummary, corpus),
     roadmap: mergeRoadmap(existing?.roadmap, draft.roadmap),
-    pendingQuestions: mergePendingQuestions(existing?.pendingQuestions, draft.pendingQuestions),
+    pendingQuestions: mergePendingQuestions(existing?.answeredQuestions, draft.pendingQuestions),
+    // پاسخ‌هایِ ثبت‌شده دستیِ تراپیست‌اند؛ regenerate آن‌ها را دست نمی‌زند (فقط applyFieldPatch اضافه می‌کند)
+    answeredQuestions: existing?.answeredQuestions ?? [],
+    // نکاتِ کلیدیِ دستیِ تراپیست (ستاره‌گذاری) با regenerate عوض نمی‌شود؛ وگرنه پیشنهادِ تازه‌ی مدل
+    keyPoints: existing?.keyPoints?.edited ? existing.keyPoints : { ids: draft.keyPointIds ?? [], edited: false },
+    // ردیف‌هایِ قبل/اکنون: اگر تراپیست ردیفِ اصلی (changeOverTime) را تایید/ویرایش کرده، ردیف‌هایِ قبلی با آن هم‌گام می‌مانند
+    changeRows: (['before', 'after'] as const).some(k => existing?.changeOverTime?.[k]?.reviewedByTherapist && !existing.changeOverTime[k].pending)
+      ? existing?.changeRows : draft.changeRows,
   };
 }
