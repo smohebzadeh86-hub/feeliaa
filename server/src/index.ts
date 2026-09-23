@@ -76,7 +76,15 @@ await app.register(obsRoutes);
 // Serve static (فرانت)
 const publicDir = path.join(__dirname, '..', '..', 'public');
 try {
-  await app.register(fastifyStatic, { root: publicDir });
+  // ⭐ باگِ واقعیِ deploy (۲۰۲۶-۰۹-۲۳): پیش‌فرضِ fastify-static یعنی «public, max-age=0» — مرورگر
+  // اجازه داشت feelia-rt.jsِ کش‌شده را بدونِ پرسیدن از سرور دوباره اجرا کند؛ تبِ مالک بعد از دو
+  // deployِ رفعِ موتورِ رونویسی هنوز نسخه‌ی قدیمی را اجرا می‌کرد (در لاگِ nginx هیچ درخواستی برایِ
+  // /feelia-rt.js نبود). no-cache = همیشه revalidate (ETag/Last-Modified → ۳۰۴ِ ارزان).
+  await app.register(fastifyStatic, {
+    root: publicDir,
+    cacheControl: false,
+    setHeaders: (reply) => { reply.header('Cache-Control', 'no-cache'); },
+  });
 } catch (e) {
   // public/ وجود نداره
 }

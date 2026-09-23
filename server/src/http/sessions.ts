@@ -33,9 +33,11 @@ const autoCaseFileRepo = new SqlCaseFileRepository();
 async function maybeAutoGenerateCaseFile(clientId: string, therapistId: string): Promise<void> {
   try {
     const therapistRow = await query(
-      'SELECT case_file_auto_generate FROM therapists WHERE id = ?',
+      'SELECT case_file_auto_generate, case_file_enabled FROM therapists WHERE id = ?',
       [therapistId]
     );
+    // فیچرِ پرونده فقط برایِ حسابِ دارایِ case_file_enabled (migration 022) — همان گاردِ requireCaseFileAccess.
+    if (!therapistRow.rows[0]?.case_file_enabled) return;
     if (therapistRow.rows[0]?.case_file_auto_generate !== true) return;
 
     const clientRow = await query(

@@ -4321,7 +4321,9 @@ async function toggleCaseFileAutoGenerate(){
 // نداده (case_file_auto_generate هنوز NULL است). بعدِ پاسخ، همیشه از toggleِ کنارِ
 // دکمه‌هایِ پرونده قابلِ‌تغییر است — این مودال فقط یک بار دیده می‌شود.
 function maybeShowCaseFileAutoPrompt(){
-  if(currentTherapist&&currentTherapist.case_file_auto_generate===null){
+  // فقط برایِ حسابی که فیچرِ پرونده برایش فعال است (case_file_enabled) — وگرنه سؤالی درباره‌ی
+  // فیچری پرسیده می‌شد که کاربر به آن دسترسی ندارد (سرور هم PATCH را ۴۰۳ می‌داد).
+  if(currentTherapist&&currentTherapist.case_file_enabled&&currentTherapist.case_file_auto_generate===null){
     $('caseFileAutoPromptModal').classList.add('open');
   }
 }
