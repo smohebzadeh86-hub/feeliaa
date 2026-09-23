@@ -388,6 +388,13 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-23 — GIT — commit و push ِ مستنداتِ عملیاتِ production (`71b0863`)
+
+- **درخواست:** مالک («کامیت کن و پوش»). فقط `PROJECT_STATUS.md` و `docs/01-architecture/deployment-operations.md` → `71b0863`، push به `origin/feat/clarity`.
+- **عمداً commit نشد (کارِ نشستِ دیگر — nginx review / 504):** `public/index.html` (تحملِ 504ِ nginx در `regenerateCaseFile`)،
+  `docs/02-reference/repository-map.md`، `deploy/`، `verification/2026-09-23-nginx-review-case-file-504.md` — همچنان در working tree.
+  ورودی‌هایِ آن نشست در همین Event Log (که حالا commit شده) به این فایل‌ها ارجاع می‌دهند.
+
 ### 2026-09-23 — DOCS — هم‌گام‌سازیِ `deployment-operations.md` با واقعیتِ production
 
 - **درخواست:** مالک («اصلاحش کن و به روزش کن»).
