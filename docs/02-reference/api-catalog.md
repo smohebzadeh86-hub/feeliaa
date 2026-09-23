@@ -67,7 +67,18 @@
 
 | Method | Path | Auth | پاسخ | نکته |
 |---|---|---|---|---|
-| GET | `/api/client-config` | auth | `{clarity: {projectId} | null}`، هدر `Cache-Control: no-store` | برای ادمین همیشه null؛ ID نامعتبر → null | 
+| GET | `/api/client-config` | auth | `{clarity: {projectId} \| null, obs: {enabled, sample}}`، هدر `Cache-Control: no-store` | Clarity برای ادمین همیشه null؛ ID نامعتبر → null. `obs` **(جدید، فازِ ۱ِ رصد/حسابرسی، 2026-09-22)** برخلافِ Clarity برایِ ادمین هم پر می‌شود — از `OBS_CLIENT_ENABLED`/`OBS_CLIENT_SAMPLE` |
+
+## ۶.۱ Observability — `server/src/http/obs.ts` (`auth`) — جدید، فازِ ۱ (2026-09-22)
+
+| Method | Path | Body | موفق | خطاها | مصرف |
+|---|---|---|---|---|---|
+| POST | `/api/obs/events` | `{events:[...]}` — ۱ تا ۲۰۰ رویداد؛ `bodyLimit:64KiB`. دو شکلِ آیتم: **(۱) UI** `{nav_id, seq, kind:'click'\|'nav'\|'visibility'\|'net'\|'lifecycle'\|'error', screen?, session_id?, target_id?, target_role?, target_tag?, value_num?, ts?}` → `obs_ui_events`. **(۲) client_event (فازِ ۲، از 2026-09-23)** `{nav_id, seq?, kind:'client_event', event, session_id?, run_id?, detail?, ts?}` — `event` باید عضوِ `OBS_CLIENT_EVENTS` باشد (`rt.ws_open`/`rt.ws_close`/... — رجوع به `server/src/obs/types.ts`)، `detail` از `sanitizeDetail()` رد می‌شود → `obs_events` (نه `obs_ui_events`؛ `run_id` اینجا join به `session_audio.run_id` دارد) | 204 (پیش از هر کارِ DB)؛ رویدادهایِ نامعتبر/نام‌ناشناس بی‌صدا drop می‌شوند، نه 400 | 400 `obs-bad-payload` (بدنه/آرایه‌ی نامعتبر)، 429 `obs-rate-limited` (>۲۰ درخواست یا >۱۵۰۰ رویداد/دقیقه به‌ازایِ تراپیست) | `public/feelia-obs.js`، `public/feelia-rt.js` (فقط `client_event`) |
+
+`ts` (اگر فرستاده شود) فقط به‌عنوانِ `client_ts` پذیرفته می‌شود و فقط اگر در بازه‌ی ±۲۴ ساعتِ زمانِ
+سرور باشد؛ زمانِ اصلیِ ردیف (`ts`) همیشه `DEFAULT`ِ ستونِ DB است، هرگز از بدنه‌ی درخواست. اگر
+`session_id` مالِ تراپیستِ درخواست‌دهنده نباشد، ردیف با `session_id=null` ذخیره می‌شود + یک
+رویدادِ جداگانه‌ی `obs.session_mismatch` — تله‌متری هرگز 404 نمی‌دهد (نباید existence oracle شود).
 
 ## ۷. Admin — `server/src/http/admin.ts` (همه `admin`)
 
@@ -89,6 +100,16 @@
 
 نکته: پارامترهای `:id` اعتبارسنجیِ UUID ندارند؛ مقدارِ غیر-UUID احتمالاً خطای pg و 500 می‌دهد (**INFERRED**).
 
+### ۷.۱ Observability — پنلِ ادمین (`server/src/http/admin.ts`، همه `admin`) — جدید، فازِ ۱ (2026-09-22)
+
+| Method | Path | Query | موفق | نکته |
+|---|---|---|---|---|
+| GET | `/api/admin/sessions/recent` | `status=in_progress\|completed\|all` (پیش‌فرض `in_progress`)، `since_hours` (پیش‌فرض ۱۶۸)، `therapist_id?`، `has_transcript=true\|false`، `limit` (≤۲۰۰)، `offset` | `{sessions:[{id, session_num, date, start_time, status, source, created_at, updated_at, client_id, client_code, therapist_id, therapist_name, transcript_len, audio_count, audio_bytes, audio_duration_ms, note_count}]}` | حلِ مشکلِ کشف‌پذیریِ اصلیِ پلن: فهرستِ سراسریِ جلساتِ اخیر/ناتمام. `transcript_len` از `CHAR_LENGTH` (نه `LENGTH`ِ بایت‌محور — فارسیِ utf8mb4 چندبایتی است)؛ خودِ متن هرگز SELECT نمی‌شود |
+| GET | `/api/admin/sessions/:id/timeline` | — | `{timeline:[{ts, lane:"server"\|"client"\|"ui"\|"audio"\|"note"\|"db", label, detail}]}` مرتب بر `ts` | ادغامِ `obs_events` + `obs_ui_events` + `listSessionAudio()` + متادیتایِ `session_notes` (بدونِ متن) + دو آیتمِ مصنوعیِ `created_at`/`updated_at`ِ خودِ جلسه | 404 owned نیست (جلسه) |
+| GET | `/api/admin/obs/events` | `event?, severity?, therapist_id?, session_id?, source?, from?, to?, limit?` (≤۵۰۰) | `{events:[…]}` — همه‌ی ستون‌هایِ `obs_events` | فیلترهایِ اختیاری با الگویِ `(? IS NULL OR col=?)` |
+| GET | `/api/admin/obs/ui-events` | `kind?, therapist_id?, session_id?, nav_id?, from?, to?, limit?` (≤۵۰۰) | `{events:[…]}` — همه‌ی ستون‌هایِ `obs_ui_events` | همان الگو |
+| GET | `/api/admin/obs/stats` | — | `{daily_counts:[{day,event,count}] (۱۴ روزِ اخیر), queue:{event_queue_length, ui_queue_length, db_healthy, drain_interval_ms, total_enqueued, total_inserted, total_db_errors}, jsonl_files:[{name,bytes}], db_size_bytes:{obs_events,obs_ui_events}}` | آمارِ سلامتِ کاملِ لایه‌ی obs برایِ یک نگاه |
+
 ## ۸. AI Case File — `server/src/features/case-file/api/caseFile.routes.ts` (همه `auth`) — جدید، 2026-09-17
 
 پرونده‌ی روندِ درمان — سنتزِ LLM از رویِ `sessions.transcript`/`session_notes` همان مراجع.
@@ -99,8 +120,9 @@ UIِ فعلی فقط برایِ `status='inactive'` رندر می‌شود. جز
 |---|---|---|---|---|---|
 | GET | `/api/clients/:id/case-file` | — | `{case_file: CaseFileRecord \| null, treatment_rhythm: TreatmentRhythm}` | 404 owned | UI |
 | POST | `/api/clients/:id/case-file/regenerate` | `{force?: boolean, confirmPhrase?: string}` — وقتی `force:true`، `confirmPhrase` باید دقیقاً `"بازتولید کامل"` باشد | `{case_file: CaseFileRecord, skipped: boolean, treatment_rhythm: TreatmentRhythm}`؛ همزمان (منتظر می‌ماند تا فراخوانیِ LLM تمام شود)؛ اگر امضایِ کورپوس (§جدید 2026-09-17) با آخرین تولید یکسان بود و `force` نبود، **بدونِ فراخوانیِ LLM** همان رکورد با `skipped:true` برمی‌گردد؛ `force=true` یعنی فیلدهایِ `reviewedByTherapist` هم دور ریخته می‌شوند (`force_regenerated_at/by` ثبت می‌شود) | 400 (`force:true` بدونِ `confirmPhrase` درست)، 404 owned، 409 `{error, code:"busy"}` اگر تولیدِ دیگری کمتر از ۳ دقیقه پیش شروع شده (race)، 502 `{error, code}` (`llm-failed`\|`llm-invalid-output`\|`unknown`) اگر LLM ناموفق/خروجیِ نامعتبر بدهد | UI |
-| PATCH | `/api/clients/:id/case-file` | `{fieldId, action:"edit"\|"approve"\|"accept-suggestion"\|"dismiss-suggestion", value?}` — schemaِ `fieldId` در `application/applyFieldPatch.ts` (شاملِ `identity`\|`mainIssue`\|`overallStatus`\|`safetyRisk`\|`sensitiveContext`\|…) | `{case_file: CaseFileRecord}` | 400 (fieldId/action نامعتبر یا ناسازگار)، 404 (owned یا پرونده هنوز نساخته) | UI |
-| POST | `/api/clients/:id/case-file/items` | `{kind:"axis"\|"medication"\|"roadmap", title\|name\|question, statusTone?, priority?, why?}` | `{case_file}` — ردیفِ دستی با `addedByTherapist:true` (در regenerate حفظ می‌شود؛ p1 مجاز نیست ⇒ p3) | 400، 404 owned/پرونده | UI (2026-09-19) |
+| PATCH | `/api/clients/:id/case-file` | `{fieldId, action:"edit"\|"approve"\|"accept-suggestion"\|"dismiss-suggestion"\|"pin"\|"unpin"\|"move", value?}` — **جدید 2026-09-20:** `fieldId="finding.<id>"` با `pin`/`unpin` (نکته‌ی کلیدی، حداکثر ۳؛ بیش از سقف ⇒ ۴۰۰ «حداکثر 3 نکته‌ی کلیدی»؛ یافته‌ی ناموجود ⇒ ۴۰۰ «یافته یافت نشد») یا `move` (جابه‌جاییِ یافته‌ی محور؛ `value="<axisId>:<role>"`؛ فقط یافته‌ی محور — نه زوجین/خانواده؛ نقش/محورِ نامعتبر ⇒ ۴۰۰) — schemaِ `fieldId` در `application/applyFieldPatch.ts` (شاملِ `identity`\|`mainIssue`\|`overallStatus`\|`safetyRisk`\|`sensitiveContext`\|…). **جدید 2026-09-22:** `fieldId="medication.<id>.name"` با `action:"edit"` — فقط برایِ ردیفِ دستیِ `addedByTherapist:true` (وگرنه ۴۰۰ «فقط نامِ دارویِ افزوده‌شده‌یِ دستی قابلِ ویرایش است»)؛ `name` یک `string` ساده است، نه `CaseFileField` (بدونِ source/approve/suggestion) | `{case_file: CaseFileRecord}` | 400 (fieldId/action نامعتبر یا ناسازگار)، 404 (owned یا پرونده هنوز نساخته) | UI |
+| POST | `/api/clients/:id/case-file/items` | `{kind:"axis"\|"medication"\|"roadmap", title\|name\|question, statusTone?, priority?, why?}` — **جدید 2026-09-22:** برایِ `kind:"medication"`، `dose?`/`frequency?`/`lastChange?`/`prescriber?` هم پذیرفته می‌شوند (اختیاری، بدونِ خطا اگر خالی؛ حداکثر ۱۲۰ نویسه) | `{case_file}` — ردیفِ دستی با `addedByTherapist:true` (در regenerate حفظ می‌شود؛ p1 مجاز نیست ⇒ p3) | 400، 404 owned/پرونده | UI (2026-09-19، UI مودال 2026-09-22) |
+| POST | `/api/clients/:id/case-file/upgrade` | — | `{case_file, upgraded:number}` — **جدید 2026-09-20:** بدونِ LLM/بازتولید؛ فقط کارِ دست‌نخورده‌یِ AI را به ساختارِ «یافته» ارتقا می‌دهد (`application/upgradeLegacyContent.ts`)؛ ایدمپوتنت | 404 |
 | DELETE | `/api/clients/:id/case-file/items/:kind/:itemId` | — | `{case_file}`؛ فقط ردیفِ `addedByTherapist` | 400 (ردیفِ AI/نامعتبر)، 404 | UI (2026-09-19) |
 
 `CaseFileRecord` = `{clientId, content, status:"ready"|"generating"|"error"|"stale", generatingStartedAt, model, promptVersion, generatedAt, generatedFromSessionId, corpusSignature, therapistEditedAt, forceRegeneratedAt, forceRegeneratedBy, errorMessage}`؛ ساختارِ `content` در [database-catalog §client_case_file](database-catalog.md). `corpusSignature`/`generatingStartedAt` ستون‌هایِ migration 019 (2026-09-17) — به ترتیب برایِ ردِ regenerateِ بدونِ داده‌ی جدید و قفلِ نرمِ race.

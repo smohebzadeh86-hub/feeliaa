@@ -23,7 +23,15 @@
 | `OPENROUTER_API_KEY` | `features/case-file/adapters/llm/openrouter.adapter.ts` | — | فقط اگر `LLM_PROVIDER=openrouter` | **بله** | نبود → 502 `llm-failed` روی regenerate |
 | `OPENROUTER_MODEL` | همان | — (عمداً بدونِ fallbackِ hardcode‌شده — تصمیمِ مالک) | **الزامی** اگر `LLM_PROVIDER=openrouter` | خیر | شناسه‌ی مدلِ OpenRouter (فرمتِ `<provider>/<model>`)؛ نبود → 502 `llm-failed` |
 | `OPENROUTER_SITE_URL` | همان | `https://feelia.ir` | خیر | خیر | هدرِ `HTTP-Referer` — فقط شناساییِ اپ در داشبوردِ OpenRouter، بدونِ دیتایِ کاربر |
+| `OPENROUTER_REASONING_EFFORT` | همان | `low` | خیر | خیر | سقفِ «فکرِ پنهان» (reasoning) مدل: `minimal`|`low`|`medium`|`high` یا `default` (هیچ پارامتری نفرست). دلیل (2026-09-20، دادهٔ ساختگی): بدونِ سقف یک اجرا ۱۴٬۱۳۲ توکنِ reasoning داشت و ۷۸۹ث طول کشید؛ با `low` ۱۸۴ث. مقدارِ نامعتبر ⇒ خطای `llm-failed`. |
 | `LLM_PROVIDER` | `features/case-file/adapters/llm/registry.ts` | `openai` | خیر | خیر | `openai` یا `openrouter`؛ مقدارِ دیگر → throw |
+| `LOG_LEVEL` | `index.ts` (سطحِ لاگرِ Fastify) | `info` | خیر | خیر | **جدید، فازِ ۱ِ رصد/حسابرسی، 2026-09-22** — قبلاً `logger:true` هارد بود |
+| `OBS_SLOW_MS` | `obs/httpHook.ts` | `1500` | خیر | خیر | آستانه‌ی «کند» برایِ ثبتِ `http.request` در DB (پایین‌ترش فقط در JSONL می‌ماند) |
+| `OBS_EVENTS_RETENTION_DAYS` | `obs/sweep.ts` | `180` | خیر | خیر | نگهداریِ `obs_events` |
+| `OBS_UI_RETENTION_DAYS` | `obs/sweep.ts` | `30` | خیر | خیر | نگهداریِ `obs_ui_events` |
+| `OBS_CLIENT_ENABLED` | `http/clientConfig.ts` | `true` (هر مقدارِ غیرِ `'false'`) | خیر | خیر | کلیدِ سراسریِ روشن/خاموشِ `FeeliaObs` (شاملِ ادمین) |
+| `OBS_CLIENT_SAMPLE` | `http/clientConfig.ts` | `1` | خیر | خیر | نرخِ نمونه‌برداریِ per-page-load (۰ تا ۱) |
+| `OBS_LOG_MAX_BYTES` | `obs/fileSink.ts` | `8388608` (۸MB) | خیر | خیر | **پیاده‌سازی‌شده 2026-09-23.** سقفِ حجمِ هر فایلِ `obs.jsonl`/`obs.jsonl.N` پیش از rotate؛ مقدارِ نامعتبر/۰/منفی/NaN → fallback به ۸MB. تعدادِ فایل‌ها (`KEEP=5`) ثابت است و از env نمی‌آید. |
 
 کلیدهای موجود در `server/.env` محلی ولی **بدونِ استفاده در کد:** `AUTH_PASSWORD` (C8). `PROXY_URL` در آن comment شده است.
 
@@ -39,13 +47,18 @@
 | `TEMP_KEY_EXPIRES_IN_SECONDS` / `TEMP_KEY_MAX_SESSION_SECONDS` / `MINT_TIMEOUT_MS` | 120 / 7200 / 10000 | `stt/tempkey.ts` |
 | `QUEUE_DIR` / `MAX_AUDIO_BYTES` / `RETENTION_MS` | `<cwd>/data/batch-queue` / 50MB / ۲۴h | `stt/batchqueue.ts` |
 | `ARCHIVE_DIR` / `RETENTION_MS` | `<cwd>/data/session-audio` / ۱۴ روز | `stt/sessionAudioArchive.ts` |
+| JSONLِ obs: `MAX_BYTES` / `KEEP` | 8MB / 5 (سقفِ دیسک ~۴۸MB، `<cwd>/data/logs/obs.jsonl[.1..5]`) | `obs/fileSink.ts` |
+| صفِ obs: `MAX_QUEUE` / `DRAIN_BATCH` / درین هر `2s` (یا `30s` وقتِ خرابیِ DB) | 2000 / 200 | `obs/eventLog.ts` |
+| obs rate-limit | ۲۰ درخواست + ۱۵۰۰ رویداد/دقیقه به‌ازایِ تراپیست | `http/obs.ts` |
+| `FeeliaObs`: `MAX_BUF` / `BATCH_MAX` / flush دوره‌ای | 200 / 50 / ۱۵ثانیه | `public/feelia-obs.js` |
+| `FeeliaObs` backoff | [5s, 15s, 60s, 300s]، reset روی هر 2xx | `public/feelia-obs.js` |
 | `POLL_INTERVAL_MS` / `POLL_TIMEOUT_MS` / timeoutِ درخواست | 2000 / ۱۰ دقیقه / 20000 | `stt/asyncTranscribe.ts` |
 | ffmpeg timeout / پاکسازیِ job | ۵ دقیقه / ۲ ساعت | `stt/speakerResolve.ts` |
 | موتورِ سرور: `RECONNECT_BASE_DELAY`، `MAX_RECONNECT`، `CONNECT_TIMEOUT`، `FINALIZE_TIMEOUT`، `MAX_BUFFER_CHUNKS` | 1000، 6، 8000، 8000، 200 | `stt/soniox.ts` |
 | `P1_PARAMS` | GRACE 60s، REORDER 2s، HANDOVER 5s، BUFFER_MAX 100، FORWARDED_SET_MAX 2000 | `ws/p1.ts` |
 | voice-note حجم | 100B–50MB | `http/sessions.ts` |
 | slow query log | >100ms | `db/connection.ts` |
-| sweep intervals | ۲۴h (audio)، ۱h (resolve jobs) | `index.ts` |
+| sweep intervals | ۲۴h (audio)، ۱h (resolve jobs)، **۱h (صفِ batch — `BATCH_SWEEP_INTERVAL_MS`، commitنشده 2026-09-23؛ قبلاً فقط startup)** | `index.ts`؛ ثابت در `stt/batchqueue.ts` |
 | multipart `fileSize` | **commitنشده (audit صدا/۲۰۲۶-۰۹-۱۶): ۱۰MB صریح** (`register(multipart, { limits: { fileSize: 10*1024*1024 } })`) — قبلاً ۱MiB عملی (`bodyLimit` پیش‌فرضِ Fastify، تأییدشده در `@fastify/multipart@10.1.1`) که سگمنت‌هایِ صوتیِ بزرگ‌تر را با ۴۱۳ رد می‌کرد | `index.ts`؛ پیامد: [platform plan](../06-platform/implementation-plan.md) |
 | workerِ دوره‌ایِ retryِ صفِ batch | commitنشده — هر ۵ دقیقه (`setInterval`) + سرِ startup | `index.ts` → `stt/batchqueue.ts#retryQueuedBatches` |
 | `LATE_TRANSCRIPT_LABEL` | commitنشده — `[بخشِ ضبط‌شده در زمانِ قطعیِ اینترنت — بعداً رونویسی شد]` | `stt/batchqueue.ts` (export شده، در `mergeBatchTranscript` prepend می‌شود) |
@@ -100,7 +113,7 @@
 
 | فایل | نکته |
 |---|---|
-| `package.json` (root) | `dev`، `test:rt` |
+| `package.json` (root) | `dev`، `test:rt`، `test:cf` |
 | `pnpm-workspace.yaml` | `packages: server, packages/*` (`packages/` وجود ندارد)؛ `allowBuilds: esbuild: false` |
 | `server/package.json` | `dev`، `build`، `start`؛ وابستگی `global-agent` بدونِ استفاده |
 | `server/tsconfig.json` | ES2022، NodeNext، strict، `src → dist` |

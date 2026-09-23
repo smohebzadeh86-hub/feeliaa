@@ -26,6 +26,8 @@
 | `llm-failed` | 502 | `case-file/domain/errors.ts` (`CaseFileGenerationError`) | فراخوانیِ OpenAI ناموفق (شبکه/کلید/rate-limit) یا `OPENAI_API_KEY` تنظیم نشده | UI: پیامِ خطا + دکمه‌ی تلاشِ دوباره؛ `client_case_file.status='error'` |
 | `llm-invalid-output` | 502 | همان | پاسخِ خالی یا JSONِ نامعتبر/ناسازگار با schema | همان |
 | `unknown` (case-file) | 502 | همان | خطایِ دیگر در `generateCaseFile` | همان |
+| `obs-bad-payload` | 400 | `POST /api/obs/events` | بدنه/آرایه‌ی `events` نامعتبر (خالی، >۲۰۰ عضو، یا شکلِ اشتباه) | `feelia-obs.js`: این batch دور ریخته می‌شود (بدونِ retry فوری، منتظرِ flushِ بعدی) |
+| `obs-rate-limited` | 429 | `POST /api/obs/events` | >۲۰ درخواست یا >۱۵۰۰ رویداد/دقیقه به‌ازایِ تراپیست | `feelia-obs.js`: بافر خالی می‌شود + backoff |
 
 ## ۳. statusهای بدونِ code
 

@@ -15,7 +15,7 @@
 
 ## ۲. CAS
 - کلاینت `baseVersion` را در `start` از `GET /api/sessions/:id` می‌گیرد؛ پس از هر PUT موفق `baseVersion++`.
-- سرور: `SELECT transcript_version` → مقایسه → `UPDATE … transcript_version = transcript_version + 1`. **دو گامِ جدا بدونِ قفل/شرطِ WHERE روی نسخه** → دو PUT هم‌زمان با نسخه‌ی یکسان هر دو می‌توانند موفق شوند (R5).
+- سرور: پیش‌بررسیِ سریع با `SELECT transcript_version` (برایِ پیامِ 409ِ واضح) + **گاردِ اتمیکِ واقعی: `UPDATE sessions SET transcript=…, transcript_version=transcript_version+1 WHERE id=? AND client_id IN (…) AND transcript_version=?`** — **رفع شد (2026-09-22)**: قبلاً UPDATE هیچ شرطی رویِ نسخه نداشت، فقط پیش‌بررسیِ جدا داشت؛ بینِ آن SELECT و UPDATE یک پنجره‌ی race باز بود. با MySQLِ لوکالِ واقعی (دیتایِ canary، پاک‌شده بعدِ تست) تأیید شد: با الگویِ قدیمی هر دو نویسنده‌ی هم‌زمان موفق می‌شدند (یکی متنِ دیگری را بی‌صدا overwrite می‌کرد، `transcript_version` دو واحد جلو می‌رفت)؛ با گاردِ جدید فقط یکی `affectedRows=1` می‌گیرد، دیگری `409` (`rowCount=0` → recheck برایِ تشخیصِ 404 در برابرِ 409).
 - 409 → `persistConfirmed` rebase: `GET`؛ اگر متنِ سرور ≥ متنِ محلی → سرور برنده (و confirmed محلی به آن ارتقا در صورتِ طولانی‌تر بودن)؛ وگرنه یک PUT دیگر با نسخه‌ی تازه.
 - **قاعده‌ی «طولانی‌تر برنده است»** یک heuristic است؛ مثلاً جایگزینیِ resolve-speakers با متنِ کوتاه‌تر در تبِ دیگر ممکن است با autosaveِ تبِ قدیمی override شود (**INFERRED**).
 - W3 و W4 نسخه‌ی کلاینت‌های دیگر را کهنه می‌کنند (W3 با +1) یا نه (W4) — W4 می‌تواند بدونِ اطلاعِ CAS بازنویسی کند.
@@ -26,7 +26,7 @@
 |---|---|
 | prefixِ DB فقط وقتی جایگزینِ confirmed محلی می‌شود که طولانی‌تر باشد | `RTSession.start`، `awaitBatchDrain` |
 | batch = append با `\n\n` | W3 |
-| مارکرِ ناپیوستگی: `[اتصال دوباره برقرار شد — شماره‌گذاری گوینده‌ها از این نقطه ممکن است با قبل فرق کند]` در هر اتصالِ Soniox بعد از اولین (reconnect، یا resumeی که اتصالش بسته شده بود). از 2026-09-14 توقف/ادامه‌ی عادی روی همان WS انجام می‌شود و مارکر نمی‌گیرد | `noteDiscontinuity` در `connectWithFreshMint` |
+| مارکرِ ناپیوستگی: `[اتصال دوباره برقرار شد — شماره‌گذاری گوینده‌ها از این نقطه ممکن است با قبل فرق کند]` در هر اتصالِ Soniox بعد از اولین (reconnect، یا resumeی که اتصالش بسته شده بود). از 2026-09-14 توقف/ادامه‌ی عادی روی همان WS انجام می‌شود و مارکر نمی‌گیرد. از 2026-09-23 همین لحظه رویدادِ تله‌متریِ `rt.gap_marked` هم فایر می‌شود (بدونِ متنِ بالینی، فقط signal) — رجوع به `docs/07-subsystems/01-browser-realtime-engine.md` §۶.۵ | `noteDiscontinuity` در `connectWithFreshMint` |
 | برچسبِ گوینده `گوینده N:` در ابتدای پاراگراف، شماره‌ی فارسی | `handleSonioxMessage`، `buildTextFromTokens`، `buildTextFromAsyncTokens` |
 | `cleanText`: حذفِ `<end>`/`</end>`/`<fin>`، فشرده‌سازیِ فاصله، حداکثر یک خطِ خالی | `feelia-rt.js` |
 | interim هرگز persist نمی‌شود | FeeliaRT؛ legacy: `hint` فقط RAM |
@@ -41,11 +41,12 @@
 | drainِ دوگانه روی RECOVERED→ACTIVE | `_draining` | کد |
 | finish هم‌زمان با drain | `_queueLock` | کد |
 | دو پردازشِ هم‌زمانِ صف در سرور | — | **باز** ([subsystem 02 §8.5](02-audio-durability-batch-fallback.md)) |
-| batch پس از متنِ realtime که بخشی از همان صدا را دارد | append (نه dedupe) | **طراحی‌شده:** بخشی از متن ممکن است دو بار بیاید اگر سگمنتی که realtime جزئی پوشش داده بود با purpose=transcript آپلود شود (INFERRED) |
-| overwrite با متنِ کهنه | CAS (غیراتمیک) | جزئی |
+| بعدِ یک قطعی/reconnect، تمامِ سگمنت‌هایِ *بعدیِ* durable (حتی ACTIVEِ سالم) دوباره purpose=transcript می‌گرفتند و append می‌شدند | intentِ per-segment روی stateِ لحظه‌ای (نه `self.unreliable`ِ سراسری) + بستنِ اجباریِ مرزِ سگمنت روی هر گذارِ ACTIVE↔قطعی | **رفع شد (2026-09-22):** `scheduleReconnect`/`offlineHandler`/`connectWithFreshMint` در `feelia-rt.js`؛ T18 در `scripts/rt-harness.cjs` PASS (و بدونِ فیکس عمداً FAIL می‌شود) |
+| batch پس از متنِ realtime که بخشی از همان صدا را دارد | append (نه dedupe) | **بهبود یافت (2026-09-22):** ریسکِ اصلی این بود که یک قطعیِ «بی‌صدا» (WSای که readyState اش دیگه OPEN نیست ولی onclose/onerror دیر یا هیچ‌وقت فایر نمی‌شه، مثلِ WiFiای که بدونِ FIN/RST محو می‌شه) پنجره‌ی تشخیص را طولانی می‌کرد و مرزِ سگمنت دیر بسته می‌شد. `startWsWatchdog` (تایمرِ ۳ثانیه‌ای که فقط `ws.readyState` را چک می‌کند، بدونِ فرضی دربارهٔ cadenceِ پیام‌هایِ Soniox — رویِ سکوتِ طبیعی false-positive نمی‌دهد) این پنجره را به حدِ چند ثانیه محدود کرد؛ با T19/T19b در `scripts/rt-harness.cjs` تأیید شد (قطعیِ بی‌صدایِ شبیه‌سازی‌شده تشخیص داده شد؛ سکوتِ طبیعی هیچ reconnectِ کاذبی نساخت). یک پنجره‌ی بسیار کوچک‌ترِ نظری (چند صدم ثانیه، تا فاصله‌ی واقعیِ رخدادِ WS.onclose تا اجرایِ handlerِ جاوااسکریپت) هنوز به‌طورِ تئوریک باز است — قابلِ‌اندازه‌گیری/رفعِ کامل نیست بدونِ صفر کردنِ event-loop latency (INFERRED، عملاً بی‌اهمیت) |
+| overwrite با متنِ کهنه | CAS | **کامل شد (2026-09-22):** حالا اتمیک (`AND transcript_version=?` در WHEREِ UPDATE)، نه فقط چکِ جدا |
 
 ## ۵. تغییرِ امن در این ناحیه
 1. هر نوشتنِ جدید از مسیرِ W1 با `transcript_version`.
 2. هرگز replace برای نتایجِ batch.
 3. T1، T2، T6، T10، T14 را اجرا کنید؛ سناریوی جدید را به harness اضافه کنید.
-4. CAS اتمیک (پیشنهاد): `UPDATE … WHERE id=$ AND transcript_version=$expected RETURNING` — [ماژول 04 plan](../04-modules/04-transcription/implementation-plan.md).
+4. ~~CAS اتمیک (پیشنهاد)~~ **پیاده شد (2026-09-22):** `server/src/http/sessions.ts`، `UPDATE … WHERE id=? AND transcript_version=?` (بدونِ `RETURNING` چون MySQL آن را ندارد؛ `affectedRows` جایگزین شد).

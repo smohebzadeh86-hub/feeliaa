@@ -2,7 +2,81 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-18 — آخرین رویداد: **رفعِ سه باگِ واقعیِ کشف‌شده در
+> **آخرین به‌روزرسانی:** 2026-09-23 — آخرین رویداد: **BUG+FIX: race چرخشِ durable در `feelia-rt.js`
+> (ریشه‌ی سگمنت‌هایِ خرابِ جلسه‌ی `aebef3b8-…`) + intentِ معکوسِ مرزهای قطعی + خطایِ دائمی در صفِ
+> batch سرور.** در Chromeِ واقعی بازتولید و رفع شد؛ `pnpm test:rt` 49/49، `test:cf` 108/108، `tsc`
+> تمیز. **commit (`3e732b1`) و push به `origin/feat/clarity` شد، همراهِ کارِ commitنشده‌ی نشست‌های قبلی در ۶
+> commitِ موضوعی؛ deploy نشده.** جزئیات در Event Log و [verification](verification/2026-09-23-durable-rotation-race.md).
+> قبل‌ترش (همین روز): **رفعِ کاملِ ۳ موردِ
+> بازِ باقی‌مانده از deployِ همین نشست + دیپلویِ دومِ آن‌ها به production:** (۱) باگِ واقعیِ
+> `sessionIdFromFilename` در `batchqueue.ts` (فایلِ صفِ خیلی قدیمی/بدونِ runId باعثِ خطایِ
+> «Data too long for column session_id» می‌شد) رفع و با تستِ دستی تأیید شد؛ (۲) باگِ
+> `copy-assets.mjs` (migrationهایِ MySQL به `dist/` کپی نمی‌شدند) رفع شد؛ (۳) ffmpeg رویِ سرور
+> نصب شد (`8.0.1-3ubuntu2`). یک یافته‌ی جدید و نامرتبط (سگمنت‌هایِ صدایِ خرابِ یک جلسه‌ی واقعی)
+> کشف و به یک taskِ جداگانه ارجاع شد — رفع نشد. جزئیات در Event Log زیر.**
+> قبل‌ترش (همین نشست): **DEPLOYِ واقعیِ
+> working tree به production (`/root/feeliaa-mysql`، پروسه‌یِ pm2 که واقعاً زنده است) + محدودسازیِ
+> فیچرِ Case File به یک تراپیستِ مشخص (فاطمه قربانعلی). auditِ اولیه‌ی همین نشست اشتباهاً
+> `/root/feeliaa` (پروسه‌ی pm2 دیگری به‌نامِ `feelia` که **stopped** است) را به‌عنوانِ production
+> بررسی کرده بود — تصحیح شد.**
+> قبل‌ترش (همین نشست/نشستِ قبلی): **تستِ واقعیِ چرخشِ کاملِ
+> لاگِ JSONLِ observability (آخرین آیتمِ بازِ checklistِ فازِ۱، بخش ۶) — PASS.** با مجوزِ
+> صریحِ مالک، سرورِ dev توسطِ خودِ مالک با `OBS_LOG_MAX_BYTES=64000` ری‌استارت شد (چون
+> kill‌کردنِ آن پروسه توسطِ classifierِ auto-mode برایِ من رد می‌شد)؛ با ~۳۸۰۰ درخواستِ
+> واقعیِ HTTP (بیشتر `GET /api/health`، چون کشف شد رویدادهایِ UI فقط به DB می‌روند نه فایل)
+> کاسکیدِ کاملِ `obs.jsonl.1`..`.5` تولید و تأیید شد؛ `obs.jsonl.6` هرگز ایجاد نشد (سقفِ
+> سختِ دیسک برقرار است)؛ md5ِ `.5` بینِ دو دورِ ترافیک عوض شد یعنی کاسکید واقعاً درحالِ حرکت
+> است. حسابِ QA canaryِ تازه (`3e95c98d-...`) طبقِ رویه حذف نشد. هیچ کدِ اپلیکیشن تغییر نکرد.
+> آیتمِ بازِ باقی‌مانده: **DB-down resilience** — نیازمندِ توقفِ سرویسِ `FeeliaMySQL` (دسترسیِ
+> ادمین ندارم)؛ مالک صریحاً تصمیم گرفت فعلاً موکول شود. جزئیات:
+> [verification](verification/2026-09-23-obs-log-rotation-full-cascade.md).
+> قبل‌ترش (این نشست): **فازِ ۴ی پلنِ observability
+> (گسترشِ Clarity) — auditِ read-only کدِ Clarity در برابرِ سندِ canonical؛ هیچ driftی پیدا
+> نشد، فقط یک نقصِ مستندسازی (`SessionDetail` در جدولِ §۵ به‌عنوانِ «عمداً ردیابی‌نشده» فهرست
+> نشده بود) رفع شد. کدی تغییر نکرد. با این، هر ۴ فازِ پلنِ observability تمام شدند. جزئیات در
+> Event Log زیر.**
+> قبل‌ترش (این نشست): **فازِ ۳ی پلنِ observability
+> (باگ‌هایِ پخش/دانلودِ صدا) — ۳ باگِ واقعی رفع شد: Range بدونِ clamp در
+> `admin.ts` (حالا ۴۱۶ برایِ رنجِ نامعتبر)، seqِ مشترکِ `kind='note'`/`kind='session'` در
+> `sessionAudioArchive.ts` (هشدارِ کاذبِ «ناقص»)، و نبودِ `onerror` رویِ پلیرِ صدا در
+> `index.html`. ۲ موردِ دیگرِ ادعاشده (پسوندِ mp4→m4a، وابستگیِ ffmpeg) بعدِ audit «نه باگ»
+> تشخیص داده شدند. `tsc --noEmit` تمیز، `pnpm test:rt` بدونِ رگرسیون. commit نشده. جزئیات در
+> Event Log زیر.**
+> قبل‌ترش (این نشست): **هر سه آیتمِ باقی‌مانده‌ی
+> verificationِ observability (migration idempotency، endpoint edge cases، `rt.reconnect_exhausted`)
+> با evidenceِ واقعیِ DB/HTTP/Browser کامل و PASS شدند.** با مجوزِ صریحِ مالک: سرورِ dev رویِ
+> پورتِ ۳۰۰۰ دو بار متوقف/ری‌استارت شد (migration idempotency تأیید شد — `DELETE FROM
+> _migrations WHERE name='021_observability_events.sql'` → ری‌استارت → `CREATE TABLE IF NOT
+> EXISTS` بدونِ خطا دوباره اعمال شد → `SHOW CREATE TABLE obs_events` بایت‌به‌بایت با قبل
+> یکسان ماند)؛ یک حسابِ QA canaryِ تازه (`e068f44d-...`) ثبت‌نام شد و ۹ سناریویِ edge-case
+> رویِ `POST /api/obs/events` (batch سالم، بدونِ auth→۴۰۱، >۲۰۰ رویداد→۴۰۰، >۶۴KB→۴۱۳،
+> rate-limit→۴۲۹، `target_id` فارسی→NULL، `therapist_id` جعلی→نادیده‌گرفته‌شد، `client_ts`
+> آینده→NULL، `session_id`ِ تراپیستِ دیگر→NULL+`obs.session_mismatch`) همگی با کوئریِ مستقیمِ
+> DB تأیید شدند؛ با همان حساب یک جلسه‌ی realtimeِ واقعی در Browser pane شروع و
+> `window.WebSocket` monkey-patch شد تا reconnectِ خودکار تمامِ ۴ تلاش را ببازد —
+> `rt.reconnect_exhausted` واقعاً در `obs_events` با `session_id=fb60e450-...`/
+> `run_id=mud6jiut59iszf` ثبت شد (اولین اجرایِ execution-verifiedِ این call-site،
+> `public/feelia-rt.js:828`). **هیچ کدِ اپلیکیشن تغییر نکرد.** حسابِ QA canary و جلسه‌اش
+> باقی گذاشته شدند (طبقِ دستورِ کار، حذف نشدند). جزئیاتِ کاملِ هر سه با خروجیِ واقعی:
+> [verification](verification/2026-09-23-obs-phase1-2-remaining-checklist-completion.md)
+> (پیوستِ سوم). قبل‌ترش (این نشست): **`OBS_LOG_MAX_BYTES` پیاده شد
+> (`server/src/obs/fileSink.ts` + مستندات)؛ سه آیتمِ دیگرِ مجازشده‌ی همین پاس (migration
+> idempotency، endpoint edge cases، `rt.reconnect_exhausted`) به‌دلیلِ محدودیتِ زمانی/scope
+> اجرا نشدند — صادقانه NOT ATTEMPTED، نه شواهدِ جعلی. جزئیات:
+> [verification](verification/2026-09-23-obs-phase1-2-remaining-checklist-completion.md).**
+> قبل‌ترش (این نشست): **تکمیلِ checklistِ باقیماندهٔ
+> فازِ ۱/۲ observability — از ۶ آیتمِ باز فقط ۱تا (sweep correctness) واقعاً با evidence اجرا و
+> PASS شد (ردیفِ synthetic ۲۰۰روزه/۴۰روزه با فراخوانیِ مستقیمِ `sweepOldObsEvents()` حذف شد،
+> ردیفِ تازه/canary دست‌نخورده ماند). ۵ موردِ دیگر (`rt.reconnect_exhausted`، migration
+> idempotency، endpoint edge cases، DB-down resilience، log rotation) **BLOCKED** — عمدتاً چون
+> ثبت‌نامِ حسابِ canaryِ تازه توسطِ classifierِ auto-modeِ محیط رد شد (`Modify Shared
+> Resources` / `PII Data Handling`) و ری‌استارتِ سرورِ dev/توقفِ سرویسِ mysqld (که به نشستِ
+> دیگری/سیستم تعلق دارند) بدونِ اطمینانِ بیشتر انجام نشد. گپِ واقعیِ کشف‌شده (نه رفع‌شده،
+> فقط مستند): `OBS_LOG_MAX_BYTES` اصلاً وجود ندارد — سقفِ فایلِ لاگ (۸MB) در
+> `server/src/obs/fileSink.ts` کاملاً hardcode است، نه configurable از env، برخلافِ ادعایِ
+> پلنِ فازِ۱. کدی تغییر نکرد. جزئیاتِ کامل با کوئری/خروجیِ واقعی:
+> [verification](verification/2026-09-23-obs-phase1-2-remaining-checklist-completion.md).**
+> قبل‌ترش (این نشست): **تأییدِ مرورگریِ واقعیِ فازِ ۲ (تله‌متریِ `rt.*`) — سرورِ dev + MySQLِ لوکالِ واقعی + Sonioxِ واقعی + Browser pane؛ ۵۹ ردیفِ واقعی در `obs_events` (۶×`rt.ws_open`/`rt.ws_close` با `close_code:1000`، ۵×چرخه‌ی reconnectِ موفق، ۱۹×`rt.state_change`)، صفر نشتِ PHI. کدِ زیرِ تست دست نخورد. جزئیات: [verification](verification/2026-09-23-obs-phase2-realtime-ws-telemetry-browser-check.md)، Event Log.** قبل‌ترش (این نشست): **لایه‌ی رصد و حسابرسی، فازِ ۲ — تله‌متریِ واقعیِ WebSocketِ realtime (`rt.*`) از خودِ `feelia-rt.js`، سیم‌کشیِ کاملِ `FeeliaObs.event()` با detail-object + مسیرِ تازه‌ی `obs_events` سمتِ سرور برایِ رویدادهایِ کلاینت.** جزئیاتِ کامل در ابتدایِ Event Log. قبل‌ترش (این نشست): **تأییدِ end-to-endِ لایه‌ی رصد با ترافیکِ واقعیِ canary؛ یک نشتِ واقعیِ سمتِ‌سرور (`target_id` بدونِ اعتبارسنجیِ الگوی امن در `obs/http.ts`) پیدا و همان‌جا رفع شد.** جزئیاتِ کامل در ابتدایِ Event Log. قبل‌ترش (این نشست، پلنِ تأییدشده‌ی مالک): **لایه‌ی رصد و حسابرسی (Observability & Audit)، فازِ ۱ — migration ۰۲۱، ماژولِ `server/src/obs/`، رفعِ ۲ نشتِ PHIِ موجود، `POST /api/obs/events`، `public/feelia-obs.js`، ۵ endpointِ پنلِ ادمین + UI، ۱۷ نقطه‌ی instrumentation، مستندسازیِ کامل.** جزئیاتِ کامل در ابتدایِ Event Log. قبل‌ترش (این نشست، به گزارشِ مالک با اسکرین‌شات): **دکمه‌های «ویرایش»/«حذف»ِ ردیفِ دارو به آیکنِ svg تبدیل شدند + ستونِ جداگانه‌ی «عملیات» بعدِ پزشک.** جزئیاتِ کامل در ابتدایِ Event Log. ⚠️ این فایل هم‌زمان توسطِ نشستِ دیگری هم ویرایش می‌شود (رویدادِ زیرِ همین خط، دربارهٔ «سوالاتِ باز»، از آن نشست است). قبل‌ترش (این نشست): **پاسخ به «سوالاتِ باز برایِ تراپیست» حالا واقعاً به‌عنوانِ دیتا (مثلِ یادداشت) وارد پرونده می‌شود؛ + دکمه‌ی صریحِ «ثبتِ پاسخ» به‌جایِ inputِ بی‌فیدبک.** Auditِ اولیه دو مشکلِ جدا پیدا کرد: **(۱ UI)** ورودیِ سوالِ باز یک `<input onchange=...>` خام بود ([public/index.html](public/index.html)) — فقط با blur ارسال می‌شد و بعدِ موفقیت هم هیچ فیدبکی نداشت (نه رندرِ دوباره، نه بنر) — دقیقاً همان «تایپ کردم چیزی نشد» که مالک گزارش داد. **(۲ pipeline، مهم‌تر)** پاسخ فقط در `pendingQuestions[].answer` ذخیره می‌شد و **هیچ‌کجا** به `aggregateClientCorpus`/`buildCaseFilePrompt`/`generateCaseFile` نمی‌رسید (grepِ کاملِ `.answer` در فیچر تأیید کرد) — تنها اثرش جلوگیری از پرسیدنِ دوباره‌ی همان سوال بود؛ و چون `corpusSignature` هم فقط از `sessions`/`session_notes` می‌آمد، دکمه‌ی موجودِ «به‌روزرسانی» ([index.html](public/index.html)، `regenerateCaseFile(false)`) بعدِ پاسخ‌دادن بی‌سروصدا `skipped:true` برمی‌گرداند — یعنی LLM حتی صدا زده نمی‌شد. پلن با مالک هم‌راستا شد و مالک صریحاً دو تصمیم داد: «ثبت» از «به‌روزرسانیِ پرونده» **جدا** بماند (دکمه‌ی جداگانه)، و سوالِ پاسخ‌داده‌شده دیگر در «سوالاتِ باز» **نماند**. فیکس (سرور): تایپِ تازه‌ی `CaseFileAnsweredQuestion` + فیلدِ `answeredQuestions?` روی `CaseFileContent` ([domain/types.ts](server/src/features/case-file/domain/types.ts)). `applyFieldPatch.ts`: پچِ `question.<id>.answer` حالا سوال را از `pendingQuestions` حذف و به `answeredQuestions` منتقل می‌کند (نه فقط `q.answer=value`)؛ پاسخِ خالی/فقط‌فاصله رد می‌شود؛ `migrateAnsweredQuestions` برایِ رکوردهایِ قدیمی (که پاسخ را هنوز در خودِ `pendingQuestions` دارند) در GET و PATCH صدا زده می‌شود (سیم‌کشی در [caseFile.routes.ts](server/src/features/case-file/api/caseFile.routes.ts)). `mergeTherapistEdits.ts`: `mergePendingQuestions` حالا در برابرِ `answeredQuestions` چک می‌کند (نه فیلدِ کهنه‌ی `answer` درونِ `pendingQuestions`)؛ `answeredQuestions` با regenerate دست‌نخورده می‌ماند (کارِ تراپیست است، نه مدل). نکته‌ی معماریِ مهم که در همین گذر کشف/رفع شد: pipelineِ دومرحله‌ای (digest→compose) در `repairLoop.ts`، corpusTextِ مرحله‌ی ۲ را **کاملاً از `digest.sessions` بازمی‌سازد** (`renderDigest.ts`) — یعنی اگر بلوکِ پاسخ به ورودیِ مرحله‌ی ۱ اضافه می‌شد (تلاشِ اولِ من)، چون schemaِ digest دقیقاً بر اساسِ `sessionNum` است، در مرحله‌ی ۲ **گم می‌شد**. فیکسِ درست: `buildAnsweredQuestionsBlock` (در [buildCaseFilePrompt.ts](server/src/features/case-file/application/buildCaseFilePrompt.ts)) بلوکِ پاسخ‌ها را می‌سازد و `composeWithRepair` (پارامترِ تازه‌ی `extraCorpusText`) آن را مستقیماً *بعدِ* `renderDigest` به corpusTextِ مرحله‌ی ۲ می‌چسباند — هرگز به مرحله‌ی ۱ نمی‌رود. `generateCaseFile.ts`: `corpusSignature` حالا `effectiveSignature` است (امضایِ corpus + شناسه‌هایِ `answeredQuestions`) — یعنی دکمه‌ی «به‌روزرسانی» که قبلاً بعدِ پاسخ‌دادن بی‌اثر بود الان واقعاً یک regenerateِ واقعی را trigger می‌کند. UI ([public/index.html](public/index.html)): input با onchange حذف شد؛ هر سوالِ باز حالا یک textarea + دکمه‌ی «ثبتِ پاسخ» دارد (`submitCaseFileAnswer`) — کلیک: غیرفعال‌شدنِ دکمه، وضعیتِ «در حالِ ثبت…»، بعدِ موفقیت `renderCaseFile()` (پس سوال فوراً از لیست محو می‌شود، طبقِ تصمیمِ مالک) + بنرِ «پاسخ ثبت شد — با «به‌روزرسانی» در پرونده اعمال می‌شود»؛ پاسخِ خالی سمتِ کلاینت هم رد می‌شود (بدونِ فراخوانیِ API). **تست:** ۶ تستِ تازه (T1–T6) در [scripts/case-file-harness.ts](scripts/case-file-harness.ts) — حذف/انتقالِ پاسخ، ردِ پاسخِ خالی، ایدمپوتنسِ migrate، عدمِ بازگشتِ سوالِ پاسخ‌داده‌شده در merge، متنِ `buildAnsweredQuestionsBlock`، و تأییدِ کدیِ اینکه بلوکِ پاسخ فقط به مرحله‌ی ۲ می‌رسد نه ۱. `pnpm test:cf`: **۱۰۸/۱۰۸ PASS** (بدونِ رگرسیون در ۱۰۲ تستِ قبلی). `cd server && npx tsc --noEmit` تمیز. **UI با Browser pane واقعاً تست شد** (سرورِ استاتیکِ scratchpad رویِ `public/`، بدونِ اکانت/DB طبقِ رویه‌ی جاافتاده): رندرِ صحیحِ textarea+دکمه (نه inputِ کهنه) تأیید شد؛ با mockِ تابعِ `api`، کلیکِ «ثبتِ پاسخ» دقیقاً `PATCH /api/clients/.../case-file` با `{fieldId:'question.q1.answer',action:'edit',value:...}` فرستاد و بعدِ پاسخِ موفق، آیتمِ سوال از DOM حذف شد؛ پاسخِ خالی/فقط‌فاصله هم سمتِ کلاینت رد شد بدونِ تماسِ API. ⚠️ تأییدِ end-to-endِ کاملِ LLMِ واقعی (که پاسخ واقعاً در axes/medication ظاهر شود) انجام نشد — نیازمندِ OpenRouterِ واقعی + حسابِ canary است؛ فقط با خواندنِ دقیقِ pipeline + هارنس تأیید شد. commit نشده. ⚠️ **این فایل هم‌زمان توسطِ نشستِ دیگری هم ویرایش می‌شد** (رویدادِ زیر، دربارهٔ دکمه‌ی «ثبت»ِ زیرفیلدِ دارو، از آن نشست است — بدونِ تعارضِ کد، حفظ شد). قبل‌ترش (این نشست، به گزارشِ مالک با اسکرین‌شات): **حذفِ دکمه‌ی «ثبت»ِ زیرِ هر زیرفیلدِ دارو (قاطی‌شونده با «در انتظار ثبت») و جایگزینیِ یک دکمه‌ی «ویرایش» یک‌جا طبقِ سیستمِ طراحی.** جزئیاتِ کامل در ابتدایِ Event Log. قبل‌ترش (این نشست، به گزارشِ مالک با اسکرین‌شات): **رفعِ ریشه‌ایِ ردیفِ خالیِ «دارو» با همه‌یِ زیرفیلدها pending.** علتِ واقعی مسیرِ افزودنِ دستیِ دارو نبود (آن مسیر، `addCaseFileItem` در [applyFieldPatch.ts](server/src/features/case-file/application/applyFieldPatch.ts:199)، بدونِ نام هرگز ردیف نمی‌سازد — `cleanText` خطا می‌دهد)؛ بلکه مدل گاهی در خروجیِ ساختِ پرونده یک آیتمِ `medication` با `name` خالی برمی‌گرداند و `validateCaseFileDraft` فقط نوعِ string بودنِ `name` را چک می‌کرد نه خالی‌نبودنش، پس این ردیفِ بی‌نام تا `mergeMedication` می‌رسید و به‌صورتِ یک ردیفِ کاملاً خالی (نام تهی + هر ۴ زیرفیلد «در انتظار ثبت») واردِ `content.medication` می‌شد — دقیقاً همان ردیفِ اضافه‌ای که مالک بعدِ افزودنِ دستیِ «میو» می‌دید. فیکس: یک خطِ فیلتر در [`enforceCaseFileRules`](server/src/features/case-file/domain/validate.ts:173) (`draft.medication = draft.medication.filter(m => m.name.trim() !== '')`) — این تابع قبل از merge روی هر draftِ خروجیِ مدل اجرا می‌شود، پس ردیف‌هایِ بی‌نامِ ورودیِ آینده فیلتر می‌شوند و ردیفِ خالیِ فعلاً موجود هم (چون `addedByTherapist` نیست) با اولین regenerateِ بعدی طبقِ منطقِ `keepManual` خودبه‌خود حذف می‌شود — نیازی به migration/پاکسازیِ دستیِ DB نیست. `tsc --noEmit` تمیز. Browser-previewable نبود (تغییر فقط رویِ pipelineِ LLM اثر می‌گذارد، نه UI مستقیم) پس تستِ end-to-end با LLM واقعی انجام نشد؛ فقط با خواندنِ دقیقِ مسیرِ کد (client → route → applyFieldPatch → merge) تأیید شد. commit نشده. قبل‌ترش (این نشست، audit صدا): **audit سخت‌گیرانه‌ی read-only + رفعِ ۲ گپِ باقی‌مانده از audit «zero-loss recording» (به دستورِ صریحِ مالک: «اینارو هم اصلاح کن»).** بعدِ یک audit کاملاً read-only (بدونِ تغییرِ فایل، گزارشِ ۱۱بخشیِ RECORDING/OFFLINE/…/FINAL VERDICT با ارجاعِ خط)، دو ریسکِ صادقانه‌ی باقی‌مانده که خودِ audit اعلام کرده بود رفع شدند: **(۱)** `getFullSessionAudio` (`server/src/stt/sessionAudioArchive.ts`) قبلاً بدونِ چکِ gap فایلِ نهایی را می‌ساخت؛ الان `checkSeqContiguous` را مستقیماً صدا می‌زند و `complete`/`missingSegments` را در نتیجه برمی‌گرداند؛ `admin.ts` این را رویِ هدرهایِ `X-Audio-Complete`/`X-Audio-Missing-Segments` رویِ خودِ `GET .../audio/full` ست می‌کند (نه فقط endpointِ جداگانه‌ی قبلی) — فایل هنوز fail-open سرو می‌شود، فقط دیگر بدونِ سیگنال نیست. تستِ واقعی: MySQLِ لوکال + ffmpegِ واقعی + فایل‌هایِ صوتیِ واقعی، یک gapِ عمدی در seq ساخته شد (`complete:false, missingSegments:[1]` تأیید)، بعد پر شد (`complete:true` + فایلِ واقعاً بازساخته‌شده تأیید)، دیتایِ canary پاک شد. **(۲)** ریسکِ «قطعیِ بی‌صدا» (WSای که readyState اش می‌میرد ولی onclose/onerror دیر/هیچ‌وقت فایر نمی‌شه) در `feelia-rt.js` با `startWsWatchdog` (تایمرِ ۳ثانیه‌ای که فقط `ws.readyState` چک می‌کند، بدونِ فرض دربارهٔ Sonioxِ ساکت) محدود شد؛ برایِ جلوگیری از reconnectِ موازیِ چندمنبعی (watchdog + handleWSClose + خطایِ Soniox هم‌زمان) گاردِ `reconnectInFlight` هم اضافه شد. تستِ جدید `T19`/`T19b` در `scripts/rt-harness.cjs` (قطعیِ بی‌صدایِ شبیه‌سازی‌شده تشخیص داده شد؛ سکوتِ طبیعی false-positive نداد). **هر دو با تلاشِ اولِ اشتباه پیدا/رفع شدند:** یک تلاشِ اولِ رفعِ کاذبِ «hang» با `timeout 20/60` که در واقع فقط کندیِ ذاتیِ suite (۸۸+ ثانیه، بدونِ ربط به این تغییر) بود، با `time`ِ کاملِ بدونِ محدودیت رفع/تصحیح شد. `tsc --noEmit` تمیز؛ `pnpm test:rt` **۴۴/۴۴ PASS** (بدونِ رگرسیون). یک یادداشتِ evidenceِ کهنه در [subsystem 01](docs/07-subsystems/01-browser-realtime-engine.md) («Node فاقدِ indexedDB») هم در همین گذر تصحیح شد چون با اجرایِ واقعی نمی‌خواند. commit نشده. قبل‌ترش (این نشست، کارِ پرونده‌ی روندِ درمان): **رفعِ دو FINDINGِ قبلی: Enterِ زودهنگام در مودالِ افزودنِ دارو + عدمِ syncِ دکمه‌ی «بازکردنِ همه»یِ محورها.** به دستورِ صریحِ مالک («بقیشه باگ هارو هم فیکس کن») بعدِ تاییدِ بصریِ فیکسِ قبلی (دوستونه‌شدنِ کارتِ زوجین). **(۱)** `cfAddItemKeydown` جایگزینِ هندلرِ خامِ Enterِ رویِ کلِ مودالِ افزودن شد ([public/index.html:1128](public/index.html:1128)) — در مودالِ چندفیلدیِ دارو فقط رویِ آخرین فیلد (تجویزکننده) submit می‌کند، در مودالِ تک‌فیلدی (axis/roadmap) مثلِ قبل فوری submit می‌کند؛ دیگر Enterِ طبیعیِ بینِ فیلدها یک ردیفِ «در انتظار ثبت» ناقص نمی‌سازد. **(۲)** یک خط `cfSyncAllBtn();` بعدِ `sec.innerHTML=html` در `renderCaseFile()` اضافه شد تا برچسبِ دکمه از همان رندرِ اولیه با وضعیتِ واقعیِ بازبودنِ محورها هماهنگ باشد. هر دو با یک صفحه‌ی تستِ مستقل در Browser pane (کپیِ عینیِ توابع از سورس، شبیه‌سازیِ رویدادِ Enterِ واقعی با `KeyboardEvent` + رندرِ fixtureِ محورها) تایید شدند — ۶/۶ PASS. commit نشده. جزئیات: [verification](verification/2026-09-22-case-file-couple-wide-split-and-findings.md)، Event Log. قبل‌ترش (همین نشست): **دوستونه‌شدنِ کارتِ پرمحتوایِ زوجین (بدونِ جمع‌شدن).** مالک سه گزارشِ UI داد؛ دوستونه‌شدنِ کارتِ زوجین (به‌جایِ collapse) پیاده و با CSS/JS واقعی در Browser pane تایید شد (`cf-couple-wide`، `column-count:2` + `break-inside:avoid-column`، سقفِ ۵ یافته/خط). commit نشده. ⚠️ **رویدادِ زیر متعلق به نشستِ دیگری است که هم‌زمان روی audit صدا کار می‌کرده — بدونِ تعارض (نواحیِ کدِ متفاوت)، حفظ شد:** آخرین رویداد (آن نشست): **CASِ اتمیک برایِ `PUT /api/sessions/:id` (رفعِ R5)** — `server/src/http/sessions.ts`: گاردِ `AND transcript_version=?` حالا مستقیماً در WHEREِ همان UPDATE است، نه یک SELECTِ جدا؛ روی MySQLِ لوکالِ واقعی (دیتایِ canary، پاک‌شده) هم باگِ قدیم بازتولید شد (دو نویسندهٔ هم‌زمان هر دو موفق می‌شدند، یکی دیگری را بی‌صدا overwrite می‌کرد) هم فیکس تأیید شد (فقط یکی موفق، دیگری 409). `tsc`/`rt-harness` (۴۰/۴۰) بدونِ رگرسیون. با این، هر ۴ گپِ اولویت‌بندی‌شده‌ی audit «zero-loss recording» رفع شدند (duplicate transcript، کاملیتِ صدا، فایلِ یتیم، CAS). قبل‌ترش (آن نشست): **audit «zero-loss recording» (ضبط/رونویسیِ زنده/بازیابیِ آفلاین) + رفعِ ۳ گپِ اولویت‌بندی‌شده به دستورِ صریحِ مالک («دونه‌دونه، بزرگ‌ترین باگ اول، آخرِ هرکدوم تست کامل»).** خبرِ audit: بیشترِ اسپکِ درخواستی از قبل در commit `df7d86b` پیاده بود. سه گپِ واقعیِ باقی‌مانده رفع شدند: **(۱، بزرگ‌ترین)** باگِ duplicateِ transcript — بعدِ **یک بار** قطعی/reconnectِ موفق، `self.unreliable`ِ یک‌طرفه باعث می‌شد تمامِ سگمنت‌هایِ durableِ *بعدی* هم (حتی ACTIVEِ کاملاً سالم) دوباره رونویسی و append شوند؛ فیکس در `feelia-rt.js` (intentِ per-segment روی stateِ لحظه‌ای + بستنِ اجباریِ مرزِ سگمنت روی هر گذارِ ACTIVE↔قطعی)، تستِ جدیدِ `T18` (بدونِ فیکس عمداً FAIL، با فیکس PASS؛ کلِ harness ۴۰/۴۰). **(۲)** چکِ کاملیتِ صدا (seqِ گپ‌دار) + نمایشِ صریحِ Audio/Transcript status در پنلِ ادمین (`sessionAudioArchive.ts`، `admin.ts`، `index.html`). **(۳)** حذفِ فایل‌هایِ یتیمِ صدا بعدِ حذفِ جلسه/مراجع/تراپیست، طبقِ LAW-010 (`deleteSessionAudioDirs`، سیم‌کشی‌شده در `sessions.ts`/`clients.ts`/`admin.ts`). `tsc --noEmit` تمیز در هر مرحله؛ متنِ رضایت (LAW-009/C1) دست‌نخورده ماند طبقِ دستورِ صریحِ مالک. commit نشده. جزئیاتِ کاملِ هر سه در Event Log زیر. قبل‌ترش: **تستِ عمیق‌ترِ مسیرِ «افزودنِ ردیف» (به دستورِ صریحِ مالک) + رفعِ باگِ دومِ کشف‌شده: ذخیره‌ی خالیِ محور/گامِ تازه بدونِ گارد بود و می‌توانست فیلد را برایِ همیشه «تاییدشده‌ی خالی» کند (۱۰۰ تست PASS؛ commit نشده)**. قبل‌ترش: **رفعِ UI و باگ‌هایِ مسیرِ «افزودنِ ردیف» در پرونده‌ی روندِ درمان — modalِ استاندارد به‌جایِ `prompt()`، حذفِ اثرِ سراسریِ `caseFileEditMode` بعدِ افزودن، scroll/highlightِ ردیفِ تازه، و ویرایشِ نامِ داروی دستی‌افزوده‌شده (۱۰۰ تست PASS بدونِ رگرسیون؛ commit نشده)**. قبل‌ترش: **مدلِ بالینیِ تأییدشده، دسته‌یِ سوم و پایانی: ارجاعِ متقاطع + قبل/اکنونِ ردیفی + جابه‌جاییِ یافته + ارتقایِ پرونده‌یِ قدیمی (۱۰۰ تست PASS؛ commit نشده)**. قبل‌ترش: **مدلِ بالینیِ تأییدشده، دسته‌یِ دوم: نکات کلیدی (۱–۳، اشاره‌گر) + رفعِ شکستِ خاموشِ digestِ بدونِ فکت (۷۴ تست PASS؛ commit نشده)**. قبل‌ترش: **مدلِ بالینیِ تأییدشده، دسته‌یِ اول: نقش‌هایِ بیشتر (۱۶) + ترتیبِ محورها بر اساسِ لحن + باز/بسته بر اساسِ اهمیت + رفعِ بنرِ ایمنیِ کاذب (۵۶ تست PASS؛ commit نشده)**. قبل‌ترش: **رفعِ ریسکِ زمانِ تولید (heartbeat حینِ فراخوانی + سقفِ reasoning؛ ۷۸۹ث ⇒ ~۲۸۸ث؛ ۵۲ تست PASS؛ commit نشده)**. قبل‌ترش گامِ ۲ «یافته» (محورها/خانواده). قبل‌ترش گامِ ۱ (رابطه‌ی زوجین): منبع/نقلِ عینی/حفظِ اطلاعات با کد تضمین می‌شود، نه با قولِ مدل؛ ۲۷ تستِ جدید PASS + mutation-check؛ مدلِ واقعی روی digestِ ساختگی تأیید شد (⚠️ مرحله‌ی ۲ = ۲۹۳ث). commit نشده، فقط زوجین. جزئیات: Event Log، [verification](verification/2026-09-20-case-file-findings-couple.md). قبل‌ترش: **رفعِ سه باگِ واقعیِ کشف‌شده در
 > تستِ لوکالِ مالک** — raceِ auto-trigger (جلسه‌ی دستی روی corpusِ خالی generate می‌شد،
 > یادداشتِ واقعیِ بعدی «busy» می‌خورد)، تکرارِ سرصفحه‌ی «رابطه با همسر/زوجین» بینِ
 > familyRelationship و coupleRelationship، و durationIndicatorِ بدونِ راهنما (مدل یک‌بار
@@ -306,6 +380,716 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-23 — GIT — commitِ موضوعیِ کلِ working tree + push به `origin/feat/clarity`
+
+- **درخواستِ مالک:** «تمام تست‌های لازم رو انجام بده و بعد تیکه‌تیکه کامیت کن و پوش کن».
+- پیش از commit: `pnpm test:rt` 49/49، `pnpm test:cf` 108/108، `tsc --noEmit` تمیز؛ اسکنِ secret رویِ کلِ diff و
+  فایل‌هایِ untracked (پاک). `.env` و `data/` در `.gitignore` هستند.
+- ۷ commit به ترتیب: `d944589` feat(obs) · `d809b9d` feat(case-file) · `e0d49b7` fix(audio,server) ·
+  `f1504aa` feat(ui) · `459b800` feat(rt) watchdog/telemetry · `3e732b1` fix(rt,batch) رفعِ race امروز · و commitِ docs.
+  برایِ جداکردنِ رفعِ امروز از کارِ قبلیِ همان فایل‌ها (`feelia-rt.js`، `rt-harness.cjs`، `batchqueue.ts`، `index.ts`،
+  `obs/types.ts`)، نسخه‌ی «بدونِ رفعِ امروز» موقتاً در tree گذاشته، با `tsc` (تمیز) و `test:rt` (44/44) تأیید و commit شد،
+  سپس نسخه‌ی کامل برگردانده و دوباره تست شد. commitهایِ میانی تک‌تک build نشده‌اند (فقط وضعیتِ پیش و پس از رفع).
+- push شامل commitهایِ محلیِ قبلاً push‌نشده هم بود (از `e151834` تا `9471ab7`).
+- **عمداً commit نشدند (untracked ماندند):** `feelia-f9b0a9c.tar`، `feelia-mysql-deploy.tar.gz` (آرتیفکتِ deploy)،
+  `server-deploy/` (کپیِ قدیمی، HISTORICAL)، `package-lock.json` (lockfileِ npm در پروژه‌ی pnpm)، `soniox.html`
+  (کپیِ مستنداتِ خارجی)، `.claude/` (تنظیماتِ محلی).
+- deploy انجام نشد.
+
+### 2026-09-23 — BUG + FIX + FINDING — race چرخشِ durable (سگمنت‌های بی‌هدر)، intentِ معکوسِ مرزهای قطعی، خطایِ دائمی در صفِ batch
+
+- **درخواستِ مالک:** پلنِ «سگمنت‌های صوتیِ خراب در صفِ batch (جلسه‌ی `aebef3b8-…`)» → «شروع کن به اصلاح کامل».
+  این همان یافته‌ی رفع‌نشده‌ی entryِ پایین (`task_ab149001`) است.
+- **BUG (ریشه، کلاینت):** در `public/feelia-rt.js#startDurable` chunkها رویِ `self.durableChunks`ِ مشترک بود و
+  `MediaRecorder.stop()` ناهمگام است؛ در هر «stop و بلافاصله start» (چرخشِ ۱۵ثانیه‌ای + سه مرزِ قطعی در
+  `scheduleReconnect`/`connectWithFreshMint`/`offlineHandler`) `onstop`ِ recorderِ قبلی فقط دُمِ بی‌هدرِ EBML را
+  در IndexedDB نوشت و بدنه‌ی اصلی در RAM گم شد. **در Chromeِ واقعی بازتولید شد** (پیش از رفع: 1487 و 1503 بایت با
+  `40b78101`/`40b78103`؛ بعد: ~10KB با `1a45dfa3`).
+- **FINDING → FIX (باگِ دوم، همان race):** intent از `self.state`ِ لحظه‌ی `onstop` خوانده می‌شد؛ در مرزِ ورود به
+  قطعی سگمنتِ سالم `transcript` (رونویسیِ تکراری — دقیقاً فایل‌هایِ ردشده‌ی `aebef3b8`) و در مرزِ برگشت سگمنتِ خودِ
+  قطعی `archive` می‌گرفت (متنِ دوره‌ی قطعی هرگز رونویسی نمی‌شد). بازتولید در مرورگر هم تأیید کرد.
+- **FIX کلاینت:** chunkها محلیِ closureِ هر recorder؛ `stopDurableSegment` پیش از `rec.stop()` همگام
+  `rec._seqAtStop`/`rec._stateAtStop` را ثبت می‌کند و `onstop` از همین‌ها استفاده می‌کند. pause/finish رفتارِ
+  یکسان دارند (state پیش از stop ست می‌شود). seq حالا به ترتیبِ stop است (سگمنتِ خالی/abort ممکن است یک
+  شماره‌ی خالی بگذارد — بی‌ضرر).
+- **FIX سرور (`server/src/stt/batchqueue.ts`):** `looksLikeValidContainer` (magic bytes) پیش از Soniox و
+  `isPermanentTranscribeError` («Invalid audio file») → فایل از صف حذف (آرشیوِ ادمین می‌ماند)، رویدادِ تازه‌ی
+  `batch.segment_unrecoverable` (افزوده به `OBS_SERVER_EVENTS` در `obs/types.ts`)، و `batch_status` به `done`
+  می‌رسد. `sweepOldBatchFiles` حالا هر ساعت هم اجرا می‌شود (`BATCH_SWEEP_INTERVAL_MS`، `index.ts`). مسیرِ دریافت
+  (`sessions.ts`) عمداً دست نخورد. متنِ رضایت (LAW-009) لازم به تغییر نبود — رفتارِ ذخیره‌ی صدا عوض نشد.
+- **تست:** `scripts/rt-harness.cjs` — `FakeRecorder` واقع‌گرا (هدرِ `HDR`، دُمِ `TAIL` + `onstop` ناهمگام) + `T20`
+  (a/a2/b/c/d). رویِ کدِ پیش از رفع: `T18`، `T20a2` (5 از 8 بدنه ذخیره شد)، `T20b/c/d` FAIL؛ بعد از رفع
+  **`pnpm test:rt` 49/49 PASS**. `pnpm test:cf` 108/108. `cd server && npx tsc --noEmit` تمیز. تابع‌هایِ container
+  با اجرایِ مستقیم چک شدند. **صفِ سرور با MySQLِ لوکال + Sonioxِ واقعی** (جلسه‌ی QA canary `fb60e450-…`) در ۴
+  سناریو PASS: بی‌هدر → bad-container بدونِ Soniox؛ هدرِ سالم/بدنه‌ی خراب → soniox-invalid-audio؛ webmِ سالم → مسیرِ
+  عادی؛ خطایِ موقت (401) → در صف ماند. **تست نشده:** جلسه‌ی end-to-endِ واقعی در اپ (رمزِ canary در دست نیست)؛
+  مرحله‌ی ۰ پلن (بررسیِ read-onlyِ فایل‌هایِ سرور توسطِ مالک).
+- **FINDING (harness):** `FakeWS.close()` `onclose` را همگام صدا می‌زند → `scheduleReconnect` بازگشتی چند سگمنتِ
+  کوتاهِ اضافی می‌سازد. artifactِ harness است، نه باگِ مرورگر؛ تغییر داده نشد، `T20` مستقل از تعداد نوشته شد.
+- **ریسکِ باقی‌مانده:** آرشیوِ صدایِ جلساتِ پیش از این رفع عمدتاً دُمِ بی‌هدر است و قابلِ بازیابی نیست
+  (Master Reference §21). سؤالِ باز (خارج از scope): intentِ آخرین سگمنتِ جلسه‌ای که از FAILED finish می‌شود
+  (`FINALIZING → archive`) — باید جدا بررسی شود که `uploadBatchSegments` جبرانش می‌کند یا نه.
+- **اسناد:** subsystem 01 (I11 + باگِ تاریخی، تصحیحِ نگهبانِ 1.5s→10s)، subsystem 02 (الگویِ درستِ stop/start +
+  خطایِ دائمی)، configuration-catalog (sweep interval)، Master Reference §21،
+  [verification](verification/2026-09-23-durable-rotation-race.md). commit شده در `3e732b1` (entryِ GITِ بالا)؛ deploy نشده.
+
+### 2026-09-23 — CODE + DEPLOY — رفعِ ۳ موردِ بازِ deployِ قبلی (باگِ نام‌گذاریِ فایلِ صف، باگِ copy-assets، نصبِ ffmpeg) + دیپلویِ دوم
+
+- **درخواستِ مالک:** «کامل حلش کن» — اشاره به ۴ موردِ بازِ گزارش‌شده در پایانِ entryِ قبلی
+  (باگِ `copy-assets.mjs`، خطایِ `session_id`ِ batch sweep، نصب‌نبودنِ ffmpeg، تصحیحِ اسناد).
+- **۱) `server/scripts/copy-assets.mjs`:** فقط `src/db/migrations`ِ قدیمیِ Postgres را به `dist/`
+  کپی می‌کرد، نه `src/db/mysql/migrations`ِ فعلی. یک entryِ دوم به آرایه‌ی `ASSETS` اضافه شد
+  (`src/db/mysql/migrations` → `dist/db/mysql/migrations`). با `pnpm --filter server run build`
+  تأیید شد `dist/db/mysql/` حالا ساخته می‌شود.
+- **۲) `server/src/stt/batchqueue.ts` (باگِ واقعی، ریشه‌یِ خطایِ لاگِ deployِ قبلی):**
+  `sessionIdFromFilename` برایِ فایل‌هایِ خیلی قدیمیِ صفِ آپلود (پیش از migration 017، بدونِ
+  بخشِ `runId` در نامِ فایل) با regexِ قدیمی اصلاً match نمی‌شد و **کلِ نامِ فایل** (شاملِ
+  seq/timestamp/پسوند) را به‌عنوانِ `session_id` برمی‌گرداند — که از `CHAR(36)` بلندتر بود و
+  INSERT در `sweepOldBatchFiles` با «Data too long for column session_id» شکست می‌خورد (صدایِ
+  همان فایل چون sweep بدونِ شرط حذف می‌کند، برایِ همیشه بدونِ آرشیو از بین می‌رفت). فیکس: تابعِ
+  مشترکِ جدیدِ `parseQueueFilename` هم فرمتِ فعلی (با runId) هم فرمتِ خیلی قدیمی (بدونِ runId) را
+  پارس می‌کند؛ اگر هیچ‌کدام match نشد `null` برمی‌گرداند و caller (`sweepOldBatchFiles`،
+  `retryQueuedBatches`) دیگر تلاش نمی‌کند آن را در DB بنویسد (فایل هنوز طبقِ سیاستِ ۲۴ساعته
+  پاک می‌شود، فقط دیگر INSERTِ نامعتبر نمی‌زند). تستِ دستیِ ۴ سناریو (فرمتِ جدید، فرمتِ خیلی
+  قدیمی، فایلِ `.note.ogg`، نامِ کاملاً نامعتبر) با دقیقاً همان نامِ فایلی که روی production
+  خطا داده بود (`cee2e5d2-dd48-40c8-818d-d05d3723a52a-000000-1790029655082.webm`) نوشته و
+  PASS شد (اسکریپتِ یک‌بارِ scratchpad، بخشی از repo نیست). `pnpm test:cf` (۱۰۸/۱۰۸) و
+  `pnpm test:rt` (۴۴ PASS/۰ FAIL) بدونِ رگرسیون.
+- **۳) نصبِ ffmpeg رویِ production:** با تأییدِ مالک، خودِ مالک `apt-get install -y ffmpeg` را
+  رویِ سرور اجرا کرد (`ffmpeg version 8.0.1-3ubuntu2` تأیید شد). تا این‌جا `remux failed: spawn
+  ffmpeg ENOENT` fail-open بود (صدا امن می‌ماند، فقط فایلِ کاملِ چندسگمنتی/remux کار نمی‌کرد)؛
+  از الان باید کار کند (بدونِ تستِ end-to endِ جداگانه‌ی remux در این نشست).
+- **دیپلویِ دوم (همان رویه‌یِ Event Logِ entryِ قبلی — تارِ محلیِ بدونِ `.env`/`data`/`node_modules`
+  با `scp` + استخراجِ مستقیم داخلِ `/root/feeliaa-mysql` + `pnpm install --frozen-lockfile` +
+  `pm2 restart feelia-mysql --update-env`، به‌دستِ خودِ مالک):** لاگِ pm2 بعدِ ری‌استارتِ جدید
+  (`pid=50709`) خطایِ `session_id` را دیگر نشان نداد؛ `curl /api/health` → `{"status":"ok",
+  "database":"connected"}`.
+- **یافته‌ی جدیدِ نامرتبط (کشف‌شده در همین لاگ، رفع‌نشده):** برایِ یک جلسه‌ی واقعی
+  (`session=aebef3b8-7910-493f-bf47-d50277ba951c`) چند سگمنتِ صدا (`000005.webm` و بقیه) واقعاً
+  خراب/ناقص‌اند — هم ffmpeg («Invalid data found when processing input») هم Soniox async
+  («Invalid audio file») رویشان شکست می‌خورند. به یک taskِ جداگانه ارجاع شد (`task_ab149001`،
+  spawn شده با `spawn_task`) — بررسیِ ریشه‌ای/بازیابی‌پذیریِ صدایِ این جلسه در این نشست
+  انجام نشد.
+- **فایل‌ها:** `server/scripts/copy-assets.mjs`، `server/src/stt/batchqueue.ts`.
+- **اسنادِ به‌روزشده:** همین ورودی؛ `docs/01-architecture/deployment-operations.md` §۴/۵ (تصحیحِ
+  کاملِ C3 به `/root/feeliaa-mysql` + رویه‌یِ واقعیِ deployِ tar/scp، نه `git pull`).
+- **عامل:** این نشست (کدنویسی/تست) + مالک (اجرایِ دستیِ apt-get/scp/pm2 رویِ production).
+- **کارِ باز:** بررسیِ taskِ صدایِ خرابِ `aebef3b8`؛ تستِ end-to-endِ remuxِ ffmpeg با یک فایلِ
+  واقعی؛ افزودنِ یک تستِ خودکار برایِ `parseQueueFilename` به `scripts/rt-harness.cjs` یا یک
+  harnessِ سرور (الان فقط تستِ دستیِ یک‌بار بود، در repo نیست).
+
+### 2026-09-23 — DEPLOY + CODE + MIGRATION — deployِ واقعیِ working tree به production + محدودسازیِ Case File به یک تراپیست (به دستورِ صریحِ مالک)
+
+- **تصحیحِ یافته‌ی قبلی (entryِ بعدیِ همین Event Log، همین تاریخ):** آن auditِ read-only اشتباهاً
+  `/root/feeliaa` را production فرض کرده بود. با بررسیِ `pm2 jlist` معلوم شد پروسه‌ی `feelia`
+  (cwd `/root/feeliaa`) واقعاً **stopped** است؛ پروسه‌ی زنده‌ای که رویِ پورتِ ۳۰۰۰ سرویس می‌دهد و
+  nginx بهش وصل است `feelia-mysql` با cwd **`/root/feeliaa-mysql`** است — یک checkout بدونِ git
+  (نه commitِ `fed8b3b3`ی که قبلاً گزارش شده بود)، با migrationهایِ MySQL فقط تا `015_client_pinned.sql`
+  (یعنی فیچرِ Case File/observability اصلاً رویِ آن نصب نبود). مقایسه‌ی قبلی بی‌ربط بود؛ `docs/01-architecture/deployment-operations.md`
+  §۴ (ادعایِ C3، مسیرِ `/root/feeliaa`) باید در یک نشستِ بعدی برایِ production واقعی به `/root/feeliaa-mysql`
+  تصحیح شود — این نشست فقط PROJECT_STATUS را هم‌گام کرد، خودِ آن سند دست‌نخورده ماند.
+- **درخواستِ مالک:** «فعلاً اگه همین نسخه تا حدِ خوبی [مقاومتِ صدا/رونویسی رو] پوشش می‌ده دیپلویش
+  کنیم، ولی قسمتِ پرونده فقط برای یک کاربر فعال باشه» — کاربرِ مشخص‌شده: **فاطمه قربانعلی**
+  (`09229123392`).
+- **کدِ جدید (پیش از deploy، تست‌شده لوکال):**
+  - migration `server/src/db/mysql/migrations/022_therapist_case_file_enabled.sql`:
+    `therapists.case_file_enabled BOOLEAN NOT NULL DEFAULT FALSE`.
+  - `server/src/auth/session.ts`/`guard.ts`: `ResolvedSession`/`request.caseFileEnabled` (همان
+    الگویِ `isAdmin` موجود) از `resolveSession` عبور می‌کند. `requireCaseFileAccess` (جدید) → ۴۰۳
+    اگر فلگ نباشد.
+  - گاردِ جدید رویِ همه‌ی روت‌هایِ `server/src/features/case-file/api/caseFile.routes.ts`
+    (`preHandler`) + `PATCH /api/auth/case-file-auto-generate` در `auth.ts` (تا کسیِ دیگر بدونِ
+    UI هم نتواند auto-generate را روشن کند).
+  - `/api/auth/me` حالا `case_file_enabled` برمی‌گرداند؛ `public/index.html`: دکمه‌ی «پرونده» رویِ
+    کارتِ مراجع و بارگذاریِ بخشِ پرونده فقط اگر `currentTherapist.case_file_enabled` باشد.
+  - تست: `tsc --noEmit` تمیز، `pnpm test:cf` (۱۰۸ PASS/۰ FAIL)، `pnpm test:rt` (بدونِ FAIL) — بدونِ
+    رگرسیون. با Browser pane لوکال هم تأیید شد: دکمه‌ی «پرونده» برایِ حسابِ بدونِ فلگ دیده نمی‌شود؛
+    `GET /api/clients/x/case-file` مستقیم `403` می‌دهد.
+- **Deploy (با هماهنگیِ مالک، هر دستور را خودِ مالک رویِ سرور اجرا کرد — LAW-006):**
+  1. `pnpm --filter server run build` لوکال (تأیید شد `dist/` کامل و به‌روز است؛ **یافته‌ی جانبی:**
+     `server/scripts/copy-assets.mjs` فقط `src/db/migrations`ِ قدیمیِ Postgres را به `dist/` کپی
+     می‌کند، نه `src/db/mysql/migrations`ِ فعلی — چون deploy کدِ منبع (`server/src`) را هم شامل
+     می‌شد، `resolveMigrationsDir` با fallback به `<cwd>/server/src/db/mysql/migrations` کار کرد؛
+     اگر روزی deployِ فقط-`dist` انجام شود، این باگ واقعی می‌شود. رفع نشد — خارج از scope همین کار.).
+  2. تارِ `server/ public/ package.json pnpm-lock.yaml pnpm-workspace.yaml` (بدونِ `.env`/`node_modules`/`data`؛
+     تأییدِ عدمِ وجودِ `.env` در آرشیو قبل از ارسال) با `scp` به `/root/` منتقل شد.
+  3. رویِ سرور: `tar -xzf` مستقیم داخلِ `/root/feeliaa-mysql` (فقط فایل‌هایِ داخلِ آرشیو overwrite
+     شدند؛ `.env`/`data/`/`node_modules` چون در آرشیو نبودند دست‌نخورده ماندند) → `pnpm install --frozen-lockfile`
+     → `pm2 restart feelia-mysql --update-env`.
+  4. لاگ: migrationهایِ `016` تا `022` همگی `applied` (بدونِ خطا)؛ `GET /api/health` →
+     `{"status":"ok","database":"connected"}`.
+  5. با یک اسکریپتِ یک‌بارِ `_enable_cf.mjs` (نوشته و بعدش حذف‌شده): `UPDATE therapists SET
+     case_file_enabled=TRUE WHERE id='a0ce3a82-a19a-4210-a20d-0180594a6b5a'` (idِ فاطمه، پیداشده با
+     `SELECT ... WHERE phone=?`) — تأیید شد فقط همین یک ردیف `true` است.
+- **یافته‌های جانبیِ لاگ (بی‌ربط به این تغییر، رفع‌نشده، فقط ثبت):**
+  - `[session-audio] remux failed, keeping raw file: spawn ffmpeg ENOENT` — ffmpeg رویِ این سرور
+    نصب نیست؛ fail-open طبقِ طراحی (subsystem 02)، صدا از دست نمی‌رود، فقط پخشِ فایلِ کاملِ
+    چندسگمنتی/remux کار نمی‌کند.
+  - `[batch] pre-sweep archive failed (still sweeping): Error: Data too long for column 'session_id' at row 1`
+    رویِ یک فایلِ خیلی قدیمیِ باقی‌مانده در صف (`cee2e5d2-...`) — به‌نظر یک باگِ واقعیِ
+    از‌قبل‌موجود (نه ناشی از این deploy)؛ بررسیِ ریشه‌ای نشد.
+  - یک درخواستِ `GET /.env` از IP خارجی در لاگ دیده شد (اسکنِ خودکارِ رایج/بی‌ضرر — `404` داد، فایل
+    اصلاً وجود ندارد چون هرگز deploy نشده؛ فقط برایِ اطلاع).
+- **فایل‌ها:** `server/src/db/mysql/migrations/022_therapist_case_file_enabled.sql` (جدید)،
+  `server/src/auth/{session,guard}.ts`، `server/src/http/auth.ts`، `server/src/features/case-file/api/caseFile.routes.ts`،
+  `public/index.html`.
+- **اسنادِ به‌روزشده:** همین ورودی. هنوز به‌روزنشده (کارِ باز): `docs/02-reference/database-catalog.md`
+  (migration 022)، `docs/04-modules/08-ai-case-file/module-prd.md` (محدودیتِ فازِ اول به یک
+  تراپیست)، `docs/01-architecture/deployment-operations.md` (اصلاحِ مسیرِ واقعیِ production به
+  `/root/feeliaa-mysql`، حلِ C3).
+- **عامل:** این نشست + مالک (اجرایِ دستیِ دستورهایِ SSH رویِ production، به دستورِ صریحِ خودش).
+- **کارِ باز:** رفعِ باگِ `copy-assets.mjs` (مایگریشن‌هایِ mysql کپی نمی‌شوند به dist)، بررسیِ
+  خطایِ `session_id` طولانی در batch sweep، نصبِ ffmpeg رویِ سرور (اختیاری)، هم‌گام‌کردنِ اسنادِ
+  بالا، و تصمیمِ بعدی درباره‌یِ گسترشِ Case File به سایرِ تراپیست‌ها.
+
+### 2026-09-23 — AUDIT — مقایسه‌ی read-only کدِ working tree با production (به دستورِ صریحِ مالک؛ فقط برایِ اطلاع، هیچ تغییری اعمال نشد) — ⚠️ **این ورودی اشتباهاً `/root/feeliaa`ِ متوقف‌شده را به‌جایِ production واقعی بررسی کرده؛ تصحیح در entryِ بالاتر**
+
+- **چه شد:** مالک خواست بداند working tree فعلی (شاخه‌ی `feat/clarity`، تغییراتِ فراوانِ uncommitted) با کدِ
+  در حالِ اجرا روی production چه تفاوتی دارد. با SSH به `185.110.191.126` (root؛ پسورد را مالک مستقیم در چت
+  داد — در هیچ فایل/خروجی/کامیت چاپ نشد) وصل شدم. `pm2 jlist` تأیید کرد پروسه‌ی `feelia` واقعاً از
+  `/root/feeliaa` اجرا می‌شود (نه `$HOME/server-deploy` — تعارضِ ثبت‌شده‌ی C3 در
+  `docs/01-architecture/deployment-operations.md` با این، برایِ production حل شد: مسیرِ درست `/root/feeliaa`ست).
+  سرور روی branch **`main`**، commit `fed8b3b3` (۲۰۲۶-۰۹-۱۵، مرجِ Clarity) است؛ یک فایلِ untracked دارد:
+  `server/real_retry.mjs` (اسکریپتِ دستیِ retry برایِ batch queue — احتمالاً از یک عملیاتِ دستیِ قبلی، بی‌ضرر).
+  با tar (بدونِ `.env`/`node_modules`/`data`) یک snapshot از `server/`، `public/`، `package.json` گرفتم و با
+  working tree لوکال مقایسه کردم. **نتیجه‌ی کلی:** سرور به‌طورِ قابلِ‌توجهی عقب‌تر از working tree است —
+  کدِ فیچرِ AI Case File (`server/src/features/case-file/**`) و مایگریشنِ MySQL
+  (`server/src/db/mysql/schema.sql`) کاملاً **روی سرور وجود ندارند**؛ همچنین observability جدید
+  (`server/src/http/obs.ts`, `server/src/ws/obs`, `public/feelia-obs.js`) و `server/src/ws/p1.ts` /
+  `ws/transcription.ts` که در working tree هست، روی سرور نیست. فایل‌هایِ مشترک هم اندازه‌ی متفاوتِ زیادی
+  دارند (نمونه: `public/index.html` سرور ۴۶۵۲ خط در برابرِ ۶۷۳۴ خطِ لوکال؛ `public/feelia-rt.js` ۱۲۹۳ در
+  برابرِ ۱۵۹۷؛ `server/src/http/admin.ts` ۲۹۲ در برابرِ ۶۶۹؛ `server/src/http/sessions.ts` ۵۶۳ در برابرِ ۷۲۸).
+  مایگریشن‌هایِ ۰۰۱ تا ۰۰۳ که در `diff -rq` به‌عنوانِ «differ» علامت خوردند بعدِ بررسیِ دستی فقط تفاوتِ
+  line-ending بودند، نه تفاوتِ محتوایی — بدونِ ریسک. جزئیاتِ کامل: verification زیر.
+- **فایل‌ها:** — (هیچ کدی تغییر نکرد؛ فقط این ورودی و فایلِ verification نوشته شدند).
+- **اسنادِ به‌روزشده:** همین ورودی؛ `docs/01-architecture/deployment-operations.md` بخشِ C3 باید در یک نشستِ
+  بعدی به «حل‌شده: `/root/feeliaa`» به‌روز شود (خارج از scope همین auditِ read-only ماند).
+- **عامل:** این نشست، به دستورِ مالک.
+- **کارِ باز:** هیچ تصمیمی درباره‌یِ deploy گرفته نشد؛ این صرفاً یک گزارشِ وضعیت بود. اگر مالک بخواهد
+  feature‌های جدید (Case File، MySQL، Observability) روی production برود، آن یک تصمیمِ جداگانه‌ی deploy است.
+
+### 2026-09-23 — DOCS — فازِ ۴ (پلنِ observability): auditِ هم‌راستاییِ Clarity با کد — بدونِ drift، یک نکته‌ی مستندسازی رفع شد
+
+- **چه شد:** به دستورِ صریحِ مالک («ادامه بده و چک کن و حل کن») فازِ ۴ (پلنِ اصلی: «گسترشِ
+  Clarity طبقِ قراردادِ allowlist») شروع شد. چون پلن هیچ رویداد/صفحه‌ی جدیدِ مشخصی برایِ
+  اضافه‌کردن معرفی نمی‌کند، به‌جایِ حدس‌زدنِ فیچرِ تازه، یک audit اولیه (ایجنتِ Explore،
+  read-only) هم‌راستاییِ `docs/analytics-clarity.md` (canonical) را با کدِ واقعی
+  (`public/feelia-analytics.js`, `public/index.html`, `server/src/http/clientConfig.ts`) در ۶
+  محور چک کرد: ۱) allowlistِ `EVENTS` (۳۳ رویداد، تطابقِ کامل)، ۲) هر فراخوانیِ `uxTrack()` در
+  کد (هیچ‌کدام خارج از allowlist نبود)، ۳) نگاشتِ screenها + فهرستِ mask، ۴) صفر موردِ
+  `clarity('identify'` یا `data-clarity-unmask`، ۵) گارد ادمین (کلاینت + سرور، هر دو مستقل)،
+  ۶) regex/رفتارِ `CLARITY_PROJECT_ID`. **نتیجه: هیچ driftی پیدا نشد** — فقط یک نقصِ مستندسازی:
+  صفحه‌ی `SessionDetail` در کد عمداً trackنمی‌شود و mask هم دارد، ولی برخلافِ `Auth`/`Admin*` در
+  جدولِ §۵ به‌عنوانِ «عمداً ردیابی‌نشده» فهرست نشده بود. فیکس: یک ردیفِ تازه در
+  [docs/analytics-clarity.md](docs/analytics-clarity.md) §۵ برایِ `SessionDetail` +
+  تکمیلِ فهرستِ Admin با `AdminSessionTimeline`/`AdminActivity` (endpointهایِ تازه‌ی فازِ ۱
+  observability که قبلاً به این جدول اضافه نشده بودند).
+- **کدی تغییر نکرد** (فقط سند). با این، هر ۴ فازِ پلنِ observability (۱، ۲، ۳، ۴) به پایان
+  رسیدند.
+- commit نشده.
+
+### 2026-09-23 — CODE + TEST — فازِ ۳ (پلنِ observability): رفعِ ۳ باگِ واقعیِ پخش/دانلودِ صدا
+
+- **چه شد:** طبقِ درخواستِ صریحِ مالک («ادامه‌ی پلن رو پیاده‌سازی کن»)، فازِ ۳ (باگ‌هایِ
+  پخش/دانلودِ صدا، فهرست‌شده در پلنِ اصلیِ observability §۵) با یک audit اولیه (ایجنتِ Explore،
+  read-only) شروع شد. audit ۵ موردِ ادعاشده را بررسی کرد — ۳تا واقعی بودند، ۲تا نه:
+  - **(۱، رفع شد) Range بدونِ clamp** — `server/src/http/admin.ts` (دو route: `.../audio/full`
+    و `.../session-audio/:audioId/stream`) هدرِ `Range` را بدونِ چکِ کراندار پارس می‌کرد؛
+    `Range: bytes=999999999-` یک `Content-Length` منفی و `Content-Range` نامعتبر تولید می‌کرد
+    (نه ۴۱۶). فیکس: تابعِ مشترکِ `parseRange(rangeHeader, size)` که start/end را clamp می‌کند
+    و برای رنجِ غیرقابل‌ارضا `null` برمی‌گرداند → هر دو route حالا `416 Range Not Satisfiable`
+    + `Content-Range: bytes */size` می‌دهند. تستِ واحدِ دستی (اسکریپتِ موقتِ node، حذف‌شده) ۶
+    حالتِ لبه (نرمال، start فراتر از سایز، end فراتر از سایز با clamp، suffix `bytes=-N`،
+    ورودیِ نامعتبر، start>end) را تایید کرد.
+  - **(۲، رفع شد) هشدارِ کاذبِ «صدایِ ناقص»** — `server/src/stt/sessionAudioArchive.ts`:
+    `archiveAudioForAdmin` شمارنده‌ی `seq` را با `SELECT MAX(seq) WHERE session_id=?` (بدونِ
+    فیلترِ `kind`) می‌ساخت، یعنی سگمنت‌هایِ `kind='note'` و `kind='session'` یک شمارنده‌ی
+    مشترک را مصرف می‌کردند؛ ولی `checkSeqContiguous`/`deriveSessionStatus` فقط ردیف‌هایِ
+    `kind='session'` را چک می‌کنند و انتظارِ seqِ کاملاً پیوسته دارند — هر یادداشتِ صوتیِ بینِ
+    دو سگمنتِ جلسه یک gapِ کاذب می‌ساخت. فیکس: کوئری حالا `AND kind = ?` هم دارد، یعنی هر
+    `kind` شمارنده‌ی seqِ مستقلِ خودش را دارد. **توجه برایِ خودِ گزارش:** این فیکس فقط
+    رکوردهایِ *تازه* را درست می‌کند؛ سگمنت‌هایِ قدیمی‌ترِ همان جلسه (که seqِ درهم دارند) در DB
+    دست‌نخورده ماندند — اگر جلسه‌ای از قبل هشدارِ ناقص نشان می‌دهد، ممکن است هنوز کاذب باشد.
+  - **(۳، رفع شد) نبودِ `onerror` رویِ پلیرِ صدا** — `public/index.html` (دو `<audio>`: صدایِ
+    کاملِ جلسه و صدایِ یادداشت) هیچ‌کدام هندلرِ خطا نداشتند؛ ۴۰۴/۵۰۳ فقط پلیرِ خرابِ خالیِ
+    مرورگر را نشان می‌داد بدونِ پیام. فیکس: `attachAudioErrorNote(row)` + `addEventListener
+    ('error', ...)` رویِ هر دو پلیر — پیامِ «فایلِ صدا بارگذاری نشد» با `textContent` (نه
+    `innerHTML`، طبقِ قاعدۀ همیشگیِ همین فایل).
+  - **(۴، NOT AN ISSUE) پسوندِ mp4→m4a** — audit نشان داد این mislabeling نیست: هیچ
+    recorderِ این کدبیس `audio/mp4` را جزوِ `MIME_CANDIDATES` ندارد؛ فقط Safari (که
+    `audio/webm` را پشتیبانی نمی‌کند) واقعاً MediaRecorderِ mp4/aac تولید می‌کند، پس پسوندِ
+    `.m4a` برایِ آن مسیر درست است. تغییری داده نشد.
+  - **(۵، از قبل guarded) وابستگیِ ffmpeg** — برایِ per-segment remux best-effort/fail-open
+    است؛ برایِ `getFullSessionAudio`/`speakerResolve` hard-dependency است ولی از قبل با
+    `checkFfmpegAvailable()` گارد شده و پیامِ ۵۰۳ٍ روشن می‌دهد، نه crash. تغییری لازم نبود.
+- **تست:** `cd server && npx tsc --noEmit` تمیز. `pnpm test:rt` بدونِ رگرسیون (همان تست‌ها
+  PASS — این فاز به `feelia-rt.js` دست نزد). Browser-previewable نبود بدونِ DB/اکانتِ واقعی
+  برایِ فایل‌هایِ صوتیِ واقعی؛ فقط با تستِ واحدِ دستیِ رنج و خواندنِ دقیقِ کد تایید شد —
+  end-to-endِ واقعی (پخشِ واقعیِ فایلِ ۴۱۶/۵۰۳ در مرورگر) انجام نشد.
+- **باقی‌مانده:** فازِ ۴ (گسترشِ Clarity) هنوز شروع نشده. دیتایِ قدیمیِ seqِ درهم (بندِ ۲) در
+  DB migrate نشده — فقط رکوردهایِ تازه درست‌اند.
+- commit نشده.
+
+### 2026-09-23 — CODE + DOCS — `OBS_LOG_MAX_BYTES` پیاده شد؛ سه آیتمِ دیگر (migration idempotency، endpoint edge cases، `rt.reconnect_exhausted`) در این پاس اجرا نشدند
+
+- **چه شد:** مالک در همین session صریحاً سه مجوزِ تازه داد (حسابِ canaryِ جدید، ری‌استارتِ
+  سرورِ dev رویِ پورتِ ۳۰۰۰، افزودنِ `OBS_LOG_MAX_BYTES`). فقط آیتمِ کد انجام شد:
+  `server/src/obs/fileSink.ts` — `MAX_BYTES` حالا از `process.env.OBS_LOG_MAX_BYTES` خوانده
+  می‌شود (guard برایِ NaN/۰/منفی → fallback ۸MB پیشین)؛ `KEEP=5` دست‌نخورده ماند. `cd server &&
+  npx tsc --noEmit` تمیز. مستندات: `docs/02-reference/configuration-catalog.md` ردیفِ تازه
+  برایِ `OBS_LOG_MAX_BYTES` اضافه شد.
+- **اجرا نشد (نه به‌دلیلِ فقدانِ مجوز، بلکه محدودیتِ زمانی/scope این پاس):** migration
+  idempotency (ری‌استارتِ کنترل‌شده‌ی سرورِ ۳۰۰۰ + حذف/بازگردانیِ ردیفِ `_migrations`)،
+  endpoint edge casesِ `POST /api/obs/events` (نیازمندِ حسابِ canaryِ واقعیِ تازه)، و
+  `rt.reconnect_exhausted` (نیازمندِ سناریویِ Browser-driven واقعی). هیچ شواهدِ جعلی برایِ
+  این سه ساخته نشد؛ پیشنهاد: یک نشستِ جداگانه با بودجه‌ی کافی. جزئیات:
+  [verification](verification/2026-09-23-obs-phase1-2-remaining-checklist-completion.md)
+  (پیوستِ انتهایِ سند).
+
+### 2026-09-23 — TEST + DOCS — تکمیلِ checklistِ باقیماندهٔ فازِ ۱/۲ observability («کامل تست هاش رو انجام بده»)
+
+- **چه شد:** به دستورِ صریحِ مالک، ۶ آیتمِ بازِ باقی‌مانده از پلنِ فازِ۱ §۶ + شکافِ شناخته‌شده‌ی
+  `rt.reconnect_exhausted`ِ فازِ۲ بررسی شدند. **کدی تغییر نکرد** (فقط دو اسکریپتِ موقتِ tsx
+  ساخته و بعدِ اجرا حذف شدند).
+  - **PASS (با evidence واقعی):** sweep correctness (§۶ آیتمِ ۱۰) — `sweepOldObsEvents()`
+    مستقیماً (بدونِ انتظار برایِ intervalِ ۲۴ساعته) import/call شد؛ ردیفِ synthetic ۲۰۰روزه
+    (`obs_events`) و ۴۰روزه (`obs_ui_events`) واقعاً حذف شدند، ردیفِ synthetic تازه و ۶۳ ردیفِ
+    canaryِ واقعیِ فازِ۱/۲ دست‌نخورده ماندند. جزئیاتِ کاملِ خروجی در verificationِ زیر.
+  - **BLOCKED (۵ مورد):** `rt.reconnect_exhausted`، migration idempotency (§۶ آیتمِ۳)، endpoint
+    edge cases (§۶ آیتمِ۴)، DB-down resilience (§۶ آیتمِ۶)، log rotationِ اجرایی (§۶ آیتمِ۷).
+    علتِ مشترکِ ۴ موردِ اول: نیاز به authِ یک تراپیستِ canaryِ **تازه** (رمزِ canaryهایِ موجود
+    هیچ‌وقت لاگ نشده، طبقِ رویه‌ی همیشگی) — تلاشِ `POST /api/auth/register` هم با `curl` هم با
+    PowerShellِ `Invoke-RestMethod` توسطِ classifierِ auto-modeِ این محیط رد شد (`Modify Shared
+    Resources`، بعد `PII Data Handling`)، **نه تصمیمِ خودم**. مورد پنجم (migration idempotency)
+    نیازمندِ ری‌استارتِ سرورِ dev/پورتِ ۳۰۰۰ بود که متعلق به یک نشستِ دیگر است (idle حدودِ
+    ۳.۵ساعت طبقِ `MAX(ts)`، ولی همچنان در حالِ اجرا)؛ بدونِ اطمینان از اینکه نشستِ دیگری به آن
+    متکی نیست، متوقف/ری‌استارت نشد. DB-down هم به همین دلیل + این‌که `mysqld` یک Windows
+    Service سیستمی است (نه پروسه‌ی این نشست) بلوک شد.
+  - **گپِ واقعیِ کشف‌شده (فقط مستند شد، رفع نشد):** `OBS_LOG_MAX_BYTES` در کدِ فعلی اصلاً وجود
+    ندارد — `server/src/obs/fileSink.ts:8` مقدارِ `MAX_BYTES=8*1024*1024` را کاملاً hardcode
+    کرده، نه از env. طبقِ دستورِ کار («اگر پیدا نشد، به‌عنوانِ گپ ثبت کن، خودت اضافه نکن») هیچ
+    کدی اضافه نشد.
+- **فایل‌ها:** `verification/2026-09-23-obs-phase1-2-remaining-checklist-completion.md` (جدید).
+  هیچ فایلِ کدِ اپلیکیشن تغییر نکرد.
+- **تست / تأیید:** `tsc --noEmit` اجرا نشد (هیچ فایلِ TSِ اپلیکیشن تغییر نکرده بود؛ آخرین اجرا
+  در verificationِ فازِ۲ تمیز و دست‌نخورده ماند). جزئیاتِ کاملِ SQL/کوئری/خروجیِ واقعیِ هر
+  آیتم در فایلِ verificationِ بالا.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** ۵ موردِ BLOCKED نیازمندِ یکی از این دو تصمیمِ مالک‌اند: (۱) اجازه/رمزِ
+  صریح برایِ ثبت‌نامِ حسابِ canaryِ تازه یا افشایِ رمزِ یکی از حساب‌هایِ canaryِ موجود، یا (۲)
+  تأییدِ این‌که سرورِ dev/پورتِ ۳۰۰۰ فعلاً به هیچ نشستِ دیگری متعلق/وابسته نیست تا بشود آن را
+  ری‌استارت کرد (فقط برایِ migration idempotency؛ DB-down همچنان به‌دلیلِ `mysqld` بودنِ سرویسِ
+  سیستمی جداگانه بررسی می‌خواهد). `OBS_LOG_MAX_BYTES`ِ configurable هم یک گپِ بازِ مستندشده
+  است که تصمیمِ افزودنش (اگر لازم باشد) با مالک است. commit نشده.
+
+### 2026-09-23 — TEST + DOCS — تأییدِ مرورگریِ واقعیِ فازِ ۲ (تله‌متریِ `rt.*`ِ WebSocket) — کارِ بازِ نشستِ قبلی بسته شد
+
+- **چه شد:** کارِ بازِ ثبت‌شده در ورودیِ زیر («تأییدِ end-to-endِ مرورگری ... هنوز انجام نشده») این‌بار واقعاً انجام شد — بدونِ لمسِ `feelia-rt.js`/`feelia-obs.js`/`server/src/obs/*`/`server/src/http/obs.ts` (کدِ زیرِ تست). سرورِ dev از قبل رویِ پورتِ ۳۰۰۰ بالا بود (متعلق به نشستِ دیگر، این نشست آن را بالا نیاورد/ری‌استارت نکرد) و به MySQLِ لوکالِ واقعی وصل بود؛ `SONIOX_API_KEY` واقعی هم در `server/.env` موجود بود — پس نیازی به mockِ Soniox نبود.
+  - تراپیست/مراجعِ canaryِ تازه با `curl` ساخته شد (`POST /api/auth/register`, `POST /api/clients`)، بعد با Browser pane واقعاً وارد UI شدند.
+  - **مشکلِ محیط:** Browser pane دسترسیِ میکروفونِ واقعی را بلاک می‌کند؛ `feelia-rt.js` بدونِ یک `MediaStream` واقعی وارد مسیرِ mint/WS نمی‌شود. راه‌حل: با `javascript_tool`، `navigator.mediaDevices.getUserMedia` با یک `MediaStream` واقعی از `AudioContext.createMediaStreamDestination()` (نه mock/فیک دستی) جایگزین شد — فقط پرکردنِ جایِ هاردویرِ غایب، بدونِ دست‌زدن به کدِ زیرِ تست.
+  - جلسه از UI واقعاً STARTING→ACTIVE شد و ~۳ دقیقه به حالِ خودش رها شد. Sonioxِ واقعی در این بازه چندبار سشن را با کدِ پاکِ `1000` بست؛ `feelia-rt.js` هر بار خودکار reconnect زد. جلسه با «ذخیره و پایان» finalize شد.
+  - **نتایجِ واقعی از DB (نه کنسولِ کلاینت):** `SELECT COUNT(*) FROM obs_events WHERE session_id=...` → **۵۹**. تفکیک: `rt.ws_open`×۶، `rt.ws_close`×۶ (همه `close_code:1000, was_clean:true` از خودِ `CloseEvent` واقعی)، `rt.reconnect_scheduled`×۵→`rt.reconnect_ok`×۵ (هر بار موفق در تلاشِ اول)، `rt.state_change`×۱۹ (چرخه‌ی کاملِ `ACTIVE→RECONNECTING→RECOVERED→ACTIVE`)، `rt.gap_marked`×۵، به‌علاوه‌یِ `session.created`/`stt.mint_ok`×۶/`session.transcript_put`×۶. `run_id` رویِ همه‌ی ۵۳ ردیفِ `rt.*` یکسان و پایدار ماند.
+  - **چکِ PHI:** `SELECT COUNT(*) FROM obs_events WHERE session_id=... AND CAST(detail AS CHAR) REGEXP '[^ -~]'` → **۰**. `obs_ui_events` از ۱۴ به ۲۰ رسید (فقط رویدادهایِ `nav`/`click`، بدونِ تداخل با مسیرِ تازه‌ی `client_event`).
+  - **یافته‌ی جانبیِ ابزار (نه باگِ فیلیا):** `read_network_requests`ِ Browser pane هر ۷ درخواستِ `POST /api/obs/events` را `204 No Content [FAILED: net::ERR_ABORTED]` نشان داد — گزارشِ گمراه‌کننده‌یِ خودِ DevTools Protocol برایِ `fetch(keepalive:true)`؛ SQL ثابت کرد داده واقعاً رسیده بود. جزئیاتِ کامل در verificationِ زیر.
+  - `rt.reconnect_exhausted` عمداً trigger نشد — هر ۵ تلاشِ reconnectِ این اجرا در تلاشِ اول موفق شدند (Sonioxِ واقعی همیشه در دسترس بود)؛ آن مسیر از قبل با `T19`/`T19b`ِ `rt-harness.cjs` پوشش دارد.
+- **فایل‌ها:** `verification/2026-09-23-obs-phase2-realtime-ws-telemetry-browser-check.md` (جدید). هیچ فایلِ کدی تغییر نکرد.
+- **تست / تأیید:** جزئیاتِ کاملِ SQL در فایلِ verificationِ بالا. `tsc --noEmit` تغییر نکرد (کد دست‌نخورد).
+- **دادهٔ canaryِ باقی‌مانده (تصمیم با مالک):** therapist `fbdacf0a-1b56-43d7-8ba0-4ee3a80bc2f4` (phone `09120000222`)، client `8adbd94d-31eb-404a-b682-c5cda3286723` (کد `CL-GBB4`)، session `ec0dcc7f-8f65-4c80-a5b1-e93e29987d29`. طبقِ LAW-006 حذف نشدند.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** با این، کارِ بازِ ثبت‌شده در ورودیِ «فازِ ۲» زیر (تأییدِ end-to-endِ مرورگری) **بسته شد**. تنها موردِ تست‌نشده‌یِ باقی‌مانده از آن پلن: `rt.reconnect_exhausted` با قطعیِ طولانی/عمدیِ شبکه (پوشش‌داده‌شده در `rt-harness.cjs`، نه در مرورگرِ واقعی). commit نشده.
+
+### 2026-09-23 — CODE + TEST + DOCS — لایه‌ی رصد و حسابرسی، فازِ ۲: تله‌متریِ واقعیِ WebSocketِ realtime از خودِ `feelia-rt.js`
+
+- **چه شد:** فازِ ۱ فقط قلاب گذاشته بود (`OBS_CLIENT_EVENTS` در `types.ts`، `feelia-rt.js` عمداً دست‌نخورده). این گذر واقعاً سیم‌کشی کرد. انگیزه: گزارشِ مالک («یه تراپیست وسطِ یه جلسه‌ی ۳دقیقه‌ای چندبار قطع شد، هیچ‌کس نمی‌دونست چرا») — تنها ردِ موجود پرچمِ تجمیعیِ `realtime_reliable` بود، نه چرایی/زمان/تعدادِ قطعی.
+  - **کشفِ معماریِ مهم قبل از نوشتنِ کد:** `FeeliaObs.event()`ِ فازِ ۱ فقط `(name, valueNum)` می‌گرفت — هیچ حاملِ detail-objectی نبود؛ و مسیرِ `POST /api/obs/events`ِ موجود فقط به `obs_ui_events` می‌نوشت (بدونِ ستونِ `run_id`/`detail`). ولی `ALLOWED_DETAIL_KEYS`ِ `redact.ts` از قبل دقیقاً کلیدهایِ لازم (`close_code`, `was_clean`, `reason`, `state`, `prev_state`, `run_id`, ...) را داشت — یعنی مقصدِ طراحی‌شده‌ی فازِ ۱ برایِ `rt.*`، جدولِ `obs_events` (که `run_id`/`detail` JSON و امکانِ join با `session_audio.run_id` را دارد) بوده، نه `obs_ui_events`. بدونِ این، close_code/reason هیچ‌وقت جایی برایِ نشستن نداشتند.
+  - **فیکسِ معماری (حداقلی، بدونِ migrationِ تازه):** `event(name, arg)` در `public/feelia-obs.js` حالا دو شکل می‌پذیرد — فرمِ عددیِ قدیمی (بدونِ تغییرِ رفتار) و فرمِ تازه‌ی object (`event('rt.ws_close', {close_code, was_clean})`) که یک آیتمِ `kind:'client_event'` با `detail` (فیلترشده با allowlistِ محلیِ `CLIENT_DETAIL_KEYS`) و `run_id` می‌سازد و از همان pipelineِ بافر/batch/backoff/sendBeaconِ فازِ ۱ رد می‌شود. سمتِ سرور، `server/src/http/obs.ts` یک مسیرِ جداگانه برایِ `kind==='client_event'` اضافه شد: نامِ رویداد باید عضوِ `OBS_CLIENT_EVENTS` باشد (وگرنه بی‌صدا drop)، `detail` از همان `sanitizeDetail()`ِ سمتِ سرور (مرجعِ نهاییِ LAW-001) رد می‌شود، و نتیجه با `logEvent({source:'client', ...})` به `obs_events` می‌رود — نه `obs_ui_events`. مالکیتِ `session_id` دقیقاً همان چکِ موجود (بدونِ existence oracle) را دوباره استفاده می‌کند.
+  - **instrumentationِ `feelia-rt.js`:** یک تابعِ کوچکِ `obsEvent(name, detail)` (try/catch + چکِ `window.FeeliaObs`) در ۱۰ نقطه صدا زده می‌شود: `rt.ws_open` (بعدِ handshakeِ موفق، قبل از resolve)، `rt.ws_error` (onerrorِ WS)، `rt.ws_close` (اولین خطِ `handleWSClose(ev)` — فقط `ev.code`/`ev.wasClean` عددی/بولی؛ **`ev.reason` هرگز خوانده نمی‌شود**)، `rt.reconnect_scheduled` (در `scheduleReconnect(reason)` — پارامترِ `reason` که قبلاً کاملاً بلااستفاده بود، الان با یک گاردِ توکن‌ایمنِ محلی `safeReasonToken` واقعاً لاگ می‌شود؛ کدهایِ موجود از قبل کوتاه/token-safe بودند: `closed`, `soniox-error`, `temp-key-expired`, `watchdog-ws-not-open`, `retry`, `online`, `online-after-failed`)، `rt.reconnect_ok` (در `connectWithFreshMint` وقتی `isReconnect` واقعاً true است)، `rt.reconnect_exhausted` + `rt.unreliable_set` (رسیدن به `MAX_RECONNECT_ATTEMPTS`)، `rt.unreliable_set` (هر جایِ دیگرِ `self.unreliable=true` می‌شود — گاردِ یک‌طرفه‌بودن با `if(!self.unreliable)` قبل از emit، تا فقط یک‌بار رخ دهد)، `rt.mint_failed` (catchِ `connectWithFreshMint` — فقط `status`/`code`، نه `message`)، `rt.watchdog_fired` (تایمرِ `startWsWatchdog` قبل از `scheduleReconnect`)، `rt.state_change` (در `setState` — این فایل از قبل یک state machineِ صریح داشت (`STATES`)، پس این رویداد بدونِ اختراعِ چیزِ تازه اضافه شد؛ `{state, prev_state}`)، `rt.gap_marked` (در `noteDiscontinuity()` — نقطه‌ای که کد از قبل «گپِ دیاریزیشن» را صریحاً علامت می‌زد). `FeeliaObs.setSession(sessionId, runId)` حالا در ابتدایِ `RTSession.prototype.start()` صدا زده می‌شود (قبلاً هیچ‌جا صدا زده نمی‌شد).
+  - **منطقِ reconnect/timing عمداً دست‌نخورده ماند** — فقط instrumentation؛ هیچ تغییرِ رفتاری.
+- **فایل‌ها:** `public/feelia-rt.js` (۱۰ نقطه‌ی `obsEvent`)، `public/feelia-obs.js` (فرمِ دومِ `event()` + `sanitizeClientDetail`)، `server/src/http/obs.ts` (مسیرِ `client_event`)، `server/src/obs/types.ts` (بدونِ تغییر — `OBS_CLIENT_EVENTS` از فازِ ۱ همه‌ی ۱۰ نامِ لازم را از قبل داشت، تأیید شد، چیزی اضافه نشد)، `docs/07-subsystems/01-browser-realtime-engine.md`، `docs/07-subsystems/03-transcript-integrity.md`.
+- **تست / تأیید:**
+  - `cd server && npx tsc --noEmit` — **تمیز، قبل و بعد**.
+  - `pnpm test:rt` — **۴۴/۴۴ PASS، بدونِ رگرسیون** (خروجیِ تست بایت‌به‌بایت همان تست‌ها/همان ترتیب؛ harness در Node بدونِ `document`/`window.FeeliaObs` اجرا می‌شود — `obsEvent` با چکِ `window.FeeliaObs` بی‌اثر و بی‌خطا ماند، دقیقاً طبقِ الزامِ ایمنی).
+  - `grep -n "ev.reason\|\.message" public/feelia-rt.js` — دو مچ: یکی کامنتِ توضیحی («ev.reason هیچ‌وقت خوانده نمی‌شود»)، دیگری `err.message` در یک `console.warn` محلی (کنسولِ dev، هرگز به obs/سرور فرستاده نمی‌شود). هیچ بای‌پسِ واقعیِ فیلترِ امن نیست.
+  - **تستِ Browser pane با WSِ mock واقعی انجام نشد** — این نشست به مسیرِ خواندنِ عمیقِ کد (rt.js کاملاً، obs.js کاملاً، redact/eventLog/types سمتِ سرور) و اثباتِ منطقی/استاتیکِ هر مسیرِ event محدود ماند؛ راه‌اندازیِ یک WS mock به‌جایِ Soniox + سرویسِ `public/` بدونِ اکانت (الگویِ استفاده‌شده در تست‌هایِ قبلیِ case-file) ممکن بود ولی در این نشست اجرا نشد. **بنابراین: `rt.ws_open`/`rt.ws_close`/`rt.reconnect_scheduled`/... سیم‌کشی‌شده و با خواندنِ دقیقِ کد + عبورِ تمیزِ `pnpm test:rt` تأیید شدند، ولی رسیدنِ واقعیِ ردیف به `obs_events` با `close_code` واقعی در مرورگر تأیید *نشد*.** ⬅️ **به‌روزرسانی (2026-09-23، نشستِ بعدی): با Sonioxِ واقعی (نه mock) + سرورِ dev/MySQLِ لوکالِ واقعی، این تأیید انجام شد — ۵۹ ردیفِ واقعی در `obs_events` با `close_code`های واقعی، صفر نشتِ PHI. جزئیات در ورودیِ بالاترِ همین Event Log.**
+  - `rt.state_change`/`rt.gap_marked` (که در پلنِ اولیه «فقط اگه معنی‌دار بود» مشروط بودند) **پیاده شدند، نه skip** — چون این فایل از قبل هم یک state machineِ صریح (`STATES`/`setState`) و هم یک مفهومِ صریحِ گپ (`noteDiscontinuity`/`hadGap`) داشت؛ هیچ‌کدام اختراعِ تازه نبودند.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** ~~تأییدِ end-to-endِ مرورگری (WS mock → `obs_events` واقعی با `close_code`) روی این ماشین هنوز انجام نشده~~ — **✅ بسته شد، به ورودیِ بالاترِ همین Event Log (2026-09-23، «تأییدِ مرورگریِ واقعیِ فازِ ۲») مراجعه کن.** `FeeliaObs.setSession()` برایِ RTSessionِ حالتِ `note` هم صدا زده می‌شود (نه فقط `live`) — یعنی یک یادداشتِ صوتیِ هم‌زمان با جلسه‌یِ زنده، `session_id`/`run_id`ِ سراسریِ obs را موقتاً به runِ یادداشت تغییر می‌دهد؛ اثرش فقط تله‌متری است (نه دادهٔ بالینی)، ولی به‌عنوانِ محدودیتِ شناخته‌شده یادداشت می‌شود. commit نشده.
+
+### 2026-09-22 — TEST + INCIDENT + CODE — تأییدِ end-to-endِ لایه‌ی رصد با ترافیکِ واقعیِ canary؛ یک نشتِ واقعیِ سمتِ‌سرور پیدا و رفع شد
+
+- **چه شد:** بخشِ ۶ (item 5) از دستورِ پیاده‌سازیِ فازِ ۱ («PHI-grepِ ترافیکِ واقعی») که در گزارشِ قبلی «انجام نشد» علامت خورده بود، این‌بار واقعاً انجام شد. بررسیِ عدمِ تداخل: نه پورتِ ۳۰۰۰ نه هیچ پروسه‌ی node/tsx در حالِ اجرا بود (`Get-NetTCPConnection`/`Get-Process` خالی) — پس امن بود که این نشست خودش `pnpm dev` را بالا بیاورد. یک تراپیست/مراجع/جلسه‌ی **canary** (غیرواقعی) ساخته شد، متنِ رونویسیِ فارسیِ واقعی PUT شد، یک تعارضِ نسخه‌ی عمدی (۴۰۹) گرفته شد، یادداشتِ فارسی اضافه شد، بچِ ۷تاییِ `POST /api/obs/events` (شاملِ یک `target_id` عمداً فارسی برایِ تستِ adversarial، شبیه‌سازیِ آنلاین/آفلاین، و یک `session_id`ِ غیرمالک برایِ تستِ `obs.session_mismatch`) فرستاده شد، جلسه completed شد، یک loginِ ناموفق و یک ۴۰۳ِ ادمین هم اضافه شد.
+  - **INCIDENT واقعی پیدا شد:** `server/src/http/obs.ts` تابعِ `safeShortString` فقط طول/trim را چک می‌کرد، نه الگویِ امنِ توکن — یعنی `target_id`ِ فارسیِ ارسالی واقعاً در `obs_ui_events` ذخیره شد (ردیفِ id=3، تأییدشده با SELECT مستقیم). این یک شکافِ LAW-001 بود: دفاعِ سمتِ‌کلاینتِ `feelia-obs.js` تنها لایه بود، سرور خودش الگو را اعمال نمی‌کرد (defense-in-depth ناقص).
+  - **فیکسِ فوری در همین گذر:** `safeShortString` با `safeShortToken` جایگزین شد که مستقیماً از `isSafeToken` (همان تابعِ `obs/redact.ts`) برایِ `target_id`/`target_role`/`target_tag`/`screen` استفاده می‌کند. بچِ عیناً همان درخواست دوباره فرستاده شد (بعدِ ری‌استارتِ خودکارِ `tsx watch`) — ردیفِ تازه `target_id=null` گرفت؛ شمارشِ `SELECT COUNT(*) FROM obs_ui_events WHERE target_id REGEXP '[^ -~]'` دیگر رشد نکرد (هنوز ۱، فقط از ردیفِ قدیمیِ پیش از فیکس).
+  - **نتایجِ عددیِ واقعی** (نه «باید صفر باشد»): `grep -P '[\x{0600}-\x{06FF}]' server/data/logs/obs.jsonl*` → **صفر مچ** (تأییدِ دوباره با اسکریپتِ Node + کنترلِ مثبت که خودِ regex درست کار می‌کند). `SELECT COUNT(*) FROM obs_events WHERE CAST(detail AS CHAR) REGEXP '[^ -~]'` → **۰**. `SELECT COUNT(*) FROM obs_events WHERE route LIKE '%?%'` → **۰**. `obs_ui_events` از ۰ به **۱۴** ردیف رسید، `obs_events` از ۰ به **۱۸** ردیف — تأییدِ end-to-endِ واقعیِ هر دو sink (فایل + DB)، نه فقط صفِ درون‌حافظه‌ای.
+  - دلیلِ فنیِ این‌که JSONL هیچ‌وقت نشتی نداشت: `writeJsonl()` فقط از `logEvent()` صدا زده می‌شود؛ `logUiEvents()` (منبعِ leak) اصلاً به فایل نمی‌نویسد — پس چکِ JSONLِ تنها کافی نبود؛ SQLِ مستقیم روی `obs_ui_events` بود که مشکلِ واقعی را پیدا کرد.
+- **فایل‌ها:** `server/src/http/obs.ts` (فیکس). `verification/2026-09-22-obs-phase1-canary-traffic-and-phi-check.md` (جدید — جزئیاتِ کامل).
+- **تست / تأیید:** `cd server && npx tsc --noEmit` بعدِ فیکس تمیز. جزئیاتِ کاملِ SQL/grep در فایلِ verificationِ بالا.
+- **دادهٔ canaryِ باقی‌مانده (تصمیم با مالک):** therapist `9026b74b-ca89-49f0-86de-d0691bac307f` (phone `09120000111`)، client `d5f74439-85b6-4aa9-80d0-06e4b79ab920` (کد `CL-39Y2`)، session `d68f0db5-b9e0-4475-a37c-06a928bb8f95`، note `bace1904-631a-4f5a-9f72-6865d6f5c943`، به‌علاوه‌یِ ۱۸ ردیفِ `obs_events`/۱۴ ردیفِ `obs_ui_events` (شاملِ یک ردیفِ leak‌شده‌یِ قدیمیِ id=3) و چند خطِ `data/logs/obs.jsonl`. طبقِ LAW-006 هیچ‌کدام حذف نشدند.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** اگر مالک بخواهد، این چند ردیفِ canary/leakِ قدیمی را با یک دستورِ صریح می‌توان پاک کرد. سرورِ dev که این نشست بالا آورده بود، بعدِ اتمامِ verification با `Stop-Process` خاموش شد (پورتِ ۳۰۰۰ دوباره آزاد است). commit نشده.
+
+### 2026-09-22 — CODE + MIGRATION + TEST + DOCS — لایه‌ی رصد و حسابرسی (Observability & Audit)، فازِ ۱: زیرساخت + پنلِ ادمین (پلنِ تأییدشده‌ی مالک، پیاده‌سازیِ کامل)
+
+- **چه شد:** پیاده‌سازیِ کاملِ پلنِ تأییدشده‌ی «لایه‌ی رصد و حسابرسی — فاز ۱» که مالک از قبل با جزئیاتِ کامل بررسی/تأیید کرده بود. خلاصه:
+  1. **Migration 021** (`server/src/db/mysql/migrations/021_observability_events.sql` + `server/src/db/mysql/schema.sql`): دو جدولِ `obs_events` (رویدادهایِ ساختارمند، retention ۱۸۰روزه) و `obs_ui_events` (فایرهوزِ کلیک/ناوبری، retention ۳۰روزه) — عمداً `BIGINT AUTO_INCREMENT` (نه UUID) و بدونِ FK (طبقِ D-E: حذفِ تراپیست/مراجع نباید ردِ حسابرسی را پاک کند).
+  2. **ماژولِ `server/src/obs/`**: `types.ts` (نام‌هایِ رویداد + `OBS_CLIENT_EVENTS` به‌عنوانِ قلابِ فازِ ۲)، `redact.ts` (`sanitizeDetail`/`isSafeToken` — نقطه‌ی اجرایِ LAW-001، allowlist نه blocklist)، `fileSink.ts` (JSONLِ چرخشیِ دستی، **بدونِ dependencyِ جدید**، سقفِ ۴۸MB)، `eventLog.ts` (صفِ درون‌حافظه‌ای MAX_QUEUE=2000 + drainِ دوره‌ای به DB با backoff هنگامِ خرابیِ DB)، `httpHook.ts` (`registerObsHooks` — هر HTTP request یک `http.request`؛ همیشه در JSONL، فقط خطا/کند/mutationِ مهم/مسیرِ ادمین در DB)، `sweep.ts` (پاکسازیِ سنی، الگویِ عیناً از `sweepOldSessionAudio`).
+  3. **رفعِ دو نشتِ PHI موجود (LAW-001):** `server/src/http/sessions.ts` — `console.log('[diag-transcript]', ...tail:body.transcript.slice(-80))` که ۸۰ نویسه‌ی آخرِ متنِ بالینی را در stdout می‌نوشت، حذف و با `logEvent({event:'session.transcript_put'/'session.transcript_conflict', detail:{len,version}})` جایگزین شد. `server/src/index.ts` — `Fastify({logger:true})` که کوکیِ `feelia_session`/هدرِ Authorization را در stdout می‌نوشت، به `logger:{level:LOG_LEVEL, redact:{paths:['req.headers.cookie','req.headers.authorization','res.headers["set-cookie"]'], remove:true}}, disableRequestLogging:true` اصلاح شد.
+  4. **`POST /api/obs/events`** (`server/src/http/obs.ts`، جدید): `requireAuth`، `bodyLimit:64KiB`، rate-limit ۲۰req/۱۵۰۰event در دقیقه، پاسخِ ۲۰۴ قبل از هر کارِ DB (چکِ مالکیتِ `session_id` بعدِ send، fire-and-forget)؛ `session_id`ِ غیرمالک ⇒ ذخیره با `null` + `obs.session_mismatch` (نه ۴۰۴ — تله‌متری existence oracle نمی‌شود). `clientConfig.ts`: بلوکِ `obs:{enabled,sample}` اضافه شد (برخلافِ Clarity، برایِ ادمین هم فعال).
+  5. **`public/feelia-obs.js`** (جدید، سبکِ دقیقاً `feelia-analytics.js`: IIFE، فقط `var`، بدونِ arrow function، هر متد try/catch): فقط ۴ خواندنِ DOM در کلیک (`data-obs`/`id`، `role`، `tagName`، `value_num=null`) — کامنتِ سرصفحه صراحتاً هیچ‌جا `textContent`/`innerText`/`innerHTML`/`.value`/`aria-label`/`placeholder` نمی‌خواند. ring buffer، batch+backoff [5s,15s,60s,300s]، `sendBeacon` روی unload، `401`⇒خاموشیِ دائم، `413`⇒نصفِ batch، `429`⇒backoff+خالی‌کردنِ بافر. سیم‌کشیِ `public/index.html`: تگِ `<script src="/feelia-obs.js">`، `FeeliaObs.boot()` کنارِ `FeeliaAnalytics.boot()` در `enterApp`، `setScreen()` در `showScreen`، `onLogout()` در logout. **`feelia-rt.js` اصلاً لمس نشد** (طبقِ محدودیتِ صریحِ پلن).
+  6. **پنلِ ادمین:** ۵ endpointِ جدید در `admin.ts` (`GET .../sessions/recent`، `.../sessions/:id/timeline`، `.../obs/events`، `.../obs/ui-events`، `.../obs/stats`) + استخراجِ `deriveSessionStatus()` از منطقِ inlineِ قبلیِ `GET .../sessions/:id/audio` به `sessionAudioArchive.ts` (هر دو مسیر از همان تابع استفاده می‌کنند). UI: صفحه‌ی جدیدِ `#screenAdminActivity` (دو زیرتب: «جلسات اخیر» کارت‌مانند با هشدارِ بصریِ ردیفِ in_progressِ >۲ساعته‌یِ دارایِ متن، و «رویدادها» جدولِ فیلترشده) + `#screenAdminSessionTimeline` (ادغامِ رنگی بر اساسِ lane). همه‌ی رشته‌هایِ سمتِ‌سرور با `textContent` (هرگز `innerHTML`).
+  7. **Instrumentation دستی (۱۷ نقطه، بیش از ۱۵ خواسته‌شده):** `auth.login_ok/failed`، `auth.logout` (بدونِ شماره‌ی موبایل در detail — PII)، `session.created/transcript_put/transcript_conflict/deleted`، `audio.segment_received/archive_failed`، `batch.enqueued/completed/failed`، `stt.mint_ok/mint_failed`، `casefile.generated/failed`، `admin.export/delete` — همه بدونِ تغییرِ رفتار/control-flowِ موجود.
+  8. **sweep**: `sweepOldObsEvents` سیم‌کشی‌شده در `index.ts` (startup + هر ۲۴ساعت)، `flushObsQueue()` روی `app.onClose`/`SIGTERM`.
+- **فایل‌ها:** `server/src/db/mysql/migrations/021_observability_events.sql` (جدید)، `server/src/db/mysql/schema.sql`، `server/src/obs/{types,redact,fileSink,eventLog,httpHook,sweep}.ts` (جدید)، `server/src/http/obs.ts` (جدید)، `server/src/http/{sessions,auth,stt,admin,clientConfig}.ts`، `server/src/index.ts`، `server/src/stt/{sessionAudioArchive,batchqueue}.ts`، `server/src/features/case-file/application/generateCaseFile.ts`، `public/feelia-obs.js` (جدید)، `public/index.html`.
+- **اسنادِ به‌روزشده:** `docs/02-reference/database-catalog.md` (جدولِ migration ۰۲۱ + بخشِ ۲.۱ با توضیحِ کاملِ تصمیم‌هایِ PK/FK)، `api-catalog.md` (۶ endpointِ جدید)، `error-code-catalog.md` (`obs-bad-payload`/`obs-rate-limited`)، `configuration-catalog.md` (`LOG_LEVEL` + همه‌ی `OBS_*`)، `repository-map.md` (`server/src/obs/`، `public/feelia-obs.js`)، `docs/01-architecture/deployment-operations.md` (`data/logs/`، سقفِ ۴۸MB)، `docs/00-governance/project-laws.md` (ثبتِ صریحِ نقضِ آگاهانه‌ی D-E زیرِ LAW-010 و D-F زیرِ LAW-011، به همان الگویِ تصمیمِ D1ِ Clarity).
+- **تست / تأیید:**
+  - `cd server && npx tsc --noEmit` — **تمیز، قبل و بعد**.
+  - `pnpm test:rt` — **۴۴/۴۴ PASS، بدونِ رگرسیون** (`feelia-rt.js` اصلاً لمس نشد، طبقِ انتظار سبز ماند)، اجراشده چندبار از ریشه‌ی repo.
+  - `pnpm test:cf` — **۱۰۸/۱۰۸ PASS، بدونِ رگرسیون** (چون `generateCaseFile.ts` لمس شد).
+  - **Migration رویِ MySQLِ dev واقعی تأیید شد** — نه با `pnpm dev`ِ خودِ این نشست، بلکه یک `pnpm dev`ِ از‌قبل‌در‌حالِ‌اجرایِ نشستِ دیگری (که هم‌زمان رویِ همین repo کار می‌کرد) با `tsx watch` فایلِ migrationِ تازه را دید و خودکار اعمال کرد (`_migrations` رکوردِ `021_observability_events.sql` را با `applied_at≈14:33` نشان می‌دهد؛ ستون‌هایِ `DESCRIBE obs_events` دقیقاً منطبق بر پلن). **ایدمپوتنسی مستقیماً تأیید شد**: اجرایِ دستیِ مجددِ هر دو `CREATE TABLE IF NOT EXISTS` بدونِ خطا برگشت. این یک تغییرِ همگام/غیرِتصادفی روی DBِ dev بود (افزودنیِ خالص، بدونِ لمسِ جدولِ موجود) — طبقِ راهنمایِ حاکمیت به‌عنوانِ FINDING ثبت می‌شود، نه violation.
+  - `grep -nE 'textContent|innerText|innerHTML|\.value|aria-label|placeholder' public/feelia-obs.js` — **اجرا شد**؛ فقط ۲ خطِ کامنتِ سرصفحه (که خودِ قاعده را توضیح می‌دهند) + ۴ خطِ `.value_num` (فیلدِ عددیِ allowlistشده، نه خواندنِ `.value`ِ DOM) مچ شدند. هیچ خواندنِ واقعیِ متن/DOM وجود ندارد — تأییدِ ساختاری، نه grepِ صفرِ لفظی (نامِ فیلدِ `value_num` که خودِ پلن/schema تعریف کرده، اجتناب‌ناپذیر با `\.value` مچ می‌شود).
+  - `grep '\[diag-transcript\]'`/`grep 'feelia_session='` روی `server/src` — **صفر نتیجه** (فقط یک کامنتِ توضیحی حاویِ رشته‌ی `[diag-transcript]` باقی مانده، نه فراخوانی).
+  - PHI-grepِ ترافیکِ واقعی روی `data/logs/obs.jsonl` **انجام نشد** — این نشست هیچ سروری خودش بالا نیاورد (برایِ جلوگیری از تداخل با `pnpm dev`ِ نشستِ دیگری که هم‌زمان رویِ همین DB/repo کار می‌کرد) و آن سرورِ دیگر تا این لحظه ترافیکی نگرفته بود که `data/logs/` را بسازد؛ به‌جایش redactionِ `sanitizeDetail`/`isSafeToken` با بازبینیِ کدی و allowlist ساختاری تضمین می‌شود.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** فازِ ۲ (تله‌متریِ واقعیِ `rt.*` از خودِ `feelia-rt.js`، که در این فاز عمداً دست‌نخورده ماند) پیاده نشده — فقط نام‌هایِ رویداد به‌عنوانِ constant در `OBS_CLIENT_EVENTS` آماده‌اند. `FeeliaObs.setSession()` هنوز از هیچ نقطه‌ای در جریانِ جلسه‌ی زنده صدا زده نمی‌شود (قلاب آماده است، سیم‌کشیِ کامل به فازِ ۲ موکول شد تا از دست‌زدنِ گسترده به glueِ جلسه‌ی زنده پرهیز شود). تأییدِ ترافیکِ واقعیِ obs (grepِ PHI روی JSONLِ واقعی، تستِ تعاملیِ Browser pane برایِ UIِ پنلِ ادمین) با یک سرورِ dev بدونِ تداخل، در دسترسِ مالک است. commit نشده.
+
+### 2026-09-22 — CODE + TEST — دکمه‌های «ویرایش»/«حذف»ِ ردیفِ دارو به آیکنِ svg تبدیل شدند + ستونِ جداگانه‌ی «عملیات» بعدِ پزشک (پیگیریِ همان اسکرین‌شاتِ مالک — «UIاش خیلی بیریخته‌ست»)
+
+- **گزارشِ مالک:** بعدِ فیکسِ قبلی (دکمه‌ی متنیِ «ویرایش» کنارِ نامِ دارو)، مالک گفت ساختار هنوز بیریخته است؛ درخواستِ صریح: دکمه‌های حذف/ویرایش به svg (آیکنِ سطلِ‌آشغال/مدادِ ادیت) تبدیل شوند و در ستونی بعدِ «پزشک» (انتهایِ ردیف) قرار بگیرند، نه چسبیده به متنِ نامِ دارو.
+- **راه‌حل:** `cfMedEditBtn` قبلی حذف و با `cfMedActionsHtml(item)` جایگزین شد — یک `<div class="cf-med-actions">` شاملِ دو دکمه‌ی آیکن‌محضِ svgِ درجا (`CF_ICON_EDIT` مداد، `CF_ICON_TRASH` سطل‌آشغال؛ بدونِ فایل/دیپندنسیِ خارجی، رنگ از `currentColor`، کلاسِ جدیدِ `.cf-icon-btn`/`.cf-icon-edit`/`.cf-icon-del`). سلولِ نامِ دارو حالا فقط متنِ نام است (بدونِ دکمه)؛ در جدولِ دسکتاپ یک `<th>عملیات</th>`/`<td>` **آخرین ستون** (بعدِ پزشک) اضافه شد؛ در کارتِ موبایل `.cf-med-name` به `flex justify-content:space-between` تبدیل شد تا نامِ دارو و گروهِ آیکن‌ها دو سرِ ردیف بمانند نه چسبیده به‌هم. تابعِ عمومیِ `cfDelBtn` (استفاده‌شده در axis/roadmap، خارج از دامنه‌ی این گزارش) دست‌نخورده ماند.
+- **فایل:** `public/index.html` فقط (CSS + `cfMedActionsHtml`، دو callsiteِ جدول/کارتِ دارو).
+- **تست:** پارسِ سینتکسِ کاملِ اسکریپت تمیز. تعاملیِ واقعیِ Browser pane با `public/index.html` از `file://` (mockِ `currentCaseFile`/`api()`، همان الگویِ verificationِ قبلی): جدولِ دسکتاپ با ستونِ «عملیات» به‌عنوانِ آخرین ستون تأیید شد (`querySelectorAll('th')` → `[دارو,دوز,دفعات,آخرین تغییر,پزشک,عملیات]`)، سلولِ نامِ دارو فقط متن است. کلیکِ واقعیِ آیکنِ مداد → مودالِ «ویرایشِ دارو» باز شد (اسکرین‌شات)؛ کلیکِ واقعیِ آیکنِ سطل‌آشغال (با `find` رویِ عنوانِ دکمه چون رویِ خودِ svg متن نیست) → مودالِ تاییدِ حذف با نامِ داروی درست باز شد (اسکرین‌شات). کارتِ موبایل هم با نام/آیکن‌ها دو سرِ ردیف تأیید شد.
+- **محدودیت:** بدونِ سرور/DB/حسابِ واقعی. عرضِ واقعیِ Browser pane این نشست کمتر از breakpointِ ۵۲۰px بود، پس تستِ جدولِ دسکتاپ با `resize_window` به عرضِ دلخواه (۶۸۰px) انجام شد نه اندازه‌ی پیش‌فرض.
+- **عامل:** این نشست.
+- **کارِ باز:** هیچ — درخواستِ مالک (svg + ستونِ «عملیات» بعدِ پزشک) کامل پیاده شد.
+- commit نشده. جزئیات: [verification](verification/2026-09-22-medication-row-edit-button.md) (به‌روزشده).
+
+### 2026-09-22 — CODE + TEST — پاسخ به «سوالاتِ باز» حالا به‌عنوانِ دیتا وارد پرونده می‌شود + دکمه‌ی صریحِ «ثبتِ پاسخ» (به دستورِ صریحِ مالک)
+
+- **گزارشِ مالک:** «وقتی تایپ کردم چیزی نشد» + دو سوال: پاسخ کجا ذخیره می‌شود؟ چطور روی خودِ پرونده اثر می‌گذارد؟ + درخواستِ صریح: پاسخ باید «مثلِ یادداشت‌ها» دیتا حساب شود و در به‌روزرسانیِ پرونده اثر بگذارد؛ دکمه‌ی «ثبت» جدا از دکمه‌ی «به‌روزرسانیِ پرونده» باشد؛ سوالِ پاسخ‌داده‌شده دیگر در «سوالاتِ باز» نماند.
+- **Auditِ اولیه (دو مشکلِ جدا):** **(۱)** UI: `<input onchange=...>` خام — فقط با blur ارسال می‌شد، بدونِ فیدبکِ موفقیت. **(۲، اصلی)** پاسخ فقط در `pendingQuestions[].answer` می‌ماند و هیچ‌کجا (grepِ کاملِ `.answer` در کلِ فیچر) به `aggregateClientCorpus`/`buildCaseFilePrompt`/`generateCaseFile` نمی‌رسید؛ و چون `corpusSignature` فقط از `sessions`/`session_notes` می‌آمد، دکمه‌ی از قبل موجودِ «به‌روزرسانی» بعدِ پاسخ‌دادن بی‌صدا `skipped:true` می‌داد — LLM حتی صدا زده نمی‌شد.
+- **راه‌حل:** تایپِ تازه‌ی `CaseFileAnsweredQuestion` + `CaseFileContent.answeredQuestions?` ([domain/types.ts](server/src/features/case-file/domain/types.ts)). `applyFieldPatch.ts`: پچِ `question.<id>.answer` سوال را از `pendingQuestions` حذف و به `answeredQuestions` منتقل می‌کند (پاسخِ خالی رد می‌شود)؛ `migrateAnsweredQuestions` رکوردِ قدیمی را در GET/PATCH ([caseFile.routes.ts](server/src/features/case-file/api/caseFile.routes.ts)) هم‌گام می‌کند. `mergeTherapistEdits.ts`: `mergePendingQuestions` در برابرِ `answeredQuestions` چک می‌کند؛ `answeredQuestions` با regenerate دست‌نخورده می‌ماند. **کشفِ معماریِ مهم در همین گذر:** pipelineِ دومرحله‌ای corpusTextِ مرحله‌ی ۲ (compose) را کاملاً از `digest.sessions` بازمی‌سازد (`renderDigest.ts`) — schemaِ digest بر اساسِ `sessionNum` است، پس هر متنِ غیرِجلسه‌ای که به مرحله‌ی ۱ برود در مرحله‌ی ۲ گم می‌شود؛ فیکسِ درست: `buildAnsweredQuestionsBlock` ([buildCaseFilePrompt.ts](server/src/features/case-file/application/buildCaseFilePrompt.ts)) مستقیماً *بعدِ* `renderDigest` به ورودیِ مرحله‌ی ۲ می‌چسبد (پارامترِ تازه‌ی `extraCorpusText` در `composeWithRepair`، [repairLoop.ts](server/src/features/case-file/application/repairLoop.ts)). `generateCaseFile.ts`: `corpusSignature` حالا `effectiveSignature` (corpus + شناسه‌هایِ `answeredQuestions`) است تا دکمه‌ی «به‌روزرسانی» بعدِ پاسخ‌دادن واقعاً regenerate کند. UI ([public/index.html](public/index.html)): input با onchange حذف؛ هر سوالِ باز textarea + دکمه‌ی «ثبتِ پاسخ» دارد (`submitCaseFileAnswer`) — بعدِ موفقیت `renderCaseFile()` (سوال فوراً از لیست محو می‌شود) + بنر؛ پاسخِ خالی سمتِ کلاینت هم رد می‌شود.
+- **فایل:** `server/src/features/case-file/domain/types.ts`، `application/applyFieldPatch.ts`، `application/mergeTherapistEdits.ts`، `application/buildCaseFilePrompt.ts`، `application/repairLoop.ts`، `application/generateCaseFile.ts`، `api/caseFile.routes.ts`، `public/index.html`، `scripts/case-file-harness.ts`.
+- **تست:** ۶ تستِ تازه (T1–T6، `scripts/case-file-harness.ts`) — حذف/انتقالِ پاسخ، ردِ پاسخِ خالی، ایدمپوتنسِ `migrateAnsweredQuestions`، عدمِ بازگشتِ سوالِ پاسخ‌داده‌شده در merge، `buildAnsweredQuestionsBlock`، تأییدِ کدیِ اینکه بلوکِ پاسخ فقط به مرحله‌ی ۲ می‌رسد. `pnpm test:cf` **۱۰۸/۱۰۸ PASS** (بدونِ رگرسیون). `cd server && npx tsc --noEmit` تمیز. **UI با Browser pane واقعاً تست شد** (سرورِ استاتیکِ scratchpad رویِ `public/`، بدونِ اکانت/DB): رندرِ textarea+دکمه تأیید شد؛ با mockِ `api`، کلیکِ «ثبتِ پاسخ» دقیقاً `PATCH .../case-file` با `{fieldId:'question.<id>.answer',action:'edit',value}` فرستاد و بعدِ پاسخِ موفق آیتم از DOM حذف شد؛ پاسخِ خالی/فقط‌فاصله سمتِ کلاینت رد شد (بدونِ تماسِ API).
+- **محدودیت:** end-to-endِ کاملِ LLMِ واقعی (پاسخ واقعاً در axes/medication ظاهر شود) تست نشد — نیازمندِ OpenRouterِ واقعی + حسابِ canary؛ فقط با خواندنِ دقیقِ pipeline + هارنس تأیید شد.
+- **عامل:** این نشست.
+- **کارِ باز:** تأییدِ end-to-endِ LLMِ واقعی با یک regenerateِ canary (وقتِ مالک).
+- commit نشده.
+
+> ⚠️ رویدادِ زیر متعلق به نشستِ دیگری است که هم‌زمان کار می‌کرده (تغییرِ دکمه‌ی «ثبت»ِ
+> زیرفیلدِ دارو) — بدونِ تعارضِ کد (نواحیِ متفاوت)، حفظ شد.
+
+### 2026-09-22 — CODE + TEST — حذفِ دکمه‌ی «ثبت»ِ زیرِ هر زیرفیلدِ دارو (قاطی‌شونده با «در انتظار ثبت») و جایگزینیِ یک دکمه‌ی «ویرایش» یک‌جا (طبقِ اسکرین‌شاتِ گزارش‌شده‌یِ مالک)
+
+- **گزارشِ مالک (با اسکرین‌شات):** در جدولِ دارو، دکمه‌ی «ثبت»ِ زیرِ هر زیرفیلدِ خالی (دوز/دفعات/آخرین‌تغییر/پزشک) از نظرِ ساختار با نشانِ «در انتظار ثبت» قاطی می‌شد (هر دو ریزوفلت/کوچک، تویِ ستونِ باریکِ جدول رویِ هم می‌افتادند)؛ درخواست: ساختارِ دکمه طبقِ سیستمِ طراحی متفاوت شود، و به‌جایِ یک دکمه‌ی «ثبت» زیرِ تک‌تکِ فیلدها، یک دکمه‌ی «ادیت» باشد.
+- **راه‌حل:** مکانیزمِ قبلیِ per-field (`cfFillField`/`cfPendingField`، دکمه‌ی `.cf-fill-btn` داخلِ `fieldHtml`) کاملاً حذف شد. به‌جایش یک دکمه‌ی تک به نامِ «ویرایش» (`cfMedEditBtn`، کلاسِ جدیدِ `.cf-med-edit-btn` — pillِ توخالیِ teal، طبقِ همان زبانِ طراحیِ `.cf-btn`/`.cf-btn.cf-primary`یِ همین بخش، بصراحت متفاوت از نشانِ خط‌چین‌دارِ `.cf-pending` و از دکمه‌ی قرمزِ «حذف») کنارِ نامِ دارو (فقط برایِ ردیفِ `addedByTherapist`) قرار گرفت. کلیک → همان مودالِ استانداردِ افزودنِ دارو با ۵ فیلد (نام+دوز+دفعات+آخرین‌تغییر+پزشک، پیش‌پرشده با مقادیرِ فعلی) باز می‌شود (`openCfEditMedModal`، mode جدیدِ `medication-edit` در `submitCfAddItem`، جایگزینِ mode قدیمیِ `medication-rename` که فقط نام را پوشش می‌داد). ذخیره فقط فیلدهایِ غیرخالی را PATCH می‌کند (فیلدِ خالی‌ماندهنشده skip می‌شود — طبقِ همان قاعده‌ی `saveCaseFileEdits`: PATCHِ `edit` با مقدارِ خالی، `pending` را برایِ همیشه `false` می‌کرد).
+- **فایل:** `public/index.html` فقط (CSS + `fieldHtml` ساده‌سازی‌شد (پارامترِ `fillable` و شاخه‌ی مرتبط حذف)، `cfMedEditBtn`/`openCfEditMedModal`/mode جدید در `submitCfAddItem`/`cfAddItemKeydown`، هر دو callsiteِ جدول/کارتِ موبایلِ دارو).
+- **تست:** پارسِ سینتکسِ کاملِ اسکریپت (`new Function` رویِ هر بلاکِ `<script>`) تمیز. تعاملیِ واقعیِ Browser pane با `public/index.html` مستقیم از `file://` (بدونِ سرور/DB — همان الگویِ verification قبلیِ mock)، `currentCaseFile`/`api()` mock شد: ردیفِ داروییِ دستیِ همه‌زیرفیلد-خالی رندر شد (فقط نشانِ «در انتظار ثبت» + دکمه‌ی «ویرایش»، بدونِ دکمه‌ی «ثبت»ِ قدیمی) — دسکتاپ (جدول) و موبایل (کارت، `resize_window preset:mobile`) هر دو اسکرین‌شات گرفته شدند. کلیکِ «ویرایش» → مودالِ پیش‌پرشده باز شد؛ با دوز=`20mg`، آخرین‌تغییر=`امروز` (دفعات/پزشک خالی رها شدند) submit شد → دقیقاً ۳ PATCH فرستاده شد (`name` بدون‌تغییر + `dose` + `lastChange`؛ **صفر** PATCH برایِ دفعات/پزشکِ خالی — تأییدشد با `window.__patches`) و رندرِ بعدی درست به‌روزرسانی شد (دفعات/پزشک هنوز «در انتظار ثبت»).
+- **محدودیت:** بدونِ سرور/DB/حسابِ واقعی (طبقِ محدودیتِ ممنوعیتِ ورودِ رمز/دادهٔ واقعیِ مراجع)؛ `api()` mock بود، endpointِ واقعیِ `caseFile.routes.ts`/`applyFieldPatch.ts` دست‌نخورده ماند (این تغییر فقط فرانت است). دارکمود بصری تست نشد (فقط از الگویِ رنگیِ `--cf-teal`ِ موجود پیروی می‌کند که قبلاً در سایرِ دکمه‌ها تأیید شده).
+- **عامل:** این نشست.
+- **کارِ باز:** هیچ — درخواستِ مالک (تمایزِ ساختاریِ دکمه + یک دکمه‌ی ادیت به‌جایِ چند دکمه‌ی ثبت) کامل پیاده شد.
+- commit نشده. جزئیات: [verification](verification/2026-09-22-medication-row-edit-button.md).
+
+> ⚠️ رویدادِ زیر متعلق به همین نشست است؛ رویدادهایِ زیرینِ آن (FINDINGِ ۲۳-بار-باگ‌خوردن،
+> رفعِ ردیفِ خالیِ دارو) از نشستِ دیگری‌اند که هم‌زمان کار می‌کرده — بدونِ تعارض (نواحیِ
+> متفاوت)، حفظ شدند.
+
+### 2026-09-22 — CODE + TEST — رفعِ کاملِ باقی‌ماندهیِ `confirm()`ِ خامِ مرورگر در سراسرِ اپ (به دستورِ صریحِ مالک: «همشو حل کن، تست‌های کامل هم انجام بده»)
+
+- **چه شد:** ورودیِ قبلیِ همین نشست («کارِ باز») ۷ نقطه‌یِ دیگرِ `confirm()`ِ خام را فهرست کرده بود. مالک خواستِ همه‌شان اصلاح و کامل تست شوند.
+- **راه‌حل:** یک مودالِ عمومیِ قابلِ‌استفاده‌ی مجدد (`#genericConfirmModal` + `showGenericConfirm`/`closeGenericConfirm`/`genericConfirmOk`، هم‌راستا با `.modal-back`/`.modal`/`.modal-actions`ِ موجود، ثبت‌شده در `MODAL_CLOSERS`) جایگزینِ هر ۷ موردِ `confirm()`ِ خام شد: فعال/غیرفعال‌کردنِ تراپیست، نقشِ ادمین، حذفِ مراجع از پنلِ ادمین، ارتقایِ ساختارِ پرونده (`cfUpgrade`)، اعمالِ به‌روزرسانیِ پیشنهادیِ فیلد (`onCfSuggestClick`)، و دور ریختنِ یادداشتِ آرشیوِ ذخیره‌نشده (دو callsite‌یِ `confirmDiscardArchiveWork` قدیمی یکی شدند در `guardUnsavedArchiveWork`، + `hideArchiveTextInput`).
+- **فایل:** `public/index.html` فقط.
+- **تست:** ایستا (پارسِ سینتکسِ کاملِ اسکریپت، `tsc --noEmit` تمیز، `pnpm test:rt` ۴۴/۴۴ PASS بدونِ رگرسیون) + تعاملیِ واقعیِ مرورگری برایِ هر ۷ مورد (+ بازتستِ موردِ قبلیِ حذفِ ردیفِ دارو) با سرورِ mockِ HTTPِ اسکرچ‌پد و کلیک/دیسپچِ رویدادِ واقعی — هرکدام: مودالِ درست با متنِ درست باز شد، «انصراف»/Escape رفتارِ صحیح داشت (شاملِ revertِ چک‌باکس در تراپیست)، تاییدش دقیقاً درخواستِ HTTPِ مورد‌انتظار را فرستاد. `grep 'confirm('` بعدِ فیکس صفر فراخوانیِ واقعی نشان می‌دهد (فقط کامنت). جزئیاتِ کاملِ جدول: [verification](verification/2026-09-22-all-native-confirm-replaced-with-design-system-modal.md).
+- **محدودیت:** بدونِ DB/حسابِ واقعی (طبقِ محدودیتِ ممنوعیتِ ورودِ رمز/دادهٔ واقعیِ مراجع)؛ فقط قراردادِ فرانت↔API تست شد.
+- **عامل:** این نشست.
+- **کارِ باز:** هیچ — همه‌ی `confirm()`هایِ شناخته‌شده‌یِ اپ رفع شدند.
+- commit نشده.
+
+### 2026-09-22 — FINDING — علتِ گزارشِ «سرِ یه تستِ رونویسیِ زنده، ۲۳ بار باگ خورد» از یه کاربرِ جدید: فیکسِ ریشه‌ای همین امروز در این نشست پیدا شد ولی هنوز commit/deploy نشده
+
+- **گزارشِ کاربر (با AskUserQuestion دقیق شد):** یه تراپیستِ تازه‌کار جلسه‌ی آزمایشی گرفته؛ وسطِ رونویسیِ زنده اینترنتش (فیلترشکن) قطع/وصل شده، ترنسکریپت مارکِ `[اتصال دوباره برقرار شد — شماره‌گذاری گوینده‌ها از این نقطه ممکن است با قبل فرق کند]` را نشون می‌ده (یعنی reconnect واقعاً افتاده و `noteDiscontinuity` صدا خورده)، ولی بعدِ اون: «صدا فعاله، ولی متن جدید دریافت نمی‌شه» — ضبط ادامه داشته، رونویسیِ زنده برای همیشه ساکت مونده.
+- **تشخیص:** این دقیقاً همون کلاسِ باگی است که همین نشست، زودتر امروز، در audit صدا (ردیفِ بالاترِ همین Event Log) کشف و فیکس شد: «قطعیِ بی‌صدا» — `ws.readyState` می‌میره ولی `onclose`/`onerror` دیر/هیچ‌وقت فایر نمی‌شه، پس `scheduleReconnect` هیچ‌وقت صدا زده نمی‌شه و state رویِ ACTIVE می‌مونه (invariant I16، فیکس: `startWsWatchdog`). با `git diff --stat HEAD -- public/feelia-rt.js` تأیید شد: این فیکس (+ I14/I15، مجموعاً ۷۳ خط) **هنوز commit نشده** — یعنی رویِ production (که رویِ commitِ قدیمی‌تر از این تغییرات دیپلوی شده) این باگ همچنان فعال است. «۲۳ بار» با تعدادِ بالایِ retry/قطعیِ واقعیِ یک فیلترشکنِ ناپایدار در یه جلسه‌ی طولانی سازگار است، نه یه عددِ عجیب.
+- **فایل‌های بررسی‌شده (فقط خواندن، بدونِ تغییر):** [public/feelia-rt.js](public/feelia-rt.js) (خطوط ۶۵۰-۹۰۰، ۱۱۵۰+ watchdog)، [docs/07-subsystems/01-browser-realtime-engine.md](docs/07-subsystems/01-browser-realtime-engine.md).
+- **تست / تأیید:** فقط خواندنِ کد + `git diff --stat` روی HEAD؛ تستِ end-to-end جدید اجرا نشد (خودِ فیکس امروز با `pnpm test:rt` ۴۴/۴۴ در ورودیِ بالاترِ همین لاگ تأیید شده بود). دیتای گزارش‌شده‌ی کاربر (ترانسکریپتِ واقعی) هیچ‌جا کپی/ذخیره نشد — طبقِ LAW-001 فقط برایِ تشخیص خونده شد.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** فیکس رویِ working tree آماده است ولی commit/deploy نشده (تصمیمِ مالک، LAW-006/LAW-022). تا commit/deploy نشه، کاربرانِ جدید با اینترنتِ ناپایدار همین باگ را دوباره می‌بینند.
+
+### 2026-09-22 — CODE + TEST — رفعِ ریشه‌ایِ ردیفِ خالیِ دارو که هیچ‌وقت پاک نمی‌شد (پیگیریِ سوم/چهارمِ گزارشِ مالک — «اون ردیف بالای در انتظار ثبت پاک نمیشه»)
+
+- **گزارشِ مالک:** بعدِ افزودنِ دستیِ یک دارو، ردیفِ *دیگرِ* بالایِ آن (خالی، «در انتظار ثبت») هنوز پاک نمی‌شود — با AskUserQuestion دقیق شد که منظور همان ردیفِ AIِ بی‌نامِ گزارش‌شده در ورودیِ قبلی است (`FINDING` در ورودیِ «رفعِ دو مشکلِ گزارش‌شده‌یِ مالک…» پایین‌ترِ همین Event Log).
+- **چرا ادعایِ «خودبه‌خود پاک می‌شود» (ورودیِ `validate.ts:179`) غلط از‌آب‌درآمد:** آن فیکس فقط رویِ *خروجیِ تازه‌ی مدل* اعمال می‌شود (`enforceCaseFileRules` قبل از merge). ردیفِ خالی که *قبلِ* آن فیکس در DB ذخیره شده بود یک شیِ AIِ معمولی است (`addedByTherapist` ندارد) — `mergeMedication` ([mergeTherapistEdits.ts:99](server/src/features/case-file/application/mergeTherapistEdits.ts:99)) فقط با یک `regenerate`ِ واقعی آن را حذف می‌کند (چون در draftِ تازه دیگر نمی‌آید و `keepManual` فقط ردیف‌هایِ دستی را نگه می‌دارد). ولی: (۱) `addCaseFileItem`/`removeCaseFileItem` (مسیرِ «افزودنِ دارو») اصلاً `mergeMedication` را صدا نمی‌زنند — فقط push/splice رویِ همان آرایه‌ی قدیمی. (۲) `GET /case-file` هم هیچ merge‌ای انجام نمی‌دهد، رکوردِ خام را برمی‌گرداند. (۳) خودِ `regenerate` هم اگر دادهٔ جلسه‌ی جدیدی نباشد می‌تواند `skip` شود. پس ردیفِ خالی تا وقتی یک regenerateِ واقعی رخ ندهد **برایِ همیشه** می‌ماند — و چون `addedByTherapist` ندارد، دکمه‌ی «حذف» (`cfDelBtn`) هم اصلاً نشانش نمی‌دهد؛ تراپیست هیچ راهِ دستی‌ای برایِ حذفش نداشت.
+- **فیکس:** تابعِ جدیدِ export‌شده‌ی `dropGhostMedication(content)` در [applyFieldPatch.ts](server/src/features/case-file/application/applyFieldPatch.ts) — فقط وقتی حداقل یک ردیفِ AIِ بی‌نام (`!addedByTherapist && !name.trim()`) هست آرایه را فیلتر می‌کند (وگرنه همان آرایه‌ی قبلی را برمی‌گرداند، بدونِ بازسازیِ بی‌دلیل). در [caseFile.routes.ts](server/src/features/case-file/api/caseFile.routes.ts) بلافاصله بعدِ هر `caseFileRepo.get(id)` صدا زده می‌شود: `GET`، `PATCH`، `POST /upgrade`، `POST /items`، `DELETE /items/:kind/:itemId` — یعنی چه در نمایشِ صرف (GET) چه در هر مسیرِ نوشتنِ دیگر، ردیفِ کهنه هم دیده نمی‌شود هم با اولین نوشتنِ بعدی واقعاً از DB پاک می‌شود؛ بدونِ نیاز به regenerate/migration/دستکاریِ دستیِ DB.
+- **فایل‌ها:** `server/src/features/case-file/application/applyFieldPatch.ts`، `server/src/features/case-file/api/caseFile.routes.ts`، `scripts/case-file-harness.ts` (۲ تستِ جدید).
+- **تست / تأیید:** `cd server && npx tsc --noEmit` تمیز. `pnpm test:cf` **۱۰۲ PASS / ۰ FAIL** (۱۰۰ تستِ قبلی + ۲ تستِ جدیدِ `S1`/`S2` رویِ خودِ `dropGhostMedication`: حذفِ ردیفِ AIِ بی‌نام/فقط-فاصله، دست‌نخورده‌ماندنِ ردیفِ دستی و ردیفِ AIِ نام‌دار، و ایدمپوتنت‌بودن — بدونِ ردیفِ کهنه آرایه اصلاً بازساخته نمی‌شود). **محدودیتِ صادقانه:** تستِ end-to-end با سرور/DB/حسابِ واقعیِ همین مراجعِ گزارش‌شده انجام نشد (ممنوع بدونِ اجازه‌ی ورودِ رمز/دادهٔ واقعی)؛ منطق فقط با unit test تایید شد، نه با کلیکِ واقعی رویِ حسابِ مالک.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** اگر مالک بعدِ ری‌استارتِ سرور (`pnpm dev`، تا کدِ جدید لود شود) دوباره صفحه‌ی مراجع را باز کند، ردیفِ خالی دیگر نباید دیده شود؛ اگر باز هم دیده شد احتمالاً کشِ مرورگر است (طبقِ ورودیِ قبلیِ همین Event Log دراین‌باره) نه این باگ.
+
+### 2026-09-22 — TEST + FINDING — تأییدِ تعاملیِ واقعیِ مرورگری برایِ فیکسِ «مودالِ حذفِ ردیفِ دارو» (بعدِ ری‌استارتِ اپ، پیگیریِ گزارشِ تکراریِ مالک)
+
+- **زمینه:** مالک بعدِ ری‌استارتِ اپ دوباره همان اسکرین‌شاتِ قبلی (`localhost:3000 says` رویِ حذفِ دارو) را فرستاد و گفت «هنوز درست نشده». بررسیِ `git diff public/index.html` نشان داد فیکس (`cfDeleteItemModal`/`showCfDeleteItem`/`closeCfDeleteItem`/`confirmCfDeleteItem` جایِ `removeCaseFileItem`+`confirm()`) از قبل در working tree هست — دقیقاً همان کاری که در ورودیِ Event Log زیرِ همین تاریخ («رفعِ دو مشکلِ گزارش‌شده‌یِ مالک…») ثبت شده بود. متنِ اسکرین‌شات (`این ردیفِ افزوده‌شده حذف شود؟`) با متنِ فعلیِ کد (`...برای همیشه حذف می‌شود.`) فرق داشت — نشانه‌یِ اسکرین‌شاتِ کهنه/کشِ مرورگر، نه نقصِ باقی‌مانده.
+- **تستِ تازه:** برخلافِ تاییدِ قبلی (فقط `file://` + stubِ سبک + پارسِ سینتکس)، این بار یک سرورِ mockِ HTTPِ واقعی (اسکرچ‌پد) که `public/` را عیناً سرو می‌کند و `/api/auth/me`+`/api/clients`+`/api/clients/1`+`/api/clients/1/case-file` (GET/DELETE) را stub می‌کند در Browser pane باز شد؛ با دادهٔ کاملاً ساختگی (بدونِ حساب/رمزِ واقعی)، سناریویِ دقیقِ اسکرین‌شات (دارویِ دستیِ زیرفیلد-خالی) بازسازی شد. کلیکِ واقعیِ دکمه‌ی «حذف» → مودالِ استانداردِ اپ (نه دیالوگِ خام) با نامِ واقعیِ دارو باز شد؛ کلیکِ «بله، حذف شود» → یک `DELETE /api/clients/1/case-file/items/medication/med1` واقعی رفت، مودال بسته شد، ردیف از UI حذف شد. اسکرین‌شاتِ هر دو مرحله گرفته شد. جزئیات: [verification](verification/2026-09-22-case-file-delete-item-modal-browser-verify.md).
+- **کد تغییر نکرد** — این ورودی فقط تأییدِ اضافیِ یک فیکسِ از‌قبل‌موجود است.
+- **نتیجه به مالک:** فیکس در کد هست و با تعاملِ واقعیِ مرورگری کار می‌کند؛ اگر هنوز دیالوگِ خام دیده می‌شود، هارد-رفرش (Ctrl+Shift+R) یا بازکردنِ تبِ جدید پیشنهاد شد.
+- **کارِ باز:** همان الگویِ `confirm()`ِ خام در جاهایِ دیگرِ اپ (فعال/غیرفعال‌کردنِ تراپیست، ادمین‌کردن، حذفِ مراجع از پنلِ ادمین، ارتقایِ ساختارِ پرونده، اعمالِ به‌روزرسانیِ پیشنهادی، دور ریختنِ یادداشتِ ذخیره‌نشده — `public/index.html` خطوطِ ۲۳۶۸/۲۳۸۵/۲۴۷۷/۳۶۹۷/۴۳۲۵/۴۴۰۶/۵۹۸۲) هنوز باقی است؛ طبقِ محدودیتِ «بدونِ تغییرِ نامرتبط با task» به این نوبت اضافه نشد — منتظرِ تاییدِ صریحِ مالک برایِ گسترشِ دامنه.
+
+### 2026-09-22 — CODE + TEST + FINDING — رفعِ دو مشکلِ گزارش‌شده‌یِ مالک با اسکرین‌شات: دارویِ دستیِ pending بدونِ راهِ پرکردن + تاییدِ حذف بدونِ UIِ سازگار با سیستمِ طراحی
+
+- **چه شد:**
+  - **گزارشِ مالک (۲ مورد، با اسکرین‌شاتِ ردیفِ «میو»):** (۱) بعدِ افزودنِ دستیِ یک دارو، اگر زیرفیلدهایِ اختیاری (دوز/دفعات/آخرین‌تغییر/پزشک) خالی می‌ماندند، ردیف تا ابد «در انتظار ثبت» نشان می‌داد بدونِ هیچ راهِ ساده‌ای برایِ پرکردن جز بازکردنِ حالتِ ویرایشِ کلِ پرونده. (۲) تاییدِ حذفِ ردیفِ دستی از `confirm()`ِ خامِ مرورگر استفاده می‌کرد — نه یک UIِ سازگار با بقیه‌ی مودال‌هایِ اپ (طبقِ خواستِ صریحِ مالک: «باید بر اساسِ سیستم دیزاین پرونده براش ui بزنی»).
+  - **FINDING (نه باگِ این نوبت، بلکه ریشه‌یابیِ اسکرین‌شات):** ردیفِ اولِ اسکرین‌شات (بدونِ نام، هر ۴ زیرفیلد pending) از یک باگِ *جداگانه* بود که در همین working tree (uncommitted، نشستِ دیگر) از قبل ریشه‌یابی و رفع شده بود — مدل گاهی یک آیتمِ `medication` بدونِ `name` برمی‌گرداند و `enforceCaseFileRules` ([validate.ts:179](server/src/features/case-file/domain/validate.ts:179)) حالا آن را فیلتر می‌کند. آن فیکس دست‌نخورده ماند؛ فقط تایید شد که هنوز در کد هست. ردیفِ دومِ اسکرین‌شات («میو») مربوط به همین مشکلِ تازه‌ی زیر بود.
+  - **ریشه‌یِ واقعیِ مشکلِ (۱):** `addCaseFileItem` ([applyFieldPatch.ts:208](server/src/features/case-file/application/applyFieldPatch.ts:208)) زیرفیلدهایِ اختیاری را با `therapistField('')` می‌سازد که `reviewedByTherapist:false, pending:true` است — این خودش طبقِ طراحی درست است (فیلدِ خالی باید pending باشد). باگ در UI بود: `fieldHtml` ([public/index.html](public/index.html)) برایِ فیلدِ خالی همیشه یک `<span>` استاتیکِ غیرقابلِ‌کلیک برمی‌گرداند و تنها راهِ پرکردنش ورود به `caseFileEditMode` (ویرایشِ کلِ سند) بود — هیچ affordanceِ درجا مثلِ الگویِ موجودِ axis/roadmap (`cfPendingNewItem`) برایِ زیرفیلدهایِ منفردِ دارو وجود نداشت.
+  - **فیکسِ (۱):** حالتِ جدیدِ `cfPendingField` (fieldId، مکملِ `cfPendingNewItem`) + پارامترِ چهارمِ `fillable` در `fieldHtml`. برایِ زیرفیلدهایِ خالیِ داروهایِ `addedByTherapist` (فقط این‌ها، نه ردیف‌هایِ AI)، به‌جایِ اسپنِ استاتیک یک دکمه‌ی کوچکِ «ثبت» نمایش داده می‌شود (`cfFillField(fieldId)`) که همان `cfInlineEditHtml`/`saveCfNewItemField`/`dismissCfNewItem`ِ موجود را برایِ همان یک فیلد صدا می‌زند (بدونِ ورود به ویرایشِ کلِ سند). `saveCfNewItemField`/`dismissCfNewItem` حالا `cfPendingField` را هم پاک می‌کنند.
+  - **فیکسِ (۲):** مودالِ جدیدِ `cfDeleteItemModal` (همان الگویِ `deleteSessionModal`/`deleteClientModal`: `.modal-back`/`.modal`/`.modal-actions`، دکمه‌یِ `btn-danger`) جایِ `confirm()` در حذفِ ردیفِ دستیِ پرونده نشست. `showCfDeleteItem(kind,id)`/`closeCfDeleteItem()`/`confirmCfDeleteItem()` جایگزینِ `removeCaseFileItem` شدند؛ نامِ ردیف (دارو/محور/گام) در متنِ تاییدیه نشان داده می‌شود. `cfDeleteItemModal` به `MODAL_CLOSERS` هم اضافه شد تا کلیکِ پس‌زمینه/Escape هم مثلِ بقیه‌ی مودال‌ها کار کند.
+- **فایل‌ها:** `public/index.html` (فقط؛ بدونِ تغییرِ سرور/schema/migration).
+- **اسنادِ به‌روزشده:** همین ورودی (به‌جایِ به‌روزرسانیِ خطِ خلاصه‌یِ بلندِ سربرگ، طبقِ §0 محدودیت‌ها: Event Log append-only کافی است).
+- **تست / تأیید:** بدونِ حساب/DBِ واقعی (طبقِ محدودیتِ ممنوعیتِ ورودِ رمز/دادهٔ واقعی)، با همان روشِ verificationِ قبلیِ همین فایل (`file://` + `javascript_tool` + stubِ `api()` + دیتایِ mockِ کاملِ `CaseFileContent`، دو ردیفِ دارو: یکی `addedByTherapist:true` با زیرفیلدهایِ خالی، یکی `addedByTherapist:false`): (۱) فقط ردیفِ دستی ۴ دکمه‌ی «ثبت» گرفت (ردیفِ AI صفر — بدونِ تغییرِ رفتارِ فیلدهایِ AI)؛ (۲) کلیکِ «ثبت» تکستریایِ درجا باز کرد؛ تایپ+ذخیره دقیقاً یک `PATCH /api/clients/:id/case-file {fieldId,action:'edit',value}` فرستاد و `cfPendingField` را `null` کرد و مقدارِ تازه در DOM ظاهر شد؛ (۳) کلیکِ «حذف» مودالِ استایل‌شده با نامِ واقعیِ دارو باز کرد (نه `confirm()`)؛ «انصراف» stateِ را پاک و مودال را بست (`MODAL_CLOSERS` هم صدا زده و تایید شد)؛ تاییدِ حذف دقیقاً یک `DELETE /api/clients/:id/case-file/items/medication/:id` فرستاد. اسکرین‌شاتِ Browser pane هر دو UI را بصری هم تایید کرد (دکمه‌ی «ثبت» کنارِ «ویرایشِ نام»/«حذف» فقط رویِ ردیفِ دستی؛ مودالِ حذفِ سازگار با سیستمِ طراحی). سینتکسِ کاملِ اسکریپت‌هایِ inline با `new Function` پارس شد (بدونِ خطا). **محدودیتِ صادقانه:** تستِ end-to-end با سرور/DB/حسابِ واقعی انجام نشد؛ `cd server && npx tsc --noEmit` صدا زده نشد چون هیچ فایلِ TypeScript تغییر نکرد.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** الگویِ مشابه (فیلدِ خالیِ بدونِ affordanceِ درجا، تاییدِ حذف با `confirm()`ِ خام) جاهایِ دیگرِ اپ (مثلاً `showDeleteClient`/سایرِ `confirm()`های خطِ ۲۴۶۴/۴۲۷۷/۴۳۵۸/۵۹۳۴) هم وجود دارد؛ طبقِ خواستِ مالک فقط دامنه‌یِ گزارش‌شده (پرونده‌ی روندِ درمان) اصلاح شد، بقیه خارج از این نوبت. ⬅️ **به‌روزرسانی (همین نشست، بالاترِ همین Event Log):** با دستورِ صریحِ بعدیِ مالک («همشو حل کن») هر ۷ موردِ باقی‌مانده هم رفع و تک‌تک تست شدند؛ دیگر هیچ `confirm()`ِ خامی در اپ نمانده.
+
+### 2026-09-22 — GIT — تجزیه‌ی commit تمامِ کدِ uncommittedِ `public/index.html` به ۵ commitِ منطقی (به دستورِ صریحِ مالک: «تیکه تیکه کامیت کن»)
+
+- **دامنه:** بعدِ تاییدِ فیکسِ کارتِ زوجین، مالک خواستِ کلِ کارِ uncommittedِ همین فایل تیکه‌تیکه commit شود. بررسیِ دقیق نشان داد ~۶۰۰ خطِ uncommitted شاملِ چند feature‌یِ مستقل ولی داخلاً به‌هم‌وابسته بود (مثلاً `cfFocusNewItem` در findings به `cfSaveOpen`/`cfSyncAllBtn` در axis-collapse نیاز دارد و برعکس) — پس دانه‌بندی بر اساسِ گراف واقعیِ وابستگیِ توابع انجام شد، نه صرفاً بر اساسِ ترتیبِ خطوط.
+- **روش:** `public/index.html` با `git checkout HEAD --` به آخرین commitِ آن‌زمان (`e04f427`) ریست شد (نسخه‌ی کاملِ working tree قبلش در اسکرچ‌پد بک‌آپ گرفته شد)؛ سپس هر باکت به‌ترتیبِ وابستگی با Edit دوباره روی همان محتوایِ دقیقِ diff (نه بازنویسی) اضافه و commit شد. بعدِ هر commit با `diff` رویِ فایلِ کاملِ بک‌آپ‌شده تایید شد که نه چیزی گم شده نه تکرار شده.
+- **۵ commit:**
+  1. `0f6f0ca` — دوستونه‌شدنِ کارتِ زوجین (مستقل، کارِ خودِ همین گفتگو).
+  2. `451f131` — watcherِ نوتیفیکیشن/pollingِ تولیدِ پرونده (بی‌ربط به دو باگ‌فیکس ولی uncommitted بود).
+  3. `d184d37` — یافته‌هایِ ساخت‌یافته + نکاتِ کلیدی + ارجاعِ متقاطع + مودالِ افزودن/حذفِ آیتم + جمع‌شوندگیِ محورها/جلسات/گام‌ها + ردیف‌هایِ موازیِ تغییر — بزرگ‌ترین تکه، چون findings و add-item-modal/axis-collapse دوطرفه به هم وابسته بودند (نمی‌شد جدا کرد بدونِ شکستنِ یکی). فیکسِ Enterِ زودهنگام (`cfAddItemKeydown`) این‌جا تویِ همان مودالِ پایه جا گرفت.
+  4. `09bdc83` — یادداشتِ «به‌روزرسانیِ خودکار فقط برایِ غیرفعال‌ها» (کوچک، مستقل).
+  5. `7798e21` — فیکسِ اصلیِ FINDING۲ (فراخوانیِ `cfSyncAllBtn()` بعدِ رندرِ اولیه).
+- **رفعِ ۱ باگِ واقعیِ کشف‌شده حینِ بازسازی:** اولین پاسِ من موردِ (۱) و (۵) از فهرستِ hunkها را عمداً «بی‌ربط، دستِ‌نخورده رها کن» گذاشتم (تنظیمِ یک دکمه‌ی client-card + نمایشِ وضعیتِ Audio/Transcript در پنلِ ادمین — کارِ نشستِ audit صدا)، ولی چون از یک ریستِ کامل شروع کرده بودم، «دست‌نخورده رها کردن» عملاً یعنی این دو تکه از working tree پاک شدند، نه اینکه uncommitted بمانند. با diff رویِ فایلِ بک‌آپ‌شده کشف و فوراً با Edit به‌طور کامل به working tree برگردانده شدند (بدونِ commit — همان‌طور که باید، چون مالِ این گفتگو نیستند)؛ تاییدِ نهایی: `diff` بینِ working tree و بک‌آپِ کامل فقط یک تفاوتِ بی‌اهمیتِ محلِ قرارگیریِ یک ثابت را نشان داد (بدونِ افتادگی/تکرار).
+- **تست:** بعدِ هر commit، اسکریپتِ فرزندِ داخلِ `<script>` با `new Function(js)` پارس شد (بدونِ خطایِ syntax) — کارِ سبک‌وزنِ جایگزینِ `tsc` چون فایل خالص HTML/JS است، نه TypeScript.
+- **رفع‌نشده/دستِ‌نخورده (عمداً، مالِ نشست‌هایِ دیگر):** تنظیمِ `flex:1.7` رویِ اولین دکمه‌ی client-card، و نمایشِ وضعیتِ Audio/Transcript در `openAdminClientSessions` — هر دو در working tree باقی‌اند، uncommitted، منتظرِ commitِ خودِ نشستِ صاحبشان.
+- commit شد (۵ commitِ بالا)؛ push نشد.
+
+### 2026-09-22 — AUDIT + CODE + TEST — audit سخت‌گیرانه‌ی read-only + رفعِ ۲ ریسکِ باقی‌مانده از audit «zero-loss recording» (به دستورِ صریحِ مالک: «اینارو هم اصلاح کن»)
+
+- **بخشِ ۱ — Audit (read-only، بدونِ تغییرِ فایل):** مالک یک قالبِ سخت‌گیریِ ۱۱بخشی خواست (RECORDING/OFFLINE/DURABILITY/SYNC/FINAL AUDIO/ADMIN/COMPLETENESS/DUPLICATION/TRANSCRIPT/NETWORK FAILURE/UNCOMMITTED CHANGES + FINAL VERDICT)، با ارجاعِ دقیقِ فایل/خط برایِ هر ادعا. نتیجه: **PASS — COMPLETE AUDIO PATH VERIFIED**، با دو ریسکِ صادقانه‌ی اعلام‌شده (نه پنهان‌شده): (الف) `getFullSessionAudio` قبل از concat هیچ چکِ gap انجام نمی‌داد، (ب) پنجره‌ی تشخیصِ یک قطعیِ «بی‌صدا» (بدونِ رویدادِ WSِ close) نامحدود بود. جزئیاتِ کاملِ audit در پیامِ همان نوبت (این فایل تکرارش نمی‌کند طبقِ «یک fact → یک مالک»؛ کدِ واقعی مرجع است).
+- **بخشِ ۲ — رفعِ ریسکِ (الف):**
+  - `server/src/stt/sessionAudioArchive.ts` (`getFullSessionAudio`): بلافاصله بعدِ خواندنِ `rows`، `checkSeqContiguous(rows)` صدا زده می‌شود؛ `FullAudioResult`ِ نوعِ `ok:true` حالا `complete`/`missingSegments` هم دارد (در هر دو مسیرِ cache-hit و ساختِ تازه).
+  - `server/src/http/admin.ts` (`GET /api/admin/sessions/:id/audio/full`): هدرهایِ `X-Audio-Complete`/`X-Audio-Missing-Segments` از رویِ همین نتیجه ست می‌شوند — فایل fail-open سرو می‌شود (بلاک نمی‌شود)، فقط دیگر بدونِ سیگنالِ کاملیت نیست.
+  - **تستِ واقعی** (MySQLِ لوکال + ffmpegِ واقعی نصب‌شده رویِ ماشین + فایل‌هایِ صوتیِ واقعیِ سکوت با `ffmpeg -f lavfi anullsrc`، دیتایِ canary): دو سگمنت با seq=۰،۲ (seq=۱ عمداً جا افتاده) ثبت شد → `getFullSessionAudio` واقعاً `{complete:false, missingSegments:[1]}` برگرداند؛ بعد seq=۱ هم واقعاً اضافه شد → `{complete:true, missingSegments:[]}` و فایلِ نهایی واقعاً با ffmpeg دوباره ساخته شد (نه صرفِ ادعا). ۲/۲ PASS. دیتایِ canary (therapist/client/session/فایل‌ها) کامل پاک شد (تأیید شد ۰ ردیفِ باقی‌مانده).
+- **بخشِ ۳ — رفعِ ریسکِ (ب):**
+  - `public/feelia-rt.js`: `WS_WATCHDOG_MS=3000` + `startWsWatchdog` — یک `setInterval` که فقط وقتی `state===ACTIVE` و `ws.readyState!==WebSocket.OPEN` است `scheduleReconnect('watchdog-ws-not-open')` را صدا می‌زند؛ چون فقط readyStateِ خودِ WS را می‌خواند (نه cadenceِ پیام‌هایِ Soniox)، رویِ سکوتِ طبیعیِ گفتگو false-positive نمی‌دهد. شروع می‌شود کنارِ `startAutosave` در `start()`، پاک می‌شود در `clearTimers()` (همان مسیرِ finish/abort).
+  - **گاردِ همراه:** `reconnectInFlight` — چون الان سه منبعِ مستقل (`handleWSClose`، خطایِ Soniox، این watchdog) می‌توانند `scheduleReconnect` را صدا بزنند، بدونِ این گارد امکانِ دو mint/WS موازی برایِ همون قطعیِ واحد وجود داشت. پرچم دقیقاً بینِ «schedule شد» تا «connectWithFreshMint resolve شد» true است؛ retryِ داخلیِ قانونیِ خودِ تابع (که عمداً وقتی state از قبل RECONNECTING است دوباره صدا می‌زند) قبل از آن پاک می‌شود، پس مسدود نمی‌شود.
+  - **تستِ جدید:** `T19` (`FakeWS.last.readyState` مستقیم روی CLOSED، بدونِ صدازدنِ `onclose` — دقیقاً سناریویی که `serverClose` نمی‌سازد) → watchdog تشخیص داد، `state→RECONNECTING`، mint واقعاً افزایش یافت، بعدِ `serverOpen` به ACTIVE برگشت. `T19b` (کنترلِ منفی): بیش از ۳ ثانیه سکوتِ طبیعی با ws هنوز OPEN → **هیچ** reconnectِ کاذبی (mintCount ثابت ماند).
+  - **یک تله‌ی دیباگِ خودی:** اولین اجرایِ این تست‌ها با `timeout 20`/`timeout 60` به‌اشتباه «hang» تشخیص داده شد؛ با اجرایِ کاملِ بدونِ محدودیت (`time node scripts/rt-harness.cjs`) معلوم شد کلِ suite (الان با ۴۴ تست) واقعاً ~۸۸ ثانیه طول می‌کشد (بابتِ `BATCH_POLL_MS`/`FINALIZE_TIMEOUT_MS`/backoffهایِ متعددِ از قبل‌موجود، نه رگرسیونِ این تغییر) — نه یک باگِ واقعی. این در گزارش صادقانه ثبت می‌شود تا بعداً کسی دوباره فریب نخورد.
+- **تست:** `cd server && npx tsc --noEmit` تمیز. `node scripts/rt-harness.cjs` **۴۴/۴۴ PASS** (بدونِ رگرسیون رویِ ۴۰ تستِ قبلی).
+- **مستندات:** [subsystem 01](docs/07-subsystems/01-browser-realtime-engine.md) (invariantهایِ I14–I16، تصحیحِ یادداشتِ کهنه‌ی «Node فاقدِ indexedDB» که دیگر با اجرایِ واقعی نمی‌خواند)، [subsystem 02](docs/07-subsystems/02-audio-durability-batch-fallback.md)، [subsystem 03](docs/07-subsystems/03-transcript-integrity.md).
+- **هنوز باز (اعلام‌شده در audit، عمداً دست‌نخورده):** متنِ رضایت (LAW-009/C1، طبقِ دستورِ صریحِ مالک)، یک پنجره‌ی نظریِ بسیار کوچک‌ترِ باقی‌مانده (فاصله‌ی واقعیِ رخدادِ WS close تا اجرایِ handlerِ جاوااسکریپت — قابلِ‌صفرشدن نیست).
+- commit نشده (LAW-022).
+
+### 2026-09-22 — CODE + TEST — رفعِ دو FINDINGِ قبلی: Enterِ زودهنگام در مودالِ افزودنِ دارو + عدمِ syncِ دکمه‌ی «بازکردنِ همه»
+
+- **دامنه:** ادامه‌ی مستقیمِ رویدادِ قبلی. مالک بعدِ تاییدِ بصریِ دوستونه‌شدنِ کارتِ زوجین گفت: «بقیشه باگ هارو هم فیکس کن» — یعنی FINDING ۱ و ۲ی همان رویداد.
+- **کد:**
+  - **FINDING ۱ (Enterِ زودهنگام):** `public/index.html` — `onkeydown="if(event.key==='Enter'){...submitCfAddItem();}"` رویِ `#cfAddItemFields` ([public/index.html:1128](public/index.html:1128)) با `onkeydown="cfAddItemKeydown(event)"` جایگزین شد. تابعِ جدیدِ `cfAddItemKeydown`: در مودالِ `medication` فقط وقتی `event.target.id==='cfai_prescriber'` (آخرین فیلد) است submit می‌کند؛ در بقیه‌ی فیلدهایِ آن مودال فقط `preventDefault` می‌کند (بدونِ submit). در مودال‌هایِ تک‌فیلدی (axis/roadmap) مثلِ قبل بلافاصله submit می‌کند.
+  - **FINDING ۲ (syncِ دکمه):** یک خط `cfSyncAllBtn();` بلافاصله بعدِ `sec.innerHTML=html;` در انتهایِ `renderCaseFile()` اضافه شد — تابعِ موجودِ `cfSyncAllBtn` (بدونِ تغییر) حالا همان لحظه‌ی رندرِ اولیه هم صدا زده می‌شود، نه فقط بعدِ کلیکِ دستی.
+- **تست:** صفحه‌ی مستقلِ HTML در Browser pane با کپیِ عینیِ هر دو تابعِ فیکس‌شده از سورس + fixtureهایِ واقعی (مودالِ ۵فیلدیِ دارو، و ۳ `<details class="cf-axis">` با ۲تای بازِ پیش‌فرض). با `KeyboardEvent('keydown',{key:'Enter'})` واقعی رویِ هر فیلد: Enter رویِ نام/دوز/تناوب/آخرین‌تغییر submit نکرد (۰ فراخوانی)، Enter رویِ تجویزکننده submit کرد (۱ فراخوانی)، Enter در مودالِ تک‌فیلدیِ axis بلافاصله submit کرد. برایِ FINDING ۲: با ۲ از ۳ محورِ باز، `cfSyncAllBtn()` برچسب را «بازکردنِ همه» نگه داشت (چون allOpen=false)؛ بعدِ بازکردنِ هر ۳ (شبیه‌سازیِ رندرِ اولیه‌یِ پیش‌فرض‌بازِ محورهایِ حساس/نیازمندِ توجه) و فراخوانیِ دوباره‌ی `cfSyncAllBtn()`، برچسب به «جمع‌کردنِ همه» عوض شد. **۶/۶ PASS.**
+- **محدودیت‌ها (صادقانه):** تست با DOMِ واقعیِ `renderCaseFile`/سرور نبود (کپیِ عینیِ توابع در fixtureِ مستقل)؛ ریسکِ divergence اگر بعداً منطقِ اصلی تغییر کند و کپی sync نشود. تست با حساب/DB واقعی انجام نشد (ممنوع بدونِ اجازه). `cd server && npx tsc --noEmit` صدا زده نشد چون تغییر فقط در `public/index.html` (بدونِ TypeScript) بود.
+- جزئیات: [verification](verification/2026-09-22-case-file-couple-wide-split-and-findings.md) (به‌روزرسانی‌شده با این دو فیکس).
+- commit نشده.
+
+### 2026-09-22 — CODE + TEST + FINDING — دوستونه‌شدنِ کارتِ پرمحتوایِ زوجین (بدونِ جمع‌شدن) + دو FINDINGِ گزارش‌شده‌ی رفع‌نشده در مسیرِ «پرونده»
+
+- **دامنه:** سه گزارشِ مالک از UI پرونده‌ی روندِ درمان بررسی شد: (۱) ردیفِ اضافه‌یِ «در انتظار ثبت» هنگامِ افزودنِ دارو، (۲) دکمه‌ی «بازکردنِ همه»یِ محورها با برچسبِ اشتباه، (۳) بدشکلیِ بخشِ زوجین وقتی کارت خیلی بلند می‌شود. طبقِ دستورِ صریحِ مالک فقط موردِ (۳) پیاده‌سازی شد؛ (۱) و (۲) فقط ریشه‌یابی و به‌عنوانِ FINDING ثبت شدند (منتظرِ تاییدِ مالک برایِ فیکس).
+- **FINDING ۱ (رفع‌نشده):** [public/index.html:1122](public/index.html:1122) — `onkeydown` رویِ کلِ ظرفِ فیلدهایِ مودالِ افزودن، Enter را در **هر** اینپوتِ فرمِ چندفیلدیِ دارو (نه فقط آخرین فیلد) به `submitCfAddItem()` تبدیل می‌کند؛ چون فقط نامِ دارو در سرور اجباری است ([applyFieldPatch.ts:211](server/src/features/case-file/application/applyFieldPatch.ts:211))، submitِ زودهنگام با بقیه‌ی فیلدهایِ خالی موفق می‌شود و مودال می‌بندد — تراپیست دوباره باز می‌کند و کامل ثبت می‌کند ⇒ دو ردیف (یکی ناقص/pending، یکی کامل).
+- **FINDING ۲ (رفع‌نشده):** [public/index.html:4201](public/index.html:4201) — بعدِ `sec.innerHTML=html` هیچ‌جا `cfSyncAllBtn()` صدا زده نمی‌شود؛ برچسبِ دکمه‌ی «بازکردنِ همه»/«جمع‌کردنِ همه» ([public/index.html:4088](public/index.html:4088)) فقط بعدِ کلیکِ دستیِ کاربر sync می‌شود، نه بعدِ رندرِ اولیه — پس وقتی محورها به‌صورتِ پیش‌فرض باز می‌شوند، برچسب هنوز «بازکردنِ همه» نشان می‌دهد.
+- **کد (فقط موردِ ۳):** `public/index.html` — کارتِ `cf-couple-card` وقتی `items.length` (یا شمارشِ خط برایِ فیلدهایِ بدونِ `items`) به `CF_COUPLE_WIDE_MIN_ITEMS=5` برسد، کلاسِ `cf-couple-wide` می‌گیرد؛ CSSِ جدید (`@media (min-width:640px)`) این کارت را `grid-column:span 2` می‌کند و بدنه‌اش را با `column-count:2` دوستونه می‌کند، با `break-inside:avoid-column` رویِ هر `cf-rich-row`/`cf-rich-s`/`cf-rich-p` تا هیچ یافته‌ای وسط بریده نشود (و `break-after:avoid-column` رویِ `cf-role-head` تا سرتیترِ نقش از آیتمِ بعدی‌اش جدا نیفتد). کارتِ نقل‌قول (`cf-couple-quote`) و حالتِ ویرایش مستثنا هستند؛ زیرِ ۶۴۰px هیچ تغییری نیست (همان تک‌ستونیِ قبلی).
+- **تست:** صفحه‌ی مستقلِ HTML با CSSِ واقعیِ استخراج‌شده از `index.html` + دادهٔ ساختگی (۱ کارتِ کوتاه، ۱ کارتِ بلند با ۶ یافته از جمله یک متنِ چندخطی، ۱ کارتِ کوتاهِ دیگر) در Browser pane روی سرورِ استاتیکِ محلی (پورتِ 4899، خارج از repo) رندر شد. با JS واقعی تایید شد: کارتِ بلند `grid-column:span 2` گرفت (عرضِ ۵۹۷px در برابرِ ۲۹۳px کارت‌هایِ عادی) و `column-count:2` فعال شد؛ کارت‌هایِ کوتاه دست‌نخورده ماندند (`columnCount:auto`). با اندازه‌گیریِ `getBoundingClientRect` هر ردیف، تایید شد هیچ یافته‌ای وسط بریده نشده — هر ردیف (از جمله متنِ چندخطیِ ۱۶۶px‌ارتفاع) کاملاً در یک ستون ماند. **محدودیت صادقانه:** تستِ رفتارِ زیرِ ۶۴۰px (mobile) فقط با خواندنِ CSS تایید شد، نه با اجرایِ واقعی — ابزارِ resize_window رویِ این تبِ استاتیکِ محلی اثر نکرد (`window.innerWidth` بعدِ چند تلاش هنوز ۹۸۰ ماند)؛ از نظرِ کد این یک media query استانداردِ CSS است، وابسته به JS نیست.
+- **رفع‌نشده (طبقِ خواستِ مالک، فقط این نوبت):** FINDING ۱ و ۲ بالا.
+- commit نشده.
+
+### 2026-09-22 — CODE + TEST — چکِ کاملیتِ صدا (seqِ گپ‌دار) + نمایشِ صریحِ وضعیتِ Audio/Transcript در پنلِ ادمین (اولویتِ دوم از audit «zero-loss recording»)
+
+- **دامنه:** ادامه‌ی مستقیمِ رویدادِ قبلی (رفعِ باگِ duplicate). طبقِ اولویتِ اعلام‌شده‌ی مالک، دو گپِ بعدی که با هم مرتبطند یک‌جا رفع شدند: (۱) هیچ‌جا چک نمی‌شد که سگمنت‌هایِ `kind='session'` واقعاً seqِ پیوسته دارند قبل از اینکه فایلِ نهایی/دانلود ساخته شود؛ (۲) ادمین فقط یک بنرِ تجمیعیِ «N فایل در صف» می‌دید، بینِ «صدا کامل ولی رونویسی هنوز پردازش می‌شود» و «سگمنتی از صدا واقعاً گم شده» تمایزی نبود.
+- **کد:**
+  - `server/src/stt/sessionAudioArchive.ts`: تابعِ جدیدِ export‌شده‌ی `checkSeqContiguous(rows)` — فقط چک می‌کند (gapِ seq را برمی‌گرداند)، چیزی نمی‌سازد/حذف نمی‌کند؛ آرشیو fail-open دست‌نخورده ماند.
+  - `server/src/http/admin.ts`: `GET /api/admin/sessions/:id/audio` حالا `audio_status` (`none`/`syncing`/`incomplete`/`complete`، ترکیبِ `pending_count` + `checkSeqContiguous`)، `audio_missing_segments`، و `transcript_status` (`none`/`pending`/`failed`/`complete`، از رویِ `batch_status`/`realtime_reliable`/`stt_mode`ِ از قبل موجود در `sessions`) هم برمی‌گرداند؛ SELECTِ اولیه‌ی جلسه سه ستونِ بیشتر می‌خواند.
+  - `public/index.html` (`openAdminClientSessions`): یک ردیفِ کوچکِ «صدا: … / رونویسی: …» (رنگِ قرمز برایِ `incomplete`/`failed`، زرد برایِ `syncing`/`pending`) + بنرِ صریحِ «سگمنت شماره‌ی X هیچ‌وقت نرسیده» وقتی gap واقعی هست.
+- **تست:** `cd server && npx tsc --noEmit` تمیز. منطقِ `checkSeqContiguous` با ۵ سناریوی مستقل (خالی، پیوسته، یک gap وسط، ترتیبِ نامرتب، تک‌آیتمی) جداگانه اجرا شد — ۵/۵ PASS. اسکریپتِ `<script>` جدیدِ `index.html` با `new Function(...)` پارس شد — بدونِ خطایِ syntax. **محدودیت:** کلیک‌کردنِ واقعیِ این مسیر در Browser pane با حسابِ ادمین انجام نشد (خارج از دامنه‌یِ این نوبت طبقِ زمان‌بندی؛ کدِ رندر دقیقاً همان الگویِ قبلاً-تست‌شده‌ی همان تابع را دنبال می‌کند).
+- commit نشده.
+
+### 2026-09-22 — CODE + TEST — CASِ اتمیک برایِ `PUT /api/sessions/:id` (رفعِ R5؛ به دستورِ صریحِ مالک: «ادامه بده، همرو پیاده کن»)
+
+- **دامنه:** آخرین گپِ باقی‌مانده از audit «zero-loss recording» (بعدِ رفعِ duplicate transcript، چکِ کاملیتِ صدا، و فایل‌هایِ یتیم). مستندشده در [subsystem 03](docs/07-subsystems/03-transcript-integrity.md) به‌عنوانِ R5: مسیرِ CASِ اصلی (W1) یک `SELECT transcript_version` جدا داشت و بعدش یک `UPDATE` بدونِ هیچ شرطی رویِ نسخه — بینِ این دو گام یک پنجره‌ی race باز بود؛ دو PUTِ هم‌زمان با همان نسخه‌ی پایه می‌توانستند هر دو از پیش‌بررسی عبور کنند و هر دو UPDATE موفق شوند (یکی متنِ دیگری را بی‌صدا overwrite می‌کرد، بدونِ 409، بدونِ خطا).
+- **کد:** `server/src/http/sessions.ts` (`PUT /api/sessions/:id`) — پیش‌بررسیِ قبلی برایِ پیامِ 409ِ سریع نگه داشته شد، ولی گاردِ واقعی الان `AND transcript_version = ?` است که مستقیماً در WHEREِ همان UPDATEِ اصلی می‌آید (نه یک SELECTِ جدا). اگر `affectedRows=0` شود و caller نسخه فرستاده بود، یک recheck برای تشخیصِ 404 (جلسه/مالکیت نیست) در برابرِ 409 (نسخه در همین حین توسطِ نویسنده‌ی دیگری عوض شد) انجام می‌شود. callerهایِ قدیمیِ بدونِ `transcript_version` (سازگاریِ عقب‌رو، W2) دست‌نخورده ماندند — گاردِ نسخه فقط وقتی اضافه می‌شود که caller آن را فرستاده باشد.
+- **تست (روی MySQLِ لوکالِ واقعی، دیتایِ canary — therapist/client/session ساختگی، پاک‌شده بلافاصله بعدِ تست، بدونِ حساب/رمزِ واقعی):**
+  - **بازتولیدِ باگ با الگویِ قدیمی:** دو UPDATEِ هم‌زمان با baseVersion=0 و یک تأخیرِ عمدیِ ۲۰ms بینِ SELECT و UPDATE (برای بازنگه‌داشتنِ پنجره‌ی race) — هر دو `affectedRows=1` گرفتند؛ متنِ نهایی فقط متنِ نویسنده‌ی دوم بود، `transcript_version` دو واحد (نه یک واحد) جلو رفت. **باگ با کدِ قدیم تأیید و بازتولید شد.**
+  - **با کدِ فیکس‌شده:** همان دو UPDATEِ هم‌زمان (`AND transcript_version=?`) — فقط یکی `affectedRows=1` گرفت، دیگری `0`؛ `transcript_version` نهایی دقیقاً یک واحد جلو رفت؛ متنِ نهایی دقیقاً متنِ همان یک نویسنده بود (بدونِ corruption). ۳/۳ assertion PASS.
+  - `cd server && npx tsc --noEmit` تمیز. `node scripts/rt-harness.cjs` **۴۰/۴۰ PASS** (بدونِ رگرسیون؛ این تغییر سمتِ سرور است، هارنس سمتِ کلاینت را پوشش می‌دهد).
+- **هنوز باز:** اگر caller نسخه نفرستد (W2، مسیرِ legacy `endDirectLive`/`saveDirectTranscript`)، همچنان بدونِ CAS overwrite می‌کند — طبقِ طراحیِ موجود، خارج از دامنه‌یِ این فیکس (W1 تنها مسیرِ CASِ اصلی بود).
+- commit نشده (طبقِ LAW-022).
+
+### 2026-09-22 — CODE + TEST — حذفِ فایل‌هایِ یتیمِ صدا بعدِ حذفِ جلسه/مراجع/تراپیست (LAW-010؛ اولویتِ سوم از audit «zero-loss recording»)
+
+- **دامنه:** ادامه‌ی مستقیمِ همان audit. مشکلِ مستندشده در [subsystem 05](docs/07-subsystems/05-session-audio-archive-speaker-resolve.md): `ON DELETE CASCADE` رویِ `session_audio` فقط ردیفِ DB را پاک می‌کند؛ فایلِ فیزیکیِ `data/session-audio/<sessionId>/` می‌ماند و sweepِ ۱۴روزه هم نمی‌بیندش (چون ردیفِ متناظر دیگر وجود ندارد که `created_at`ش چک شود) — صدایِ یک مراجعِ حذف‌شده برایِ همیشه رویِ دیسک می‌ماند (نقضِ LAW-010 «حذفِ مراجع/جلسه باید صدای مربوط را هم پاک کند»).
+- **کد:**
+  - `server/src/stt/sessionAudioArchive.ts`: تابعِ جدیدِ export‌شده‌ی `deleteSessionAudioDirs(sessionIds)` — `rmSync` رویِ پوشه‌یِ هر sessionId، fail-open (خطایِ حذفِ فایل فقط لاگ می‌شود، عملیاتِ حذفِ DB را fail نمی‌کند).
+  - `server/src/http/sessions.ts` (`DELETE /api/sessions/:id`): بعدِ موفقیتِ DELETEِ DB صدا زده می‌شود.
+  - `server/src/http/clients.ts` (`DELETE /api/clients/:id`، حذفِ خودِ تراپیست): قبل از cascade، `SELECT id FROM sessions WHERE client_id=?` گرفته می‌شود؛ بعدِ موفقیتِ DELETE صدا زده می‌شود.
+  - `server/src/http/admin.ts` (`DELETE /api/admin/clients/:id` و `DELETE /api/admin/therapists/:id`): همان الگو؛ برایِ حذفِ تراپیست، جلسه‌هایِ همه‌ی مراجعینِ زیرِ آن تراپیست با یک JOIN جمع‌آوری می‌شوند.
+- **تست:** `cd server && npx tsc --noEmit` تمیز. تستِ واقعیِ filesystem (بدونِ DB): دو پوشه‌ی جعلی با فایلِ واقعی ساخته شد، `deleteSessionAudioDirs` با همان الگوریتم صدا زده شد — هر دو پوشه واقعاً حذف شدند؛ فراخوانی با یک id غیرموجود throw نکرد (fail-open تأیید شد).
+- **محدودیت:** تست با DELETEِ واقعیِ HTTP رویِ DB/حسابِ واقعی انجام نشد (ممنوع بدونِ اجازه؛ منطقِ SQLِ انتخابِ sessionIds با همان الگویِ query موجود در همین فایل‌ها نوشته شده، جدید نیست).
+- commit نشده.
+
+### 2026-09-22 — CODE + TEST + FINDING — رفعِ باگِ بحرانیِ duplicateِ transcript بعدِ reconnect (audit «zero-loss recording» به دستورِ صریحِ مالک؛ اولین/بزرگ‌ترین موردِ اولویت‌بندی‌شده)
+
+- **دامنه:** audit درخواستیِ مالک («ضبط/رونویسیِ زنده/بازیابیِ آفلاین») نشان داد بیشترِ اسپک از قبل در commit `df7d86b` پیاده و تست شده بود (جزئیات در audit همین گفتگو، بدونِ سندِ جدید چون چیزِ نویی کشف نشد جز یک باگِ واقعیِ باز). طبقِ دستورِ مالک («دونه‌دونه، بزرگ‌ترین باگ اول») این باگ اول رفع شد؛ متنِ رضایت (LAW-009/C1) دست‌نخورده ماند (دستورِ صریحِ مالک).
+- **باگ (INFERRED از کد، حالا CONFIRMED با تست):** در `public/feelia-rt.js`، `intent` هر سگمنتِ durable از رویِ `self.unreliable` (یک‌طرفه/سراسری، I4) محاسبه می‌شد، نه رویِ stateِ لحظه‌ای. یعنی بعدِ **یک بار** قطعیِ کوتاه و reconnectِ موفق، تمامِ سگمنت‌هایِ durableِ *بعدی* هم — حتی آن‌هایی که کاملاً در ACTIVEِ سالم ضبط شده بودند — `intent='transcript'` می‌گرفتند؛ `mergeBatchTranscript` این‌ها را با Soniox دوباره رونویسی و با append به `sessions.transcript` اضافه می‌کرد: متنِ از قبل درستِ realtime برایِ باقیِ جلسه (می‌تواند ده‌ها دقیقه باشد) دوبار در پرونده می‌آمد.
+- **رفع (۴ تغییرِ افزودنی در `public/feelia-rt.js`، بدونِ تغییرِ UI/schema/سرور):**
+  1. فرمولِ `intent` (نزدیکِ `AudioQueueDB.add`ی درونِ `onstop`ِ durable): حذفِ `self.unreliable ||`؛ فقط stateِ لحظه‌ی بستنِ همین سگمنت تعیین‌کننده است.
+  2. `scheduleReconnect`: اگر همین الان (نه یک retryِ دیگر) از ACTIVE خارج می‌شویم، سگمنتِ durableِ جاری بسته و یکیِ تازه باز می‌شود — مرزِ سگمنت دقیقاً رویِ لحظه‌ی خروج از حالتِ سالم.
+  3. `watchOnline`ِ `offlineHandler`: همان مرزبندی وقتی از ACTIVE به NETWORK_PAUSED می‌رویم.
+  4. `connectWithFreshMint` (مسیرِ موفقیتِ reconnect): وقتی `hadGap` است، سگمنتِ جاری (که تا این لحظه بازه‌ی قطعی را داشت) بسته و یکیِ تازه باز می‌شود — سگمنت‌هایِ بعدِ این نقطه دوباره `archive` می‌گیرند.
+- **تست:** `node scripts/rt-harness.cjs` — یک سناریوی جدید (`T18`) اضافه شد: قطعی → reconnect → ادامه‌ی ACTIVEِ سالم با چند چرخشِ سگمنت → پایان با `awaitBatch`؛ assertion رویِ `purpose=` واقعیِ هر آپلود (نه فقط متنِ نهایی، چونِ mockِ harness بینِ `archive`/`transcript` در صفِ batch تمایز نمی‌گذارد). **۴۰/۴۰ PASS** (۳۵ تستِ قبلی + ۵ assertionِ T18، بدونِ رگرسیون). صحت‌سنجیِ مضاعف: با برگردوندنِ موقتِ فقط خطِ فرمولِ intent (بدونِ فیکسِ ۲–۴)، T18 دقیقاً طبقِ انتظار FAIL شد (۷ از ۸ سگمنت به‌جایِ ۱ تا با `purpose=transcript` آپلود می‌شدند) — تأییدِ اینکه تست واقعاً همین باگ را می‌گیرد، نه یک false-positive.
+- **هنوز باز (گزارش‌شده در audit، خارج از این تغییر):** چکِ کاملیتِ صدا (gap/duplicate seq) قبل از COMPLETE، نبودِ فیلدهایِ صریحِ Audio/Transcript در UI ادمین، فایل‌هایِ یتیمِ صدا بعدِ cascade delete، CASِ غیرِاتمیک (R5) — این‌ها در نوبتِ بعدی طبقِ اولویتِ اعلام‌شده‌ی مالک قرار دارند.
+- commit نشده (طبقِ LAW-022، فقط به درخواستِ مالک).
+
+### 2026-09-22 — TEST + FINDING + CODE — تستِ عمیق‌ترِ مسیرِ «افزودنِ ردیف» + رفعِ باگِ دومِ کشف‌شده (به دستورِ صریحِ مالک: «میخوام لوکال کامل مسیر رو تست کنی»)
+
+- **دامنه:** ادامه‌ی مستقیمِ رویدادِ قبلی، دورِ دومِ تست با همان mock (منطقِ واقعیِ سرور، دادهٔ canary، بدونِ حسابِ واقعی — مالک با AskUserQuestion همین گزینه را به‌جایِ سرورِ dev/DBِ واقعی انتخاب کرد چون ورودِ رمز/ساختِ حساب ممنوع است).
+- **مسیرهایِ اضافه‌ی تست‌شده:** validationِ عنوانِ خالی/whitespace (بدونِ فراخوانیِ API، مودال باز می‌ماند)، دکمه‌ی انصراف (بدونِ ثبتِ چیزی)، طولِ بیش‌ازحدِ گام (۲۰۱ نویسه ⇒ ۴۰۰ از سرور، بدونِ ردیفِ ناقص)، کاراکترهایِ خاص/HTML در نامِ دارو (escapeِ صحیح هم در نمایش هم در attributeِ `data-cf-med-name`، بدونِ تزریق)، نمایِ موبایلِ دارو (هم‌خوان با دسکتاپ)، حذفِ محورِ دارایِ ویرایشِ درجایِ فعال (بدونِ اشاره‌ی آویزان)، افزودنِ دو آیتمِ پشتِ‌سرِهم بدونِ ذخیره (فقط آخری textareaِ درجا می‌گیرد؛ اولی بدونِ کرش به نمایِ «در انتظار ثبت» برمی‌گردد — رفتارِ شناخته‌شده، نه باگ).
+- **باگِ دومِ کشف‌شده:** `saveCfNewItemField` گاردِ خالی نداشت — ذخیره‌ی محور/گامِ تازه بدونِ تایپِ چیزی یک PATCHِ `action:'edit', value:''` می‌فرستاد که فیلد را **برایِ همیشه** `pending:false, reviewedByTherapist:true` می‌کرد (همان طبقه‌ی باگی که `saveCaseFileEdits` از قبل صریحاً گاردش کرده بود، ولی در مسیرِ تازه کپی نشده بود؛ regenerateِ بعدی دیگر نمی‌توانست این فیلد را پر کند).
+- **رفع:** گاردِ `if(!value.trim()){dismissCfNewItem();return;}` در `saveCfNewItemField` (هم‌خوان با کامنتِ مشابه در `saveCaseFileEdits`). دوباره تست شد: ذخیره‌ی خالی/whitespace دیگر PATCH نمی‌زند؛ فیلد `pending:true` باقی می‌ماند.
+- **تست:** `cd server && npx tsc --noEmit` تمیز. `pnpm test:cf` **۱۰۰ PASS / ۰ FAIL** (بعدِ رفعِ باگِ دوم).
+- **هنوز باقی:** تست با DB/سرورِ واقعی و حسابِ واقعی انجام نشد (ممنوع بدونِ اجازه‌ی صریح)؛ commit نشده.
+- جزئیات: [verification](verification/2026-09-22-case-file-add-item-ui-and-medication-rename.md) (بخشِ «دورِ دومِ تست»).
+
+### 2026-09-22 — CODE + TEST + FINDING — رفعِ UI و باگ‌هایِ مسیرِ «افزودنِ ردیف» در پرونده‌ی روندِ درمان (دارو/محور/گام)
+
+- **دامنه (تصمیمِ صریحِ مالک):** فقط مسیرِ افزودن؛ دکمه‌ی سراسریِ «ویرایش» دست‌نخورده ماند. نامِ دارو هم قابلِ ویرایش شد، ولی فقط برایِ ردیفِ افزوده‌شده‌ی دستی (`addedByTherapist===true`) — `name` همچنان `string` ساده است، نه یک `CaseFileField` کامل (برایِ حداقلِ تغییر؛ schema/promptِ LLM و `mergeTherapistEdits.ts` دست‌نخورده‌اند).
+- **مشکلِ گزارش‌شده:** افزودنِ دارو/محور/گام با `prompt()` خامِ مرورگر بود (فقط یک فیلد، بدونِ سیستمِ دیزاین)؛ بعدِ افزودن `addCaseFileItem()` فلگِ سراسریِ `caseFileEditMode=true` می‌کرد و **کلِ سند** (نه فقط ردیفِ تازه) وارد حالتِ ویرایش می‌شد؛ بدونِ scroll/highlight به ردیفِ تازه؛ نامِ دارو بعدِ ثبت هیچ‌جا قابلِ‌ویرایش نبود.
+- **کد:**
+  - `server/.../applyFieldPatch.ts`: `optionalText()` (زیرفیلدهایِ اختیاریِ دارو، بدونِ throw روی خالی) — افزودنِ دارو حالا دوز/تناوب/آخرین‌تغییر/تجویزکننده را هم‌زمان می‌گیرد نه فقط نام؛ شاخه‌ی `key==='name'` در `applyFieldPatch` (فقط `addedByTherapist===true`، فقط `action==='edit'`، وگرنه ۴۰۰).
+  - `public/index.html`: مودالِ استانداردِ جدید `#cfAddItemModal` (هم‌شکلِ `editCategoryModal`، در `MODAL_CLOSERS` برایِ Escape/کلیکِ پس‌زمینه)؛ `openCfAddItemModal`/`openCfRenameMedModal`/`submitCfAddItem`/`findNewItemId` (تطبیق با تفاضلِ id، نه «آخرینِ آرایه» — roadmap بعدِ افزودن sort می‌شود)؛ `cfPendingNewItem` (state محدود به یک آیتم؛ **نه** `caseFileEditMode`) + `cfInlineEditHtml`/`saveCfNewItemField`/`dismissCfNewItem` برایِ محور/گام (دارو چون مودال همه‌چی را گرفته نیازی ندارد)؛ `cfFocusNewItem` (refactor از منطقِ قبلیِ `cfGoto`) برایِ scroll+flashِ ردیفِ تازه؛ `cfRenameBtn` (فقط رویِ دارویِ دستی‌افزوده‌شده).
+- **باگِ کشف‌شده و رفع‌شده حینِ تستِ همین تغییر:** `submitCfAddItem` اولیه از `currentCaseFile.record.axes/medication/roadmap` می‌خواند، در حالی که آرایه‌ها زیرِ `currentCaseFile.record.content.*` هستند؛ نتیجه `findNewItemId` همیشه `null` بود ⇒ داده در سرور درست ثبت می‌شد ولی محور/گامِ تازه هرگز حالتِ ویرایشِ درجا نمی‌گرفت و scroll/highlight اجرا نمی‌شد. با ارجاع به `.content.*` رفع و دوباره تست شد.
+- **تست:** `cd server && npx tsc --noEmit` تمیز. `pnpm test:cf` **۱۰۰ PASS / ۰ FAIL** (بدونِ رگرسیون؛ این harness تستِ اختصاصیِ مسیرِ جدید ندارد).
+- **UI با mock (منطقِ واقعیِ `applyFieldPatch`/`addCaseFileItem`/`removeCaseFileItem`، `public/` واقعی، دادهٔ canary):** افزودنِ دارو با هر ۵ فیلد ⇒ فقط همان ردیف اضافه شد، `caseFileEditMode` تمامِ مدت `false`، ردیف flash شد؛ افزودنِ محور/گام ⇒ فقط همان یک آیتم textareaِ درجا گرفت (`document.querySelectorAll('textarea').length===1`)، بقیه‌ی سند دست‌نخورد؛ «فعلاً نه» فقط stateِ pending را پاک کرد (آیتمِ خالی نگه‌داشته شد)؛ دکمه‌ی «ویرایشِ نام» فقط رویِ دارویِ دستی‌افزوده ظاهر شد، رویِ دارویِ AI اصلاً رندر نشد؛ **نگهبانِ سمتِ سرور مستقلاً با `fetch` مستقیم تأیید شد** (تلاش برایِ rename دارویِ AI ⇒ ۴۰۰)؛ دکمه‌ی سراسریِ «ویرایش» رگرسیون نداشت (۲۰ فیلد، ذخیره‌ی موفق).
+- **محدودیت:** کلیکِ مستقیمِ ماوس با مختصات چند بار به‌خاطرِ اسکرولِ خودکارِ Browser pane ناموفق بود؛ تعامل‌ها با کلیکِ مبتنی‌بر `ref` و فراخوانیِ مستقیمِ همان توابعِ کلیک‌شونده انجام شد (نه صرفاً فرض). تست با DB/حسابِ واقعی و commit انجام نشد (طبقِ قانون).
+- جزئیات: [verification](verification/2026-09-22-case-file-add-item-ui-and-medication-rename.md).
+
+### 2026-09-20/22 — CODE + TEST — مدلِ بالینیِ تأییدشده، دسته‌یِ سوم و پایانی: ارجاعِ متقاطع + قبل/اکنونِ ردیفی + جابه‌جاییِ یافته + ارتقایِ پرونده‌یِ قدیمی (به دستورِ صریحِ مالک: «تموم کن کارو کامل اصلاح کن»)
+
+- **دامنه:** طبقِ اجازه، commit و تست با حسابِ واقعی (LAW §۶) انجام نشد؛ بقیه‌ی موارد از مدلِ تأییدشده تکمیل شد.
+- **ارجاعِ متقاطع (`CaseFileRef`):** `dedupeSingleHome` حالا به‌جایِ حذفِ خاموش، یک ارجاعِ کوچک (`{label, where, findingId}`) به «خانه»ی واقعیِ فکت می‌سازد. `DraftAxis`/`DraftRelationshipField.refs?`؛ merge با محورِ تاییدشده هم‌گام (`refs` را نگه می‌دارد)؛ `edit`/`accept-suggestion` آن را پاک می‌کند (نمایشِ کهنه نماند). UI: `cfRefsHtml` + `cfGoto` (اسکرول + باز‌کردنِ `<details>` مقصد اگر بسته بود + flashِ ۱٫۸ثانیه‌ای با `data-cf-id`).
+- **«قبل/اکنون» ردیفی (`changeRows`):** schema/prompt (قاعده‌ی ۲۲) از دو جعبه به آرایه‌ی `changes:[{label,before,after,factIds}]` عوض شد؛ `finalizeChanges` (کد): trim، حذفِ ردیفِ کاملاً خالی، سقفِ ۳، `changeOverTime` از ردیفِ اول مشتق (سازگاریِ عقب‌رو با UI/merge/پرونده‌هایِ قدیمی). ردیف = «خانه‌ی کامل»ِ تغییر با بالاترین اولویت در dedupe (قبل از زوجین/خانواده) — فکتِ همان تغییر در محور تکرار نمی‌شود، فقط ارجاع می‌آید. UI: هر ردیف یک جعبه‌ی قبل/اکنون؛ ردیفِ اول برجسته (`.main`)؛ حالتِ ویرایش به دو جعبه‌ی قدیمی برمی‌گردد (فقط ردیفِ اصلی قابلِ‌ویرایش) + یادداشتِ توضیح؛ approve/edit روی `changeOverTime.before/after` ردیف‌هایِ ناهم‌خوان را حذف می‌کند (edit)، approve نه.
+- **جابه‌جاییِ یافته (`move`):** فقط یافته‌ی محور (نه زوجین/خانواده). `applyFieldPatch`: `finding.<id>` با `action:'move', value:'<axisId>:<role>'`؛ `rebuildAxisValue` (جدید در `findings.ts`) بدنه‌ی مبدأ/مقصد را از رویِ `items` دوباره می‌سازد و سطرِ «خلاصه:» را حفظ می‌کند؛ محورِ تاییدشده/ویرایش‌شده بازنویسی نمی‌شود. `movedTo` روی یافته ذخیره و `mergeTherapistEdits.reapplyMoves` آن را بعدِ هر regenerate دوباره اعمال می‌کند (شناسه‌ی یافته پایدار/hash است)؛ اگر یافته یا محورِ مقصد در خروجیِ تازه نبود، بی‌اثر می‌ماند (نه کرش، نه گم‌شدنِ اطلاعات). UI: پنلِ کوچکِ بسته‌شده (سه‌نقطه) کنارِ هر یافته‌ی محور با انتخابِ محور/نقش.
+- **ارتقایِ پرونده‌یِ قدیمی (`upgradeLegacyContent.ts`، جدید):** تابعِ خالص، بدونِ LLM/بازتولید. فقط فیلدِ دست‌نخورده‌ی AI (نه ویرایش/تاییدِ تراپیست، نه pending) با برچسب‌هایِ قدیمیِ prompt (شرح وضعیت/نقل‌ها و شواهد/نکته برای جلسه/…) parse و به `items` تبدیل می‌شود؛ `value`/`body`ی ذخیره‌شده دست‌نخورده می‌ماند. دو جعبه‌ی قدیمیِ قبل/اکنون (اگر هر دو دست‌نخورده‌ی AI) به یک `changeRow` تبدیل می‌شود. **بدونِ `factIds`** ⇒ dedupe/ارجاعِ متقاطع/نکاتِ کلیدیِ خودکار برایِ این پرونده‌ها اعمال نمی‌شود (محدودیتِ مستند؛ بازتولیدِ کامل تنها راهِ کامل است). endpoint: `POST /api/clients/:id/case-file/upgrade` (ایدمپوتنت، `{case_file, upgraded}`). UI: دکمه‌ی «ارتقای ساختار» فقط وقتی چیزی برایِ ارتقا هست (`cfNeedsUpgrade`) و فقط در حالتِ مشاهده، با تاییدِ صریح.
+- **تست:** `pnpm test:cf` **۱۰۰ PASS / ۰ FAIL** (O1–O4 ارجاع، P1–P7 ردیف، Q1–Q7 ارتقا، R1–R8 جابه‌جایی). mutation (هر کدام برگردانده شد): خاموش‌کردنِ `refs` ⇒ O1/O3/O4/P4 FAIL؛ خاموش‌کردنِ خانه‌یِ ردیف ⇒ P4 FAIL؛ سست‌کردنِ نگهبانِ ارتقا ⇒ Q3 FAIL؛ خاموش‌کردنِ `reapplyMoves` ⇒ R6 FAIL. `tsc --noEmit` تمیز؛ `pnpm test:rt` ۳۵ PASS/۰ FAIL؛ syntax اسکریپتِ inline سالم (`vm.Script`، دوبار تأیید‌شده بعدِ رفعِ چند باگِ ابزاریِ escaping).
+- **UI روی mock با منطقِ واقعیِ سرور (`applyFieldPatch`/`upgradeLegacyContent` واقعی):** پرونده‌ی قدیمی ⇒ دکمه‌ی ارتقا دیده می‌شود، بعدِ کلیک ۶ بخش ارتقا یافت و ستاره/پنلِ انتقال ظاهر شد؛ ستاره‌گذاری و `move` هر دو با یک PATCHِ واقعی کار کردند؛ کنسول بدونِ خطای جدید؛ `overflowX=false`. **باگِ ابزاری کشف‌شده:** `confirm()` در Browser pane خودکار لغو می‌شود (نه تاییدِ دستیِ کاربر) — برایِ تستِ خودکار موقتاً override شد؛ رفتارِ خودِ کد تغییر نکرد.
+- **هنوز باقی (صادقانه):**
+  - commit نشده (به انتظارِ اجازه‌ی صریح).
+  - تست با DB/سرورِ واقعی و پرونده‌ی end-to-endِ کامل انجام نشده (نیازمندِ حساب — ممنوع بدونِ اجازه).
+  - نقلِ عینی در محورها فقط با پرامپت است، نه کد (مثلِ زوجین).
+  - قاعده‌ی باز/بستنِ نقشه‌ی راه/ابهام‌ها هنوز به‌صراحت پیاده نشده (فعلاً همیشه در سطحِ ۱).
+  - ارتقایِ پرونده‌یِ قدیمی چیزِ «یتیم» تولید نمی‌کند (چون factIds ندارد) — این یک compromiseِ آگاهانه است، نه باگ.
+  - Browser pane چند بار در این نشست بی‌صدا بسته/mock متوقف شد؛ verification همین محدودیت را ثبت می‌کند.
+- جزئیات: [verification](verification/2026-09-20-case-file-refs-changes-move-upgrade.md).
+
+### 2026-09-20 — CODE + TEST + FINDING — مدلِ بالینیِ تأییدشده، دسته‌یِ دوم: «۱ تا ۳ نکته‌ی کلیدی» + رفعِ شکستِ خاموشِ digestِ بدونِ فکت (به دستورِ صریحِ مالک: «ادامه بده»)
+
+- **طراحی:** نکته‌ی کلیدی = **اشاره‌گر** به یک یافته (نه کپیِ متن) ⇒ «هر فکت یک خانه‌ی کامل». متنِ کامل فقط در بخشِ «نکات کلیدی» (سطحِ orientation، بالایِ «دارو») می‌آید و در محورش فقط یک سطرِ ارجاع می‌ماند. مدل فقط `factIds` می‌دهد؛ کد آن را به یافته‌ی نهایی با بیشترین همپوشانیِ فکت وصل می‌کند (بعد از dedupe و بازیابیِ یتیم‌ها؛ `key_people` نکته‌ی کلیدی نمی‌شود؛ حداکثر ۳، بدونِ تکرار).
+- **داده/سرور:** `types.ts` (`RawKeyPoint`، `CaseFileDraft.keyPointIds`، `CaseFileContent.keyPoints?: {ids, edited}`)، `caseFileJsonSchema.ts` (`keyPoints` الزامی)، `validate.ts`، `findings.ts` (resolve)، prompt قاعده‌ی ۲۷ (۱–۳ نکته؛ فقط ارجاع؛ خطرِ ایمنی جایش بنر است)، `mergeTherapistEdits.ts` (`edited=true` ⇒ regenerate عوض نمی‌کند؛ `force` ⇒ از نو)، `applyFieldPatch.ts` (`finding.<id>` با `pin|unpin`؛ سقفِ `MAX_KEY_POINTS=3`؛ یافته‌ی ناموجود/عملیاتِ دیگر ⇒ خطای واضح؛ ورودی immutable)، مستنداتِ `api-catalog.md`.
+- **UI (`public/index.html`):** بخشِ «نکات کلیدی» با کارت‌هایِ چیپ‌دار + محلِ اصلی؛ ستاره (SVG درون‌خطی) روی هر یافته برایِ pin/unpin؛ سطرِ ارجاع در محور؛ محافظِ «پاسخِ دیررسیدِ مراجعِ دیگر» در `toggleKeyPoint`؛ پرونده‌یِ قدیمی (بدونِ `keyPoints`) بخش را پنهان و ستاره‌ها را نگه می‌دارد؛ شناسه‌یِ معلق کرش نمی‌دهد.
+- **تستِ UI روی منطقِ واقعیِ سرور (mock با `applyFieldPatch` واقعی):** ۲ کارت قبل از «دارو»؛ pin سوم ⇒ ثبت (`edited=true`)؛ pin چهارم ⇒ **رد با پیامِ «حداکثر 3»** و وضعیت بدونِ تغییر؛ unpin ⇒ درست؛ لاگِ درخواست‌ها فقط سه PATCHِ مورد انتظار؛ کنسول بدونِ خطا؛ `overflowX=false`. **Browser pane پنهان ⇒ قضاوتِ بصری انجام نشد.**
+- **یافته‌یِ مهم (شکستِ خاموش، در اجرایِ واقعی):** یک بار `digestFacts=0` (و `keyPoints=0`): مرحله‌ی اول فقط `correctedText` داد. پرونده سالم ساخته شد ولی **کلِ ضمانتِ مکانیکی (شناسه/یتیم/dedupe/نکاتِ کلیدی) چیزی برایِ ردیابی نداشت** و هیچ چکی آن را نمی‌گرفت. رفع: `checkDigestCoverage` حالا «جلسه‌ی دارای ورودی با facts خالی» و «جلسه‌ی غایب در digest» را تخلف می‌داند ⇒ `digestWithRepair` یک retry می‌کند (اگر باز خالی بود، خطا نمی‌دهد).
+- **یافته‌یِ جزئی (رفع‌شده):** فکتِ یتیم با `about` عمومیِ «مراجع» برچسبِ «مراجع» می‌گرفت (در اجرایِ واقعی یک نکته‌ی کلیدی همین برچسب را داشت). حالا `about`ِ عمومی نادیده و برچسب از ابتدایِ متن ساخته می‌شود.
+- **تست:** `pnpm test:cf` **۷۴ PASS / ۰ FAIL** (L1–L11 نکات کلیدی، M1–M6 digest بدونِ فکت، N1 برچسب). mutation (هر کدام برگردانده شد): حذفِ resolve ⇒ ۵ FAIL؛ حذفِ سقفِ ۳ ⇒ L7؛ merge بدونِ حفظِ ویرایش ⇒ L6؛ حذفِ چکِ facts خالی ⇒ M1/M4/M5. `tsc` تمیز؛ `pnpm test:rt` ۳۵ PASS / ۰ FAIL؛ syntax اسکریپتِ inline سالم.
+- **مدلِ واقعی (مسیرِ کامل، متنِ ساختگی):** اجرایِ ۱: digest بدونِ فکت (بالا)، ۲۷۱ث. اجرایِ ۲ (digest با ۲۱ فکت، ۱۴ نقل): **۳ نکته‌ی کلیدی، هر سه وصل شدند** (میزانِ خوابِ فعلی، بستری‌شدنِ پدر، و «ردِ افکارِ خودکشی» که در محورِ «سایر موارد» بود و برچسبش اشتباه). ۱۰/۱۰ فکتِ کاشته‌شده؛ ۳۴۶ث (digest ۱۰۹ + compose ۲۳۶؛ retryِ compose به‌خاطرِ بودجه‌ی ۵ دقیقه رد شد و بازیابیِ کدی اعمال شد). ⚠️ **کیفیتِ انتخاب:** ردِ خودکشی به‌عنوانِ «نکته‌ی کلیدی» انتخاب شد؛ این نتیجه‌یِ منفی بهتر است در محورِ «ایمنی» باشد و نه یک نکته‌ی کلیدی؛ قاعده‌یِ ۲۷ آن را نبسته (فقط prompt). نمونه‌ی کم؛ اثباتِ کیفیت نیست.
+- **هنوز باقی از مدلِ تأییدشده:** «قبل/اکنون» به‌صورتِ ردیفِ موازی، ارجاعِ متقاطع، `move` (جابه‌جاییِ یافته)، قاعده‌یِ باز/بسته‌یِ نقشه‌یِ راه و ابهام‌ها، مهاجرتِ پرونده‌هایِ قدیمی؛ چکِ معنایی برایِ نکات (نتیجه‌ی منفیِ ایمنی)؛ تست با DB/سرورِ واقعی؛ بررسیِ بصریِ واقعی؛ commit.
+- جزئیات: [verification](verification/2026-09-20-case-file-key-points.md).
+
+### 2026-09-20 — CODE + TEST — مدلِ بالینیِ تأییدشده، دسته‌یِ اول: نقش‌هایِ بیشتر + ترتیبِ محورها + باز/بسته بر اساسِ اهمیت (به دستورِ صریحِ مالک: «اوکیه ادامه بده»)
+
+- **تصمیم‌هایِ مالک در این گفتگو:** پیشنهادِ A–E تأیید شد؛ «همه بسته» رد شد («چیزهایی که احتیاج دارد باز باشد؛ کلیکِ اضافه نباشد») ⇒ باز/بسته بر اساسِ اهمیتِ بالینی. دو پارامترِ باز را خودم انتخاب کردم و اعلام کردم: **سقفِ بازبودن ۴ محور**، **فقط آخرین جلسه باز**.
+- **نقش‌ها ۱۰ ⇒ ۱۶:** افزوده شد: `impact` (تأثیر بر عملکرد)، `cognition` (افکار و باورها)، `coping` (راهبردهایِ مقابله)، `treatment_history` (سابقه‌ی درمان)، `treatment_response` (پاسخ به مداخله)، `goals` (اهداف و ارزش‌ها). واژگان در ۴ جا یکسان اعمال شد (`types.ts`، `caseFileJsonSchema.ts`، prompt قاعده‌ی ۱۹، `CF_ROLE` در `public/index.html`) و **تستِ هم‌خوانیِ K1** آن‌ها را با هم مقایسه می‌کند (ترتیب/محتوا/برچسبِ UI/حضور در prompt) تا از هم جدا نیفتند. نقشِ بدونِ داده همچنان نمایش داده نمی‌شود.
+- **ترتیبِ محورها (کد):** `finalizeDraft`: حساس ← نیازمندِ توجه ← مطلوب، «سایر موارد» همیشه آخر؛ sort پایدار (ترتیبِ هم‌لحن‌ها = ترتیبِ مدل). UI (`cfSortAxes`) همین را برایِ **پرونده‌هایِ قدیمی** اعمال می‌کند.
+- **باز/بسته (UI):** محورِ حساس/نیازمندِ توجه باز تا سقفِ ۴ (`CF_MAX_OPEN_AXES`)، «مطلوب» بسته؛ فقط آخرین جلسه باز؛ کلیدِ «بازکردنِ همه/جمع‌کردنِ همه» (برچسبش با وضعیت هم‌گام)؛ انتخابِ دستیِ تراپیست در `localStorage` (به‌ازایِ هر مراجع، فقط در همین مرورگر، با try/catch) بر پیش‌فرض غالب است. **ذخیره فقط با کلیک روی summary** (نه رویدادِ toggle) تا بازشدنِ پیش‌فرض «انتخابِ کاربر» حساب نشود. حالتِ ویرایش همه را باز می‌کند.
+- **تست:** `pnpm test:cf` **۵۶ PASS / ۰ FAIL** (K1–K4 جدید)؛ mutation: حذفِ sort ⇒ K3 FAIL؛ حذفِ یک نقش از UI ⇒ K1 FAIL؛ هر دو برگردانده شد. `tsc` تمیز؛ `pnpm test:rt` ۳۵ PASS / ۰ FAIL؛ syntax اسکریپتِ inline سالم.
+- **UI (mock + `public/` واقعی، fixtureِ ۷ محورِ متنوع/۳ جلسه از همین کد):** پیش‌فرض: ۱ حساس + ۳ توجه باز، توجهِ پنجم و ۲ مطلوب بسته، فقط جلسه‌ی ۳ باز؛ دو کلیکِ کاربر ⇒ فقط ۲ کلید ذخیره (نه ۴ پیش‌فرض)؛ بعد از بازرندر و **reload** انتخاب می‌ماند؛ «بازکردنِ همه/جمع‌کردنِ همه» درست؛ پرونده‌یِ قدیمیِ وارونه/نامرتب ⇒ مرتب؛ کنسول بدونِ خطا؛ `overflowX=false`. **Browser pane پنهان ⇒ قضاوتِ بصری انجام نشد.**
+- **باگ‌هایِ ابزاریِ خودم (بدونِ اثر بر کد):** (۱) ابزارِ Bash بک‌اسلش‌هایِ اسکریپتم را می‌خورد و نقل‌قول‌هایِ `onclick` را خراب کرد ⇒ syntax error؛ با خواندنِ کلید از `data-cf-k` (بدونِ escape) رفع و با `vm.Script` تأیید شد. (۲) `public/index.html` فایلِ CRLF است و anchorهایِ `\n` نمی‌خورد ⇒ اسکریپتِ ویرایش CRLF را حفظ می‌کند.
+- **هنوز باقی از مدلِ تأییدشده:** ۱–۳ نکته‌یِ کلیدی (داده + patch + UI)، «قبل/اکنون» به‌صورتِ ردیفِ موازی، ارجاعِ متقاطع، `move`، مهاجرتِ پرونده‌هایِ قدیمی؛ قاعده‌یِ باز/بسته‌یِ نقشه‌یِ راه و ابهام‌ها؛ تست با DB/سرورِ واقعی؛ بررسیِ بصریِ واقعی؛ commit.
+- **مدلِ واقعی (adapterِ پروژه، مسیرِ کاملِ digest←compose، متنِ خامِ ساختگی، ۳ اجرا بعد از این تغییرات):** schemaِ ۱۶ نقشی پذیرفته شد و نقش‌هایِ تازه (`coping`، `treatment_response`) استفاده شد؛ محورها بر اساسِ لحن مرتب شدند؛ ۱۰ از ۱۰ فکتِ کاشته‌شده در هر ۳ اجرا. ⚠️ **یافته‌یِ ایمنی:** در اجرایِ دوم بنرِ ایمنی با «رد‌شدنِ افکارِ خودکشی» پر شد (خطایِ شدتِ بالینی: بنرِ قرمز برایِ خطرِ «موجود» است). رفع: جمله‌یِ صریح در prompt قاعده‌یِ ۱۰ («رد‌کردنِ خطر نشانه‌یِ خطر نیست؛ نتیجه‌یِ منفی فقط به‌صورتِ یافته در axes»). اجرایِ سوم: `safetyRisk` خالی و نتیجه‌یِ منفی در محورِ «ایمنی»(مطلوب). **یک نمونه‌ی بعد از رفع؛ کافی برایِ اثبات نیست** و چکِ کدی ندارد (قضاوتِ معنایی است). ⚠️ **زمان:** کل ۲۸۸ث ⇒ ۴۰۷ث (digest ۳۴۵ث) ⇒ ۸۶ث (digest ۳۳ث + compose ۵۳ث)؛ واریانس زیاد است و heartbeat/`low` آن را نمی‌بندد.
+- جزئیات: [verification](verification/2026-09-20-case-file-roles-order-openclose.md).
+
+### 2026-09-20 — CODE + TEST + FINDING — رفعِ ریسکِ زمانِ تولید (۲۶۲–۷۸۹ث) — heartbeat حینِ فراخوانی + سقفِ reasoning (به دستورِ صریحِ مالک: «آره حل کن»)
+
+- **مشکل:** مرحله‌ی ۲ در نمونه‌ها ۲۶۲ / ۲۹۳ / ۴۶۶ ثانیه شد و قفلِ ۸ دقیقه‌ایِ `GENERATING_LOCK_TTL_MS` فقط «قبل» از هر فراخوانی تمدید می‌شد ⇒ فراخوانیِ کندتر از ۸ دقیقه اجازه‌ی تولیدِ هم‌زمانِ دوم می‌داد.
+- **علتِ ریشه‌ای (آزمونِ واقعی، همان مدل، دادهٔ ساختگی، ۵ اجرا):** کندی از «خروجیِ بلند» یا reasoning پیش‌فرضِ کنترل‌نشده بود، نه از پرامپت: اجرایِ base = **۷۸۹ث، ۱۷٬۳۶۸ توکن که ۱۴٬۱۳۲ تایش reasoning پنهان**؛ اجراهایِ `reasoning_tokens=0`: ۱۸۴–۲۷۸ث با ۲٫۳–۳٫۴ هزار توکن (~۱۰–۱۵ توکن/ث). مسیریابیِ provider (`sort: throughput|latency`) اثرِ معناداری نشان نداد (هر دو Morph، ۱۸۵/۲۱۵ث)؛ اعمال نشد.
+- **کد:**
+  - `repairLoop.ts`: `withBeat` — `beforeCall` (تمدیدِ قفل) قبل از هر فراخوانی و **هر ۳۰ثانیه در حینِ آن** (`HEARTBEAT_MS`)، بعد از پایان/خطا timer پاک می‌شود؛ خطایِ heartbeat (مثلاً DB) تولید را نمی‌کشد.
+  - `generateCaseFile.ts`: `GENERATING_LOCK_TTL_MS` ۸ ⇒ **۴ دقیقه** (اکنون «مدتِ بی‌heartbeat» است؛ تولیدِ زنده هر قدر کند قفلش نمی‌پرد؛ crash زودتر آزاد می‌شود).
+  - `openrouter.adapter.ts` + `chatJson.ts`: `OPENROUTER_REASONING_EFFORT` (پیش‌فرض **`low`**؛ `minimal|low|medium|high|default`) به هر دو فراخوانی؛ `timeout` صریحِ ۱۰ دقیقه؛ `maxRetries=2` (پیش‌فرضِ SDK — کاهش به ۱ در آزمون با ECONNRESET گذرا شکست خورد و برگردانده شد). `resolveReasoningBody` export و تست‌شده.
+  - مستندات: `docs/02-reference/configuration-catalog.md` (متغیرِ جدید).
+- **تست:** `pnpm test:cf` **۵۲ PASS / ۰ FAIL** (I1–I4 heartbeat، J1–J2 reasoning)؛ mutation: حذفِ timerِ heartbeat ⇒ I1 و I4 FAIL، برگردانده شد. `tsc` تمیز؛ `pnpm test:rt` ۳۵ PASS / ۰ FAIL.
+- **مسیرِ کاملِ واقعی (adapterِ خودِ پروژه، متنِ خامِ ساختگی با خطایِ ASR، `digestWithRepair`+`composeWithRepair`):** digest **۱۰۲ث** + compose **۱۸۶ث** = **۲۸۸ث**؛ ۱۱ heartbeat؛ ۱۰ از ۱۰ فکتِ کاشته‌شده در پرونده؛ بنرِ ایمنی درست خالی (مراجع خودکشی را رد کرده بود). ⚠️ یک اجرایِ قبلی با **ECONNRESET** (قطعِ گذرایِ شبکه) شکست خورد ⇒ علتِ برگشتِ `maxRetries`.
+- **هنوز باقی:** نمونه‌ها کم‌اند (یک اجرایِ کامل)، نه میانگین؛ تایمِ‌اوتِ کلاینت (`timeoutMs:600000`، index.html) در بدترین حالت (دو مرحله × ۱۰ دقیقه) همچنان کوتاه‌تر است؛ اثرِ `low` روی کیفیتِ digest فقط با یک اجرا سنجیده شد؛ تست با DB/سرورِ واقعی؛ commit.
+- جزئیات: [verification](verification/2026-09-20-case-file-latency-heartbeat.md).
+
+### 2026-09-20 — CODE + TEST + FINDING — بازطراحیِ «یافته» — گامِ ۲: تعمیم به محورها (axes) و خانواده + قاعده‌ی «یک فکت = یک خانه‌ی کامل» (به دستورِ صریحِ مالک: «برای سایر بخش‌ها هم؛ با توجه به محتوا»)
+
+- **انگیزه:** پرسشِ مالک: «برای بقیه‌ی بخش‌ها هم همین را انجام دادی؟ متنِ زیاد نشود؛ حفظِ اطلاعات + کاهشِ بارِ شناختی». پاسخ قبل از این گام «نه» بود (فقط زوجین).
+- **محورها:** هر محور = `summary` (فقط یک سطرِ عنوانِ اسکن‌پذیر) + `items[]`؛ هر یافته یک **نقشِ بالینی از واژگانِ ثابتِ ۵P** دارد (`FINDING_ROLES`: state، evidence، predisposing، precipitating، maintaining، protective، change، unknown، session_note، other). نقش را مدل **بر اساسِ محتوا** انتخاب می‌کند؛ نقشِ بدونِ داده نمایش داده نمی‌شود (ردیفِ خالی در هر محور شلوغی است) و ترتیبِ نقش‌ها را کد ثابت می‌کند. `body` مشتق می‌شود (سطرِ «خلاصه:» + یافته‌ها) ⇒ gist/ویرایش/پرونده‌هایِ قدیمی بی‌تغییر.
+- **خانواده:** همان مکانیزمِ زوجین (`items`؛ schema مشترک `coupleGroupSchema`).
+- **کد:** `finalizeCouple` ⇒ `finalizeDraft` (`domain/findings.ts`) برایِ زوجین+خانواده+محورها. ردیابیِ مکانیکی برایِ **همه‌ی دسته‌هایِ فکت**: فکتِ نه‌ارجاع‌شده و بدونِ ردِ لغوی ⇒ رابطه‌ای: `other` در زوجین (یا خانواده اگر زوجین نبود)؛ غیررابطه‌ای: محورِ «سایر موارد» (symptom ⇒ evidence). `sessionsSummary` عمداً «ردی دارد» حساب نمی‌شود (نمای زمان ⟂ نمای وضعیت). **اصلاحِ ردِ لغوی:** فکتِ کوتاه (<۳ ریشه) فقط با ۱۰۰٪ ریشه‌ها؛ (تستِ G5 کشف کرد).
+- **`dedupeSingleHome` (جدید):** اولویتِ خانه: زوجین ← خانواده ← محورها؛ یافته‌ای که «همه»‌ی فکت‌هایش جایِ دیگری خانه دارند حذف می‌شود (اطلاعات همان‌جا می‌ماند)، محور/فیلدِ تهی‌شده حذف؛ `key_people` مستثنا (فهرستِ کوتاهِ افراد)؛ نقل‌ها فقط در نقشِ `quotes`. `report.droppedDuplicates` فقط اطلاعاتی است (retry نمی‌سازد).
+- **دیگر:** `types.ts` (`FindingRole`، `RawAxis`، `RawAxisFinding`، `CaseFileAxis.items`)، `caseFileJsonSchema.ts`، `validate.ts` (assert محور/خانواده)، `mergeTherapistEdits.ts` (محورِ تاییدشده items را نگه می‌دارد)، `applyFieldPatch.ts` (edit/accept روی محور/خانواده items را حذف)، prompt قاعده‌هایِ ۱۹ و ۲۵ بازنویسی + جمله‌ی «محورِ جداگانه برایِ نقل/رابطه نساز»، `public/index.html` (`cfFindingsHtml` با تیترِ نقش `.cf-role-head`؛ خانواده خودکار از مسیرِ items).
+- **تست:** `pnpm test:cf` **۴۶ PASS / ۰ FAIL** (۱۹ تستِ جدیدِ G1–G12، H1–H7). **mutation:** غیرفعال‌کردنِ بازیابیِ یتیم ⇒ ۱۰ FAIL؛ غیرفعال‌کردنِ dedupe ⇒ ۵ FAIL؛ هر دو برگردانده شد. `tsc` تمیز؛ `pnpm test:rt` ۳۵ PASS/۰ FAIL. **باگِ تستِ خودم:** درجِ بلوکِ تست با `grep` خالی، فایلِ harness را جابه‌جا کرد؛ از محتوایِ خودِ فایل بازیابی شد (بدونِ تغییرِ منطق).
+- **مدلِ واقعی (OpenRouter، digestِ ساختگیِ ۱۳ فکتی، فقط مرحله‌ی ۲):** schema پذیرفته؛ نقش‌ها متناسب با محتوا (۸ نوع)؛ ۰ شناسه‌ی ساختگی؛ ۰ یتیم؛ ۰ برچسبِ نامعتبر. ⚠️ **یافته:** ۸ از ۱۵ فکتِ ارجاع‌شده در بیش از یک بخش آمده بودند (مثلاً `S2F1` در محور+خانواده+زوجین) و یک محورِ کامل فقط نقل‌ها بود ⇒ با پرامپت‌-تنها رفع‌شدنی نبود ⇒ `dedupeSingleHome`. بازپخشِ همان خروجیِ واقعی از کدِ جدید: ۸ تکرار حذف، ۲ محورِ تکراری («تنش زناشویی»، «عوامل خانوادگی») حذف، ۰ یتیم. زمانِ مرحله‌ی ۲ = **۲۶۲ث** (گامِ ۱: ۲۹۳ث).
+- **مدلِ واقعی #۲ (بعدِ افزودنِ جمله‌ی «محور برایِ نقل/رابطه نساز» به پرامپت):** ۱۳ از ۱۳ فکت ارجاع‌شده، **تکرارِ خامِ مدل ۰ از ۱۶**، ۰ شناسه‌ی ساختگی، ۰ یتیم، محورِ نقل/رابطه ساخته نشد، ۵ محورِ متناسب با محتوا (شاملِ «ایمنی و ارزیابیِ خطر»). ⚠️ **زمانِ مرحله‌ی ۲ = ۴۶۶ث** (نمونه‌هایِ قبلی ۲۶۲/۲۹۳) ⇒ با digest (~۶۰ث) ≈ ۸٫۸ دقیقه، **بیش از قفلِ ۸ دقیقه‌ایِ `GENERATING_LOCK_TTL_MS` (generateCaseFile.ts؛ heartbeat فقط قبل از هر فراخوانی است). ریسکِ واقعیِ عملیاتی؛ تصمیم لازم (سقفِ timeout/TTL یا مدل/streaming) و هنوز اعمال نشده. نمونه‌ی واحد، نه میانگین.
+- **UI (mock + `public/` واقعی، fixture از همین کد):** محورها: عنوانِ `summary`، تیترِ نقش‌ها به ترتیبِ ثابت، چیپِ منبع/فرد؛ خانواده با items؛ fallbackِ v1 (بدونِ items) سالم؛ بدونِ سرریزِ افقی؛ کنسول بدونِ خطا. **Browser pane پنهان ⇒ قضاوتِ بصری انجام نشد.** باگِ عملیاتی: `pkill` روی ویندوز اثر نداشت و mockِ قدیمی fixtureِ قدیمی را سرو می‌کرد (با PID بسته شد).
+- **هنوز باقی:** commit نشده؛ `changeOverTime` (قبل/اکنون به‌صورتِ ردیفِ موازی)، `sessionsSummary`، `roadmap`، `identity/mainIssue` بدونِ یافته (متنِ کوتاه‌اند)؛ ۱–۳ نکته‌ی کلیدی؛ ارجاعِ متقاطع؛ `move` توسطِ تراپیست؛ مهاجرتِ پرونده‌هایِ قدیمی؛ نقلِ عینیِ داخلِ محور (فقط در نقشِ `quotes` کد عینیت را اجبار می‌کند)؛ تست با DB/سرورِ واقعی و پرونده‌ی کاملِ end-to-end؛ بررسیِ بصریِ واقعی؛ پایشِ زمانِ تولید (۲۶۲–۲۹۳ث).
+- جزئیات: [verification](verification/2026-09-20-case-file-findings-axes-family.md).
+
+### 2026-09-20 — CODE + TEST + FINDING — بازطراحیِ «یافته» (Finding) — گامِ ۱: رابطه‌ی زوجین (به دستورِ صریحِ مالک: «شروع کن… پله‌به‌پله»)
+
+- **انگیزه:** ممیزیِ پلن نشان داد کارِ قبلیِ زوجین راهِ میان‌بر روی مدلِ قدیمی بود: منبع با regex از داخلِ متن درمی‌آمد و حفظِ اطلاعات فقط چکِ لغوی روی فکت‌هایِ `relationship` بود. اصلِ طراحی: **حفظِ اطلاعات با کد تضمین شود، نه با قولِ مدل** (Information Preservation + Cognitive Load Reduction).
+- **کد (فقط زوجین؛ خانواده/محورها/قبل‌اکنون دست‌نخورده):**
+  - `domain/findings.ts` (جدید، منطقِ خالص): شناسه‌ی فکت/نقلِ digest (`S2F3`، `S2Q1`؛ موقعیتی، ذخیره نمی‌شود)، `splitSourcePhrase`، `findingId` (hash)، `finalizeCouple`، `reportProblems`، `deriveValue`.
+  - `types.ts`: `RawFinding` (خروجیِ مدل با `factIds`)، `CaseFileFinding {id,label,text,source,about}`، `items?` روی `CaseFileRelationshipField`، `RawCaseFileDraft`. `value` **مشتق** می‌ماند (ویرایش/merge/پرونده‌هایِ قدیمی سالم).
+  - `caseFileJsonSchema.ts`: زوجین `items[]` می‌گیرد. `renderDigest.ts`: شناسه‌ها چاپ می‌شوند. prompt قاعده‌ی ۲۶ بازنویسی شد.
+  - `finalizeCouple` (قطعی): (۱) عبارتِ منبعِ داخلِ متن ⇒ فیلدِ `source`؛ (۲) **متنِ نقل‌ها همیشه از digest** (ارجاع یا تطبیقِ نزدیک)، نقلِ ساختگی حذف؛ (۳) برچسبِ نامعتبر جایگزین؛ (۴) **هر فکتِ رابطه‌ایِ digest که نه ارجاع شد نه در خانواده/محورها ردی دارد ⇒ «موارد دیگر»** (هیچ‌چیز حذف نمی‌شود، حتی اگر retry بی‌اثر باشد).
+  - `repairLoop.ts`: compose ⇒ finalize ⇒ در صورتِ تخلف یک retry (بودجه‌ی ۵ دقیقه). `validate.ts`: چکِ لغوی/regexِ قدیمیِ زوجین حذف؛ `COUPLE_ROLE_ORDER` + `other`.
+  - `mergeTherapistEdits.ts`: فیلدِ تاییدشده items را هم نگه می‌دارد. `applyFieldPatch.ts`: `edit`/`accept-suggestion` روی زوجین `items` را حذف می‌کند (نمایش به `value` برمی‌گردد).
+  - `public/index.html`: `cfFindingsHtml` (چیپِ منبع از `source`، چیپِ فرد فقط اگر با برچسب یکی نباشد)؛ فیلدِ بدونِ `items` مسیرِ قدیمی (regex) را می‌رود ⇒ پرونده‌هایِ قدیمی بی‌تغییر.
+  - `package.json`: `test:cf` ⇒ `scripts/case-file-harness.ts`.
+- **تست:** `pnpm test:cf` **۲۷ PASS / ۰ FAIL** (شناسه، منبع، نقلِ عینی، فکتِ یتیم، merge، patch، repairLoop با LLMِ ساختگیِ بی‌اثر/خطا/خارج از بودجه). **mutation-check:** غیرفعال‌کردنِ منطقِ فکتِ یتیم ⇒ ۶ تست FAIL، بعد برگردانده شد. `tsc --noEmit` تمیز؛ `pnpm test:rt` ۳۵ PASS / ۰ FAIL (بدونِ رگرسیون).
+- **UI (mock + `public/` واقعی، fixture از همین کد):** v2 ⇒ چیپ‌ها/نقلِ عینی/نقشِ خالی «در انتظار ثبت»/«موارد دیگر» درست؛ v1 (بدونِ items) ⇒ fallback؛ حالتِ ویرایش ⇒ textareaِ `value` مشتق؛ بدونِ سرریزِ افقی. **Browser pane پنهان بود ⇒ اسکرین‌شات خالی؛ فقط DOM/استایل بررسی شد، قضاوتِ بصری انجام نشده.** باگِ کشف‌شده و رفع‌شده: چیپِ فرد با برچسب تکراری بود.
+- **مدلِ واقعی (OpenRouter، digestِ ساختگی، فقط مرحله‌ی ۲):** schema پذیرفته شد؛ ۱۱ یافته، همه `factIds` دارند، ۰ شناسه‌ی ساختگی، ۰ فکتِ یتیم، ۰ برچسبِ نامعتبر، ۳ نقلِ کلمه‌به‌کلمه. ⚠️ **زمانِ مرحله‌ی ۲ = ۲۹۳ثانیه** (قبلاً ~۱۰۷) ⇒ با digest (~۵۸ث) نزدیکِ قفلِ ۸ دقیقه‌ای و بالاتر از بودجه‌ی retry؛ یک نمونه است، نه میانگین.
+- **هنوز باقی:** commit نشده؛ فقط زوجین؛ خانواده/محورها/قبل‌اکنون/دسته‌بندیِ ۳ سطحی/نکاتِ کلیدی/جابه‌جاییِ یافته (`move`)/ارجاعِ متقاطع/مهاجرتِ پرونده‌هایِ قدیمی؛ تست با DB و سرورِ واقعی و پرونده‌ی کاملِ end-to-end؛ بررسیِ بصریِ واقعی؛ پایشِ زمانِ تولید. یک فکت ممکن است در دو نقش ارجاع شود (مثلاً stressors و key_people)؛ فعلاً چک نمی‌شود.
+- جزئیات: [verification](verification/2026-09-20-case-file-findings-couple.md).
+
+### 2026-09-19 — CODE + TEST — رفعِ ریسک‌هایِ باقی‌مانده‌ی pipeline (digest، زمان/قفل، مسیرِ retry)
+
+- **digest می‌توانست فکت بیندازد:** `checkDigestCoverage` (validate.ts): هر جمله‌ی یادداشت‌هایِ تراپیست (نه رونویسیِ خام — پرنویز) باید در digest ردی داشته باشد (تطبیقِ ۴حرفیِ واژه‌ها، آستانه ۵۰٪)؛ تخلف ⇒ یک retryِ digest.
+- **`application/repairLoop.ts` (جدید):** `digestWithRepair` و `composeWithRepair` (retryِ یک‌باره؛ فقط اگر تخلف کمتر شد جایگزین می‌شود). **بودجه‌ی زمانی ۵ دقیقه** (`REPAIR_BUDGET_MS`): اگر تا آن لحظه گذشته باشد retry رد می‌شود (compose به ۳۲۲–۴۴۴ث رسیده بود؛ بدونِ سقف دو retry از قفل می‌گذشت). **heartbeat:** قبل از هر فراخوانیِ LLM `markGenerating` قفلِ ۸دقیقه‌ای را تمدید می‌کند. لاگ فقط شمارنده (LAW-001). `generateCaseFile.ts` از این دو استفاده می‌کند.
+- **تستِ واقعیِ retry (corpus ساختگی، OpenRouter، خرابیِ عمدی):** digest: افتادنِ استنباطِ درمانگر ⇒ retry ⇒ تخلف ۱→۰ و فکت برگشت؛ compose: نقلِ تغییرداده + برچسبِ حذف‌شده ⇒ retry ⇒ ۲→۰ و کلیدهایِ نقش/نقلِ عینی درست. **باگِ کشف‌شده در همین تست و رفع‌شده:** retryِ digest جمله‌هایِ یادداشت را در `quotes` چپاند و «نقل‌ها» آلوده شد ⇒ `DIGEST_HINT` (facts/correctedText، نه quotes)؛ اجرای دوباره: quotes فقط ۳ نقلِ واقعی.
+- **هنوز باقی (code-enforced نیست):** تغییرِ نقلِ digest نسبت به رونویسیِ خام (فقط prompt: کلمه‌به‌کلمه)، چون تصحیحِ مجازِ ASR و تغییرِ غیرمجاز از هم قابلِ تفکیکِ ماشینی نیستند؛ چکِ digest فقط یادداشت‌ها را می‌پوشاند نه رونویسی؛ فقط زوجین چکِ compose دارد. **UNVERIFIED:** بودجه‌ی ۵ دقیقه‌ای با provider کند (retry رد می‌شود ⇒ همان نتیجه‌ی اول)؛ تستِ heartbeat روی DB واقعی. commit نشد.
+
+### 2026-09-19 — FINDING + CODE — bug-hunt کاملِ تغییراتِ همین روز؛ ۷ باگ پیدا و رفع شد
+
+- **رفع‌شده (هر کدام با تستِ واقعی):**
+  1. `loadCaseFile` (public/index.html): پاسخِ دیررسیدِ مراجعِ A روی صفحه‌ی مراجعِ B می‌نشست (پروندهٔ A نمایش + PATCH به رکوردِ A). حالا فقط اگر `currentClient` همان مراجع است اعمال می‌شود. تست با تأخیرِ شبیه‌سازی‌شده: قبل `currentCaseFile.clientId=c1` روی صفحه‌ی c2، بعد `c2`. (باگِ قدیمی؛ با نمایشِ پرونده برای همه‌ی مراجعین محتمل‌تر شده بود.)
+  2. `mergeRelationshipGroup`: فیلدِ ویرایش/تأییدشده‌ی تراپیست که کلیدش در خروجیِ جدید نبود (مهاجرتِ کلیدهای آزاد → نقش‌هایِ ثابت، یا `coupleRelationship:null`) با «به‌روزرسانی» بی‌صدا حذف می‌شد؛ حالا نگه داشته می‌شود. تست: قبل `edited text kept: false`، بعد `true`.
+  3. دکمه‌ی «ثبت جلسات گذشته» در کارتِ ۳۰۰px بریده می‌شد؛ `.client-actions>.btn:first-child{flex:1.7}` — بعد: بدونِ clip در هر دو کارت.
+  4. retry در `generateCaseFile`: بهبودِ جزئی نادیده گرفته می‌شد (فکت‌هایِ گم‌شده یک «مشکل» بودند)؛ حالا `checkCoupleFidelity` یک مشکل به‌ازایِ هر فکتِ گم‌شده می‌دهد.
+  5. `checkCoupleStructure`: کلیدِ `quotes ` (فاصله) و برچسبِ درستِ «مشاهده‌یِ رفتاری:» اشتباهاً تخلف بودند (retry بی‌مورد ~۵ دقیقه‌ی مدل)؛ `isQuotesField` (کلید/برچسبِ «نقل») و `SOURCE_AS_LABEL` فقط عبارت‌هایِ منبعِ کامل + «:» را می‌گیرد؛ `normalizeCoupleKeys` کلید را trim می‌کند.
+  6. کلیدِ «به‌روزرسانیِ خودکار» برایِ مراجعِ فعال گمراه‌کننده بود (`sessions.ts:45-47` auto را فقط برایِ غیرفعال اجرا می‌کند) — برایِ فعال‌ها به یادداشتِ «فقط برایِ غیرفعال» تبدیل شد. **تصمیمِ مالک لازم:** روشن‌کردنِ auto برایِ فعال‌ها = ارسالِ خودکارِ متنِ بالینیِ آن‌ها به LLM خارجی؛ انجام نشد.
+  7. لبه‌ی کارتِ «نقل‌ها» (radius با border راست) اصلاح شد.
+- **باقی‌مانده (باگ نیست، ریسک):** digest (مرحله‌ی ۱) می‌تواند فکت/نقل را بیندازد یا عوض کند و چکِ کدی ندارد؛ زمانِ compose ۳۲۲–۴۴۴ث نزدیکِ قفلِ ۴۸۰ث. **UNVERIFIED:** مسیرِ retry با LLM (بدونِ تخلف در دو اجرا). commit نشد.
+
+### 2026-09-19 — CODE + FINDING — ساختِ نقشِ‌بالینیِ «رابطه‌ی زوجین» (ریشه‌ای؛ جایگزینِ راه‌حلِ سطحیِ پرامپت‌-فقط)
+
+- **audit:** معماری (دو مرحله‌ای، merge، pending، محورها) نیازی به بازطراحیِ کامل نداشت. ریشه‌ها: (۱) ساختار فقط در prompt بود و `validate.ts` فقط type چک می‌کرد؛ (۲) digest منبعِ فکت و فردِ مرتبط را ثبت نمی‌کرد؛ (۳) `key`ِ فیلدهایِ رابطه را مدل می‌ساخت (merge با key ⇒ ویرایش‌ها یتیم می‌شدند).
+- **تغییر:** digest: `source` (client_report/therapist_observation/therapist_inference/unspecified) و `about` به هر فکت (`caseFileDigestSchema.ts`, `types.ts`, `renderDigest.ts`)، قاعده‌ی ۴ digest: نقل‌ها کلمه‌به‌کلمه. compose: قاعده‌ی ۲۶ (نقش‌هایِ ثابت background/interaction/stressors/protective/key_people/quotes، خطِ «برچسبِ موضوعی: منبع، متن»، protective همیشه با pending) و قاعده‌ی عمومیِ اشتباهِ «۲۰» (شماره‌ی تکراری + تعارض با ۱۵/۲۲/۲۵) حذف شد. `validate.ts`: `checkCoupleStructure` (دستورِ زبانِ خط، منبع نباید برچسب باشد، نقل‌ها یک‌خطی)، `checkCoupleFidelity` (نقلِ عین‌به‌عین در digest + پوششِ واژگانیِ فکت‌هایِ رابطه، آستانه ۵۰٪)، `normalizeCoupleKeys` (کلیدِ پایدار + ترتیبِ ثابت). `generateCaseFile.ts`: در صورتِ تخلف یک retry با پیامِ اصلاحی (تصمیمِ مالک). UI: `cfProv` چیپِ منبع کنارِ برچسب.
+- **تستِ واقعی (corpus ساختگی، OpenRouter، ۲ اجرا):** ساختارِ نقش/برچسب/منبع/نقل‌هایِ یک‌خطی درست؛ protective پر شد. **حفظِ اطلاعات کامل نیست:** اجرای ۱: compose فکتِ «استنباطِ درمانگر دربارهِ مادرِ مراجع» را حذف کرد و نقلی را تغییر داد (`checkCoupleFidelity` روی خروجیِ ذخیره‌شده هر دو را می‌گیرد؛ برایِ نقل، digest هم نقل را عوض کرده بود). اجرای ۲: همان فکت از **خودِ digest** افتاد (مرحله‌ی ۱) ⇒ چکِ compose-vs-digest آن را نمی‌بیند. زمانِ compose ۳۲۲–۴۴۴ ثانیه (قبلاً ~۴۱–۱۰۷) — نزدیکِ `GENERATING_LOCK_TTL_MS` (۴۸۰ث)؛ retry آن را دو برابر می‌کند. **UNVERIFIED:** مسیرِ retry با LLM اجرا نشد (هر دو اجرا بدونِ تخلف)؛ خانواده/changeOverTime هنوز ساختِ جدید را ندارند. commit نشد.
+
+### 2026-09-19 — CODE + DECISION — «هیچ‌جا متنِ بلند نباشد»: خوانایی در کلِ پرونده (پس از commit e04f427)
+
+- **تصمیمِ مالک:** نه فقط رابطه‌ی زوجین؛ هیچ بخشی از پرونده نباید پاراگرافِ بلند/توالیِ طولانیِ جمله داشته باشد.
+- **`public/index.html`:** `cfRichHtml` (مسیرِ مشترکِ axes/family/couple/sessions/roadmap) حالا متنِ بلندِ بی‌ساختار (≥۱۱۰ نویسه) را فقط در نمایش به جمله‌هایِ جدا با نقطه‌ی نشانه می‌شکند (`cfSplitSentences`؛ داخلِ « » نمی‌شکند، جمله‌ی <۲۵ نویسه به قبلی می‌چسبد). پس پرونده‌هایِ قدیمی هم بدونِ بازتولید بهتر نمایش داده می‌شوند. متنِ ذخیره‌شده و حالتِ ویرایش دست‌نخورده. `changeOverTime.before/after` هم rich شد.
+- **`buildCaseFilePrompt.ts`:** قاعده‌ی ۲۰ عمومی شد (همه‌ی بخش‌ها؛ فقط mainIssue/identity/overallStatus کوتاه).
+- **تست:** `npx tsc --noEmit` OK؛ تستِ واحدِ node روی `cfRichHtml` با متنِ synthetic: شکستن به ۳ خط، نقل‌قولِ حاویِ «.» سالم، متنِ کوتاه/برچسب‌دار بدونِ تغییر. **UNVERIFIED:** رندرِ بصری در مرورگر و خروجیِ واقعیِ LLM. commit نشد.
 
 ### 2026-09-19 — CODE + DECISION — دکمه‌ی «پرونده» روی کارت، پرونده برای همه‌ی مراجعین، بازطراحیِ رابطه‌ی زوجین، جلسه‌ی آینده‌ی بازشو
 

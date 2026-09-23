@@ -81,7 +81,8 @@ FeeliaAnalytics.boot(therapist)
 | `ClientDetail` | `client_profile` | فعال + mask |
 | `AllClients` | `all_clients` | فعال + mask (2026-09-16، صفحه‌ی «همه‌ی مراجعین») |
 | `Auth` | — | Clarity قبل از login لود نمی‌شود |
-| `Admin`, `AdminTherapist`, `AdminSessions` | — | برای ادمین هرگز لود نمی‌شود |
+| `SessionDetail` | — | عمداً در `SCREENS` نیست (بدونِ رویدادِ `screen_*`)؛ containerَش (`#sessionDetail`) با `data-clarity-mask="true"` پوشیده شده (بخشِ ۷) |
+| `Admin`, `AdminTherapist`, `AdminSessions`, `AdminSessionTimeline`, `AdminActivity` | — | برای ادمین هرگز لود نمی‌شود |
 
 ## ۶. رویدادها
 

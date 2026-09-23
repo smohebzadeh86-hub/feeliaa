@@ -51,10 +51,14 @@ stateDiagram-v2
 | I7 | finish دوباره همان promise را برمی‌گرداند | `_finishPromise` |
 | I8 | abort از هر state: resolverها آزاد، timerها پاک، mic/WS/recorder بسته، صفِ IndexedDB این جلسه پاک | `abort` |
 | I9 | کارهای صفِ IndexedDB یک جلسه هم‌زمان اجرا نمی‌شوند | `_queueLock` زنجیره‌ای + `_draining` |
-| I10 | قبل از خواندنِ صف در finish، آخرین سگمنت واقعاً نوشته شده | `stopDurableSegment()` → `_flushPromise` (نگهبان 1.5s) |
+| I10 | قبل از خواندنِ صف در finish، آخرین سگمنت واقعاً نوشته شده | `stopDurableSegment()` → `_flushPromise` (نگهبان 10s، `DURABLE_FLUSH_GUARD_MS`) |
+| I11 | stop و بلافاصله start ایمن است: chunk/seq/intent هر سگمنت مالِ recorderِ خودش است و در لحظه‌ی stop ثبت می‌شود | chunks محلی در `startDurable`، `rec._seqAtStop`/`rec._stateAtStop` در `stopDurableSegment` (2026-09-23، `T20`) |
 | I11 | 401 از mint → FAILED بدونِ reconnect بی‌پایان | `connectWithFreshMint` catch |
 | I12 | برچسبِ گوینده = `generation:rawSpeaker` → شماره‌ی سراسری؛ هرگز ادغام بینِ نسل‌ها | `speakerLabelMap` |
 | I13 | حینِ MANUAL_PAUSED اتصالِ WS باز می‌ماند و فقط `{"type":"keepalive"}` هر ۵s فرستاده می‌شود؛ تایمرِ keepalive در resume/finish/abort متوقف می‌شود | `startKeepalive`، `stopKeepalive` |
+| I14 | هر سگمنتِ durable فقط یک نوع محتوا دارد (یا کاملاً حینِ ACTIVEِ سالم، یا کاملاً حینِ قطعی) — مرزِ سگمنت رویِ هر گذارِ ACTIVE↔قطعی صریح بسته می‌شود | `scheduleReconnect`، `offlineHandler`، `connectWithFreshMint` (2026-09-22) |
+| I15 | فقط یک تلاشِ reconnect هم‌زمان در جریان است، حتی اگه چند منبع (`handleWSClose`، خطایِ Soniox، watchdog) هم‌زمان trigger کنند | `reconnectInFlight` (2026-09-22) |
+| I16 | اگه `ws.readyState` دیگر OPEN نباشد ولی state هنوز ACTIVE است (onclose/onerror دیر/هیچ‌وقت فایر نشده)، حداکثر تا ۳ ثانیه بعد reconnect خودکار شروع می‌شود | `startWsWatchdog` (2026-09-22) |
 
 ## ۴. جریان‌های کلیدی
 
@@ -92,12 +96,32 @@ state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250
 - interim پس از pause روی صفحه «فریز» می‌ماند.
 - `withStore` به‌جای نتیجه IDBRequest برمی‌گرداند → صف همیشه خالی.
 - `onstop` async → آخرین سگمنت آرشیو نمی‌شد (→ `_flushPromise`).
+- `onstop` async + `self.durableChunks`ِ مشترک → هر سگمنتی که با چرخش/مرزِ قطعی بسته می‌شد فقط دُمِ بی‌هدرش ذخیره می‌شد و intentِ مرزها برعکس بود (2026-09-23 → I11؛ subsystem 02).
 - drain دوبار روی RECOVERED→ACTIVE → duplicate متن (→ `_draining`).
 - drain روی pause/resumeِ عادی با `purpose=transcript` → duplicate (→ purpose بر اساسِ `unreliable`).
 - fetch بدونِ timeout → دکمه‌ی ادامه گیر می‌کرد (→ `REQUEST_TIMEOUT_MS`).
 
+## ۶.۵ تله‌متری (فازِ ۲ رصد — `rt.*`، از 2026-09-23)
+هر رویداد با `obsEvent(name, detail)` (تعریف‌شده بالایِ `feelia-rt.js`، همیشه try/catch + چکِ `window.FeeliaObs`) به `FeeliaObs.event(name, detail)` می‌رسد؛ چون `detail` یک object است (نه عدد)، در `feelia-obs.js` به‌جایِ `obs_ui_events` به‌عنوانِ `kind:'client_event'` بافر و به `POST /api/obs/events` فرستاده می‌شود — سرور (`server/src/http/obs.ts`) نامِ رویداد را در برابرِ `OBS_CLIENT_EVENTS` (`server/src/obs/types.ts`) چک می‌کند، `detail` را از `sanitizeDetail()` (`server/src/obs/redact.ts`، اجرایِ LAW-001) رد می‌کند و با `logEvent({source:'client', runId, ...})` به جدولِ **`obs_events`** می‌نویسد (نه `obs_ui_events` — آن جدول ستونِ `run_id`/`detail` ندارد). `run_id` همان `RTSession.runId` است که با `session_audio.run_id` (migration 017) join می‌شود.
+
+| رویداد | کجا فایر می‌شود | detail | معنیِ عملیاتی |
+|---|---|---|---|
+| `rt.ws_open` | `openDirectWS`، بعدِ handshakeِ موفق | — | اتصالِ WSِ مستقیم به Soniox برقرار شد |
+| `rt.ws_close` | اولین خطِ `handleWSClose(ev)` — همیشه، حتی بستنِ عمدی | `close_code` (کدِ خامِ `CloseEvent`)، `was_clean` | `close_code=1006` تکراری برایِ یک تراپیست یعنی قطعیِ غیرطبیعیِ شبکه — شبکه را بررسی کنید. `ev.reason` عمداً هیچ‌وقت خوانده نمی‌شود (متنِ آزادِ سرور/Soniox، LAW-001) |
+| `rt.ws_error` | `ws.onerror` در `openDirectWS` | — | خطایِ سطحِ WS، معمولاً قبل از `rt.ws_close` |
+| `rt.reconnect_scheduled` | `scheduleReconnect(reason)` | `reason` (کدِ کوتاه: `closed`/`soniox-error`/`temp-key-expired`/`watchdog-ws-not-open`/`retry`/`online`/`online-after-failed`)، `attempt`، `delay_ms` | چرا/کِی reconnect زمان‌بندی شد و با چه backoffی |
+| `rt.reconnect_ok` | `connectWithFreshMint`، فقط وقتی `isReconnect===true` | `attempt` (شماره‌ی تلاشِ موفق) | reconnect جواب داد — چند تلاش طول کشید |
+| `rt.reconnect_exhausted` | `scheduleReconnect` وقتی `reconnectAttempts>=MAX_RECONNECT_ATTEMPTS` | `attempt` | همه‌ی تلاش‌ها تمام شد؛ state=FAILED، ضبطِ durable ادامه دارد |
+| `rt.mint_failed` | catchِ `connectWithFreshMint` | `status`، `code` (نه `message`) | mintِ credential شکست خورد (شبکه/rate-limit/۴۰۱) |
+| `rt.unreliable_set` | هرجا `self.unreliable` اولین‌بار true می‌شود (یک‌طرفه) | `reason` (`reconnect`/`reconnect_exhausted`/`start_fail_open`) | از این لحظه به بعد، fallbackِ batch لازم است |
+| `rt.watchdog_fired` | `startWsWatchdog`، قبل از `scheduleReconnect('watchdog-ws-not-open')` | — | قطعیِ «بی‌صدا» (WSای که readyState مرده ولی onclose نیامده) تشخیص داده شد |
+| `rt.state_change` | `setState(s)` (چون این فایل از قبل یک state machineِ صریحِ `STATES` دارد) | `state`، `prev_state` | دنباله‌ی کاملِ گذارهایِ یک RTSession — برایِ بازسازیِ timeline |
+| `rt.gap_marked` | `noteDiscontinuity()` | — | مارکرِ ناپیوستگیِ گوینده به transcript اضافه شد (بندِ ۳ همین سند) |
+
+⚠️ این تله‌متری فقط با خواندنِ دقیقِ کد + عبورِ تمیزِ `pnpm test:rt` تأیید شده؛ رسیدنِ واقعیِ ردیف به `obs_events` با یک WSِ mock در مرورگر هنوز تست نشده (کارِ بازِ ثبت‌شده در `PROJECT_STATUS.md`، رویدادِ 2026-09-23).
+
 ## ۷. تست
-`pnpm test:rt`. پوشش: T1، T2، T6–T10، T13a/b، T14–T17. **Node فاقدِ `indexedDB` است** → در WT سناریوهای وابسته به صف (T2-batch، T15، T16) شکست می‌خورند. قبل از تغییر baseline بگیرید.
+`pnpm test:rt`. پوشش: T1، T2، T6–T10، T13a/b، T14–T19b (T18/T19/T19b افزوده‌شده در 2026-09-22). فازِ ۲ (تله‌متریِ `rt.*`) رگرسیونِ صفر داشت: هر ۴۴ تست بعدِ افزودنِ `obsEvent(...)` عیناً همان نتیجه را داد؛ چون harness در Node بدونِ `window.FeeliaObs` اجرا می‌شود، هر `obsEvent` بی‌اثر می‌ماند (خودِ همین رفتار جزوِ الزامِ ایمنیِ فازِ ۲ بود). **تصحیحِ evidence:** یادداشتِ قبلیِ این بخش («Node فاقدِ `indexedDB` است → T2-batch/T15/T16 در WT شکست می‌خورند») دیگر درست نیست — `scripts/rt-harness.cjs` یک mockِ حداقلیِ `indexedDB` دارد (`globalThis.indexedDB = {...}`، نزدیکِ بالایِ فایل) که این سناریوها را هم پوشش می‌دهد؛ در اجرایِ واقعیِ 2026-09-22 هر ۴۴ تست (شاملِ T2-batch/T15/T16) بدونِ استثنا PASS شدند. باقی‌ماندهٔ این یادداشت شاید مربوط به نسخه‌ی خیلی قدیمی‌ترِ harness بوده — طبقِ LAW-019 مبنا نگیرید.
 
 ## ۸. ریسک‌ها / سؤال‌های باز
 - پیامِ `onError` هنگامِ نبودنِ IndexedDB می‌گوید «فضا پر شده» (گمراه‌کننده).

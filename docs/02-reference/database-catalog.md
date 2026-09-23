@@ -41,6 +41,7 @@
 | `018_client_case_file.sql` | **commitنشده**، فقط MySQL | جدولِ جدیدِ `client_case_file` (پرونده‌ی روندِ درمان — AI Case File)؛ افزودنیِ خالص. ✅ **رویِ یک MySQLِ لوکالِ تازه (standalone، init‌شده در همین نشست) اعمال و با `DESCRIBE` تأیید شد**؛ تستِ end-to-endِ واقعی (regenerate با OpenRouterِ واقعی) هم موفق بود — جزئیات: [verification](../../verification/2026-09-17-ai-case-file-real-e2e.md) |
 | `019_case_file_corpus_signature.sql` | **commitنشده**، فقط MySQL | دو ستونِ `corpus_signature`/`generating_started_at` به `client_case_file` (افزودنیِ خالص). ✅ رویِ MySQLِ standaloneِ لوکال apply شد (خودکار، تنها با ری‌استارتِ `tsx watch` بعدِ ذخیره‌ی فایل‌ها) و با `DESCRIBE` تأیید شد؛ end-to-endِ واقعی (regenerate با OpenRouترِ واقعی، شاملِ سناریوهایِ skip/race-409/force-400) هم موفق بود — جزئیات: [verification](../../verification/2026-09-17-case-file-corpus-signature-and-race-lock.md) |
 | `020_therapist_case_file_auto_generate.sql` | **commitنشده**، فقط MySQL | ستونِ `therapists.case_file_auto_generate BOOLEAN NULL` — تنظیمِ سه‌حالته‌ی سطحِ‌تراپیست برایِ خودکارسازیِ تولیدِ پرونده بعدِ پایانِ جلسه (فازِ ۲ِ Module 08؛ `NULL`=هنوز پرسیده نشده، `TRUE`/`FALSE`=پاسخِ صریح، همیشه قابلِ‌تغییر). افزودنیِ خالص. ✅ رویِ MySQLِ standaloneِ لوکال apply شد (خودکار با ری‌استارتِ `tsx watch`) و با لاگِ migration runner تأیید شد؛ end-to-endِ واقعی (auto-trigger با OpenRouترِ واقعی روی یک مراجعِ canaryِ غیرفعال + تأییدِ خاموش/روشنِ toggle) هم موفق بود — جزئیات: [verification](../../verification/2026-09-18-case-file-auto-trigger-and-style-fixes.md) |
+| `021_observability_events.sql` | **commitنشده**، فقط MySQL | دو جدولِ جدیدِ `obs_events`/`obs_ui_events` — لایه‌ی رصد/حسابرسیِ فازِ ۱ (پلنِ تأییدشده‌ی مالک، 2026-09-22). افزودنیِ خالص، بدونِ لمسِ جدولِ موجود. ✅ رویِ MySQLِ لوکالِ dev اعمال شد (خودکار، با ری‌استارتِ `tsx watch` بعدِ ذخیره‌ی فایل)؛ با `DESCRIBE`/`_migrations` و اجرایِ مجددِ دستیِ همان دو `CREATE TABLE IF NOT EXISTS` (بدونِ خطا) تأیید شد. جزئیات: بخشِ ۲.۱ همین فایل. |
 
 جدولِ سیستمی: `_migrations(id SERIAL, name TEXT UNIQUE, applied_at TIMESTAMPTZ)` — ساخته‌شده در `migrate.ts` (نسخه‌ی Postgres؛ معادلِ MySQL همان نقش را با `AUTO_INCREMENT`/`DATETIME` دارد — بخشِ ۲ همین فایل را برایِ وضعیتِ فعلیِ دوگانگیِ schema ببینید).
 
@@ -146,6 +147,35 @@
 | therapist_edited_at | DATETIME | yes | | آخرین PATCH دستیِ تراپیست |
 | force_regenerated_at / force_regenerated_by | DATETIME / CHAR(36) | yes | | فقط وقتی `force=true` در regenerate — لاگِ عملِ خطرناکِ «دورریختنِ همه‌ی تاییدها» |
 | error_message | TEXT | yes | | آخرین خطای `CaseFileGenerationError` |
+
+### ۲.۱ `obs_events` / `obs_ui_events` (021) — لایه‌ی رصد/حسابرسی، فازِ ۱
+
+**تصمیم‌هایِ عمدیِ مغایر با بقیه‌ی schema** (به‌جایِ CHAR(36) UUID + FK که باقیِ جداول دارند):
+- **PK از نوعِ `BIGINT AUTO_INCREMENT`**، نه UUID — این دو جدول فقط insert-محورند و هیچ‌جا با
+  UUIDِ سمتِ کلاینت ارجاع داده نمی‌شوند؛ BIGINT ارزان‌تر و برایِ ایندکسِ `ts`/`id` کافی است.
+- **بدونِ هیچ `FOREIGN KEY`** به `therapists`/`clients`/`sessions` — این جدول یک firehoseِ
+  فایراندفورگت است؛ یک insert که با errno 1452 (فقدانِ ردیفِ والد، مثلاً race بینِ خواندنِ
+  ownership و نوشتنِ obs) fail شود نباید مسیرِ اصلیِ کاربر را متوقف کند. مهم‌تر: طبقِ تصمیمِ D-E
+  مالک ([project-laws §LAW-010](../00-governance/project-laws.md))، حذفِ تراپیست/مراجع/جلسه
+  **نباید** ردِ حسابرسیِ مربوط به آن‌ها را هم پاک کند — بدونِ `ON DELETE CASCADE`، ردیف‌هایِ obs
+  حتی بعدِ حذفِ رکوردِ اصلی زنده می‌مانند (فقط `therapist_id`/`session_id`شان دیگر به چیزی اشاره
+  نمی‌کند، که عمدی است).
+
+**`obs_events`** (رویدادهایِ ساختارمندِ سرور/کلاینت/job — retention ۱۸۰ روز، `OBS_EVENTS_RETENTION_DAYS`):
+`id` BIGINT PK، `ts` DATETIME(3) (پیش‌فرضِ سرور، هرگز از کلاینت)، `client_ts` DATETIME(3) NULL،
+`source` ENUM(`server`,`client`,`job`)، `severity` ENUM(`debug`,`info`,`warn`,`error`)،
+`event` VARCHAR(64)، `code` VARCHAR(64) NULL، `therapist_id`/`client_id`/`session_id` CHAR(36) NULL
+(بدونِ FK)، `run_id`/`request_id` VARCHAR(64) NULL، `nav_id` CHAR(36) NULL، `route` VARCHAR(128) NULL
+(الگوی مسیر مثلِ `/api/sessions/:id`، نه URLِ خام)، `method` VARCHAR(8) NULL، `status_code` SMALLINT NULL،
+`duration_ms` INT NULL، `detail` JSON NULL (فقط از `sanitizeDetail()` عبورکرده — LAW-001).
+ایندکس‌ها: `(ts)`، `(therapist_id,ts)`، `(session_id,ts)`، `(event,ts)`، `(request_id)`.
+
+**`obs_ui_events`** (فایرهوزِ کلیک/ناوبریِ خام — retention ۳۰ روز، `OBS_UI_RETENTION_DAYS`، بدونِ ستونِ JSON):
+`id` BIGINT PK، `ts`/`client_ts`، `therapist_id`/`session_id` CHAR(36) NULL، `nav_id` CHAR(36)
+(هر page-load یکی)، `seq` INT (شمارنده‌ی یکنواختِ همان nav_id)، `kind` ENUM(`click`,`nav`,`visibility`,`net`,`lifecycle`,`error`)،
+`screen` VARCHAR(64) NULL، `target_id`/`target_role`/`target_tag` VARCHAR NULL (فقط `data-obs`/`id`،
+`role`، `tagName`ِ عنصرِ کلیک‌شده — هرگز متن)، `value_num` INT NULL.
+ایندکس‌ها: `(ts)`، `(therapist_id,ts)`، `(session_id,ts)`، `(nav_id,seq)`.
 
 ## ۳. Enumها (مقادیرِ واقعی در کد)
 

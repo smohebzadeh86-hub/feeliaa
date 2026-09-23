@@ -98,11 +98,15 @@ pnpm dev
 pnpm test:rt
 ```
 ```bash
+pnpm test:cf
+```
+```bash
 cd server && npx tsc --noEmit
 ```
 
 - `pnpm dev` = `pnpm --filter server dev` (tsx watch، cwd = `server/`، `.env` از `server/.env`، پورت پیش‌فرض 3000).
 - `pnpm test:rt` = harness موتورِ realtime (`scripts/rt-harness.cjs`) — بدونِ شبکه/DB. وضعیتِ فعلی: بخش 20 Master Reference.
+- `pnpm test:cf` = harness پرونده‌ی درمان (`scripts/case-file-harness.ts`، اجرا با tsx) — بدونِ شبکه/DB/LLMِ واقعی؛ دادهٔ ساختگی.
 - تستِ خودکارِ backend یا CI وجود ندارد.
 
 ## ۹. رفتارِ Agent

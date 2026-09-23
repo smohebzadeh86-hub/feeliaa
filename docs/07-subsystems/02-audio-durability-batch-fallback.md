@@ -35,7 +35,7 @@ flowchart TB
   P -->|"transcript / late-transcript"| T["آرشیو (قبل از رونویسی!) → transcribeFileAsync →<br/>mergeBatchTranscript (append، late-transcript با برچسب) → حذف"]
   P -->|note| N["آرشیو → transcribeFileAsync → INSERT session_notes(voice) → حذف"]
   RW["retryQueuedBatches (هر 5min + startup)"] --> P
-  SW["sweepOldBatchFiles (startup)"] -->|"قبل از حذفِ >24h"| A
+  SW["sweepOldBatchFiles (startup + هر 1h)"] -->|"قبل از حذفِ >24h"| A
 ```
 
 ## ۲. شناسه‌ی run و seqِ سرورساخته (رفعِ باگِ بحرانی)
@@ -69,8 +69,40 @@ flowchart TB
 | intent | چه وقت |
 |---|---|
 | `note` | `self.mode === 'note'` |
-| `transcript` | `self.unreliable` یا `state ∈ {RECONNECTING, NETWORK_PAUSED, FAILED}` |
+| `transcript` | `state ∈ {RECONNECTING, NETWORK_PAUSED, FAILED}` |
 | `archive` | وگرنه (پیش‌فرض؛ رکوردهایِ قدیمی‌ترِ بدونِ این فیلد هم همین را می‌گیرند) |
+
+**رفعِ باگِ 2026-09-22:** قبلاً شرط `self.unreliable ||` هم داشت. چون `unreliable` یک‌طرفه و
+سراسری است (I4، subsystem 01)، این یعنی بعدِ **یک بار** قطعی/reconnectِ موفق، همه‌ی سگمنت‌هایِ
+durableِ *بعدی* هم — حتی آن‌هایی که کاملاً در ACTIVEِ سالم ضبط شده بودند — `transcript` می‌گرفتند
+و دوباره رونویسی+append می‌شدند (متنِ از قبل درستِ realtime برایِ باقیِ جلسه دوبار در پرونده
+می‌آمد). الان فقط stateِ لحظه‌ی بستنِ همان سگمنت تعیین‌کننده است؛ برایِ اینکه یک سگمنتِ ۱۵ثانیه‌ای
+هیچ‌وقت هم صدایِ سالم هم صدایِ بعدِ قطعی را با هم نداشته باشد، `scheduleReconnect`،
+`offlineHandler` و مسیرِ موفقیتِ `connectWithFreshMint` حالا رویِ هر گذارِ ACTIVE↔قطعی مرزِ
+سگمنت را صریح می‌بندند (`stopDurableSegment`+`startDurable`). تست: `T18` در
+`scripts/rt-harness.cjs`.
+
+**رفعِ race چرخش (2026-09-23، [verification](../../verification/2026-09-23-durable-rotation-race.md)):**
+`MediaRecorder.stop()` ناهمگام است — آخرین `dataavailable` (دُمِ صدا) و `onstop` در یک taskِ بعدی
+می‌رسند. همه‌ی مسیرهایِ «stop و بلافاصله start» (چرخشِ ۱۵ثانیه‌ای، سه مرزِ قطعیِ بالا) قبلاً خراب
+بودند چون chunkها رویِ `self.durableChunks`ِ مشترک بود: `startDurable()` آرایه را عوض می‌کرد، دُمِ
+recorderِ قبلی در آرایه‌ی تازه می‌افتاد، و `onstop`ِ قبلی **فقط همان دُمِ بی‌هدرِ EBML** را در
+IndexedDB می‌نوشت؛ بدنه‌ی اصلی (هدر + ~۱۴ثانیه) در RAM گم می‌شد. هم‌زمان intent از `self.state`ِ
+لحظه‌ی اجرایِ `onstop` خوانده می‌شد، پس در مرزِ ورود به قطعی سگمنتِ سالم `transcript` و در مرزِ
+برگشت سگمنتِ خودِ قطعی `archive` می‌گرفت (برعکس). **الگویِ درست (الزامی):**
+- chunkها محلیِ closureِ هر recorder در `startDurable` است (`var chunks = []`)؛ هیچ stateِ مشترکی رویِ `self` نیست.
+- `stopDurableSegment` پیش از `rec.stop()` همگام `rec._seqAtStop` و `rec._stateAtStop` را ثبت می‌کند؛ `onstop` intent/seq را از همین‌ها می‌سازد (fallback به `self.*` فقط برایِ recorderی که خودش متوقف شده).
+- جدولِ intentِ بالا یعنی «state در لحظه‌ی صدا زدنِ `stopDurableSegment`»، نه لحظه‌ی `onstop`.
+- تست: `T20`/`T20a2` در harness با `FakeRecorder`ِ واقع‌گرا (هدرِ `HDR` در اولین chunk، دُمِ `TAIL` + `onstop` ناهمگام).
+
+**خطایِ دائمی در صفِ سرور (2026-09-23):** `processBatchQueueInner` بعد از آرشیوِ ادمین و پیش از
+Soniox، magic bytesِ container را چک می‌کند (`looksLikeValidContainer`: webm=`1A45DFA3`،
+ogg=`OggS`، m4a=`ftyp` در بایتِ ۴). فایلِ نامعتبر، یا خطایِ Soniox با متنِ «Invalid audio file»
+(`isPermanentTranscribeError`)، دیگر `kept queued` نمی‌ماند: فایل از صف حذف می‌شود (نسخه‌ی آرشیو
+برایِ بررسی می‌ماند)، رویدادِ `batch.segment_unrecoverable` (`reason: bad-container |
+soniox-invalid-audio`) ثبت می‌شود و `batch_status` طبقِ باقی‌مانده‌ی صف به `done` می‌رسد. مسیرِ
+دریافت (`sessions.ts`) عمداً تغییری نکرد. `sweepOldBatchFiles` حالا علاوه بر startup هر ساعت
+(`BATCH_SWEEP_INTERVAL_MS`) هم اجرا می‌شود.
 
 تابعِ مشترکِ `uploadQueuedSegment(sessionId, rec)` (در `feelia-rt.js`، exposeشده رویِ
 `window.FeeliaRT.uploadQueuedSegment`) purpose را از `rec.intent` می‌سازد و **هر چهار** تابعِ
@@ -187,10 +219,16 @@ batch_status∈{done,failed}`؛ note → `!note_audio_pending`. سپس خوان�
    (`extForMime`/`mimeForExt`/`mimeFromFilename` در `batchqueue.ts`). با فایلِ واقعیِ
    ogg (Vorbis) و m4a (AAC) رویِ MySQLِ واقعی تست شد — پسوند/`mime`/`duration_ms` هر سه درست
    ثبت شدند (جزئیاتِ کامل در verificationِ 2026-09-16).
-3. ~~بخشِ F~~ **پیاده و تست شد (2026-09-16):** `GET /api/admin/sessions/:id/audio/full[?download=1]`
+3. ~~بخشِ F~~ **پیاده و تست شد (2026-09-16؛ چکِ کاملیت اضافه شد 2026-09-22):** `GET /api/admin/sessions/:id/audio/full[?download=1]`
    (`admin.ts` → `getFullSessionAudio` در `sessionAudioArchive.ts`) همه‌ی سگمنت‌هایِ `kind='session'`
    را با ffmpeg concat می‌کند و در `data/session-audio/<sid>/full.<ext>` کش می‌کند (invalidation
-   با شمارشِ سگمنت‌ها، نه زمان). مسیرِ سریع (`-c copy`) وقتی همه‌ی سگمنت‌ها یک container/codec
+   با شمارشِ سگمنت‌ها، نه زمان). **از 2026-09-22:** قبل از concat (هم در مسیرِ کش‌شده، هم مسیرِ
+   ساختِ تازه) `checkSeqContiguous` رویِ همین سگمنت‌ها اجرا می‌شود؛ نتیجه (`complete`/`missingSegments`)
+   در پاسخِ تابع برمی‌گردد و `admin.ts` آن را رویِ هدرهایِ `X-Audio-Complete`/`X-Audio-Missing-Segments`
+   ست می‌کند — فایل هنوز fail-open ساخته/سرو می‌شود (بلاک نمی‌شود)، فقط دیگر ادعایِ کاملیتش
+   بدونِ سیگنالِ صریح نیست. تستِ واقعی (MySQLِ لوکال + ffmpegِ واقعی + فایل‌هایِ صوتیِ واقعی،
+   دیتایِ canary پاک‌شده): یک gapِ عمدی در seq ساخته و `complete:false, missingSegments:[1]`
+   تأیید شد؛ بعدِ پرکردنِ gap، `complete:true` و فایلِ واقعاً دوباره‌ساخته‌شده تأیید شد. مسیرِ سریع (`-c copy`) وقتی همه‌ی سگمنت‌ها یک container/codec
    دارند؛ fallbackِ `-filter_complex concat` با ری‌اینکودِ opus وقتی مختلط‌اند (نادر، مثلاً
    تغییرِ مرورگر وسطِ جلسه — با یک سگمنتِ webm و یک m4aِ واقعی رویِ همون جلسه تست شد). بدونِ
    ffmpeg → `503` با پیامِ روشن؛ آرشیوِ خودِ سگمنت‌ها fail-open می‌ماند. `index.html`

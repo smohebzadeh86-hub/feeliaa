@@ -8,7 +8,7 @@ feeliaa/
 ├── CLAUDE.md                          U  router agent (جدید)
 ├── PROJECT_MASTER_REFERENCE.md        U  master reference (جدید)
 ├── PROJECT_STATUS.md                  M  وضعیتِ زنده + Event Log (tracked از `54a17fd`؛ با هر رویداد به‌روز می‌شود)
-├── package.json                       T  root: dev, test:rt
+├── package.json                       T  root: dev, test:rt, test:cf
 ├── pnpm-workspace.yaml                T
 ├── pnpm-lock.yaml                     T
 ├── package-lock.json                  U  lockfileِ خالیِ npm — IRRELEVANT
@@ -23,7 +23,8 @@ feeliaa/
 ├── public/                               فرانت (سرو شده توسط سرور)
 │   ├── index.html                     T  SPA کامل (تا commit `54a17fd`)
 │   ├── feelia-rt.js                   T  موتورِ realtime (تا commit `54a17fd`)
-│   └── feelia-analytics.js            U  Clarity
+│   ├── feelia-analytics.js            U  Clarity
+│   └── feelia-obs.js                  U  جدید، فازِ ۱ِ رصد/حسابرسی (2026-09-22) — تله‌متریِ کلیک/ناوبریِ سمتِ کلاینت به `/api/obs/events`
 │
 ├── server/
 │   ├── package.json, tsconfig.json    T
@@ -36,12 +37,13 @@ feeliaa/
 │       ├── auth/ guard.ts M · session.ts T · password.ts T
 │       ├── db/   connection.ts T · migrate.ts T · ownership.ts T
 │       │   └── migrations/ 001–014 T (008–014 با commitِ `54a17fd`، 2026-09-15؛ هنوز رویِ production اجرا نشده)
-│       ├── http/ admin.ts M · auth.ts M · clients.ts T (تا `54a17fd`) · sessions.ts T (تا `54a17fd`) · stt.ts M · clientConfig.ts U · sessionDate.ts T (نرمال‌سازیِ تاریخ/ساعتِ شمسیِ جلسه، `54a17fd`)
-│       ├── stt/  batchqueue.ts M · soniox.ts M · tempkey.ts T · asyncTranscribe.ts U · sessionAudioArchive.ts U · speakerResolve.ts U
+│       ├── http/ admin.ts M · auth.ts M · clients.ts T (تا `54a17fd`) · sessions.ts T (تا `54a17fd`) · stt.ts M · clientConfig.ts U · sessionDate.ts T (نرمال‌سازیِ تاریخ/ساعتِ شمسیِ جلسه، `54a17fd`) · obs.ts U (جدید، فازِ ۱: `POST /api/obs/events`)
+│       ├── obs/   U — جدید، فازِ ۱ِ رصد/حسابرسی (2026-09-22): types.ts، redact.ts (نقطه‌ی اجرایِ LAW-001، `sanitizeDetail`/`isSafeToken`)، fileSink.ts (JSONLِ چرخشی، بدونِ dependency)، eventLog.ts (صفِ درون‌حافظه‌ای + drain به DB، `logEvent`/`logUiEvents`)، httpHook.ts (`registerObsHooks`)، sweep.ts (`sweepOldObsEvents`)
+│       ├── stt/  batchqueue.ts M · soniox.ts M · tempkey.ts T · asyncTranscribe.ts U · sessionAudioArchive.ts U (+ `deriveSessionStatus` جدید، فازِ ۱) · speakerResolve.ts U
 │       ├── features/case-file/  U — جدید 2026-09-17: AI Case File (Ports & Adapters)
-│       │   ├── domain/     types.ts، errors.ts، validate.ts، normalizeText.ts (جدید 2026-09-19)
+│       │   ├── domain/     types.ts، errors.ts، validate.ts، normalizeText.ts (جدید 2026-09-19)، findings.ts (جدید 2026-09-20: واحدِ «یافته»، شناسه‌ی فکت، finalizeCouple)
 │       │   ├── ports/      llmProvider.port.ts، caseFileRepo.port.ts
-│       │   ├── application/ aggregateClientCorpus.ts، renderDigest.ts (جدید 2026-09-19)، buildCaseFilePrompt.ts، mergeTherapistEdits.ts، applyFieldPatch.ts، generateCaseFile.ts
+│       │   ├── application/ aggregateClientCorpus.ts، renderDigest.ts (جدید 2026-09-19)، buildCaseFilePrompt.ts، mergeTherapistEdits.ts، applyFieldPatch.ts، generateCaseFile.ts، repairLoop.ts (جدید 2026-09-19)، upgradeLegacyContent.ts (جدید 2026-09-20: ارتقایِ پرونده‌ی قدیمی بدونِ LLM)
 │       │   ├── adapters/   llm/openai.adapter.ts، llm/openrouter.adapter.ts (هر دو با SDKِ 'openai')، llm/registry.ts، llm/chatJson.ts + llm/caseFileDigestSchema.ts (جدید 2026-09-19)، llm/caseFileJsonSchema.ts، repository/caseFileRepository.sql.ts
 │       │   └── api/        caseFile.routes.ts
 │       └── ws/   transcription.ts T · p1.ts T
@@ -49,6 +51,7 @@ feeliaa/
 ├── server-deploy/                     U  EVIDENCE/stale: کپیِ server در f9b0a9c + .env + dist + node_modules
 │
 ├── scripts/rt-harness.cjs             T  تستِ FeeliaRT
+├── scripts/case-file-harness.ts       T  تستِ پرونده‌ی درمان (findings/merge/patch/repairLoop؛ بدونِ شبکه/DB) — 2026-09-20
 │
 ├── docs/
 │   ├── README.md                      U
