@@ -78,3 +78,10 @@ FAIL T20d final segment → archive, seqs contiguous from 0
 ## سایر
 - `pnpm test:cf` → 108 PASS / 0 FAIL.
 - entryِ موقتِ `rt-repro` در `.claude/launch.json` بعد از تست حذف شد.
+
+## پیوست — آخرین سگمنتِ finish در FAILED/RECONNECTING (همان روز)
+`finish()` پیش از `stopDurableSegment` به `FINALIZING` می‌رفت، پس آخرین سگمنت همیشه `archive` می‌گرفت (از قبل وجود داشت؛
+رویِ نسخه‌ی پیش از `3e732b1` هم بازتولید شد). رفع: `stopDurableSegment(stateAtFinish)`. mockِ harness دیگر `archive` را
+رونویسی‌شده حساب نمی‌کند. پیش از رفع: `T16x` → `0:archive`، `T16y` → آخرین سگمنت `archive`، و `T16 … queued`/`T16 later batch merges`
+FAIL. بعد از رفع: `T16x` → `0:transcript`، `T16y` → آخرین سگمنت `transcript`، `T16z` → پایان از ACTIVE `0:archive`؛
+`pnpm test:rt` 52/52. در مرورگرِ واقعی جدا تست نشد (فقط مسیرِ state؛ مکانیکِ MediaRecorder همان بخشِ ۱ است).

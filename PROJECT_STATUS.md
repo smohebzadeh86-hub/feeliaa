@@ -381,6 +381,27 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-23 — FINDING — آخرین سگمنتِ جلسه‌ای که در FAILED/RECONNECTING تمام می‌شود هرگز رونویسی نمی‌شود
+
+- **درخواستِ مالک:** «سؤالِ باز FAILED را هم بررسی کن» (سؤالِ بازِ entryِ رفعِ race چرخش). فقط بررسی؛ کدِ پروژه تغییر نکرد.
+- **ریشه:** `finish()` در `public/feelia-rt.js` اول `setState(FINALIZING)` (خطِ 1284) و بعد `stopDurableSegment()` (خطِ 1309)
+  را صدا می‌زند؛ پس `_stateAtStop = FINALIZING` و intentِ آخرین سگمنت `archive` می‌شود. `uploadBatchSegments` فقط
+  intentِ هر رکورد را دنبال می‌کند (`uploadQueuedSegment`) و جبران نمی‌کند.
+- **پیامد:** صدایِ از آخرین مرزِ سگمنت تا «پایانِ جلسه» (تا ۱۵ثانیه) در جلسه‌ای که realtimeش در لحظه‌ی پایان قطع است
+  فقط آرشیو می‌شود و هرگز به متن نمی‌رسد. در جلسه‌ی کاملاً durable-only (mint از ابتدا شکست) که کوتاه‌تر از ۱۵ثانیه است،
+  **کلِ صدا** رونویسی نمی‌شود؛ `batch_status` هم queued نمی‌شود، پس بنرِ «متنِ نهایی هنوز آماده نیست» (`index.html:5294`)
+  هیچ‌وقت به «آماده شد» نمی‌رسد (`awaitBatchDrain` تا سقفِ ۱۵ دقیقه منتظر می‌ماند).
+- **از قبل وجود داشت، نه ناشی از رفعِ `3e732b1`:** همان سناریو رویِ نسخه‌ی پیش از رفع هم `archive` می‌دهد.
+- **چرا تست ندید:** mockِ `batch-audio` در `scripts/rt-harness.cjs` هر purposeِ غیرِ note (شاملِ `archive`) را در
+  `batchQueue` می‌گذارد، پس `T16 later batch merges` با سگمنتِ archive هم سبز می‌شد.
+- **شاهد (کپیِ scratchpadِ harness):** `T16x` (durable-only) → `0:archive` FAIL؛ `T16y` (finish در RECONNECTING) → آخرین
+  سگمنت `archive` FAIL؛ رویِ نسخه‌ی پیش از رفع هم هر دو FAIL.
+- **FIX (به دستورِ مالک: «رفعش کن و دیپلوی کن»):** `finish()` stateِ پیش از FINALIZING را در `stateAtFinish` نگه می‌دارد و
+  به `stopDurableSegment(stateOverride)` می‌دهد. mockِ `batch-audio` در harness حالا `archive` را در صفِ رونویسی نمی‌گذارد.
+  تست‌هایِ تازه: `T16x` (durable-only)، `T16y` (پایان در RECONNECTING)، `T16z` (کنترلِ منفی: پایان از ACTIVE همچنان archive).
+  با mockِ اصلاح‌شده پیش از رفع: `T16x`، `T16y` و هر دو `T16`ِ قبلی FAIL؛ بعد از رفع **`pnpm test:rt` 52/52**.
+  subsystem 02 به‌روز شد. commit/deploy: entryِ DEPLOYِ بالا.
+
 ### 2026-09-23 — DEPLOY — `50c0fe7` به production (رفعِ race چرخشِ durable + خطایِ دائمیِ صف)
 
 - **درخواستِ مالک:** «حلش کن … خودت انجام بده». اولین تلاش‌ها (SSH/ساختِ tar/ویرایشِ `settings.local.json`) توسطِ

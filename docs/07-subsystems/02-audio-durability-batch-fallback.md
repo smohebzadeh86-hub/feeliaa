@@ -93,6 +93,7 @@ IndexedDB می‌نوشت؛ بدنه‌ی اصلی (هدر + ~۱۴ثانیه) د
 - chunkها محلیِ closureِ هر recorder در `startDurable` است (`var chunks = []`)؛ هیچ stateِ مشترکی رویِ `self` نیست.
 - `stopDurableSegment` پیش از `rec.stop()` همگام `rec._seqAtStop` و `rec._stateAtStop` را ثبت می‌کند؛ `onstop` intent/seq را از همین‌ها می‌سازد (fallback به `self.*` فقط برایِ recorderی که خودش متوقف شده).
 - جدولِ intentِ بالا یعنی «state در لحظه‌ی صدا زدنِ `stopDurableSegment`»، نه لحظه‌ی `onstop`.
+- استثنا: `finish()` پیش از بستنِ آخرین سگمنت به `FINALIZING` می‌رود، پس stateِ لحظه‌ی پایان را صریح به‌عنوانِ override می‌دهد (`stopDurableSegment(stateAtFinish)`). پایان در FAILED/RECONNECTING/NETWORK_PAUSED → آخرین سگمنت `transcript`؛ پایان از ACTIVE → `archive`. قبلاً همیشه `archive` بود و صدایِ تا ۱۵ثانیه‌ی آخر (یا کلِ جلسه‌ی durable-onlyِ کوتاه) هرگز رونویسی نمی‌شد. تست: `T16x`/`T16y`/`T16z`؛ mockِ harness حالا `archive` را در صفِ رونویسی نمی‌گذارد.
 - تست: `T20`/`T20a2` در harness با `FakeRecorder`ِ واقع‌گرا (هدرِ `HDR` در اولین chunk، دُمِ `TAIL` + `onstop` ناهمگام).
 
 **خطایِ دائمی در صفِ سرور (2026-09-23):** `processBatchQueueInner` بعد از آرشیوِ ادمین و پیش از
