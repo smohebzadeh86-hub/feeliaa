@@ -2,7 +2,9 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-23 (عصر) — آخرین رویداد: **BUG+FIX+DEPLOY (hotfix) از تستِ قطعِ اینترنتِ مالک رویِ
+> **آخرین به‌روزرسانی:** 2026-09-23 (شب) — آخرین رویداد: **AUDIT+FIX: بررسیِ کانفیگِ nginx؛ 504ِ کاذبِ تولیدِ پرونده در فرانت
+> رفع شد + کانفیگِ مرجعِ `deploy/nginx/feelia.conf`** (deploy/commit نشده؛ کانفیگِ زنده خوانده نشد).
+> قبل‌ترش: **BUG+FIX+DEPLOY (hotfix) از تستِ قطعِ اینترنتِ مالک رویِ
 > production: رونویسی بعد از وصل‌شدنِ دوباره نمی‌آمد («Audio decode error»)، متنِ صدایِ دوره‌ی قطعی گم می‌شد، مرورگرِ مالک
 > `feelia-rt.js`ِ قدیمی (پیش از دو رفعِ امروز) را از کش اجرا می‌کرد، و سؤالِ «پرونده‌ی خودکار» به حسابِ بدونِ فیچر نشان
 > داده می‌شد.** `test:rt` 55/55، `test:cf` 108/108، `tsc` تمیز؛ deploy شد، commit نشد. جزئیات در Event Log و
@@ -385,6 +387,65 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-23 — DOCS — هم‌گام‌سازیِ `deployment-operations.md` با واقعیتِ production
+
+- **درخواست:** مالک («اصلاحش کن و به روزش کن»).
+- **تغییرات در `docs/01-architecture/deployment-operations.md`:** بخشِ جدیدِ **§۴.۱** (ورود با `ssh -i ~/.ssh/feelia_migration`،
+  timeoutِ گاه‌به‌گاهِ پورتِ ۲۲، مجوزِ صریح برایِ هر دستور، الگویِ اسکریپتِ یک‌بارِ DB با `DOTENV_CONFIG_PATH=/root/feeliaa-mysql/.env`)؛
+  وضعیتِ `.env` (فقط ریشه؛ `server/.env` کنار گذاشته شد)؛ پیش‌نیازِ DB از PostgreSQL به MySQL (`connection.ts`)؛ ffmpeg رویِ
+  production نصب نیست؛ مسیرهایِ migration و `copy-assets.mjs` مطابقِ کدِ فعلی (`migrate.ts:10-15`، `copy-assets.mjs:17-18` — یعنی
+  «کارِ بازِ» `copy-assets` در ورودیِ deployِ Case File در کدِ فعلی رفع شده است)؛ سرخطِ سند (nginx conf حالا در repo هست).
+- **کد:** تغییری نکرد.
+
+### 2026-09-23 — OPS — رفعِ `server/.env`ِ کهنه و world-writable رویِ production
+
+- **درخواست/مجوز:** مالک («این مشکل رو حل کن») دنبالِ FINDINGِ ورودیِ بعدی؛ اجرا توسطِ agent با SSH (کلیدِ `feelia_migration`).
+- **پیش‌بررسی:** `pm2 jlist` → `feelia-mysql` cwd `/root/feeliaa-mysql`، script `server/dist/index.js`، بدونِ args/`DOTENV_CONFIG_PATH`
+  → `dotenv/config` فقط `/root/feeliaa-mysql/.env` (`-rw-------`) را می‌خواند؛ هیچ ارجاعی به `server/.env` در package.jsonها نبود.
+- **اقدام:** `chmod 600 server/.env` → `mv -n server/.env server/.env.stale-2026-09-23` (حذف نشد؛ برگشت‌پذیر). بدونِ restart.
+- **تأیید:** `server/.env` دیگر وجود ندارد؛ نسخه‌ی کنارگذاشته `-rw-------`؛ `feelia-mysql` online (restarts همان ۴)؛
+  `/api/health` → `ok` + `connected`. `/root/feeliaa/.env` (پروسه‌ی stoppedِ قدیمی) هم `-rw-------` است.
+- **کارِ باز:** اگر بعداً مطمئن شدیم لازم نیست، `server/.env.stale-2026-09-23` با مجوزِ مالک حذف شود.
+
+### 2026-09-23 — OPS + FINDING — فعال‌سازیِ پرونده (`case_file_enabled`) برایِ حسابِ ادمینِ `09944113233`
+
+- **درخواست/مجوز:** مالک پرسید چرا پرونده برایِ حسابِ ادمینش فعال نیست (پاسخ: طبقِ طراحی — گاردِ `requireCaseFileAccess`
+  در `server/src/auth/guard.ts:63` فقط فلگ را چک می‌کند، نه `is_admin`؛ فلگ فقط برایِ `09229123392` روشن شده بود).
+  گزینه‌ی «الف» (فقط فلگِ DB، بدونِ تغییرِ کد) را انتخاب کرد و **صریحاً اجازه‌ی اجرایِ دستورها توسطِ agent** را داد.
+- **اجرا (agent، SSH با کلیدِ `~/.ssh/feelia_migration` به `root@185.110.191.126`):** اسکریپتِ موقتِ `server/_cf_check.mjs`
+  (mysql2 + dotenv) → SELECTِ پیش‌بررسی: دقیقاً یک ردیف (`id faf6bd6c-…`، `is_admin=1`، `active=1`، `case_file_enabled=0`) →
+  `UPDATE therapists SET case_file_enabled=TRUE WHERE phone='09944113233' AND is_admin=TRUE` → `affectedRows 1` →
+  حالا فلگ روشن فقط برایِ `09229123392` و `09944113233`. اسکریپت بعدش حذف شد (تأیید با `ls`). هیچ secretی چاپ نشد
+  (فقط hashِ کوتاهِ `DATABASE_URL` برایِ مقایسه). بدونِ restart — فلگ در هر درخواست توسطِ `resolveSession` خوانده می‌شود.
+- **FINDING:** پروسه‌ی `feelia-mysql` با cwdِ `/root/feeliaa-mysql` اجرا می‌شود و `.env`ِ **ریشه** (`/root/feeliaa-mysql/.env`) را
+  می‌خواند؛ `server/.env` (با `DATABASE_URL`ِ متفاوت و مجوزِ `-rw-rw-rw-`) کهنه است و با آن اتصال به MySQL `Access denied` می‌دهد.
+  اسکریپت‌هایِ عملیاتیِ بعدی باید `DOTENV_CONFIG_PATH=/root/feeliaa-mysql/.env` بدهند. مجوزِ world-writableِ `server/.env` رفع نشد (فقط ثبت).
+- **فایل‌ها:** فقط همین ورودی (کد تغییری نکرد).
+
+### 2026-09-23 — OPS — بررسیِ سلامتِ production و restartِ nginx (اجرا توسطِ مالک)
+
+- **عامل:** مالک، دستی رویِ سرور (با دستورهایِ این نشست؛ agent به سرور دسترسی نداشت — ورود با رمز توسطِ agent انجام نشد).
+- **مشاهده (15:13 UTC):** `feelia-mysql` online (↺ 4، ~130MB)، `feelia`ِ قدیمی stopped (دست نخورد)؛ nginx و mysql `active`؛
+  دیسک ۱۸٪؛ `/api/health` → `ok` + `connected`.
+- **اقدام:** `nginx -t` موفق → `systemctl restart nginx` → `curl --resolve feelia.ir:443:127.0.0.1` → `200`، `cache-control: no-cache`،
+  `Content-Length: 410019` (همان `index.html`ِ فعلی)؛ `pm2 save`.
+- **نتیجه:** سمتِ سرور مشکلی دیده نشد. nginx `1.28.3`؛ پاسخ با `HTTP/1.1` (http2 روی ۴۴۳ فعال نیست — INFERRED از همین یک پاسخ).
+  کانفیگِ مرجعِ `deploy/nginx/feelia.conf` هنوز اعمال نشده.
+
+### 2026-09-23 — AUDIT + FIX + FINDING — بررسیِ کانفیگِ nginxِ ارسالیِ مالک؛ 504ِ کاذب در تولیدِ پرونده
+
+- **درخواستِ مالک:** بررسیِ یک کانفیگِ nginx (از پروژه‌ی دیگر) برایِ پایدارترشدنِ سایت و حلِ چالش‌ها.
+- **FINDING:** `case-file/regenerate` درخواستِ همگامِ چنددقیقه‌ای است؛ با `proxy_read_timeout`ِ پیش‌فرضِ nginx (۶۰ث) مرورگر
+  504 می‌گیرد، polling قطع و «خطا» نشان داده می‌شود در حالی که سرور تولید را ادامه می‌دهد. کامنتِ فرانت درباره‌ی «abort به سرور وصل است»
+  با کد نمی‌خواند (هیچ لغوی در `server/src/features/case-file` نیست).
+- **FIX (فرانت):** `public/index.html` `regenerateCaseFile` — 504ِ بدونِ `code` مثلِ timeout رفتار می‌کند (ادامه‌ی polling). 502/503 عمداً نه.
+- **جدید:** `deploy/nginx/feelia.conf` — کانفیگِ مرجع (timeoutِ ۶۶۰ث برایِ regenerate، `client_max_body_size 12m`، gzip، هدرهایِ امن با
+  `microphone=(self)`، WSِ legacy، بدونِ override کردنِ `no-cache`ِ اپ). مواردِ خطرناکِ کانفیگِ ارسالی (`microphone=()`، `max-age` روی JS، CSP)
+  کپی نشدند.
+- **محدودیت:** کانفیگِ زنده خوانده نشد (SSH بدونِ کلید رد شد)؛ کانفیگِ مرجع روی سرور اعمال نشده و `nginx -t` نشده. deploy/commit نشد.
+- **پیشنهادهایِ باز (نیازمندِ تصمیمِ مالک):** `listen` روی `127.0.0.1`، `secure` روی کوکیِ نشست، shutdownِ graceful با `app.close()`.
+- اسناد: `deployment-operations.md` §4، `repository-map.md`؛ evidence: [verification](verification/2026-09-23-nginx-review-case-file-504.md).
 
 ### 2026-09-23 — GIT — commit و push ِ hotfixِ قطع/وصلِ اینترنت
 
