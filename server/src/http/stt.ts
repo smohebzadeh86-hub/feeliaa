@@ -6,6 +6,7 @@
 import { FastifyInstance } from 'fastify';
 import { requireAuth } from '../auth/guard.js';
 import { getOwnedSession } from '../db/ownership.js';
+import { logEvent } from '../obs/eventLog.js';
 import { SonioxEngine } from '../stt/soniox.js';
 import {
   SONIOX_WS_URL,
@@ -181,6 +182,7 @@ export async function sttRoutes(app: FastifyInstance) {
       console.log(
         `[stt-mint] temp-key issued therapist=${therapistId} session=${session_id} expires_in=${TEMP_KEY_EXPIRES_IN_SECONDS}s single_use=true`
       );
+      logEvent({ event: 'stt.mint_ok', sessionId: session_id, therapistId, detail: { purpose } });
       return {
         websocket_url: SONIOX_WS_URL,
         model: 'stt-rt-v5',
@@ -198,6 +200,7 @@ export async function sttRoutes(app: FastifyInstance) {
       console.log(
         `[stt-mint] fail code=${code} therapist=${therapistId} session=${session_id} key_len=${masterKey.length}`
       );
+      logEvent({ event: 'stt.mint_failed', sessionId: session_id, therapistId, severity: 'warn', code, detail: { purpose } });
       reply.code(status);
       // 503 یعنی: session می‌تواند ساخته/ادامه یابد ولی realtime الان ممکن نیست —
       // فرانت باید durable ضبط کند و به صف batch برود، نه اینکه session را بلاک کند.

@@ -24,6 +24,16 @@ function clarityProjectId(): string | null {
   return raw;
 }
 
+// obs (لایه‌ی رصد/حسابرسیِ فازِ ۱) — برخلافِ Clarity، برایِ ادمین هم فعال است
+// (تصمیمِ مالک، پلنِ obs بخشِ ۳): پنلِ ادمین هم باید بتواند کلیک/ناوبریِ خودش را ببیند.
+// sample به‌صورتِ per-page-load در feelia-obs.js اعمال می‌شود، نه per-event اینجا.
+function obsConfig(): { enabled: boolean; sample: number } {
+  const enabled = process.env.OBS_CLIENT_ENABLED !== 'false'; // پیش‌فرض روشن
+  const rawSample = Number(process.env.OBS_CLIENT_SAMPLE);
+  const sample = Number.isFinite(rawSample) && rawSample > 0 && rawSample <= 1 ? rawSample : 1;
+  return { enabled, sample };
+}
+
 export async function clientConfigRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
 
@@ -31,6 +41,6 @@ export async function clientConfigRoutes(app: FastifyInstance) {
   app.get('/api/client-config', async (request, reply) => {
     reply.header('Cache-Control', 'no-store');
     const projectId = request.isAdmin ? null : clarityProjectId();
-    return { clarity: projectId ? { projectId } : null };
+    return { clarity: projectId ? { projectId } : null, obs: obsConfig() };
   });
 }
