@@ -54,6 +54,9 @@ export const OBS_SERVER_EVENTS = [
   'batch.enqueued',
   'batch.completed',
   'batch.failed',
+  // سگمنتِ صفِ batch که هرگز قابلِ رونویسی نیست (container خراب / Soniox «Invalid audio file») —
+  // از صف خارج می‌شود (نسخه‌ی آرشیو برایِ بررسی می‌ماند) تا worker تا ابد retry نکند.
+  'batch.segment_unrecoverable',
   'stt.mint_ok',
   'stt.mint_failed',
   'casefile.generated',

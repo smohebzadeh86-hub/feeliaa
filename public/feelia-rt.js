@@ -391,7 +391,7 @@
     this.durableRec = null;
     this.durableRotateTimer = null;
     this.durableSeq = 0; // شماره‌ی افزایشیِ سگمنت — کلیدِ ردیفِ IndexedDB می‌شه (sessionId_seq)
-    this.durableChunks = [];
+    // (chunkهای durable عمداً رویِ self نیستند — محلیِ هر recorder در startDurable؛ race چرخش)
     this.confirmed = '';
     this.interim = '';
     this.baseVersion = 0; // transcript_version پایه برای CAS
@@ -567,7 +567,13 @@
   RTSession.prototype.startDurable = function () {
     var self = this;
     if (!self.stream) return;
-    self.durableChunks = [];
+    // ⭐ فیکسِ race چرخش (۲۰۲۶-۰۹-۲۳، verification/2026-09-23-durable-rotation-race.md):
+    // آرایه‌ی chunk محلیِ *همین* recorder است، نه یک property مشترک رویِ self. rec.stop()
+    // ناهمگام است — آخرین dataavailable و onstop بعداً می‌رسند، وقتی caller (چرخش/مرزِ
+    // قطعی) با startDurable() بلافاصله recorderِ بعدی را ساخته. قبلاً دُمِ recorderِ قبلی
+    // به آرایه‌ی تازه می‌افتاد و onstopِ قبلی فقط همان دُمِ بی‌هدرِ EBML را ذخیره می‌کرد —
+    // بدنه‌ی اصلیِ سگمنت (هدر + ~۱۴ثانیه) در RAM رها و گم می‌شد.
+    var chunks = [];
     var mime = pickMime();
     try {
       self.durableRec = mime
@@ -584,8 +590,9 @@
     // stopDurableSegment از قبل self.durableRec رو null کرده (رجوع به همون تابع).
     var recordedMime = self.durableRec.mimeType || mime || 'audio/webm';
     self.durableRec.ondataavailable = function (e) {
-      if (e.data && e.data.size > 0) self.durableChunks.push(e.data);
+      if (e.data && e.data.size > 0) chunks.push(e.data);
     };
+    var rec = self.durableRec;
     // ⭐ نوشتنِ مستقیم به IndexedDB همین‌جا (نه فقط نگه‌داشتن توی RAM) — تا رفرش/بستنِ
     // تب/کرش این سگمنت رو از بین نبره. seq قبل از async شدن گرفته می‌شه که با سگمنتِ
     // بعدی (که veryممکنه بلافاصله بعدِ چرخش شروع بشه) قاطی نشه.
@@ -598,14 +605,16 @@
     // می‌شه که فقط بعدِ تمومِ AudioQueueDB.add (یا تصمیمِ «چیزی برایِ ذخیره نبود»)
     // resolve می‌شه؛ stopDurableSegment همین promise رو برمی‌گردونه.
     var resolveFlush;
-    self.durableRec._flushPromise = new Promise(function (res) { resolveFlush = res; });
-    self.durableRec.onstop = function () {
-      var chunks = self.durableChunks;
-      self.durableChunks = [];
+    rec._flushPromise = new Promise(function (res) { resolveFlush = res; });
+    rec.onstop = function () {
       // اگه abort() صدا زده شده باشه (لغوِ صریحِ کاربر)، این تکه رو دور بریز — وگرنه
       // بعدِ پاک‌سازیِ صف دوباره اضافه می‌شد و برایِ همیشه یتیم می‌موند.
       if (!chunks.length || self.aborted) { resolveFlush(); return; }
-      var seq = self.durableSeq++;
+      // seq و state در لحظه‌ی stopDurableSegment ثبت شده‌اند (نه اینجا، که ممکن است بعد از
+      // تغییرِ state و شروعِ سگمنتِ بعدی اجرا شود). fallback فقط برایِ recorderی است که
+      // خودش (مثلاً با پایانِ track) بدونِ stopDurableSegment متوقف شده.
+      var seq = typeof rec._seqAtStop === 'number' ? rec._seqAtStop : self.durableSeq++;
+      var stateAtStop = rec._stateAtStop || self.state;
       // ⭐ intent تصمیمِ همین لحظه است (نه بعداً حدس‌زده‌شده در زمانِ آپلود، audit صدا/
       // ۲۰۲۶-۰۹-۱۶، بخشِ C): یادداشتِ صوتی همیشه 'note'؛ اگه realtime همین الان غیرقابل‌اعتماد
       // است یا وضعیتِ ناپایدار (reconnect/network-paused/failed)، این سگمنت باید رونویسی
@@ -618,8 +627,12 @@
       // mergeBatchTranscript (append) به transcript اضافه می‌شدند — متنِ از قبل درستِ
       // realtime برایِ باقیِ جلسه دوبار می‌آمد. تنها stateِ *لحظه‌ی بستنِ همین سگمنت*
       // باید تعیین‌کننده باشد، نه پرچمِ سراسریِ unreliable.
+      // ⭐ و «لحظه‌ی بستن» یعنی لحظه‌ی صدا زدنِ stopDurableSegment (stateAtStop)، نه لحظه‌ی
+      // اجرایِ همین onstopِ ناهمگام: callerهای مرزِ قطعی بلافاصله بعد از stop، state را
+      // عوض می‌کنند — قبلاً سگمنتِ سالمِ پیش از قطعی transcript و سگمنتِ خودِ قطعی
+      // archive می‌گرفت (برعکس؛ ۲۰۲۶-۰۹-۲۳).
       var intent = self.mode === 'note' ? 'note' :
-        (self.state === STATES.RECONNECTING || self.state === STATES.NETWORK_PAUSED || self.state === STATES.FAILED)
+        (stateAtStop === STATES.RECONNECTING || stateAtStop === STATES.NETWORK_PAUSED || stateAtStop === STATES.FAILED)
           ? 'transcript' : 'archive';
       try {
         var blob = new Blob(chunks, { type: recordedMime });
@@ -633,7 +646,8 @@
       } catch (e) { resolveFlush(); }
     };
     try { self.durableRec.start(1000); } catch (e) {}
-    // چرخشِ خودکارِ ۶۰ثانیه‌ای — نه فقط سرِ pause/resume (توضیح بالایِ DURABLE_ROTATE_MS)
+    // چرخشِ خودکارِ ۱۵ثانیه‌ای — نه فقط سرِ pause/resume (توضیح بالایِ DURABLE_ROTATE_MS).
+    // stop و بلافاصله start امن است چون chunks/seq/state هر recorder مالِ خودش است (بالا).
     self.durableRotateTimer = self.later(function () {
       if (self.durableRec && self.durableRec.state === 'recording') {
         self.stopDurableSegment();
@@ -659,6 +673,9 @@
     var rec = this.durableRec;
     this.durableRec = null;
     if (rec.state === 'inactive') return Promise.resolve();
+    // seq و state همین حالا (همگام) ثبت می‌شوند — onstop بعداً اجرا می‌شود (توضیحِ startDurable).
+    rec._seqAtStop = this.durableSeq++;
+    rec._stateAtStop = this.state;
     var flushP = rec._flushPromise || Promise.resolve();
     // نگهبان: اگه onstop به هر دلیلی (خطای مرورگر/state عجیب) هیچ‌وقت fire نشه،
     // finish() تا ابد قفل نمونه.
@@ -1549,7 +1566,7 @@
   }
 
   // ⭐ فلاشِ فوریِ سگمنتِ durableِ جاری وقتی صفحه پنهان/بسته می‌شود (audit صدا/۲۰۲۶-۰۹-۱۶):
-  // بدونِ این، تا ۱۵ ثانیه‌ی آخرِ صدا فقط در RAM (self.durableChunks) است — رفرش/بستنِ
+  // بدونِ این، تا ۱۵ ثانیه‌ی آخرِ صدا فقط در RAM (chunksِ recorderِ جاری) است — رفرش/بستنِ
   // تب/کرش همان چند ثانیه را از بین می‌برد. stopDurableSegment سگمنتِ جاری را به
   // IndexedDB می‌نویسد؛ اگر صفحه فقط پنهان شده (نه واقعاً بسته)، بلافاصله سگمنتِ
   // بعدی شروع می‌شود تا ضبطِ زنده قطع نشود.

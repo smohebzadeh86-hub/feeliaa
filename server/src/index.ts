@@ -20,7 +20,7 @@ import { obsRoutes } from './http/obs.js';
 import { registerObsHooks } from './obs/httpHook.js';
 import { startObsDrainLoop, flushObsQueue } from './obs/eventLog.js';
 import { sweepOldObsEvents } from './obs/sweep.js';
-import { sweepOldBatchFiles, retryQueuedBatches } from './stt/batchqueue.js';
+import { sweepOldBatchFiles, retryQueuedBatches, BATCH_SWEEP_INTERVAL_MS } from './stt/batchqueue.js';
 import { sweepOldSessionAudio } from './stt/sessionAudioArchive.js';
 import { sweepOldResolveJobs } from './stt/speakerResolve.js';
 
@@ -97,6 +97,7 @@ const start = async () => {
     await runMigrations();
     // پاک‌سازی فایل‌های صوت batch قدیمی (حریم خصوصی/دیسک) — قبل از حذف، تلاش می‌کنه آرشیو کنه
     try { await sweepOldBatchFiles(); } catch {}
+    setInterval(() => { sweepOldBatchFiles().catch(() => {}); }, BATCH_SWEEP_INTERVAL_MS);
     // آرشیوِ صدایِ ادمین: هم سرِ startup هم هر ۲۴ ساعت — سروری که هفته‌ها ری‌استارت
     // نمی‌شه هم نباید صدایِ بیشتر از سقفِ نگه‌داری رو نگه داره.
     try { await sweepOldSessionAudio(); } catch {}

@@ -1,7 +1,7 @@
 // صف batch fallback — فقط برای failure مسیر realtime.
 // حریم خصوصی: صوت خام فقط در این مسیرِ شکست به سرور Feelia می‌آید (نه در حالت عادی)،
 // روی دیسکِ موقتِ سرور می‌ماند تا رونویسی شود، بلافاصله بعد از موفقیت حذف می‌شود،
-// و فایل‌های قدیمی‌تر از ۲۴ ساعت در startup پاک می‌شوند. هیچ صوتی در DB ذخیره نمی‌شود.
+// و فایل‌های قدیمی‌تر از ۲۴ ساعت در startup و هر ساعت پاک می‌شوند. هیچ صوتی در DB ذخیره نمی‌شود.
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -78,6 +78,24 @@ export function audioPathFor(sessionId: string, purpose: BatchPurpose = 'transcr
   return path.join(QUEUE_DIR, `${safe}-${seqPadded}-${runSafe}-${Date.now()}${markerFor(purpose)}${ext}`);
 }
 
+// بررسیِ magic bytesِ container (۲۰۲۶-۰۹-۲۳، race چرخشِ durable در کلاینت): سگمنتی که با
+// هدرِ واقعیِ container شروع نمی‌شود (مثلاً دُمِ بی‌هدرِ یک MediaRecorder) هرگز قابلِ رونویسی
+// نیست — Soniox و ffmpeg هر دو ردش می‌کنند. عمداً فقط در صف (پیش از Soniox) استفاده می‌شود،
+// نه در مسیرِ دریافت: فایل پذیرفته و آرشیو می‌شود تا برایِ بررسی بماند.
+export function looksLikeValidContainer(buf: Buffer, ext: string): boolean {
+  if (!buf || buf.length < 12) return false;
+  if (ext === 'ogg') return buf.subarray(0, 4).toString('latin1') === 'OggS';
+  if (ext === 'm4a') return buf.subarray(4, 8).toString('latin1') === 'ftyp';
+  // webm/Matroska: EBML header
+  return buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3;
+}
+
+// خطایِ Soniox که با retry هیچ‌وقت درست نمی‌شود (خودِ فایل نامعتبر است) — نه خطایِ موقتِ
+// شبکه/سهمیه. متنِ پیام از error_messageِ خودِ Soniox می‌آید (asyncTranscribe.ts).
+export function isPermanentTranscribeError(e: unknown): boolean {
+  return /invalid audio file/i.test(String(e));
+}
+
 export function validateAudioBuffer(buf: Buffer): string | null {
   if (!buf || buf.length < 100) return 'فایل صوتی خیلی کوتاه است';
   if (buf.length > MAX_AUDIO_BYTES) return 'فایل صوتی بیش از حد بزرگ است';
@@ -149,10 +167,20 @@ function seqFromFilename(filePath: string): number {
 function runIdFromFilename(filePath: string): string {
   return parseQueueFilename(filePath)?.runId ?? 'legacy';
 }
-function mimeFromFilename(filePath: string): string {
+function extFromFilename(filePath: string): string {
   const base = path.basename(filePath);
   const m = base.match(new RegExp(`\\.(${EXT_ALTERNATION})$`));
-  return mimeForExt(m ? m[1] : 'webm');
+  return m ? m[1] : 'webm';
+}
+function mimeFromFilename(filePath: string): string {
+  return mimeForExt(extFromFilename(filePath));
+}
+
+// سگمنتِ غیرقابلِ‌رونویسی را از صف خارج کن (نسخه‌ی آرشیوِ ادمین از قبل نوشته شده و می‌ماند).
+function dropUnrecoverable(sessionId: string, file: string, purpose: BatchPurpose, bytes: number, reason: string) {
+  removeAudioFile(file);
+  console.log(`[batch] unrecoverable segment dropped from queue (archive kept) session=${sessionId} purpose=${purpose} seq=${seqFromFilename(file)} bytes=${bytes} reason=${reason}`);
+  logEvent({ event: 'batch.segment_unrecoverable', sessionId, source: 'job', severity: 'warn', detail: { purpose, seq: seqFromFilename(file), bytes, reason } });
 }
 
 function filesFor(sessionId: string, purpose: BatchPurpose): string[] {
@@ -282,6 +310,12 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
         logEvent({ event: 'audio.archive_failed', sessionId, source: 'job', severity: 'error', detail: { purpose } });
         continue;
       }
+      // ⭐ فایلِ بدونِ هدرِ container هرگز رونویسی نمی‌شود — قبلاً هر ۵ دقیقه (retryQueuedBatches)
+      // دوباره به Soniox آپلود و رد می‌شد و batch_status برایِ همیشه 'queued' می‌ماند.
+      if (!looksLikeValidContainer(buffer, extFromFilename(file))) {
+        dropUnrecoverable(sessionId, file, purpose, buffer.length, 'bad-container');
+        continue;
+      }
       const baseRow = await query('SELECT transcript_version FROM sessions WHERE id = ?', [sessionId]);
       const baseVersion: number = baseRow.rows[0]?.transcript_version ?? 0;
       console.log(`[batch] processing session=${sessionId} purpose=${purpose} bytes=${buffer.length} (async API)`);
@@ -289,6 +323,10 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       try {
         text = await transcribeFileAsync(buffer, `${sessionId}.webm`, `feelia:${sessionId}:${purpose}`);
       } catch (e) {
+        if (isPermanentTranscribeError(e)) {
+          dropUnrecoverable(sessionId, file, purpose, buffer.length, 'soniox-invalid-audio');
+          continue;
+        }
         console.log('[batch] async transcribe error, kept queued (already archived):', String(e).slice(0, 160));
         continue; // این فایل توی صف می‌مونه؛ صدا از قبل آرشیو شده، فقط رونویسی عقب افتاده
       }
@@ -334,7 +372,10 @@ function sessionIdFromFilename(filePath: string): string | null {
   return parseQueueFilename(filePath)?.sessionId ?? null;
 }
 
-// پاک‌سازی startup: فایل‌های قدیمی‌تر از RETENTION_MS (نشت دیسک/حریم خصوصی).
+// پاک‌سازی: فایل‌های قدیمی‌تر از RETENTION_MS (نشت دیسک/حریم خصوصی). در startup و هر
+// BATCH_SWEEP_INTERVAL_MS (index.ts) — قبلاً فقط startup، یعنی سروری که ری‌استارت نمی‌شد
+// سیاستِ ۲۴ساعته را هرگز اعمال نمی‌کرد.
+export const BATCH_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 // ⭐ باگِ قبلی: فایل مستقیم پاک می‌شد، حتی اگه Soniox/سرور هیچ‌وقت نتونسته بود
 // آرشیوش کنه (کلیدِ نامعتبر، ری‌استارتِ مکرر) — یعنی بعدِ ۲۴ ساعت صدا برایِ همیشه
 // از بین می‌رفت. الان قبل از حذف، یه‌بار تلاش می‌کنه آرشیوش کنه (fail-open — اگه

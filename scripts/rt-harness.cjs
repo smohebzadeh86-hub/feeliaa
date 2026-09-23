@@ -18,13 +18,28 @@ function newSession(id) { sessions[id] = { transcript: '', transcript_version: 0
 
 // ——— stub های مرورگر ———
 const sentBlobs = [];
+// ⭐ واقع‌گرا مثلِ MediaRecorderِ واقعی (۲۰۲۶-۰۹-۲۳، race چرخشِ durable): اولین chunk هدرِ
+// container (نشانگرِ 'HDR') را دارد، و stop() ناهمگام است — دُمِ صدا ('TAIL') و onstop در
+// یک taskِ بعدی می‌رسند. نسخه‌ی قبلیِ کاملاً همگام این race را هرگز بازتولید نمی‌کرد.
 class FakeRecorder {
-  constructor(stream, opts) { this.stream = stream; this.state = 'inactive'; this.ondataavailable = null; this.onstop = null; }
-  start(ts) { this.state = 'recording'; if (this.ondataavailable) this.ondataavailable({ data: new Blob(['x'.repeat(500)]) }); }
-  stop() { if (this.state === 'inactive') return; this.state = 'inactive'; if (this.onstop) this.onstop(); }
+  constructor(stream, opts) { this.stream = stream; this.durable = !!(opts && opts.audioBitsPerSecond); this.state = 'inactive'; this.ondataavailable = null; this.onstop = null; }
+  start(ts) {
+    this.state = 'recording';
+    if (this.durable) FakeRecorder.durableStarts++; // فقط durable (liveRec بیت‌ریتِ صریح ندارد)
+    setTimeout(() => { if (this.ondataavailable) this.ondataavailable({ data: new Blob(['HDR' + 'x'.repeat(500)]) }); }, 0);
+  }
+  stop() {
+    if (this.state === 'inactive') return;
+    this.state = 'inactive';
+    setTimeout(() => {
+      if (this.ondataavailable) this.ondataavailable({ data: new Blob(['TAIL']) });
+      if (this.onstop) this.onstop();
+    }, 0);
+  }
 }
 globalThis.MediaRecorder = FakeRecorder;
 FakeRecorder.isTypeSupported = () => true;
+FakeRecorder.durableStarts = 0;
 Object.defineProperty(globalThis, 'navigator', { value: { mediaDevices: { getUserMedia: async () => ({ active: true, getTracks: () => [{ stop() {} }] }) } }, configurable: true, writable: true });
 
 class FakeWS {
@@ -68,6 +83,8 @@ globalThis.fetch = async (url, opts = {}) => {
   }
   m = url.match(/^\/api\/sessions\/([^/?]+)\/batch-audio/);
   if (m && method === 'POST') {
+    const q = new URLSearchParams(url.split('?')[1] || '');
+    sentBlobs.push({ sessionId: m[1], purpose: q.get('purpose'), seq: Number(q.get('seq')), blob: opts.body && opts.body.f ? opts.body.f[0] : null });
     const purpose = url.includes('purpose=note') ? 'note' : 'transcript';
     (purpose === 'note' ? noteQueue : batchQueue).push({ sessionId: m[1] });
     return json(202, { status: 'queued', purpose });
@@ -217,6 +234,42 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('T18 post-recovery segments uploaded as purpose=archive, not re-transcribed', s18Archive.length >= 1, s18Uploads.join(','));
   ok('T18 finish still honestly reports unreliable/batch', out18.reliable === false && out18.mode === 'batch');
   ok('T18 confirmed realtime text kept both parts, no drop', s18.confirmed.includes('قبل از قطعی') && s18.confirmed.includes('بعد از بازگشت'));
+
+  // Test 20 (race چرخشِ durable، ۲۰۲۶-۰۹-۲۳): stop و *بلافاصله* start (بدونِ await — دقیقاً
+  // مثلِ تایمرِ چرخش و مرزهای قطعی). با FakeRecorderِ ناهمگام، قبلاً (الف) onstopِ recorderِ
+  // قبلی فقط دُمِ بی‌هدر را ذخیره می‌کرد و (ب/ج) intentِ سگمنت‌های مرزی برعکس بود.
+  newSession('s20');
+  const durableStartsBefore20 = FakeRecorder.durableStarts;
+  const s20 = RT.createSession('s20', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+  const p20 = s20.start(); await sleep(5); serverOpen(FakeWS.last); await p20;
+  await sleep(5);
+  s20.stopDurableSegment(); s20.startDurable(); // seq0: چرخشِ عادی در ACTIVE
+  await sleep(5);
+  serverClose(FakeWS.last); // seq1: سگمنتِ سالمِ پیش از قطعی (مرز در scheduleReconnect)
+  await sleep(1200);
+  serverOpen(FakeWS.last); // seq2: سگمنتِ خودِ قطعی (مرز در connectWithFreshMint)
+  await sleep(5);
+  await s20.finish({ awaitBatch: true }); // seq3: سگمنتِ پایانی
+  const durableStarts20 = FakeRecorder.durableStarts - durableStartsBefore20;
+  await sleep(20);
+  const up20 = sentBlobs.filter((b) => b.sessionId === 's20').sort((a, b) => a.seq - b.seq);
+  const txt20 = await Promise.all(up20.map((b) => (b.blob ? b.blob.text() : Promise.resolve(''))));
+  const desc20 = up20.map((b, i) => b.seq + ':' + b.purpose + ':' + txt20[i].slice(0, 3) + ':' + txt20[i].length).join(',');
+  // ⚠️ تعدادِ دقیقِ سگمنت‌ها ثابت نیست: FakeWS.close() onclose را همگام صدا می‌زند و
+  // scheduleReconnect چند بار (هنوز در ACTIVE) بازگشتی اجرا می‌شود — artifactِ harness، نه
+  // مرورگر. پس به‌جای شمارش، شکل را چک می‌کنیم: همه archive جز *یک* transcript که سگمنتِ
+  // خودِ قطعی است (یکی مانده به آخر)، و سگمنتِ پایانی archive.
+  const n20 = up20.length;
+  ok('T20a every durable segment starts with container header and keeps body+tail (no headless tail)',
+    n20 >= 4 && txt20.every((t) => t.startsWith('HDR') && t.endsWith('TAIL') && t.length > 500), desc20);
+  // هر durable recorder دقیقاً یک سگمنتِ ذخیره‌شده — هیچ بدنه‌ای گم نشده (قبلاً بدنه‌ی سگمنت‌هایِ
+  // چرخشی در RAM رها می‌شد و فقط دُمش، یا هیچ‌چیز، به صف می‌رسید).
+  ok('T20a2 one stored segment per durable recorder (no body lost)', n20 === durableStarts20, 'segments=' + n20 + ' durableRecorders=' + durableStarts20);
+  ok('T20b segments closed while ACTIVE (rotation + entering outage) → archive',
+    n20 >= 4 && up20.slice(0, n20 - 2).every((b) => b.purpose === 'archive'), desc20);
+  ok('T20c outage segment closed on recovery (RECONNECTING at stop) → transcript, exactly one',
+    up20[n20 - 2] && up20[n20 - 2].purpose === 'transcript' && up20.filter((b) => b.purpose === 'transcript').length === 1, desc20);
+  ok('T20d final segment → archive, seqs contiguous from 0', up20[n20 - 1] && up20[n20 - 1].purpose === 'archive' && up20.every((b, i) => b.seq === i), desc20);
 
   // Test 19: قطعیِ «بی‌صدا» — WSای که readyState اش دیگه OPEN نیست ولی onclose/onerror
   // هیچ‌وقت فایر نمی‌شه (شبیه‌سازیِ یک شبکه‌ی محو‌شده بدونِ FIN/RST؛ برخلافِ serverClose
