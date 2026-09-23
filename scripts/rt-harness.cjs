@@ -126,6 +126,21 @@ globalThis.fetch = async (url, opts = {}) => {
 };
 globalThis.FormData = class { constructor() { this.f = []; } append(k, v, n) { this.f.push(v); } };
 globalThis.window = globalThis;
+// mock حداقلیِ IndexedDB برای harness (فقط عملیاتِ AudioQueueDB)
+(function () {
+  const data = new Map();
+  const req = (fn) => { const r = { result: undefined, onsuccess: null, onerror: null }; setTimeout(() => { try { r.result = fn(); } catch (e) { r.error = e; if (r.onerror) r.onerror(); return; } if (r.onsuccess) r.onsuccess(); }, 0); return r; };
+  const store = {
+    put: (rec) => req(() => { data.set(rec.id, rec); return rec.id; }),
+    getAll: () => req(() => [...data.values()]),
+    delete: (id) => req(() => { data.delete(id); }),
+    index: () => ({ getAll: (range) => req(() => [...data.values()].filter((r) => r.sessionId === range.v)) }),
+  };
+  const db = { objectStoreNames: { contains: () => true }, createObjectStore: () => store, transaction: () => ({ objectStore: () => store }) };
+  globalThis.indexedDB = { open: () => { const r = { result: db }; setTimeout(() => r.onsuccess && r.onsuccess(), 0); return r; } };
+  globalThis.IDBKeyRange = { only: (v) => ({ v }) };
+})();
+
 globalThis.addEventListener = () => {}; globalThis.removeEventListener = () => {};
 
 const src = fs.readFileSync(path.join('public', 'feelia-rt.js'), 'utf8');
@@ -172,6 +187,67 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const out2 = await s2.finish({ awaitBatch: true }); // حالت صریحِ منتظر drain (پیش‌فرض جدید non-blocking است)
   ok('T2 unreliable -> batch fallback', out2.mode === 'batch' && out2.reliable === false && out2.text.includes('BATCH FULL TEXT'), out2.mode);
   ok('T2 no duplicate of confirmed', (sessions.s2.transcript.match(/متن تاییدشده/g) || []).length === 1);
+
+  // Test 18 (بخشِ ۱۸ audit): بعدِ یک قطعیِ کوتاه که reconnect می‌شود، جلسه باید در ACTIVEِ
+  // سالم ادامه پیدا کند — سگمنت‌هایِ durableِ *بعدِ* بازگشت نباید دوباره purpose=transcript
+  // بگیرند (باگِ قدیمی: self.unreliableِ یک‌طرفه باعث می‌شد همه‌ی سگمنت‌هایِ بعدی هم برای
+  // همیشه دوباره رونویسی/append شوند — دوپلیکیتِ متنِ از قبل درستِ realtime).
+  newSession('s18');
+  const s18 = RT.createSession('s18', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+  const p18 = s18.start(); await sleep(5); serverOpen(FakeWS.last); await p18;
+  serverTokens(FakeWS.last, [{ text: 'قبل از قطعی', is_final: true }]);
+  await sleep(5);
+  serverClose(FakeWS.last); // قطعِ غافلگیرانه — مرزِ سگمنت باید همین‌جا خودکار بسته شود (فیکسِ scheduleReconnect)
+  await sleep(1200);
+  serverOpen(FakeWS.last); // reconnect موفق — مرزِ سگمنتِ برگشت هم باید خودکار بسته شود (فیکسِ connectWithFreshMint)
+  await sleep(5);
+  ok('T18 recovered to ACTIVE after reconnect', s18.state === 'ACTIVE' && s18.unreliable === true, s18.state);
+  serverTokens(FakeWS.last, [{ text: 'بعد از بازگشت — سالم', is_final: true }]);
+  await sleep(5);
+  // شبیه‌سازیِ چرخشِ عادیِ ۱۵ثانیه‌ایِ durable در وسطِ یک دورانِ کاملاً ACTIVE (بدونِ صدا زدنِ
+  // تایمرِ واقعی) — این سگمنت باید intent=archive بگیرد چون در لحظه‌ی بسته‌شدن ACTIVE هستیم.
+  await s18.stopDurableSegment(); s18.startDurable();
+  serverTokens(FakeWS.last, [{ text: ' — ادامه‌ی سالم', is_final: true }]);
+  await sleep(5);
+  const out18 = await s18.finish({ awaitBatch: true });
+  const s18Uploads = fetchUrls.filter((u) => u.includes('/sessions/s18/batch-audio'));
+  const s18Transcript = s18Uploads.filter((u) => u.includes('purpose=transcript'));
+  const s18Archive = s18Uploads.filter((u) => u.includes('purpose=archive'));
+  ok('T18 exactly one segment uploaded as purpose=transcript (the outage segment)', s18Transcript.length === 1, s18Uploads.join(','));
+  ok('T18 post-recovery segments uploaded as purpose=archive, not re-transcribed', s18Archive.length >= 1, s18Uploads.join(','));
+  ok('T18 finish still honestly reports unreliable/batch', out18.reliable === false && out18.mode === 'batch');
+  ok('T18 confirmed realtime text kept both parts, no drop', s18.confirmed.includes('قبل از قطعی') && s18.confirmed.includes('بعد از بازگشت'));
+
+  // Test 19: قطعیِ «بی‌صدا» — WSای که readyState اش دیگه OPEN نیست ولی onclose/onerror
+  // هیچ‌وقت فایر نمی‌شه (شبیه‌سازیِ یک شبکه‌ی محو‌شده بدونِ FIN/RST؛ برخلافِ serverClose
+  // که همیشه onclose را صدا می‌زند). watchdogِ readyState (فیکسِ این نوبت) باید این را
+  // خودش تشخیص بدهد و reconnect را شروع کند، حتی بدونِ هیچ رویدادی از خودِ WS.
+  newSession('s19');
+  const s19 = RT.createSession('s19', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+  const p19 = s19.start(); await sleep(5); serverOpen(FakeWS.last); await p19;
+  ok('T19 starts ACTIVE', s19.state === 'ACTIVE', s19.state);
+  const mintsBefore19 = mintCount;
+  // ⚠️ readyState را مستقیم روی مقدارِ CLOSED می‌گذاریم، بدونِ صدا زدنِ onclose —
+  // دقیقاً همون چیزی که serverClose/handleWSClose اصلاً نمی‌بینه.
+  FakeWS.last.readyState = FakeWS.CLOSED;
+  // WS_WATCHDOG_MS (۳۰۰۰ms، بدترین حالت تا لبه‌ی تیک بعدی) + اولین backoffِ reconnect
+  // (۱۰۰۰ms) پیش از اینکه mintِ واقعی زده بشه.
+  await sleep(4300);
+  ok('T19 watchdog detected silently-dead WS without onclose', s19.state === 'RECONNECTING' && mintCount > mintsBefore19, 'state=' + s19.state + ' mints=' + mintCount + '/' + mintsBefore19);
+  serverOpen(FakeWS.last);
+  await sleep(5);
+  ok('T19 recovers ACTIVE after watchdog-triggered reconnect', s19.state === 'ACTIVE');
+  await s19.abort();
+
+  // Test 19b (کنترلِ منفی): سکوتِ طبیعیِ گفتگو (بدونِ پیام از Soniox، ws هنوز OPEN) برایِ
+  // بیشتر از WS_WATCHDOG_MS نباید هیچ reconnectِ کاذبی بسازد.
+  newSession('s19b');
+  const s19b = RT.createSession('s19b', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+  const p19b = s19b.start(); await sleep(5); serverOpen(FakeWS.last); await p19b;
+  const mintsBefore19b = mintCount;
+  await sleep(3300); // ws.readyState همچنان OPEN، هیچ پیامی نمی‌رسه
+  ok('T19b no false-positive reconnect during natural silence', s19b.state === 'ACTIVE' && mintCount === mintsBefore19b, 'state=' + s19b.state + ' mints=' + mintCount + '/' + mintsBefore19b);
+  await s19b.abort();
 
   // Test 7: abort from STARTING (mint pending) — no hang
   newSession('s3');

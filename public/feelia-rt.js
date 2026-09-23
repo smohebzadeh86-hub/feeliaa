@@ -53,6 +53,15 @@
   // می‌رفت — بدونِ هیچ زمینه‌ی صوتیِ اضافه برایِ بستنِ درستِ آخرین گفته.
   var PAUSE_SILENCE_BUFFER_MS = 250;
   var AUTOSAVE_MS = 5000;
+  // ⭐ برخلافِ handleWSClose (که به رویدادِ onclose/onerrorِ خودِ WebSocket وابسته است)،
+  // یک قطعیِ «بی‌صدا» (کابل/WiFی که بدونِ FIN/RST محو می‌شه) می‌تونه تا مدتی هیچ رویدادی
+  // فایر نکنه — در همون فاصله، durable segment هنوز state=ACTIVE می‌بینه و intent=archive
+  // می‌گیره، درحالی‌که واقعاً دیگه چیزی به Soniox نمی‌رسه (گپِ متنی، نه دوپلیکیت). این
+  // watchdog فقط readyStateِ خودِ WS را چک می‌کند (بدونِ فرضی درباره‌ی cadence پیام‌هایِ
+  // Soniox، پس رویِ سکوتِ طبیعیِ گفتگو false-positive نمی‌دهد) — اگه دیگه OPEN نیست ولی
+  // state هنوز ACTIVEه، یعنی onclose/onerror دیر یا هیچ‌وقت فایر نشده؛ همون reconnect
+  // معمولی را دستی صدا می‌زنیم تا مرزِ سگمنت هرچه زودتر بسته شود.
+  var WS_WATCHDOG_MS = 3000;
   var BATCH_POLL_MS = 5000;
   var BATCH_TIMEOUT_MS = 15 * 60 * 1000; // explicit: سقف انتظار batch
   var MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg'];
@@ -330,6 +339,30 @@
     return reqJson('/api/stt/realtime-session', { method: 'POST', body: { session_id: sessionId, purpose: purpose } });
   }
 
+  // ————————————————— تله‌متریِ فازِ ۲ (rt.*) —————————————————
+  // قلابِ کلاینتِ فازِ ۱ (FeeliaObs) اینجا واقعاً صدا زده می‌شود. هیچ dependencyِ
+  // سخت‌ای رویِ FeeliaObs نیست — window.FeeliaObs ممکنه اصلاً وجود نداشته باشه
+  // (مثلاً scripts/rt-harness.cjs که این فایل را بدونِ document/window.FeeliaObs
+  // اجرا می‌کند) — هر فراخوانی کاملاً بی‌اثر و بی‌خطا می‌ماند.
+  // scheduleReconnect(reason) already only receives short machine codes (closed,
+  // soniox-error, temp-key-expired, watchdog-ws-not-open, retry, online,
+  // online-after-failed) — همه با الگویِ SAFE_TOKEN_RE سمتِ سرور (redact.ts) سازگارند.
+  // این تابع فقط یک لایه‌ی دفاعیِ اضافه است: اگه یه‌روز یه reasonِ آزاد/بلند به این‌جا
+  // برسه، به‌جایِ فرستادنِ متنِ نامعتبر (که سرور بی‌صدا حذفش می‌کنه)، یه کدِ عمومیِ
+  // امن جایگزین می‌شه.
+  var RT_REASON_TOKEN_RE = /^[A-Za-z0-9_.:-]{1,64}$/;
+  function safeReasonToken(reason) {
+    return (typeof reason === 'string' && RT_REASON_TOKEN_RE.test(reason)) ? reason : 'unknown';
+  }
+
+  function obsEvent(name, detail) {
+    try {
+      if (window.FeeliaObs && typeof window.FeeliaObs.event === 'function') {
+        window.FeeliaObs.event(name, detail || {});
+      }
+    } catch (e) {}
+  }
+
   function isAvailable() {
     try {
       return !!(window.fetch && window.WebSocket && window.MediaRecorder &&
@@ -366,6 +399,7 @@
     this.autosaveFailStreak = 0;
     this.unreliable = false;
     this.reconnectAttempts = 0;
+    this.reconnectInFlight = false;
     this.hadGap = false;
     this.curSpeaker = null;
     // باگِ ریشه‌ای: Soniox دیاریزیشنِ گوینده‌ها رو per-connection حساب می‌کنه — هر
@@ -389,6 +423,7 @@
     // (تعریف‌شده کنارِ uploadQueuedSegment)، که همین sessionId رو با sweep هم مشترک است.
     this.timers = [];
     this.autosaveTimer = null;
+    this.wsWatchdogTimer = null;
     this.finishResolver = null;
     this.aborted = false;
     this.closingIntentional = false;
@@ -403,7 +438,9 @@
   }
 
   RTSession.prototype.setState = function (s) {
+    var prevState = this.state;
     this.state = s;
+    if (prevState !== s) obsEvent('rt.state_change', { state: s, prev_state: prevState });
     try { this.cb.onState(s, this.snapshot()); } catch (e) {}
     // ⭐ هر بار که واقعاً به ACTIVE/RECOVERED می‌رسیم (شروع، resume، یا reconnect
     // موفق)، اگه صدایی از یه outage قبلی توی صفِ آفلاین مونده، همون‌جا آپلودش کن —
@@ -435,6 +472,7 @@
     this.timers.forEach(function (t) { clearTimeout(t); });
     this.timers = [];
     if (this.autosaveTimer) { clearInterval(this.autosaveTimer); this.autosaveTimer = null; }
+    if (this.wsWatchdogTimer) { clearInterval(this.wsWatchdogTimer); this.wsWatchdogTimer = null; }
   };
 
   // ——— audio مشترک ———
@@ -573,8 +611,15 @@
       // است یا وضعیتِ ناپایدار (reconnect/network-paused/failed)، این سگمنت باید رونویسی
       // بشه ('transcript') چون شاید هنوز جایی ثبت نشده؛ وگرنه فقط برایِ بازبینیِ ادمین
       // آرشیو کافیه ('archive'، متن از قبل از رویِ realtime درست ذخیره شده).
+      // ⭐ فیکسِ باگِ duplicate واقعی (اولویتِ بالا): self.unreliable یک‌طرفه است (I4) و
+      // برایِ کلِ عمرِ RTSession ثابت می‌ماند — استفاده از آن اینجا یعنی بعدِ فقط یک
+      // قطعیِ کوتاه، تمامِ سگمنت‌هایِ *بعدی* هم (حتی آن‌هایی که کاملاً توی ACTIVEِ سالمِ
+      // بعدِ reconnect ضبط شدند) intent='transcript' می‌گرفتند و دوباره رونویسی و با
+      // mergeBatchTranscript (append) به transcript اضافه می‌شدند — متنِ از قبل درستِ
+      // realtime برایِ باقیِ جلسه دوبار می‌آمد. تنها stateِ *لحظه‌ی بستنِ همین سگمنت*
+      // باید تعیین‌کننده باشد، نه پرچمِ سراسریِ unreliable.
       var intent = self.mode === 'note' ? 'note' :
-        (self.unreliable || self.state === STATES.RECONNECTING || self.state === STATES.NETWORK_PAUSED || self.state === STATES.FAILED)
+        (self.state === STATES.RECONNECTING || self.state === STATES.NETWORK_PAUSED || self.state === STATES.FAILED)
           ? 'transcript' : 'archive';
       try {
         var blob = new Blob(chunks, { type: recordedMime });
@@ -652,6 +697,7 @@
           reject(new Error('superseded'));
           return;
         }
+        obsEvent('rt.ws_open', {});
         try {
           ws.send(JSON.stringify({
             api_key: cred.api_key,
@@ -672,6 +718,7 @@
       };
       ws.onerror = function () {
         clearTimeout(timer);
+        obsEvent('rt.ws_error', {});
         if (!settled) { settled = true; try { ws.close(); } catch (e) {} reject(new Error('direct-error')); }
         // بعد از resolve، خطا از onclose/reconnect مدیریت می‌شود
       };
@@ -683,7 +730,7 @@
   RTSession.prototype.attachWSHandlers = function (ws) {
     var self = this;
     ws.onmessage = function (ev) { self.handleSonioxMessage(ev); };
-    ws.onclose = function () { self.handleWSClose(); };
+    ws.onclose = function (ev) { self.handleWSClose(ev); };
   };
 
   RTSession.prototype.handleSonioxMessage = function (ev) {
@@ -739,8 +786,16 @@
     }
   };
 
-  RTSession.prototype.handleWSClose = function () {
+  RTSession.prototype.handleWSClose = function (ev) {
     var self = this;
+    // ⭐ فازِ ۲: کدِ بستنِ واقعیِ WS (مثلاً ۱۰۰۶ برایِ قطعیِ غیرطبیعی) ثبت می‌شود.
+    // ev.reason عمداً هیچ‌وقت خوانده/فرستاده نمی‌شود — متنِ آزادِ سرور/Soniox است و
+    // با اسکیمای allowlistِ redact.ts (LAW-001) خودش فیلتر می‌شد؛ برای وضوح همین‌جا
+    // هم لمسش نمی‌کنیم.
+    obsEvent('rt.ws_close', {
+      close_code: ev && typeof ev.code === 'number' ? ev.code : null,
+      was_clean: ev && typeof ev.wasClean === 'boolean' ? ev.wasClean : null
+    });
     if (self.closingIntentional || self.aborted) return;
     if (self.state === STATES.MANUAL_PAUSED || self.state === STATES.FINALIZING ||
         self.state === STATES.COMPLETED || self.state === STATES.CANCELED) return;
@@ -753,7 +808,25 @@
     if (self.aborted) return;
     if (self.state === STATES.MANUAL_PAUSED || self.state === STATES.FINALIZING ||
         self.state === STATES.COMPLETED || self.state === STATES.CANCELED) return;
+    // ⭐ الان سه منبعِ مستقل می‌توانند scheduleReconnect را صدا بزنند: handleWSClose،
+    // خطایِ Soniox، و watchdogِ readyState (پایین‌ترِ همین فایل). اگه یک تلاشِ reconnect
+    // از قبل زمان‌بندی‌شده/در حالِ اجراست، دوباره schedule نکن — وگرنه دو mint/WS موازی
+    // برایِ همون قطعیِ واحد باز می‌شد. این با retryِ داخلیِ خودِ همین تابع (که عمداً
+    // وقتی state از قبل RECONNECTING است دوباره صدا زده می‌شود) تداخل ندارد چون پرچم
+    // دقیقاً قبل از همون فراخوانیِ داخلی پاک می‌شود (پایین‌ترِ همین تابع).
+    if (self.reconnectInFlight) return;
+    // ⭐ مکملِ فیکسِ intent بالا: اگه همین الان ACTIVE بودیم (مرزِ واقعیِ خروج از حالتِ
+    // سالم — نه یه retryِ دیگه از وسطِ RECONNECTING)، سگمنتِ durableِ در حالِ ضبط را
+    // همین‌جا ببند و یکیِ تازه شروع کن. وگرنه یه سگمنتِ ۱۵ثانیه‌ایِ در حالِ چرخش می‌توانست
+    // هم صدایِ سالمِ قبل از قطعی هم صدایِ بعدِ قطعی را با هم داشته باشد و با یک intent
+    // (لزوماً درست برایِ کلِ محتوایش نه) آپلود شود.
+    if (self.state === STATES.ACTIVE && self.durableRec) {
+      self.stopDurableSegment();
+      self.startDurable();
+    }
     if (self.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      obsEvent('rt.reconnect_exhausted', { attempt: self.reconnectAttempts, reason: safeReasonToken(reason) });
+      if (!self.unreliable) obsEvent('rt.unreliable_set', { reason: 'reconnect_exhausted' });
       self.unreliable = true;
       self.setState(STATES.FAILED);
       try { self.cb.onError('اتصالِ زنده قطع شد؛ ضبط ادامه دارد و متن پس از پایان آماده می‌شود'); } catch (e) {}
@@ -761,16 +834,21 @@
     }
     var delay = RECONNECT_BACKOFF_MS[Math.min(self.reconnectAttempts, RECONNECT_BACKOFF_MS.length - 1)];
     self.reconnectAttempts++;
+    obsEvent('rt.reconnect_scheduled', { reason: safeReasonToken(reason), attempt: self.reconnectAttempts, delay_ms: delay });
     self.hadGap = true;
+    if (!self.unreliable) obsEvent('rt.unreliable_set', { reason: 'reconnect' });
     self.unreliable = true; // یک‌طرفه: گپ احتمالی یعنی دیگر قابل‌اعتماد کامل نیست
     self.interim = ''; // interim قبلی discard — از نقطه امن ادامه
     try { if (self.ws) self.ws.close(); } catch (e) {}
     self.ws = null;
     self.setState(STATES.RECONNECTING);
+    // از همین‌جا تا resolveِ connectWithFreshMint (چه موفق چه ناموفق) «در حالِ کار» است.
+    self.reconnectInFlight = true;
     self.later(function () {
-      if (self.aborted || self.noNewConnections) return;
-      if (self.state !== STATES.RECONNECTING) return;
+      if (self.aborted || self.noNewConnections) { self.reconnectInFlight = false; return; }
+      if (self.state !== STATES.RECONNECTING) { self.reconnectInFlight = false; return; }
       self.connectWithFreshMint().then(function (ok) {
+        self.reconnectInFlight = false;
         if (!ok && !self.noNewConnections && self.state === STATES.RECONNECTING) self.scheduleReconnect('retry');
       });
     }, delay);
@@ -783,6 +861,7 @@
   // دهد — خطرناک برای یادداشت درمانی)، این نقطه را صریح در transcript علامت می‌زنیم
   // و شماره‌گذاری را از نو (با اولین لیبل تازه) شروع می‌کنیم.
   RTSession.prototype.noteDiscontinuity = function () {
+    obsEvent('rt.gap_marked', {});
     this.curSpeaker = null;
     this.confirmed += (this.confirmed ? '\n\n' : '') +
       '[اتصال دوباره برقرار شد — شماره‌گذاری گوینده‌ها از این نقطه ممکن است با قبل فرق کند]';
@@ -818,12 +897,25 @@
         // BUG-FIX: هر اتصال بعد از اولین (چه reconnect چه resume دستی) یک دیارizationِ
         // تازه‌ی Soniox است — قبل از افزایش generation علامت بزن (شرط روی مقدار فعلی).
         var isReconnect = self.generation > 0;
+        var attemptsUsed = self.reconnectAttempts;
         self.generation++;
         self.reconnectAttempts = 0;
         self.realtimeUp = true;
-        if (isReconnect) self.noteDiscontinuity();
+        if (isReconnect) {
+          obsEvent('rt.reconnect_ok', { attempt: attemptsUsed });
+          self.noteDiscontinuity();
+        }
         // استریمر زنده روی همان stream با MediaRecorder تازه (هدر تازه)؛ durable دست‌نخورده ادامه می‌دهد
         self.startLivePusher();
+        // ⭐ همان مرزبندیِ سگمنت، سمتِ بازگشت: اگه این reconnect دنباله‌ی یک gapِ واقعی
+        // است (hadGap)، سگمنتِ در حالِ ضبط (که تا همین لحظه با state=RECONNECTING/
+        // NETWORK_PAUSED/FAILED بسته می‌شد و درست intent=transcript می‌گرفت) را ببند و
+        // یکیِ تازه شروع کن — تا سگمنت‌هایِ *بعدِ* این نقطه (حالا که واقعاً ACTIVE شدیم)
+        // به‌درستی intent=archive بگیرند، نه اینکه توی همون سگمندِ مرزی قاطی بمانند.
+        if (self.hadGap && self.durableRec) {
+          self.stopDurableSegment();
+          self.startDurable();
+        }
         self.setState(self.hadGap ? STATES.RECOVERED : STATES.ACTIVE);
         if (self.hadGap) {
           // RECOVERED گذراست — بلافاصله ACTIVE با پرچم gap
@@ -839,6 +931,13 @@
         console.warn('[feelia-rt] connect failed: status=' + (err && err.status) +
           ' code=' + (err && err.code) + ' message=' + (err && err.message));
       } catch (e) {}
+      // فازِ ۲: mint-fail (و هر شکستِ دیگرِ همین مسیر — direct-timeout/direct-error هم
+      // از همین catch رد می‌شن چون از .then(mintCredential).then(openDirectWS) هستن) —
+      // فقط status/code (نه message/متنِ آزاد) که از قبل هم در allowlistِ redact.ts است.
+      obsEvent('rt.mint_failed', {
+        status: (err && typeof err.status === 'number') ? err.status : null,
+        code: (err && typeof err.code === 'string') ? err.code : null
+      });
       // 401 یعنی نشست Feelia مرده — reconnect بی‌فایده است
       if (err && err.status === 401) {
         self.setState(STATES.FAILED);
@@ -861,6 +960,10 @@
     self.noNewConnections = false;
     self.realtimeUp = false;
     self.startedAt = Date.now();
+    // فازِ ۲: قلابِ فازِ ۱ که تا اینجا از هیچ‌کجا صدا زده نمی‌شد — همین‌جا rt.* بعدی‌ها
+    // به session_id/run_idِ درستِ همین RTSession متصل می‌شوند (obs_events.run_id ⟷
+    // session_audio.run_id، هر دو از همین genRunId()).
+    try { if (window.FeeliaObs && typeof window.FeeliaObs.setSession === 'function') window.FeeliaObs.setSession(self.sessionId, self.runId); } catch (e) {}
     self.setState(STATES.STARTING);
     // نسخه پایه transcript برای CAS (اگر DB متنی از قبل دارد، ادامه همان)
     var baseP = self.persist
@@ -881,6 +984,7 @@
           if (!ok) {
             // FAIL-OPEN (ISSUE 4): realtime بالا نیامد ولی میکروفون داریم —
             // صادقانه FAILED با ضبط durable؛ legacy proxy صدا زده نمی‌شود.
+            if (!self.unreliable) obsEvent('rt.unreliable_set', { reason: 'start_fail_open' });
             self.unreliable = true;
             self.realtimeUp = false;
             self.startDurable();
@@ -891,6 +995,7 @@
           }
           self.startDurable();
           self.startAutosave();
+          self.startWsWatchdog();
           self.watchOnline();
           self.setState(STATES.ACTIVE);
           return true;
@@ -909,6 +1014,12 @@
     try {
       self.offlineHandler = function () {
         if (self.state === STATES.ACTIVE || self.state === STATES.RECONNECTING) {
+          // همان مرزبندیِ سگمنت — فقط وقتی از ACTIVEِ سالم واردِ آفلاین می‌شویم (نه از
+          // RECONNECTINGی که قبلاً خودش مرز را بسته)، سگمنتِ جاری را ببند/دوباره شروع کن.
+          if (self.state === STATES.ACTIVE && self.durableRec) {
+            self.stopDurableSegment();
+            self.startDurable();
+          }
           self.setState(STATES.NETWORK_PAUSED);
         }
       };
@@ -937,6 +1048,20 @@
       if (this.onlineHandler) window.removeEventListener('online', this.onlineHandler);
     } catch (e) {}
     this.offlineHandler = this.onlineHandler = null;
+  };
+
+  // مکملِ فیکسِ intent/segment-boundary: تنگ‌کردنِ پنجره‌ی تشخیصِ قطعیِ «بی‌صدا» — چون
+  // readyStateِ خودِ WebSocket را می‌خواند (نه cadenceِ پیام‌های Soniox)، رویِ سکوتِ
+  // طبیعیِ گفتگو هرگز فایر نمی‌شود.
+  RTSession.prototype.startWsWatchdog = function () {
+    var self = this;
+    if (self.wsWatchdogTimer) clearInterval(self.wsWatchdogTimer);
+    self.wsWatchdogTimer = setInterval(function () {
+      if (self.state === STATES.ACTIVE && (!self.ws || self.ws.readyState !== WebSocket.OPEN)) {
+        obsEvent('rt.watchdog_fired', {});
+        self.scheduleReconnect('watchdog-ws-not-open');
+      }
+    }, WS_WATCHDOG_MS);
   };
 
   RTSession.prototype.startAutosave = function () {
