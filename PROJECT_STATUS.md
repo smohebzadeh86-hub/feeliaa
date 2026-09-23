@@ -2,7 +2,12 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-23 — آخرین رویداد: **BUG+FIX: race چرخشِ durable در `feelia-rt.js`
+> **آخرین به‌روزرسانی:** 2026-09-23 (عصر) — آخرین رویداد: **BUG+FIX+DEPLOY (hotfix) از تستِ قطعِ اینترنتِ مالک رویِ
+> production: رونویسی بعد از وصل‌شدنِ دوباره نمی‌آمد («Audio decode error»)، متنِ صدایِ دوره‌ی قطعی گم می‌شد، مرورگرِ مالک
+> `feelia-rt.js`ِ قدیمی (پیش از دو رفعِ امروز) را از کش اجرا می‌کرد، و سؤالِ «پرونده‌ی خودکار» به حسابِ بدونِ فیچر نشان
+> داده می‌شد.** `test:rt` 55/55، `test:cf` 108/108، `tsc` تمیز؛ deploy شد، commit نشد. جزئیات در Event Log و
+> [verification](verification/2026-09-23-offline-reconnect-owner-test-hotfix.md).
+> قبل‌ترش: **BUG+FIX: race چرخشِ durable در `feelia-rt.js`
 > (ریشه‌ی سگمنت‌هایِ خرابِ جلسه‌ی `aebef3b8-…`) + intentِ معکوسِ مرزهای قطعی + خطایِ دائمی در صفِ
 > batch سرور.** در Chromeِ واقعی بازتولید و رفع شد؛ `pnpm test:rt` 49/49، `test:cf` 108/108، `tsc`
 > تمیز. **commit (`3e732b1`)، push به `origin/feat/clarity`، و deploy به production (`50c0fe7`) شد؛ دو فایلِ
@@ -242,7 +247,7 @@
 | ریشه‌ی واقعیِ «realtimeِ یادداشتِ صوتی وصل نمی‌شه» | ✅ **رفع و commit شد** (`2551943`) — مالک تأیید کرد جلسه‌ی اصلی مشکلی نداشت، فقط یادداشت؛ چون کدِ اتصال بینِ این دو مشترکه، دنبالِ چیزی گشتیم که *قبل*ِ اون کدِ مشترک فرق می‌کرد: `POST /api/stt/realtime-session` (mintِ credential) رویِ جلسه‌ی `completed` همیشه ۴۰۰ می‌داد، بدونِ تفکیکِ purpose — و تنها نقطه‌ی UIِ یادداشتِ صوتی (Wrapup) همیشه *بعد*ِ completed‌شدن اجرا می‌شه. یعنی یادداشتِ صوتی هیچ‌وقت credential نمی‌گرفت، حتی قبل از تلاش برایِ WS. با پارامترِ `purpose` ('note'/'transcript') رفع شد؛ رفتارِ جلسه‌ی اصلی (که purpose نمی‌فرسته) دست‌نخورده ماند. تأیید شد مستقیم رویِ سرورِ لوکال: `purpose=note` رویِ جلسه‌ی completed حالا `200`+`api_key` واقعی می‌ده (قبلاً ۴۰۰) | 2026-09-14 | [ui-ux-audit §ریشه‌ی realtime](docs/05-plans/ui-ux-audit-2026-09-14.md#رفعِ-ریشه‌ی-واقعیِ-realtimeِ-یادداشتِ-صوتی--2026-09-14) |
 | Clarity (محلی) | ✅ route 10/10، sandbox 41/41 | 2026-09-14 | [evidence](verification/2026-09-14-clarity-test-pass.md) |
 | Clarity (تولید، دادهٔ واقعی) | ❗ کد درست کار می‌کند ولی **صفر traffic رسیده** — `ERR_CONNECTION_CLOSED` به `clarity.ms` از مرورگرِ مالک، تأییدشده با Data Export API (`Traffic:[]`). علتِ محتملِ INFERRED: فیلترینگِ شبکه (VPN/ISP/سراسری) — هنوز تفکیک نشده | 2026-09-14 | §7 Event Log (FINDING) |
-| Production | `feelia.ir` = پروسه‌ی pm2 `feelia-mysql` در `/root/feeliaa-mysql` (checkoutِ بدونِ git، deploy با tar) = **`50c0fe7`** برایِ سرور + **`public/feelia-rt.js` از `d514111`** (رفعِ race چرخشِ durable + intentِ آخرین سگمنتِ finish)؛ migrationها تا `022`. `/root/feeliaa` (پروسه‌ی `feelia`) stopped و قدیمی است | 2026-09-23 | §7 Event Log — DEPLOY 2026-09-23 |
+| Production | `feelia.ir` = پروسه‌ی pm2 `feelia-mysql` در `/root/feeliaa-mysql` (checkoutِ بدونِ git، deploy با tar) = **working treeِ `8bf9387` + hotfixِ commitنشده‌ی 2026-09-23 عصر** (دُمِ liveRec رویِ WSِ تازه، بازنویسیِ متنِ batch در rebaseِ 409، `Cache-Control: no-cache`، سؤالِ پرونده فقط با `case_file_enabled`)؛ migrationها تا `022`. `/root/feeliaa` (پروسه‌ی `feelia`) stopped و قدیمی است | 2026-09-23 | §7 Event Log — BUG+FIX+DEPLOY 2026-09-23 (hotfix) |
 | مستندات | ✅ ساختارِ کامل؛ ❗ هیچ سندی توسطِ مالک review نشده | 2026-09-14 | [documentation-map](docs/00-governance/documentation-map.md) |
 | ریسکِ بحرانیِ باز | ❗ R1 (متنِ رضایت ↔ ذخیره‌ی صدا، UI-05/UX-004)؛ ❗ **R15** (یادداشت/علامت در شکستِ ذخیره بی‌صدا از دست می‌رود، UX-001)، **R16** (متنِ یادداشت‌ها در پرونده نمایش داده نمی‌شود، UX-002)، **R17** (خروج در حالتِ ضبطِ محلی با میکروفونِ روشن، UX-003) — هر سه در HEAD `8347fbb` و production؛ R12–R14 محلی رفع شد ولی روی production هنوز فعال | 2026-09-14 | [Master Reference §22](PROJECT_MASTER_REFERENCE.md) |
 | UX audit | 42 یافته (Critical ۵، High ۱۴، Medium ۱۸، Low ۵)؛ پس از commitهای هم‌زمان: ۷ جزئی رفع، ۰ کامل؛ ۱۲ سؤالِ باز؛ roadmap = PROPOSED | 2026-09-14 | [UX_AUDIT_REPORT](docs/05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) |
@@ -380,6 +385,38 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-23 — BUG + FIX + DEPLOY — تستِ قطعِ اینترنتِ مالک: رونویسی بعد از reconnect نمی‌آمد، متنِ دوره‌ی قطعی گم شد، JSِ کهنه در کش، سؤالِ پرونده برایِ حسابِ بی‌فیچر
+
+- **گزارشِ مالک:** قطعِ اینترنت → «صدا ضبط می‌شود و متنش بعداً اضافه می‌شود» ولی متنی نیامد؛ بعد از وصل‌شدن فقط برچسبِ
+  «شماره‌گذاریِ گوینده‌ها ممکن است فرق کند» و دیگر هیچ رونویسی؛ خطایِ `Audio decode error`؛ سؤالِ «پرونده خودکار؟» برایِ حسابِ
+  بدونِ فیچر؛ صدا در پنلِ ادمین نبود. درخواست: «بررسی و رفع کن و دیپلوی کن».
+- **شواهدِ production (read-only، لاگِ pm2/nginx، فقط UUID/اندازه):** جلسه‌ی تستِ مالک `e78df1a5-…` — سگمنت‌هایِ ۱ تا ۴
+  (1491–2313 بایت) بی‌هدرِ EBML (`40 9d 81 03`…)، `bad-container`؛ فقط `000000` و `000005` سالم؛ `full.webm` فقط سگمنتِ ۰.
+  مرورگرِ مالک آخرین بار `/feelia-rt.js` را **11:55 UTC** گرفته بود — پیش از هر دو deployِ امروز (12:52 رفعِ race چرخش،
+  13:12 `d514111`)؛ بارگذاری‌هایِ 13:01/13:08/13:13 هیچ درخواستی برایِ آن نزدند. `PATCH /api/auth/case-file-auto-generate` → `403`.
+- **BUG 1 (ریشه‌ی «Audio decode error»، در همه‌ی نسخه‌ها):** `startLivePusher` به `self.ws`ِ لحظه‌ی رسیدنِ chunk می‌فرستاد؛
+  liveRecِ اتصالِ قبلی تا reconnect روشن بود و `stop()`ش ناهمگام است → دُمِ بی‌هدرش اولین بایت‌هایِ WSِ تازه می‌شد → Soniox
+  (`audio_format:auto`) می‌بست → reconnect → همان چرخه (فقط برچسبِ «اتصال دوباره برقرار شد»). **FIX:** هر recorder فقط به WSِ
+  زمانِ ساختش می‌فرستد (`targetWs`)؛ `scheduleReconnect` liveRecِ مرده را متوقف می‌کند.
+- **BUG 2 (گم‌شدنِ متنِ دوره‌ی قطعی، LAW-008):** صدایِ قطعی حینِ جلسه آپلود و سمتِ سرور append می‌شد؛ rebaseِ 409 در
+  `persistConfirmed` فقط طول را مقایسه می‌کرد و اگر متنِ زنده بیشتر رشد کرده بود، متنِ سرور (همراهِ متنِ batch) را بازنویسی
+  می‌کرد. **FIX:** `persistedText` (آخرین متنِ هم‌نسخه با سرور)؛ اگر هر دو طرف فقط به آن افزوده‌اند، هر دو افزوده حفظ می‌شوند.
+- **BUG 3 (deploy):** fastify-static پیش‌فرض `public, max-age=0` می‌فرستاد و مرورگر JSِ کش‌شده را بدونِ revalidate اجرا کرد.
+  **FIX:** `server/src/index.ts` → `Cache-Control: no-cache` (ETag → 304). علتِ سگمنت‌هایِ بی‌هدرِ تستِ مالک همین بود (کدِ پیش از `3e732b1`).
+- **BUG 4:** `maybeShowCaseFileAutoPrompt` شرطِ `case_file_enabled` نداشت. **FIX:** شرط در `index.html` + گاردِ دفاعی در
+  `maybeAutoGenerateCaseFile` (`sessions.ts`).
+- **تست:** `T21` (اولین صدایِ WSِ تازه هدر است) و `T22/T22b` (rebase متنِ batch را نگه می‌دارد) در `scripts/rt-harness.cjs` —
+  هر سه رویِ `HEAD:public/feelia-rt.js` FAIL، بعد از رفع PASS؛ **`pnpm test:rt` 55/55**؛ `pnpm test:cf` 108/108؛ `tsc --noEmit`
+  تمیز؛ `@fastify/static` با همان گزینه‌ها: `no-cache` + `304`؛ تابعِ prompt با سه حالت (بی‌فیچر → نمایش داده نمی‌شود).
+  **تست نشده:** جلسه‌ی end-to-endِ واقعی با قطعِ اینترنت در مرورگر (نیازِ حساب/میکروفون) — مالک باید دوباره تست کند.
+- **DEPLOY (به درخواستِ صریحِ مالک):** build لوکال → تارِ `server/ public/ package.json pnpm-lock.yaml pnpm-workspace.yaml`
+  (بدونِ `.env`/`data`/`node_modules`، بررسی شد) → بکاپ `/root/feeliaa-mysql-backup-before-hotfix-0923b.tar.gz` → `tar -xzf`
+  → `pnpm install --frozen-lockfile` → `pm2 restart feelia-mysql --update-env` (pid 53964 → 56266). تأیید: `/api/health` ok/connected؛
+  `feelia.ir/` و `/feelia-rt.js` → `cache-control: no-cache`؛ JSِ سرو‌شده شاملِ `targetWs`/`persistedText`؛ startup بدونِ خطا.
+  **commit نشد** (working tree = `8bf9387` + این تغییرات).
+- **ریسکِ باقی‌مانده:** صدایِ سگمنت‌هایِ بی‌هدرِ جلسه‌ی `e78df1a5` قابلِ بازیابی نیست. `handleMicLost` هنوز recorderِ تازه (هدرِ
+  دوم) را رویِ همان WS شروع می‌کند — حالا دست‌کم با reconnect بازیابی می‌شود؛ جدا بررسی شود.
 
 ### 2026-09-23 — DEPLOY — `public/feelia-rt.js` از `d514111` (intentِ آخرین سگمنتِ finish در FAILED/RECONNECTING)
 

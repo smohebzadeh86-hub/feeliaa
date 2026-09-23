@@ -84,6 +84,10 @@ nginx باید WebSocket upgrade را برای `/ws/*` پشتیبانی کند (
 5. لاگ را با `pm2 logs feelia-mysql --lines 40 --nostream` بررسی کنید — همه‌ی migrationهایِ جدید باید `applied` باشند، بدونِ خطا.
 6. `curl -s http://localhost:3000/api/health` → `{"status":"ok","database":"connected"}`.
 7. smoke: شروعِ یک جلسه‌ی آزمایشی **با داده‌ی غیرواقعی** (اگر تغییرِ لمس‌کننده‌ی مسیرِ رونویسی/صدا بود).
+
+**کشِ مرورگر:** فایل‌هایِ `public/` (بدونِ نسخه در URL) با `Cache-Control: no-cache` سرو می‌شوند (`server/src/index.ts`،
+از ۲۰۲۶-۰۹-۲۳) تا هر بارگذاری revalidate شود (ETag → 304). پیش از آن پیش‌فرضِ `public, max-age=0` باعث شد مرورگرِ مالک
+`feelia-rt.js`ِ پیش از دو deploy را اجرا کند. برایِ تأیید: `curl -skI --resolve feelia.ir:443:127.0.0.1 https://feelia.ir/feelia-rt.js`.
 هر گام روی production نیازمندِ مجوزِ صریح است (LAW-006)؛ اولین اجرایِ کاملِ این رویه: Event Logِ
 `PROJECT_STATUS.md`، ۲۰۲۶-۰۹-۲۳ (deployِ فیچرِ Case File + محدودسازیِ آن به یک تراپیست).
 

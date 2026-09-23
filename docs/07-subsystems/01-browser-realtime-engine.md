@@ -59,6 +59,8 @@ stateDiagram-v2
 | I14 | هر سگمنتِ durable فقط یک نوع محتوا دارد (یا کاملاً حینِ ACTIVEِ سالم، یا کاملاً حینِ قطعی) — مرزِ سگمنت رویِ هر گذارِ ACTIVE↔قطعی صریح بسته می‌شود | `scheduleReconnect`، `offlineHandler`، `connectWithFreshMint` (2026-09-22) |
 | I15 | فقط یک تلاشِ reconnect هم‌زمان در جریان است، حتی اگه چند منبع (`handleWSClose`، خطایِ Soniox، watchdog) هم‌زمان trigger کنند | `reconnectInFlight` (2026-09-22) |
 | I16 | اگه `ws.readyState` دیگر OPEN نباشد ولی state هنوز ACTIVE است (onclose/onerror دیر/هیچ‌وقت فایر نشده)، حداکثر تا ۳ ثانیه بعد reconnect خودکار شروع می‌شود | `startWsWatchdog` (2026-09-22) |
+| I17 | هر live pusher فقط به WSِ زمانِ ساختِ خودش می‌فرستد؛ اولین بایت‌هایِ صوتیِ هر WSِ تازه هدرِ container است (دُمِ ناهمگامِ recorderِ قبلی هرگز رویِ WSِ تازه نمی‌رود) | `targetWs` در `startLivePusher`، `stopLivePusher` در `scheduleReconnect` (2026-09-23، `T21`) |
+| I18 | rebaseِ 409 در `persistConfirmed` متنی که سرور از آخرین ذخیره append کرده (batchِ دوره‌ی قطعی) را بازنویسی نمی‌کند — اگر هر دو طرف فقط به `persistedText` افزوده‌اند، ترکیب می‌شوند | `persistedText` (2026-09-23، `T22`) |
 
 ## ۴. جریان‌های کلیدی
 
@@ -97,6 +99,8 @@ state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250
 - `withStore` به‌جای نتیجه IDBRequest برمی‌گرداند → صف همیشه خالی.
 - `onstop` async → آخرین سگمنت آرشیو نمی‌شد (→ `_flushPromise`).
 - `onstop` async + `self.durableChunks`ِ مشترک → هر سگمنتی که با چرخش/مرزِ قطعی بسته می‌شد فقط دُمِ بی‌هدرش ذخیره می‌شد و intentِ مرزها برعکس بود (2026-09-23 → I11؛ subsystem 02).
+- دُمِ liveRecِ قبلی اولین chunkِ WSِ تازه بعد از reconnect می‌شد → Soniox «Audio decode error» → چرخه‌ی reconnect بدونِ متن (2026-09-23 → I17).
+- rebaseِ 409 با «متنِ بلندتر برنده» متنِ batchِ دوره‌ی قطعی را که سرور حینِ جلسه append کرده بود پاک می‌کرد (2026-09-23 → I18).
 - drain دوبار روی RECOVERED→ACTIVE → duplicate متن (→ `_draining`).
 - drain روی pause/resumeِ عادی با `purpose=transcript` → duplicate (→ purpose بر اساسِ `unreliable`).
 - fetch بدونِ timeout → دکمه‌ی ادامه گیر می‌کرد (→ `REQUEST_TIMEOUT_MS`).
