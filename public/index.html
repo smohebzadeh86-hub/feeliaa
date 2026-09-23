@@ -218,6 +218,7 @@ input::-ms-reveal{display:none}
 .status-reason{font-size:10px;font-weight:600;color:var(--gold-deep);background:var(--gold-soft);border-radius:99px;padding:2px 9px;flex:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .client-actions{display:flex;gap:8px;margin-top:auto}
 .client-actions>.btn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.client-actions>.btn:first-child{flex:1.7}
 
 .client-menu{position:absolute;top:12px;left:12px}
 .client-menu-btn{width:32px;height:32px;border-radius:var(--r-sm);background:none;border:none;color:var(--muted);cursor:pointer;display:grid;place-items:center;transition:color .2s,background .2s}
@@ -508,6 +509,13 @@ input::-ms-reveal{display:none}
 @media(max-width:520px){.case-file-doc .cf-axis summary{flex-wrap:wrap}}
 .case-file-doc .cf-add-row{margin-top:8px;text-align:center}
 .case-file-doc .cf-del{border:0;background:none;color:var(--cf-red);font-size:11px;cursor:pointer;font-family:inherit;padding:0 6px}
+.case-file-doc .cf-med-actions{display:flex;gap:6px;justify-content:center;flex-shrink:0}
+.case-file-doc .cf-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;flex-shrink:0;border:1px solid var(--cf-line);background:var(--cf-card);border-radius:7px;cursor:pointer;padding:0;color:var(--cf-muted)}
+.case-file-doc .cf-icon-btn svg{width:14px;height:14px}
+.case-file-doc .cf-icon-btn.cf-icon-edit{color:var(--cf-teal);border-color:var(--cf-teal)}
+.case-file-doc .cf-icon-btn.cf-icon-edit:hover{background:var(--cf-teal);color:#fff}
+.case-file-doc .cf-icon-btn.cf-icon-del{color:var(--cf-red);border-color:var(--cf-red)}
+.case-file-doc .cf-icon-btn.cf-icon-del:hover{background:var(--cf-red);color:#fff}
 .case-file-doc .cf-edit-lbl{font-size:11px;font-weight:700;color:var(--cf-muted);margin:8px 0 3px}
 .case-file-doc .cf-suggest-dot{width:7px;height:7px;border-radius:50%;background:var(--cf-amber);cursor:pointer;flex-shrink:0}
 .case-file-doc .cf-quick{background:linear-gradient(135deg,var(--cf-soft),var(--cf-teal2));border:1px solid var(--cf-line);border-radius:14px;padding:14px}
@@ -536,7 +544,7 @@ input::-ms-reveal{display:none}
 .case-file-doc .cf-med-mobile{display:none}
 .case-file-doc .cf-med-item{background:var(--cf-blue2);border:1px solid var(--cf-line);border-radius:10px;padding:9px 11px;margin-bottom:8px}
 .case-file-doc .cf-med-item:last-child{margin-bottom:0}
-.case-file-doc .cf-med-name{font-weight:700;color:var(--cf-blue);font-size:13.5px;margin-bottom:5px}
+.case-file-doc .cf-med-name{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700;color:var(--cf-blue);font-size:13.5px;margin-bottom:5px}
 .case-file-doc .cf-med-row{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:4px 0;border-bottom:1px dashed var(--cf-line)}
 .case-file-doc .cf-med-row:last-child{border-bottom:none}
 .case-file-doc .cf-med-row .cf-mlbl{color:var(--cf-muted);flex-shrink:0}
@@ -591,7 +599,9 @@ input::-ms-reveal{display:none}
 .case-file-doc .cf-pending{display:inline-block;background:var(--cf-soft);border:1px dashed var(--cf-line);border-radius:6px;padding:0 7px;color:var(--cf-muted);font-size:11px}
 .case-file-doc .cf-q-item{background:var(--cf-teal2);border:1px solid var(--cf-line);border-radius:10px;padding:9px 11px;margin-top:8px}
 .case-file-doc .cf-q-item .cf-q-text{font-size:13px;font-weight:600;color:var(--cf-teal);margin-bottom:6px}
-.case-file-doc .cf-q-item input,.case-file-doc .cf-q-item textarea{width:100%;font-family:inherit;font-size:13px;border:1px solid var(--cf-line);border-radius:8px;padding:7px 8px;background:var(--cf-card);color:var(--cf-ink);margin:0}
+.case-file-doc .cf-q-item input,.case-file-doc .cf-q-item textarea{width:100%;font-family:inherit;font-size:13px;border:1px solid var(--cf-line);border-radius:8px;padding:7px 8px;background:var(--cf-card);color:var(--cf-ink);margin:0;resize:vertical}
+.case-file-doc .cf-q-actions{display:flex;align-items:center;gap:9px;margin-top:7px}
+.case-file-doc .cf-q-status{font-size:11px;color:var(--cf-muted)}
 .case-file-doc [data-cf-editable]{display:block;width:100%;line-height:1.8;font-family:inherit;font-size:inherit;color:inherit;border:1px solid var(--cf-teal);border-radius:8px;padding:5px 7px;background:var(--cf-card);resize:vertical;min-height:34px}
 @media(max-width:520px){
   .case-file-doc .cf-grid-2{grid-template-columns:1fr}
@@ -675,6 +685,9 @@ input::-ms-reveal{display:none}
       <p>مدیریت تراپیست‌ها و دیتای سیستم</p>
     </div>
     <div id="adminStats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px"></div>
+    <button class="btn btn-secondary btn-block" style="margin-bottom:8px" onclick="openAdminActivity()">
+      فعالیت‌ها / لاگ
+    </button>
     <button class="btn btn-secondary btn-block" style="margin-bottom:16px" onclick="adminDownloadAll()">
       دانلود کاملِ دیتای سیستم
     </button>
@@ -718,6 +731,60 @@ input::-ms-reveal{display:none}
     <div class="transcript-box" id="adminSessionDetailTranscript"></div>
     <div id="adminSessionDetailNotes" style="margin-top:14px"></div>
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminSessionDetail()">بازگشت</button>
+  </section>
+
+  <!-- ⭐ لایه‌ی رصد/حسابرسی — فازِ ۱ (PROJECT_STATUS.md، 2026-09-22): فهرستِ سراسریِ
+       جلساتِ اخیر/ناتمام + جدولِ رویدادهایِ سرور، بدونِ نمایشِ هیچ متنِ بالینی. -->
+  <section id="screenAdminActivity" class="card screen" data-clarity-mask="true" hidden>
+    <div class="card-head">
+      <h2>فعالیت‌ها / لاگ</h2>
+      <p>رصدِ سراسریِ جلسات و رویدادهایِ سرور — هیچ‌جا متنِ رونویسی/یادداشت نشان داده نمی‌شود.</p>
+    </div>
+    <div class="client-tabs" role="tablist">
+      <button class="client-tab active" id="adminActivityTabSessions" role="tab" aria-selected="true" onclick="adminActivityTab('sessions')">جلسات اخیر</button>
+      <button class="client-tab" id="adminActivityTabEvents" role="tab" aria-selected="false" onclick="adminActivityTab('events')">رویدادها</button>
+    </div>
+    <div id="adminActivitySessionsPane">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+        <select id="adminRecentStatusFilter" onchange="loadAdminRecentSessions()">
+          <option value="in_progress">ناتمام</option>
+          <option value="completed">پایان‌یافته</option>
+          <option value="all">همه</option>
+        </select>
+        <select id="adminRecentSinceFilter" onchange="loadAdminRecentSessions()">
+          <option value="24">۲۴ ساعتِ اخیر</option>
+          <option value="168" selected>۷ روزِ اخیر</option>
+          <option value="720">۳۰ روزِ اخیر</option>
+        </select>
+      </div>
+      <div id="adminRecentSessionsList"></div>
+      <div class="empty" id="adminRecentSessionsEmpty" hidden><p>جلسه‌ای یافت نشد</p></div>
+    </div>
+    <div id="adminActivityEventsPane" hidden>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+        <input type="text" id="adminObsEventFilter" placeholder="نامِ رویداد (مثلاً session.created)" oninput="loadAdminObsEvents()">
+        <select id="adminObsSeverityFilter" onchange="loadAdminObsEvents()">
+          <option value="">همه‌ی severityها</option>
+          <option value="debug">debug</option>
+          <option value="info">info</option>
+          <option value="warn">warn</option>
+          <option value="error">error</option>
+        </select>
+      </div>
+      <div id="adminObsEventsList"></div>
+      <div class="empty" id="adminObsEventsEmpty" hidden><p>رویدادی یافت نشد</p></div>
+    </div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminActivity()">بازگشت</button>
+  </section>
+
+  <!-- تایم‌لاینِ یک جلسه (از رویِ کلیکِ ردیفِ «جلسات اخیر») -->
+  <section id="screenAdminSessionTimeline" class="card screen" data-clarity-mask="true" hidden>
+    <div class="card-head">
+      <h2 id="adminTimelineTitle">تایم‌لاینِ جلسه</h2>
+      <p>ترکیبِ رویدادهایِ سرور/کلاینت/UI/صدا/یادداشت، مرتب بر زمان.</p>
+    </div>
+    <div id="adminTimelineList"></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminSessionTimeline()">بازگشت</button>
   </section>
 
   <section id="screenClients" class="card screen" hidden>
@@ -1132,6 +1199,28 @@ input::-ms-reveal{display:none}
   </div>
 </div>
 
+<div class="modal-back" id="cfDeleteItemModal" data-clarity-mask="true">
+  <div class="modal">
+    <h3>حذفِ این ردیف؟</h3>
+    <p id="cfDeleteItemText">این ردیفِ افزوده‌شده برای همیشه حذف می‌شود.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeCfDeleteItem()">انصراف</button>
+      <button class="btn btn-danger" onclick="confirmCfDeleteItem()">بله، حذف شود</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="genericConfirmModal" data-clarity-mask="true">
+  <div class="modal">
+    <h3 id="genericConfirmTitle">مطمئن هستید؟</h3>
+    <p id="genericConfirmText"></p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeGenericConfirm()">انصراف</button>
+      <button class="btn btn-danger" id="genericConfirmOkBtn" onclick="genericConfirmOk()">بله</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-back" id="cancelModal">
   <div class="modal">
     <h3>لغو این جلسه؟</h3>
@@ -1205,6 +1294,7 @@ input::-ms-reveal{display:none}
 
 <script src="/feelia-rt.js"></script>
 <script src="/feelia-analytics.js"></script>
+<script src="/feelia-obs.js"></script>
 <script>
 'use strict';
 
@@ -1994,7 +2084,7 @@ function updateSteps(idx){
   }
 }
 function showScreen(name){
-  ['Auth','Clients','AllClients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions','AdminSessionDetail'].forEach(s=>{
+  ['Auth','Clients','AllClients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions','AdminSessionDetail','AdminActivity','AdminSessionTimeline'].forEach(s=>{
     const el=$('screen'+s);
     if(el)el.hidden=s!==name;
   });
@@ -2009,6 +2099,7 @@ function showScreen(name){
   if(inFlow)updateSteps({Setup:0,Live:1,Wrapup:2}[name]);
   window.scrollTo({top:0,behavior:'smooth'});
   try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.screen(name);}catch(e){}
+  try{if(window.FeeliaObs)window.FeeliaObs.setScreen(name);}catch(e){}
 }
 
 async function api(path,options={}){
@@ -2048,6 +2139,37 @@ async function api(path,options={}){
     throw err;
   }
   return data;
+}
+
+// ⭐ مودالِ تاییدِ عمومی — جایگزینِ سراسریِ `confirm()`ِ خامِ مرورگر (هم‌راستا با سیستمِ
+// طراحیِ اپ، همان الگویِ `.modal-back`/`.modal`/`.modal-actions`). موردهایِ تک‌منظوره
+// (مثلِ حذفِ جلسه/مراجع/ردیفِ پرونده) مودالِ اختصاصیِ خودشان را دارند؛ این یکی برایِ
+// بقیه‌ی تاییدهایِ پراکنده‌ای‌ست که قبلاً `confirm()`ِ خام صدا می‌زدند.
+let genericConfirmOnConfirm=null;
+let genericConfirmOnCancel=null;
+function showGenericConfirm(opts){
+  $('genericConfirmTitle').textContent=(opts&&opts.title)||'مطمئن هستید؟';
+  $('genericConfirmText').textContent=(opts&&opts.text)||'';
+  const okBtn=$('genericConfirmOkBtn');
+  okBtn.textContent=(opts&&opts.okLabel)||'بله';
+  okBtn.className='btn '+((opts&&opts.okClass)||'btn-danger');
+  genericConfirmOnConfirm=(opts&&opts.onConfirm)||null;
+  genericConfirmOnCancel=(opts&&opts.onCancel)||null;
+  $('genericConfirmModal').classList.add('open');
+}
+function closeGenericConfirm(){
+  $('genericConfirmModal').classList.remove('open');
+  const cancelFn=genericConfirmOnCancel;
+  genericConfirmOnConfirm=null;
+  genericConfirmOnCancel=null;
+  if(cancelFn)cancelFn();
+}
+function genericConfirmOk(){
+  const okFn=genericConfirmOnConfirm;
+  genericConfirmOnConfirm=null;
+  genericConfirmOnCancel=null;
+  $('genericConfirmModal').classList.remove('open');
+  if(okFn)okFn();
 }
 
 // ===== رضایت =====
@@ -2167,6 +2289,7 @@ async function logout(){
   $('logoutBtn').hidden=true;
   $('adminBtn').hidden=true;
   showScreen('Auth');
+  try{if(window.FeeliaObs)window.FeeliaObs.onLogout();}catch(e){}
   // اگر Clarity در این صفحه لود شده بود، reload تا ضبط به کاربرِ بعدیِ همین تب نرسد
   try{if(window.FeeliaAnalytics&&window.FeeliaAnalytics.onLogout())location.reload();}catch(e){}
 }
@@ -2188,6 +2311,8 @@ async function enterApp(){
   showScreen('Clients');
   // fire-and-forget — Clarity هیچ مسیری از ورود را منتظر نمی‌گذارد
   try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.boot(currentTherapist);}catch(e){}
+  // برخلافِ Clarity، obs برایِ ادمین هم فعال است — کلیدِ روشن/خاموش از سرور می‌آید.
+  try{if(window.FeeliaObs)window.FeeliaObs.boot();}catch(e){}
   // BUG-FIX (easy reconnect after refresh): این چک قبلاً بعد از لود کامل لیست
   // مراجعین اجرا می‌شد و بنرش با بنر «جلسه‌ی ناتمام» رونویسی (overwrite) می‌شد —
   // یعنی گاهی اصلاً دیده نمی‌شد. حالا اول از همه (بدون معطلی برای هیچ درخواست
@@ -2274,6 +2399,145 @@ function closeAdminPanel(){
   loadClients();
 }
 
+// ===== فعالیت‌ها/لاگ (لایه‌ی رصد/حسابرسی — فازِ ۱) =====
+let adminActivityCurrentTab='sessions';
+let adminTimelineSessionId=null;
+
+async function openAdminActivity(){
+  if(hasActiveRecording()){
+    showBanner('warn','ابتدا جلسه‌ی زنده را پایان دهید یا لغو کنید.');
+    return;
+  }
+  clearBanner();
+  showScreen('AdminActivity');
+  adminActivityTab('sessions');
+}
+function closeAdminActivity(){
+  showScreen('Admin');
+}
+function adminActivityTab(tab){
+  adminActivityCurrentTab=tab;
+  $('adminActivityTabSessions').classList.toggle('active',tab==='sessions');
+  $('adminActivityTabEvents').classList.toggle('active',tab==='events');
+  $('adminActivityTabSessions').setAttribute('aria-selected',tab==='sessions'?'true':'false');
+  $('adminActivityTabEvents').setAttribute('aria-selected',tab==='events'?'true':'false');
+  $('adminActivitySessionsPane').hidden=tab!=='sessions';
+  $('adminActivityEventsPane').hidden=tab!=='events';
+  if(tab==='sessions')loadAdminRecentSessions();
+  else loadAdminObsEvents();
+}
+
+async function loadAdminRecentSessions(){
+  try{
+    const status=$('adminRecentStatusFilter').value;
+    const sinceHours=$('adminRecentSinceFilter').value;
+    const data=await api('/api/admin/sessions/recent?status='+encodeURIComponent(status)+'&since_hours='+encodeURIComponent(sinceHours));
+    renderAdminRecentSessions(data.sessions||[]);
+  }catch(e){showBanner('error',e.message);}
+}
+function adminSessionStatusFa(s){
+  return {in_progress:'در حالِ انجام',completed:'پایان‌یافته',canceled:'لغوشده'}[s]||s;
+}
+function renderAdminRecentSessions(sessions){
+  const list=$('adminRecentSessionsList');
+  list.innerHTML='';
+  $('adminRecentSessionsEmpty').hidden=sessions.length>0;
+  sessions.forEach(function(s){
+    const row=document.createElement('div');
+    row.className='card';
+    row.style.cssText='padding:12px;margin-bottom:8px;cursor:pointer';
+    const stale=s.status==='in_progress'&&(Date.now()-new Date(s.updated_at).getTime())>2*3600*1000&&(s.transcript_len||0)>0;
+    if(stale)row.style.borderColor='var(--warn, #d97706)';
+    const title=document.createElement('div');
+    title.style.cssText='font-weight:700;font-size:13.5px';
+    title.textContent=(s.therapist_name||'—')+' · '+(s.client_code||'—')+' · جلسه‌ی '+toFa(s.session_num);
+    const meta=document.createElement('div');
+    meta.style.cssText='font-size:11.5px;color:var(--muted);margin-top:4px';
+    meta.textContent=adminSessionStatusFa(s.status)+' · طول متن '+toFa(s.transcript_len||0)+' نویسه · '+
+      toFa(Math.round((s.audio_duration_ms||0)/1000))+' ثانیه صدا · '+toFa(s.audio_count||0)+' سگمنت صدا · '+
+      'آخرین نوشتن: '+fmtDateTime(s.updated_at);
+    row.appendChild(title);
+    row.appendChild(meta);
+    row.onclick=function(){openAdminSessionTimeline(s.id,title.textContent);};
+    list.appendChild(row);
+  });
+}
+function fmtDateTime(v){
+  try{return new Date(v).toLocaleString('fa-IR');}catch(e){return String(v||'');}
+}
+
+async function loadAdminObsEvents(){
+  try{
+    const ev=$('adminObsEventFilter').value.trim();
+    const sev=$('adminObsSeverityFilter').value;
+    let url='/api/admin/obs/events?limit=100';
+    if(ev)url+='&event='+encodeURIComponent(ev);
+    if(sev)url+='&severity='+encodeURIComponent(sev);
+    const data=await api(url);
+    renderAdminObsEvents(data.events||[]);
+  }catch(e){showBanner('error',e.message);}
+}
+function renderAdminObsEvents(events){
+  const list=$('adminObsEventsList');
+  list.innerHTML='';
+  $('adminObsEventsEmpty').hidden=events.length>0;
+  events.forEach(function(ev){
+    const row=document.createElement('div');
+    row.style.cssText='padding:8px 10px;border-bottom:1px solid var(--border,#eee);font-size:12px;display:flex;gap:10px;align-items:baseline';
+    const badge=document.createElement('span');
+    badge.textContent=ev.severity;
+    badge.style.cssText='font-weight:700;min-width:40px;color:'+(ev.severity==='error'?'#c0392b':ev.severity==='warn'?'#d97706':'var(--muted)');
+    const name=document.createElement('span');
+    name.style.cssText='font-weight:600;min-width:180px';
+    name.textContent=ev.event;
+    const time=document.createElement('span');
+    time.style.color='var(--muted)';
+    time.textContent=fmtDateTime(ev.ts);
+    row.appendChild(badge);row.appendChild(name);row.appendChild(time);
+    list.appendChild(row);
+  });
+}
+
+async function openAdminSessionTimeline(sessionId,titleText){
+  adminTimelineSessionId=sessionId;
+  $('adminTimelineTitle').textContent=titleText||'تایم‌لاینِ جلسه';
+  showScreen('AdminSessionTimeline');
+  try{
+    const data=await api('/api/admin/sessions/'+sessionId+'/timeline');
+    renderAdminTimeline(data.timeline||[]);
+  }catch(e){showBanner('error',e.message);}
+}
+function closeAdminSessionTimeline(){
+  showScreen('AdminActivity');
+  adminActivityTab('sessions');
+}
+const ADMIN_TIMELINE_LANE_COLORS={server:'#2563eb',client:'#7c3aed',ui:'#0891b2',audio:'#16a34a',note:'#ca8a04',db:'#64748b'};
+function renderAdminTimeline(items){
+  const list=$('adminTimelineList');
+  list.innerHTML='';
+  items.forEach(function(it){
+    const row=document.createElement('div');
+    row.style.cssText='padding:8px 10px;border-inline-start:3px solid '+(ADMIN_TIMELINE_LANE_COLORS[it.lane]||'#999')+';margin-bottom:6px;background:var(--card-alt,#fafafa);border-radius:4px';
+    const head=document.createElement('div');
+    head.style.cssText='display:flex;justify-content:space-between;font-size:12.5px;font-weight:600';
+    const label=document.createElement('span');
+    label.textContent='['+it.lane+'] '+it.label;
+    const time=document.createElement('span');
+    time.style.color='var(--muted)';
+    time.textContent=fmtDateTime(it.ts);
+    head.appendChild(label);head.appendChild(time);
+    row.appendChild(head);
+    if(it.detail&&Object.keys(it.detail).some(function(k){return it.detail[k]!==null&&it.detail[k]!==undefined;})){
+      const detail=document.createElement('div');
+      detail.style.cssText='font-size:11px;color:var(--muted);margin-top:2px';
+      detail.textContent=Object.keys(it.detail).filter(function(k){return it.detail[k]!==null&&it.detail[k]!==undefined&&it.detail[k]!=='';})
+        .map(function(k){return k+'='+it.detail[k];}).join(' · ');
+      row.appendChild(detail);
+    }
+    list.appendChild(row);
+  });
+}
+
 async function loadAdminStats(){
   try{
     const data=await api('/api/admin/stats');
@@ -2345,14 +2609,15 @@ function renderAdminTherapists(list){
     toggleInput.type='checkbox';
     toggleInput.checked=!!t.active;
     // ⭐ فیکسِ باگِ واقعی (UI-27): تغییرِ فعال/غیرفعال فوری و بدونِ تأیید بود — یک
-    // لمسِ اشتباه یعنی حسابِ یک تراپیست بلافاصله قفل می‌شد. `confirm()` سبک‌ترین
-    // راهِ ایمن است؛ روی انصراف، چک‌باکس به حالتِ قبل برمی‌گردد (بدونِ درخواست به سرور).
+    // لمسِ اشتباه یعنی حسابِ یک تراپیست بلافاصله قفل می‌شد. مودالِ استانداردِ اپ
+    // (نه `confirm()`ِ خام) با هم‌راستاییِ سیستمِ طراحی؛ روی انصراف، چک‌باکس به حالتِ
+    // قبل برمی‌گردد (بدونِ درخواست به سرور).
     toggleInput.addEventListener('change',function(){
-      const msg=toggleInput.checked
+      const next=toggleInput.checked;
+      const msg=next
         ?'حسابِ '+(t.name||t.phone)+' دوباره فعال شود؟'
         :'حسابِ '+(t.name||t.phone)+' غیرفعال شود؟ نشستِ فعلیِ او بلافاصله باطل می‌شود.';
-      if(!confirm(msg)){toggleInput.checked=!toggleInput.checked;return;}
-      adminSetActive(t.id,toggleInput.checked);
+      showGenericConfirm({title:'مطمئن هستید؟',text:msg,okLabel:'بله',onConfirm:function(){adminSetActive(t.id,next);},onCancel:function(){toggleInput.checked=!next;}});
     });
     toggleLabel.appendChild(toggleInput);
     toggleLabel.appendChild(document.createTextNode('فعال'));
@@ -2365,11 +2630,11 @@ function renderAdminTherapists(list){
     adminToggleInput.type='checkbox';
     adminToggleInput.checked=!!t.is_admin;
     adminToggleInput.addEventListener('change',function(){
-      const msg=adminToggleInput.checked
+      const next=adminToggleInput.checked;
+      const msg=next
         ?(t.name||t.phone)+' ادمین شود؟ او به همه‌ی داده‌های سیستم دسترسی خواهد داشت.'
         :'نقشِ ادمین از '+(t.name||t.phone)+' گرفته شود؟';
-      if(!confirm(msg)){adminToggleInput.checked=!adminToggleInput.checked;return;}
-      adminSetIsAdmin(t.id,adminToggleInput.checked);
+      showGenericConfirm({title:'مطمئن هستید؟',text:msg,okLabel:'بله',onConfirm:function(){adminSetIsAdmin(t.id,next);},onCancel:function(){adminToggleInput.checked=!next;}});
     });
     adminToggleLabel.appendChild(adminToggleInput);
     adminToggleLabel.appendChild(document.createTextNode('ادمین'));
@@ -2458,10 +2723,10 @@ async function openAdminTherapistDetail(id){
       delBtn.textContent='حذف مراجع';
       // ⭐ فیکسِ باگِ واقعی (UI-27): حذفِ مراجع از پنلِ ادمین بدونِ هیچ تأییدی انجام
       // می‌شد — یک لمسِ اشتباه یعنی حذفِ آبشاریِ مراجع + همه‌ی جلسات/یادداشت‌هایش.
+      // مودالِ استانداردِ اپ به‌جایِ `confirm()`ِ خام (هم‌راستا با سیستمِ طراحی).
       delBtn.addEventListener('click',function(e){
         e.stopPropagation();
-        if(!confirm('مراجعِ '+c.code+(c.alias?' — '+c.alias:'')+' حذف شود؟ همه‌ی جلسات و یادداشت‌هایش هم برای همیشه حذف می‌شوند.'))return;
-        adminDeleteClient(c.id);
+        showGenericConfirm({title:'حذفِ مراجع؟',text:'مراجعِ '+c.code+(c.alias?' — '+c.alias:'')+' حذف شود؟ همه‌ی جلسات و یادداشت‌هایش هم برای همیشه حذف می‌شوند.',okLabel:'بله، حذف کامل',onConfirm:function(){adminDeleteClient(c.id);}});
       });
       head.appendChild(delBtn);
       div.appendChild(head);
@@ -2527,6 +2792,14 @@ async function openAdminClientSessions(clientId,title){
       // یادداشت‌هایِ صوتی (kind='note') از قبل یک فایلِ کوتاهِ یکپارچه‌اند — نیازی به
       // چسباندن ندارند، همون endpointِ per-segment قبلی برایشان کافیست.
       if(audioCount>0){
+        function attachAudioErrorNote(row){
+          if(row.querySelector('.audio-err-note'))return;
+          const note=document.createElement('span');
+          note.className='audio-err-note';
+          note.style.cssText='font-size:11px;color:var(--danger,#c0392b)';
+          note.textContent='فایلِ صدا بارگذاری نشد';
+          row.appendChild(note);
+        }
         const audioBox=document.createElement('div');
         audioBox.style.cssText='margin-top:10px;display:flex;flex-direction:column;gap:8px';
         try{
@@ -2534,6 +2807,27 @@ async function openAdminClientSessions(clientId,title){
           const sessionRows=(audioData.audio||[]).filter(function(a){return a.kind!=='note';});
           const noteRows=(audioData.audio||[]).filter(function(a){return a.kind==='note';});
           const pending=Number(audioData.pending_count||0);
+          // ⭐ بخشِ ۱۲/۱۳ی audit «zero-loss recording» (2026-09-22): قبلاً فقط یک بنرِ
+          // تجمیعیِ «N فایل در صف» بود — بینِ «صدا کامل ولی رونویسی هنوز پردازش می‌شود»
+          // و «سگمنتی از صدا واقعاً گم شده» (audio_missing_segments) هیچ تمایزی نبود.
+          var audioStatusLabel={none:'—',syncing:'در حالِ همگام‌سازی',incomplete:'ناقص (سگمنتِ گم‌شده)',complete:'کامل'};
+          var transcriptStatusLabel={none:'—',pending:'در انتظار',failed:'ناموفق',complete:'کامل'};
+          var aSt=audioData.audio_status||'none', tSt=audioData.transcript_status||'none';
+          if(aSt!=='none'||tSt!=='none'){
+            const statusLine=document.createElement('div');
+            statusLine.style.cssText='font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap';
+            var aColor=aSt==='incomplete'?'var(--danger,#c0392b)':(aSt==='syncing'?'var(--warning,#b58105)':'inherit');
+            var tColor=tSt==='failed'?'var(--danger,#c0392b)':(tSt==='pending'?'var(--warning,#b58105)':'inherit');
+            statusLine.innerHTML='<span>صدا: <b style="color:'+aColor+'">'+audioStatusLabel[aSt]+'</b></span>'+
+              '<span>رونویسی: <b style="color:'+tColor+'">'+transcriptStatusLabel[tSt]+'</b></span>';
+            audioBox.appendChild(statusLine);
+          }
+          if(aSt==='incomplete'&&(audioData.audio_missing_segments||[]).length){
+            const missBanner=document.createElement('div');
+            missBanner.style.cssText='font-size:11px;color:var(--danger,#c0392b)';
+            missBanner.textContent='سگمنت(هایِ) شماره‌ی '+audioData.audio_missing_segments.map(toFa).join('، ')+' هیچ‌وقت به سرور نرسیده‌اند — صدایِ این جلسه ناقص است.';
+            audioBox.appendChild(missBanner);
+          }
           if(pending>0){
             const banner=document.createElement('div');
             banner.style.cssText='font-size:11px;color:var(--warning,#b58105)';
@@ -2552,6 +2846,7 @@ async function openAdminClientSessions(clientId,title){
             player.style.cssText='flex:1;height:32px';
             player.preload='none';
             player.src='/api/admin/sessions/'+s.id+'/audio/full';
+            player.addEventListener('error',function(){attachAudioErrorNote(row);});
             row.appendChild(player);
             const dlBtn=document.createElement('button');
             dlBtn.className='btn btn-ghost btn-sm';
@@ -2572,6 +2867,7 @@ async function openAdminClientSessions(clientId,title){
             player.controls=true;
             player.style.cssText='flex:1;height:32px';
             player.src='/api/admin/session-audio/'+a.id+'/stream';
+            player.addEventListener('error',function(){attachAudioErrorNote(row);});
             row.appendChild(player);
             const dlBtn=document.createElement('button');
             dlBtn.className='btn btn-ghost btn-sm';
@@ -3184,14 +3480,17 @@ function buildClientCard(c){
       actions.appendChild(btn1);
     }
     // «پرونده» روی هر دو کارت (فعال/غیرفعال): مستقیم به بخشِ پروندهٔ درمان در صفحهٔ مراجع می‌رود.
-    const fileBtn=document.createElement('button');
-    fileBtn.className='btn btn-ghost btn-sm';
-    fileBtn.textContent='پرونده';
-    fileBtn.addEventListener('click',function(e){
-      e.stopPropagation();
-      openClientDetail(c.id,{scrollToCaseFile:true});
-    });
-    actions.appendChild(fileBtn);
+    // فازِ اولِ deploy: فقط برایِ تراپیستی که case_file_enabled دارد (تصمیمِ مالک، ۲۰۲۶-۰۹-۲۳).
+    if(currentTherapist&&currentTherapist.case_file_enabled){
+      const fileBtn=document.createElement('button');
+      fileBtn.className='btn btn-ghost btn-sm';
+      fileBtn.textContent='پرونده';
+      fileBtn.addEventListener('click',function(e){
+        e.stopPropagation();
+        openClientDetail(c.id,{scrollToCaseFile:true});
+      });
+      actions.appendChild(fileBtn);
+    }
     div.appendChild(actions);
 
     div.addEventListener('click',function(){openClientDetail(c.id);});
@@ -3364,7 +3663,7 @@ async function openClientDetail(clientId,opts){
     // ⭐ پرونده‌ی روندِ درمان برایِ همه‌ی مراجعین (فعال و غیرفعال) — تصمیمِ مالک 2026-09-19
     // (قبلاً فقط غیرفعال‌ها)؛ دکمه‌ی «پرونده» روی کارت با scrollToCaseFile مستقیم به این بخش می‌آید.
     caseFileEditMode=false;
-    const cfLoad=loadCaseFile(clientId);
+    const cfLoad=(currentTherapist&&currentTherapist.case_file_enabled)?loadCaseFile(clientId):Promise.resolve();
     const sl=$('sessionsList');
     sl.innerHTML='';
     data.sessions.forEach(function(s){
@@ -3652,9 +3951,11 @@ function cfNeedsUpgrade(c){
   const co=c.changeOverTime;
   return c.changeRows===undefined&&!!co&&(up(co.before)||up(co.after));
 }
-async function cfUpgrade(){
+function cfUpgrade(){
   if(!currentCaseFile)return;
-  if(!confirm('ساختارِ این پرونده به شکلِ جدید (یافته‌ها با منبع، نکاتِ کلیدی و ارجاع) ارتقا یابد؟ بازتولید نمی‌شود و ویرایش‌ها/تاییدهایِ شما دست‌نخورده می‌ماند. (فقط چینشِ نمایش عوض می‌شود.)'))return;
+  showGenericConfirm({title:'ارتقایِ ساختارِ پرونده؟',text:'ساختارِ این پرونده به شکلِ جدید (یافته‌ها با منبع، نکاتِ کلیدی و ارجاع) ارتقا یابد؟ بازتولید نمی‌شود و ویرایش‌ها/تاییدهایِ شما دست‌نخورده می‌ماند. (فقط چینشِ نمایش عوض می‌شود.)',okLabel:'بله، ارتقا بده',okClass:'btn-primary',onConfirm:doCfUpgrade});
+}
+async function doCfUpgrade(){
   const cid=currentCaseFile.clientId;
   try{
     const data=await api('/api/clients/'+cid+'/case-file/upgrade',{method:'POST',body:{}});
@@ -3753,15 +4054,26 @@ function cfAddBtn(kind,label){
 }
 function cfDelBtn(kind,item){
   if(caseFileEditMode||!item.addedByTherapist)return '';
-  return ' <button class="cf-del" title="حذفِ این ردیفِ دستی" onclick="event.stopPropagation();removeCaseFileItem(\''+kind+'\',\''+item.id+'\')">حذف</button>';
+  return ' <button class="cf-del" title="حذفِ این ردیفِ دستی" onclick="event.stopPropagation();showCfDeleteItem(\''+kind+'\',\''+item.id+'\')">حذف</button>';
 }
-// ویرایشِ نامِ دارو فقط برایِ ردیفِ افزوده‌شده‌ی دستی — نامِ داروی AI بخشی از یک CaseFileField نیست
-function cfRenameBtn(item){
+// آیکن‌هایِ svgِ درجا (بدونِ فایل/دیپندنسیِ خارجی) — pencil/trash، خطی و ساده، رنگ از currentColor
+const CF_ICON_EDIT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>';
+const CF_ICON_TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>';
+// ویرایش (نام/دوز/دفعات/آخرین‌تغییر/پزشک، یک‌جا با مودال) + حذفِ ردیف — فقط برایِ ردیفِ
+// افزوده‌شده‌یِ دستی. ستونِ جداگانه‌یِ «عملیات» با دو دکمه‌ی آیکنیِ svg (بدونِ متن) به‌جایِ
+// دکمه‌های متنی که قاطیِ سلولِ نامِ دارو می‌شدند و ظاهرِ جدول را بی‌ریخت می‌کردند.
+function cfMedActionsHtml(item){
   if(caseFileEditMode||!item.addedByTherapist)return '';
-  return ' <button class="cf-del" title="ویرایشِ نامِ دارو" onclick="event.stopPropagation();openCfRenameMedModal(this)" data-cf-med-id="'+escAttr(item.id)+'" data-cf-med-name="'+escAttr(item.name)+'">ویرایشِ نام</button>';
+  return '<div class="cf-med-actions">'+
+    '<button class="cf-icon-btn cf-icon-edit" title="ویرایشِ نام، دوز، دفعات، آخرینِ تغییر و پزشک" onclick="event.stopPropagation();openCfEditMedModal(this)"'+
+    ' data-cf-med-id="'+escAttr(item.id)+'" data-cf-med-name="'+escAttr(item.name)+'"'+
+    ' data-cf-med-dose="'+escAttr((item.dose&&item.dose.value)||'')+'" data-cf-med-frequency="'+escAttr((item.frequency&&item.frequency.value)||'')+'"'+
+    ' data-cf-med-lastchange="'+escAttr((item.lastChange&&item.lastChange.value)||'')+'" data-cf-med-prescriber="'+escAttr((item.prescriber&&item.prescriber.value)||'')+'">'+CF_ICON_EDIT+'</button>'+
+    '<button class="cf-icon-btn cf-icon-del" title="حذفِ این ردیفِ دستی" onclick="event.stopPropagation();showCfDeleteItem(\'medication\',\''+item.id+'\')">'+CF_ICON_TRASH+'</button>'+
+    '</div>';
 }
 
-let cfAddItemMode=null; // 'axis' | 'medication' | 'roadmap' | 'medication-rename'
+let cfAddItemMode=null; // 'axis' | 'medication' | 'roadmap' | 'medication-edit'
 let cfAddItemRenameId=null;
 function openCfAddItemModal(kind){
   cfAddItemMode=kind;
@@ -3783,11 +4095,16 @@ function openCfAddItemModal(kind){
   $('cfAddItemFields').innerHTML=f;
   $('cfAddItemModal').classList.add('open');
 }
-function openCfRenameMedModal(btn){
-  cfAddItemMode='medication-rename';
+function openCfEditMedModal(btn){
+  cfAddItemMode='medication-edit';
   cfAddItemRenameId=btn.getAttribute('data-cf-med-id');
-  $('cfAddItemTitle').textContent='ویرایشِ نامِ دارو';
-  $('cfAddItemFields').innerHTML='<label>نامِ دارو</label><input type="text" id="cfai_name" maxlength="80" value="'+escAttr(btn.getAttribute('data-cf-med-name')||'')+'">';
+  $('cfAddItemTitle').textContent='ویرایشِ دارو';
+  $('cfAddItemFields').innerHTML=
+    '<label>نامِ دارو</label><input type="text" id="cfai_name" maxlength="80" value="'+escAttr(btn.getAttribute('data-cf-med-name')||'')+'">'+
+    '<label>دوز</label><input type="text" id="cfai_dose" maxlength="120" value="'+escAttr(btn.getAttribute('data-cf-med-dose')||'')+'">'+
+    '<label>تناوبِ مصرف</label><input type="text" id="cfai_frequency" maxlength="120" value="'+escAttr(btn.getAttribute('data-cf-med-frequency')||'')+'">'+
+    '<label>آخرین تغییر</label><input type="text" id="cfai_lastChange" maxlength="120" value="'+escAttr(btn.getAttribute('data-cf-med-lastchange')||'')+'">'+
+    '<label>تجویزکننده</label><input type="text" id="cfai_prescriber" maxlength="120" value="'+escAttr(btn.getAttribute('data-cf-med-prescriber')||'')+'">';
   $('cfAddItemModal').classList.add('open');
 }
 function closeCfAddItemModal(){
@@ -3807,7 +4124,7 @@ function findNewItemId(oldList,newList){
 function cfAddItemKeydown(event){
   if(event.key!=='Enter')return;
   event.preventDefault();
-  if(cfAddItemMode==='medication'&&(!event.target||event.target.id!=='cfai_prescriber'))return;
+  if((cfAddItemMode==='medication'||cfAddItemMode==='medication-edit')&&(!event.target||event.target.id!=='cfai_prescriber'))return;
   submitCfAddItem();
 }
 async function submitCfAddItem(){
@@ -3815,14 +4132,25 @@ async function submitCfAddItem(){
   const mode=cfAddItemMode;
   const cid=currentCaseFile.clientId;
   try{
-    if(mode==='medication-rename'){
+    if(mode==='medication-edit'){
       const name=($('cfai_name').value||'').trim();
       if(!name){showBanner('error','نامِ دارو الزامی است');return;}
-      const data=await api('/api/clients/'+cid+'/case-file',{method:'PATCH',body:{fieldId:'medication.'+cfAddItemRenameId+'.name',action:'edit',value:name}});
-      currentCaseFile.record=data.case_file;
+      const id=cfAddItemRenameId;
+      const patches=[{fieldId:'medication.'+id+'.name',value:name}];
+      [['dose','cfai_dose'],['frequency','cfai_frequency'],['lastChange','cfai_lastChange'],['prescriber','cfai_prescriber']].forEach(function(pair){
+        const v=($(pair[1]).value||'').trim();
+        // فیلدِ خالی PATCH نمی‌شود — edit با مقدارِ خالی هم pending را false می‌کند و
+        // برایِ همیشه از دسترسِ merge/regenerateِ بعدی خارجش می‌کرد (مثلِ saveCaseFileEdits).
+        if(v)patches.push({fieldId:'medication.'+id+'.'+pair[0],value:v});
+      });
+      let data;
+      for(const p of patches){
+        data=await api('/api/clients/'+cid+'/case-file',{method:'PATCH',body:{fieldId:p.fieldId,action:'edit',value:p.value}});
+        currentCaseFile.record=data.case_file;
+      }
       closeCfAddItemModal();
       renderCaseFile();
-      cfFocusNewItem('[data-cf-id="medication.'+cfAddItemRenameId+'"]');
+      cfFocusNewItem('[data-cf-id="medication.'+id+'"]');
       return;
     }
     const body={kind:mode};
@@ -3852,7 +4180,8 @@ async function submitCfAddItem(){
     const newList=mode==='axis'?data.case_file.content.axes:mode==='medication'?data.case_file.content.medication:data.case_file.content.roadmap;
     const newId=findNewItemId(oldList,newList);
     closeCfAddItemModal();
-    // دارو با همه‌ی زیرفیلدها پر شده — نیازی به حالتِ ویرایشِ درجا نیست؛ محور/گام فقط عنوان دارند
+    // محور/گام فقط عنوان دارند ⇒ حالتِ ویرایشِ درجا برایِ متنِ اصلی؛ دارو زیرفیلدهایِ
+    // اختیاریِ خودش را دارد که با دکمه‌ی «ویرایش» (openCfEditMedModal) بعداً پر می‌شوند.
     if(mode!=='medication'&&newId)cfPendingNewItem={kind:mode,id:newId};
     renderCaseFile();
     if(newId)cfFocusNewItem('[data-cf-id="'+mode+'.'+newId+'"]');
@@ -3882,8 +4211,24 @@ function dismissCfNewItem(){
   cfPendingNewItem=null;
   renderCaseFile();
 }
-async function removeCaseFileItem(kind,id){
-  if(!currentCaseFile||!confirm('این ردیفِ افزوده‌شده حذف شود؟'))return;
+let cfDeleteTarget=null; // {kind,id} — ردیفِ در انتظارِ تاییدِ حذف، هم‌راستا با الگویِ deleteSessionModal/deleteClientModal
+function showCfDeleteItem(kind,id){
+  if(!currentCaseFile)return;
+  const list=kind==='axis'?currentCaseFile.record.content.axes:kind==='medication'?currentCaseFile.record.content.medication:currentCaseFile.record.content.roadmap;
+  const item=(list||[]).find(function(x){return x.id===id;});
+  const name=item?(item.name||item.title||item.question||''):'';
+  cfDeleteTarget={kind:kind,id:id};
+  $('cfDeleteItemText').textContent=name?'ردیفِ «'+name+'» برای همیشه حذف می‌شود.':'این ردیفِ افزوده‌شده برای همیشه حذف می‌شود.';
+  $('cfDeleteItemModal').classList.add('open');
+}
+function closeCfDeleteItem(){
+  $('cfDeleteItemModal').classList.remove('open');
+  cfDeleteTarget=null;
+}
+async function confirmCfDeleteItem(){
+  if(!currentCaseFile||!cfDeleteTarget)return;
+  const kind=cfDeleteTarget.kind,id=cfDeleteTarget.id;
+  closeCfDeleteItem();
   try{
     const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file/items/'+kind+'/'+id,{method:'DELETE'});
     currentCaseFile.record=data.case_file;
@@ -4071,18 +4416,19 @@ function renderCaseFile(){
     // ⭐ در حالتِ ویرایش فقط یک نسخه (کارتی) رندر می‌شود — رندرِ هم‌زمانِ جدول+کارت با
     // یک data-cf-field مشترک باعثِ دوبار PATCH شدنِ همون فیلد در saveCaseFileEdits می‌شد.
     if(!caseFileEditMode){
-      html+='<table class="cf-table cf-med-table"><tr><th>دارو</th><th>دوز</th><th>دفعات</th><th>آخرین تغییر</th><th>پزشک</th></tr>';
+      html+='<table class="cf-table cf-med-table"><tr><th>دارو</th><th>دوز</th><th>دفعات</th><th>آخرین تغییر</th><th>پزشک</th><th>عملیات</th></tr>';
       c.medication.forEach(function(m){
-        html+='<tr data-cf-id="medication.'+m.id+'"><td>'+escapeHtml(m.name)+cfRenameBtn(m)+cfDelBtn('medication',m)+'</td><td>'+fieldHtml('medication.'+m.id+'.dose',m.dose)+'</td>'+
+        html+='<tr data-cf-id="medication.'+m.id+'"><td>'+escapeHtml(m.name)+'</td><td>'+fieldHtml('medication.'+m.id+'.dose',m.dose)+'</td>'+
               '<td>'+fieldHtml('medication.'+m.id+'.frequency',m.frequency)+'</td>'+
               '<td>'+fieldHtml('medication.'+m.id+'.lastChange',m.lastChange)+'</td>'+
-              '<td>'+fieldHtml('medication.'+m.id+'.prescriber',m.prescriber)+'</td></tr>';
+              '<td>'+fieldHtml('medication.'+m.id+'.prescriber',m.prescriber)+'</td>'+
+              '<td>'+cfMedActionsHtml(m)+'</td></tr>';
       });
       html+='</table>';
     }
     html+='<div class="cf-med-mobile"'+(caseFileEditMode?' style="display:block"':'')+'>';
     c.medication.forEach(function(m){
-      html+='<div class="cf-med-item" data-cf-id="medication.'+m.id+'"><div class="cf-med-name">'+escapeHtml(m.name)+cfRenameBtn(m)+cfDelBtn('medication',m)+'</div>'+
+      html+='<div class="cf-med-item" data-cf-id="medication.'+m.id+'"><div class="cf-med-name"><span>'+escapeHtml(m.name)+'</span>'+cfMedActionsHtml(m)+'</div>'+
             '<div class="cf-med-row"><span class="cf-mlbl">دوز</span><span>'+fieldHtml('medication.'+m.id+'.dose',m.dose)+'</span></div>'+
             '<div class="cf-med-row"><span class="cf-mlbl">دفعات</span><span>'+fieldHtml('medication.'+m.id+'.frequency',m.frequency)+'</span></div>'+
             '<div class="cf-med-row"><span class="cf-mlbl">آخرین تغییر</span><span>'+fieldHtml('medication.'+m.id+'.lastChange',m.lastChange)+'</span></div>'+
@@ -4213,7 +4559,9 @@ function renderCaseFile(){
     html+='<div class="cf-section">'+cfSectionHead('سوالاتِ باز برایِ تراپیست','اطلاعاتی که برایِ کامل‌شدنِ پرونده لازم است — پاسخِ شما ذخیره می‌شود');
     c.pendingQuestions.forEach(function(q){
       html+='<div class="cf-q-item"><div class="cf-q-text">'+escapeHtml(q.question)+'</div>'+
-            '<input type="text" placeholder="پاسخ…" value="'+escAttr(q.answer||'')+'" onchange="answerCaseFileQuestion(\''+q.id+'\',this.value)"></div>';
+            '<textarea id="cfq_'+q.id+'" rows="2" placeholder="پاسخ…"></textarea>'+
+            '<div class="cf-q-actions"><button id="cfq_btn_'+q.id+'" class="cf-btn cf-primary" onclick="submitCaseFileAnswer(\''+q.id+'\')">ثبتِ پاسخ</button>'+
+            '<span class="cf-q-status" id="cfq_status_'+q.id+'"></span></div></div>';
     });
     html+='</div>';
   }
@@ -4250,9 +4598,11 @@ async function saveCaseFileEdits(){
   }catch(e){showBanner('error',e.message);}
 }
 
-async function onCfSuggestClick(ev,fieldId){
+function onCfSuggestClick(ev,fieldId){
   ev.stopPropagation();
-  if(!confirm('به‌روزرسانیِ پیشنهادی برایِ این بخش موجود است — اعمال شود؟\n(نادیده گرفتن = بستنِ همین پیام)'))return;
+  showGenericConfirm({title:'اعمالِ به‌روزرسانیِ پیشنهادی؟',text:'به‌روزرسانیِ پیشنهادی برایِ این بخش موجود است — اعمال شود؟',okLabel:'بله، اعمال شود',okClass:'btn-primary',onConfirm:function(){doApplyCfSuggestion(fieldId);}});
+}
+async function doApplyCfSuggestion(fieldId){
   try{
     const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file',{method:'PATCH',body:{fieldId:fieldId,action:'accept-suggestion'}});
     currentCaseFile.record=data.case_file;
@@ -4260,12 +4610,23 @@ async function onCfSuggestClick(ev,fieldId){
   }catch(e){showBanner('error',e.message);}
 }
 
-async function answerCaseFileQuestion(qId,value){
+async function submitCaseFileAnswer(qId){
   if(!currentCaseFile)return;
+  const ta=$('cfq_'+qId),btn=$('cfq_btn_'+qId),status=$('cfq_status_'+qId);
+  const value=((ta&&ta.value)||'').trim();
+  if(!value){showBanner('error','پاسخ نمی‌تواند خالی باشد');return;}
+  if(btn)btn.disabled=true;
+  if(status)status.textContent='در حالِ ثبت…';
   try{
     const data=await api('/api/clients/'+currentCaseFile.clientId+'/case-file',{method:'PATCH',body:{fieldId:'question.'+qId+'.answer',action:'edit',value:value}});
     currentCaseFile.record=data.case_file;
-  }catch(e){showBanner('error',e.message);}
+    renderCaseFile();
+    showBanner('info','پاسخ ثبت شد — با «به‌روزرسانی» در پرونده اعمال می‌شود.');
+  }catch(e){
+    if(btn)btn.disabled=false;
+    if(status)status.textContent='';
+    showBanner('error',e.message);
+  }
 }
 
 async function regenerateCaseFile(force){
@@ -4331,12 +4692,17 @@ function hasUnsavedArchiveWork(){
   if(box&&!box.hidden&&ta&&ta.value.trim())return true;
   return false;
 }
-function confirmDiscardArchiveWork(){
-  if(!hasUnsavedArchiveWork())return true;
-  return confirm('یادداشتِ صوتی/متنیِ ذخیره‌نشده دور ریخته می‌شود. ادامه می‌دهید؟');
+// مودالِ استانداردِ اپ (نه `confirm()`ِ خام)؛ callerها به‌جایِ گاردِ همزمانِ قدیمی حالا
+// یک تابعِ ادامه‌دهنده را به‌عنوانِ onConfirm پاس می‌دهند (الگویِ showGenericConfirm).
+function guardUnsavedArchiveWork(onProceed){
+  if(!hasUnsavedArchiveWork()){onProceed();return;}
+  showGenericConfirm({title:'مطمئن هستید؟',text:'یادداشتِ صوتی/متنیِ ذخیره‌نشده دور ریخته می‌شود. ادامه می‌دهید؟',okLabel:'بله، ادامه بده',onConfirm:onProceed});
 }
-async function viewTranscript(sessionId){
-  if(currentViewSession&&currentViewSession.id!==sessionId&&!confirmDiscardArchiveWork())return;
+function viewTranscript(sessionId){
+  if(currentViewSession&&currentViewSession.id!==sessionId){guardUnsavedArchiveWork(function(){doViewTranscript(sessionId);});return;}
+  doViewTranscript(sessionId);
+}
+async function doViewTranscript(sessionId){
   // ⭐ اگر یادداشتِ صوتیِ جلسه‌ی دستیِ دیگری نیمه‌کاره مانده بود (کاربر بدونِ «پایان
   // ضبط» به جلسه‌ی دیگری سوئیچ کرد)، امن رها می‌شود — نه ضبطِ اشتباه ادامه پیدا کند.
   cleanupArchiveVoice();
@@ -4410,7 +4776,9 @@ async function viewTranscript(sessionId){
   }catch(e){showBanner('error',e.message);}
 }
 function backToClientDetailFromSession(){
-  if(!confirmDiscardArchiveWork())return;
+  guardUnsavedArchiveWork(doBackToClientDetailFromSession);
+}
+function doBackToClientDetailFromSession(){
   cleanupArchiveVoice();
   if(currentClient)openClientDetail(currentClient.id);
   else goBackToClients();
@@ -5906,10 +6274,15 @@ function showArchiveTextInput(){
 }
 function hideArchiveTextInput(){
   // ⭐ فیکسِ باگِ واقعی (B1-Archive): قبلاً بدونِ هشدار متنِ ذخیره‌نشده (به‌خصوص نتیجه‌ی
-  // یک ضبطِ صوتیِ کامل) دور ریخته می‌شد. الگوی confirm عیناً از hasUnsavedArchiveWork
-  // گرفته شده.
+  // یک ضبطِ صوتیِ کامل) دور ریخته می‌شد. حالا مودالِ استانداردِ اپ به‌جایِ `confirm()`ِ خام.
   const ta=$('archiveTextNoteInput');
-  if(ta&&ta.value.trim()&&!confirm('یادداشتِ ذخیره‌نشده دور ریخته شود؟'))return;
+  if(ta&&ta.value.trim()){
+    showGenericConfirm({title:'مطمئن هستید؟',text:'یادداشتِ ذخیره‌نشده دور ریخته شود؟',okLabel:'بله، دور ریخته شود',onConfirm:doHideArchiveTextInput});
+    return;
+  }
+  doHideArchiveTextInput();
+}
+function doHideArchiveTextInput(){
   $('archiveTextNoteBox').hidden=true;
   $('archiveTextNoteInput').value='';
   archiveTextNoteOrigin=null;
@@ -6339,7 +6712,9 @@ const MODAL_CLOSERS={
   editSessionModal:closeEditSessionMeta,
   deleteTherapistModal:closeDeleteTherapist,
   deleteClientModal:closeDeleteClient,
-  cfAddItemModal:closeCfAddItemModal
+  cfAddItemModal:closeCfAddItemModal,
+  cfDeleteItemModal:closeCfDeleteItem,
+  genericConfirmModal:closeGenericConfirm
 };
 document.querySelectorAll('.modal-back').forEach(function(back){
   back.addEventListener('click',function(e){
