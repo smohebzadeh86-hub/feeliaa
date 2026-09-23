@@ -193,3 +193,54 @@ CREATE TABLE IF NOT EXISTS client_case_file (
     CONSTRAINT fk_case_file_client FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
     CONSTRAINT client_case_file_status_check CHECK (status IN ('ready','generating','error','stale'))
 ) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- -----------------------------------------------------------------------------
+-- obs_events / obs_ui_events  (021) — لایه‌ی رصد و حسابرسی، فاز ۱.
+-- عمداً بدونِ FK و با PK از نوعِ BIGINT (نه UUID) — رجوع به کامنتِ سرِ
+-- migrations/021_observability_events.sql و database-catalog.md برایِ دلیل.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS obs_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    ts DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    client_ts DATETIME(3) NULL,
+    source ENUM('server','client','job') NOT NULL,
+    severity ENUM('debug','info','warn','error') NOT NULL DEFAULT 'info',
+    event VARCHAR(64) NOT NULL,
+    code VARCHAR(64) NULL,
+    therapist_id CHAR(36) NULL,
+    client_id CHAR(36) NULL,
+    session_id CHAR(36) NULL,
+    run_id VARCHAR(64) NULL,
+    request_id VARCHAR(64) NULL,
+    nav_id CHAR(36) NULL,
+    route VARCHAR(128) NULL,
+    method VARCHAR(8) NULL,
+    status_code SMALLINT NULL,
+    duration_ms INT NULL,
+    detail JSON NULL,
+    KEY idx_obs_events_ts (ts),
+    KEY idx_obs_events_therapist_ts (therapist_id, ts),
+    KEY idx_obs_events_session_ts (session_id, ts),
+    KEY idx_obs_events_event_ts (event, ts),
+    KEY idx_obs_events_request (request_id)
+) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS obs_ui_events (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    ts DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    client_ts DATETIME(3) NULL,
+    therapist_id CHAR(36) NULL,
+    session_id CHAR(36) NULL,
+    nav_id CHAR(36) NULL,
+    seq INT NOT NULL,
+    kind ENUM('click','nav','visibility','net','lifecycle','error') NOT NULL,
+    screen VARCHAR(64) NULL,
+    target_id VARCHAR(64) NULL,
+    target_role VARCHAR(32) NULL,
+    target_tag VARCHAR(16) NULL,
+    value_num INT NULL,
+    KEY idx_obs_ui_events_ts (ts),
+    KEY idx_obs_ui_events_therapist_ts (therapist_id, ts),
+    KEY idx_obs_ui_events_session_ts (session_id, ts),
+    KEY idx_obs_ui_events_nav_seq (nav_id, seq)
+) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

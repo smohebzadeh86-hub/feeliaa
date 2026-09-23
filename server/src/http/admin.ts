@@ -1,10 +1,31 @@
 // پنل ادمین — فقط is_admin=true. هیچ‌جا متنِ رونویسی‌شده‌ی جلسات نمایش داده نمی‌شود.
 import { FastifyInstance } from 'fastify';
-import { createReadStream, statSync } from 'node:fs';
+import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs';
+import path from 'node:path';
 import { query } from '../db/connection.js';
 import { requireAdmin } from '../auth/guard.js';
-import { listSessionAudio, getSessionAudioRow, getFullSessionAudio } from '../stt/sessionAudioArchive.js';
+import { listSessionAudio, getSessionAudioRow, getFullSessionAudio, deleteSessionAudioDirs, deriveSessionStatus } from '../stt/sessionAudioArchive.js';
 import { pendingAudiosFor } from '../stt/batchqueue.js';
+import { logEvent, obsQueueStats } from '../obs/eventLog.js';
+
+// پارسِ امنِ Range: bytes=start-end با clamp به اندازه‌ی واقعیِ فایل.
+// خروجی null یعنی range غیرقابلِ‌ارضا (باید 416 برگردد) — قبلاً start فراتر از
+// stat.size منجر به Content-Length منفی و پاسخِ خراب می‌شد.
+function parseRange(rangeHeader: string, size: number): { start: number; end: number } | null {
+  const m = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
+  if (!m || (!m[1] && !m[2])) return null;
+  let start = m[1] ? parseInt(m[1], 10) : 0;
+  let end = m[2] ? parseInt(m[2], 10) : size - 1;
+  if (Number.isNaN(start) || Number.isNaN(end)) return null;
+  if (!m[1] && m[2]) {
+    // فرمِ suffix: bytes=-N یعنی N بایتِ آخر
+    start = Math.max(0, size - end);
+    end = size - 1;
+  }
+  if (start > end || start < 0 || start >= size) return null;
+  if (end >= size) end = size - 1;
+  return { start, end };
+}
 
 // دیتای کاملِ یک تراپیست: مراجعین + جلسات (با متنِ رونویسی) + یادداشت‌ها/علائم.
 // فقط از دو مسیرِ export که پشتِ requireAdmin هستن صدا زده می‌شه.
@@ -164,7 +185,10 @@ export async function adminRoutes(app: FastifyInstance) {
   // استفاده می‌شود؛ نمایشِ ادمین از `audio/full` (بخشِ F) استفاده می‌کند.
   app.get('/api/admin/sessions/:id/audio', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const session = await query('SELECT id FROM sessions WHERE id = ?', [id]);
+    const session = await query(
+      'SELECT id, batch_status, realtime_reliable, stt_mode FROM sessions WHERE id = ?',
+      [id]
+    );
     if (session.rows.length === 0) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
@@ -177,12 +201,22 @@ export async function adminRoutes(app: FastifyInstance) {
       pendingAudiosFor(id, 'late-transcript').length +
       pendingAudiosFor(id, 'note').length +
       pendingAudiosFor(id, 'archive').length;
+    // بخشِ ۱۱/۱۳ی audit «zero-loss recording» (2026-09-22): قبلاً ادمین فقط یک بنرِ
+    // تجمیعیِ «N فایل در صف» می‌دید — بینِ «صدا کامل ولی رونویسی پنding» و «سگمنتی از
+    // صدا واقعاً گم شده» تمایزی نبود. الان صریحاً محاسبه و برگردانده می‌شود.
+    // (فازِ ۱ِ رصد/حسابرسی، 2026-09-22: همین منطق در deriveSessionStatus استخراج شد
+    // تا GET /api/admin/sessions/recent هم بتواند از آن استفاده کند.)
+    const row = session.rows[0] as { batch_status: string | null; realtime_reliable: boolean | null; stt_mode: string | null };
+    const derived = deriveSessionStatus(rows, pendingCount, row);
     return {
       audio: rows.map((r) => ({
         id: r.id, seq: r.seq, bytes: r.bytes, mime: r.mime, source: r.source, kind: r.kind,
         duration_ms: r.duration_ms, created_at: r.created_at,
       })),
-      pending_count: pendingCount,
+      pending_count: derived.pendingCount,
+      audio_status: derived.audioStatus,
+      audio_missing_segments: derived.audioMissingSegments,
+      transcript_status: derived.transcriptStatus,
     };
   });
 
@@ -215,11 +249,22 @@ export async function adminRoutes(app: FastifyInstance) {
       const ext = result.mime.includes('ogg') ? 'ogg' : result.mime.includes('mp4') ? 'm4a' : 'webm';
       reply.header('Content-Disposition', `attachment; filename="session-${id}.${ext}"`);
     }
+    // بخشِ ۵ی audit «zero-loss recording» (2026-09-22): این فایل قبلاً بدونِ هیچ سیگنالی
+    // دربارهٔ کاملیت سرو می‌شد — caller ای که مستقیم این endpoint را می‌زند (نه از مسیرِ
+    // UIِ فعلی که جدا از `/audio` چک می‌کند) هیچ راهی برایِ فهمیدنِ gapِ احتمالی نداشت.
+    reply.header('X-Audio-Complete', String(result.complete));
+    if (!result.complete) {
+      reply.header('X-Audio-Missing-Segments', result.missingSegments.join(','));
+    }
     const range = request.headers.range;
     if (range) {
-      const m = /bytes=(\d*)-(\d*)/.exec(range);
-      const start = m && m[1] ? parseInt(m[1], 10) : 0;
-      const end = m && m[2] ? parseInt(m[2], 10) : stat.size - 1;
+      const parsed = parseRange(range, stat.size);
+      if (!parsed) {
+        reply.code(416);
+        reply.header('Content-Range', `bytes */${stat.size}`);
+        return reply.send();
+      }
+      const { start, end } = parsed;
       reply.code(206);
       reply.header('Content-Range', `bytes ${start}-${end}/${stat.size}`);
       reply.header('Accept-Ranges', 'bytes');
@@ -258,9 +303,13 @@ export async function adminRoutes(app: FastifyInstance) {
     const range = request.headers.range;
     const contentType = row.mime || 'audio/webm';
     if (range) {
-      const m = /bytes=(\d*)-(\d*)/.exec(range);
-      const start = m && m[1] ? parseInt(m[1], 10) : 0;
-      const end = m && m[2] ? parseInt(m[2], 10) : stat.size - 1;
+      const parsed = parseRange(range, stat.size);
+      if (!parsed) {
+        reply.code(416);
+        reply.header('Content-Range', `bytes */${stat.size}`);
+        return reply.send();
+      }
+      const { start, end } = parsed;
       reply.code(206);
       reply.header('Content-Range', `bytes ${start}-${end}/${stat.size}`);
       reply.header('Accept-Ranges', 'bytes');
@@ -285,6 +334,7 @@ export async function adminRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'تراپیست یافت نشد' };
     }
+    logEvent({ event: 'admin.export', therapistId: request.therapistId, detail: { kind: 'therapist' } });
     reply.header('Content-Disposition', `attachment; filename="feelia-${data.therapist.phone}.json"`);
     reply.type('application/json');
     return data;
@@ -298,6 +348,7 @@ export async function adminRoutes(app: FastifyInstance) {
       const data = await buildTherapistExport(row.id);
       if (data) all.push(data);
     }
+    logEvent({ event: 'admin.export', therapistId: request.therapistId, detail: { kind: 'full', count: all.length } });
     reply.header('Content-Disposition', `attachment; filename="feelia-export-${new Date().toISOString().slice(0, 10)}.json"`);
     reply.type('application/json');
     return { exported_at: new Date().toISOString(), therapists: all };
@@ -362,7 +413,16 @@ export async function adminRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'تراپیست یافت نشد' };
     }
+    // LAW-010: قبل از cascadeِ DB (therapist → clients → sessions)، شناسه‌ی همه‌ی
+    // جلسه‌هایِ زیرِ این تراپیست را نگه می‌داریم تا فایل‌هایِ صدایشان یتیم نمانند.
+    const sessionIdsResult = await query(
+      'SELECT s.id FROM sessions s JOIN clients c ON s.client_id = c.id WHERE c.therapist_id = ?',
+      [id]
+    );
+    const sessionIds = sessionIdsResult.rows.map((r: { id: string }) => r.id);
     await query('DELETE FROM therapists WHERE id = ?', [id]);
+    deleteSessionAudioDirs(sessionIds);
+    logEvent({ event: 'admin.delete', therapistId: request.therapistId, detail: { kind: 'therapist' } });
 
     return { deleted: existing.rows[0].phone };
   });
@@ -376,8 +436,234 @@ export async function adminRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
+    // LAW-010: همان دلیلِ بالا — قبل از cascade شناسه‌ی جلسه‌ها را نگه می‌داریم.
+    const sessionIdsResult = await query('SELECT id FROM sessions WHERE client_id = ?', [id]);
+    const sessionIds = sessionIdsResult.rows.map((r: { id: string }) => r.id);
     await query('DELETE FROM clients WHERE id = ?', [id]);
+    deleteSessionAudioDirs(sessionIds);
+    logEvent({ event: 'admin.delete', therapistId: request.therapistId, detail: { kind: 'client' } });
 
     return { deleted: existing.rows[0].code };
+  });
+
+  // ————————————————— لایه‌ی رصد/حسابرسی — فازِ ۱ (پنلِ ادمین) —————————————————
+
+  // GET /api/admin/sessions/recent — فهرستِ سراسریِ جلساتِ اخیر/ناتمام (مشکلِ کشف‌پذیریِ
+  // شرح‌داده‌شده در پلن: «تراپیست ضبط کرد، ثبت نهایی نزد، هیچ‌چی نمی‌تونم بازیابی کنم»).
+  // خودِ متنِ رونویسی هرگز SELECT نمی‌شود — فقط CHAR_LENGTH (نه LENGTH؛ فارسیِ utf8mb4 چندبایتی است).
+  app.get('/api/admin/sessions/recent', async (request, reply) => {
+    const q = request.query as {
+      status?: string; since_hours?: string; therapist_id?: string;
+      has_transcript?: string; limit?: string; offset?: string;
+    };
+    const status = q.status === 'completed' || q.status === 'all' ? q.status : 'in_progress';
+    const sinceHoursRaw = Number(q.since_hours);
+    const sinceHours = Number.isFinite(sinceHoursRaw) && sinceHoursRaw > 0 ? Math.min(sinceHoursRaw, 24 * 365) : 168;
+    const limitRaw = Number(q.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 50;
+    const offsetRaw = Number(q.offset);
+    const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.floor(offsetRaw) : 0;
+
+    const conditions: string[] = ['s.updated_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)'];
+    const params: unknown[] = [sinceHours];
+    if (status !== 'all') { conditions.push('s.status = ?'); params.push(status); }
+    if (q.therapist_id) { conditions.push('t.id = ?'); params.push(q.therapist_id); }
+    if (q.has_transcript === 'true') conditions.push('CHAR_LENGTH(s.transcript) > 0');
+    else if (q.has_transcript === 'false') conditions.push('(s.transcript IS NULL OR CHAR_LENGTH(s.transcript) = 0)');
+
+    const rows = await query(
+      `SELECT s.id, s.session_num, s.date, s.start_time, s.status, s.source,
+              s.created_at, s.updated_at, s.batch_status, s.realtime_reliable, s.stt_mode,
+              c.id AS client_id, c.code AS client_code,
+              t.id AS therapist_id, t.name AS therapist_name,
+              CHAR_LENGTH(s.transcript) AS transcript_len,
+              (SELECT COUNT(*) FROM session_audio a WHERE a.session_id = s.id) AS audio_count,
+              (SELECT COALESCE(SUM(a.bytes), 0) FROM session_audio a WHERE a.session_id = s.id) AS audio_bytes,
+              (SELECT COALESCE(SUM(a.duration_ms), 0) FROM session_audio a WHERE a.session_id = s.id) AS audio_duration_ms,
+              (SELECT COUNT(*) FROM session_notes n WHERE n.session_id = s.id) AS note_count
+       FROM sessions s
+       JOIN clients c ON c.id = s.client_id
+       JOIN therapists t ON t.id = c.therapist_id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY s.updated_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+    return { sessions: rows.rows };
+  });
+
+  // GET /api/admin/sessions/:id/timeline — همه‌ی رویدادهایِ مرتبط با یک جلسه، مرتب بر ts.
+  app.get('/api/admin/sessions/:id/timeline', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const session = await query('SELECT id, created_at, updated_at, status FROM sessions WHERE id = ?', [id]);
+    if (session.rows.length === 0) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+
+    type TimelineItem = {
+      ts: string; lane: 'server' | 'client' | 'ui' | 'audio' | 'note' | 'db'; label: string; detail: Record<string, unknown>;
+    };
+    const items: TimelineItem[] = [];
+
+    const events = await query(
+      'SELECT ts, source, severity, event, code, duration_ms, status_code, route, method, detail FROM obs_events WHERE session_id = ? ORDER BY ts',
+      [id]
+    );
+    for (const r of events.rows) {
+      items.push({
+        ts: r.ts, lane: r.source === 'client' ? 'client' : 'server', label: r.event,
+        detail: { severity: r.severity, code: r.code, duration_ms: r.duration_ms, status_code: r.status_code, route: r.route, method: r.method, ...(r.detail || {}) },
+      });
+    }
+
+    const uiEvents = await query(
+      'SELECT ts, kind, screen, target_id, target_role, target_tag, value_num FROM obs_ui_events WHERE session_id = ? ORDER BY ts',
+      [id]
+    );
+    for (const r of uiEvents.rows) {
+      items.push({
+        ts: r.ts, lane: 'ui', label: 'ui.' + r.kind,
+        detail: { screen: r.screen, target_id: r.target_id, target_role: r.target_role, target_tag: r.target_tag, value_num: r.value_num },
+      });
+    }
+
+    const audio = await listSessionAudio(id);
+    for (const r of audio) {
+      items.push({
+        ts: r.created_at, lane: 'audio', label: 'audio.segment',
+        detail: { seq: r.seq, bytes: r.bytes, kind: r.kind, source: r.source, duration_ms: r.duration_ms },
+      });
+    }
+
+    // متنِ یادداشت هرگز SELECT نمی‌شود — فقط متادیتا (LAW-001).
+    const notes = await query(
+      'SELECT id, type, sign_type, created_at, CHAR_LENGTH(text) AS text_len FROM session_notes WHERE session_id = ? ORDER BY created_at',
+      [id]
+    );
+    for (const r of notes.rows) {
+      items.push({ ts: r.created_at, lane: 'note', label: 'note.' + r.type, detail: { sign_type: r.sign_type, text_len: r.text_len } });
+    }
+
+    items.push({ ts: session.rows[0].created_at, lane: 'db', label: 'session.created_at', detail: {} });
+    items.push({ ts: session.rows[0].updated_at, lane: 'db', label: 'session.updated_at', detail: { status: session.rows[0].status } });
+
+    items.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+    return { timeline: items };
+  });
+
+  // GET /api/admin/obs/events — جدولِ فیلترشده‌ی obs_events (فیلترهایِ اختیاری، الگوی
+  // موجودِ `? IS NULL OR col = ?`).
+  app.get('/api/admin/obs/events', async (request) => {
+    const q = request.query as {
+      event?: string; severity?: string; therapist_id?: string; session_id?: string;
+      source?: string; from?: string; to?: string; limit?: string;
+    };
+    const limitRaw = Number(q.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 100;
+    const event = q.event?.trim() || null;
+    const severity = q.severity?.trim() || null;
+    const therapistId = q.therapist_id?.trim() || null;
+    const sessionId = q.session_id?.trim() || null;
+    const source = q.source?.trim() || null;
+    const from = q.from?.trim() || null;
+    const to = q.to?.trim() || null;
+
+    const rows = await query(
+      `SELECT id, ts, client_ts, source, severity, event, code, therapist_id, client_id, session_id,
+              run_id, request_id, nav_id, route, method, status_code, duration_ms, detail
+       FROM obs_events
+       WHERE (? IS NULL OR event = ?)
+         AND (? IS NULL OR severity = ?)
+         AND (? IS NULL OR therapist_id = ?)
+         AND (? IS NULL OR session_id = ?)
+         AND (? IS NULL OR source = ?)
+         AND (? IS NULL OR ts >= ?)
+         AND (? IS NULL OR ts <= ?)
+       ORDER BY ts DESC
+       LIMIT ?`,
+      [event, event, severity, severity, therapistId, therapistId, sessionId, sessionId, source, source, from, from, to, to, limit]
+    );
+    return { events: rows.rows };
+  });
+
+  // GET /api/admin/obs/ui-events — همان الگو برایِ obs_ui_events.
+  app.get('/api/admin/obs/ui-events', async (request) => {
+    const q = request.query as {
+      kind?: string; therapist_id?: string; session_id?: string; nav_id?: string;
+      from?: string; to?: string; limit?: string;
+    };
+    const limitRaw = Number(q.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 500) : 100;
+    const kind = q.kind?.trim() || null;
+    const therapistId = q.therapist_id?.trim() || null;
+    const sessionId = q.session_id?.trim() || null;
+    const navId = q.nav_id?.trim() || null;
+    const from = q.from?.trim() || null;
+    const to = q.to?.trim() || null;
+
+    const rows = await query(
+      `SELECT id, ts, client_ts, therapist_id, session_id, nav_id, seq, kind, screen, target_id, target_role, target_tag, value_num
+       FROM obs_ui_events
+       WHERE (? IS NULL OR kind = ?)
+         AND (? IS NULL OR therapist_id = ?)
+         AND (? IS NULL OR session_id = ?)
+         AND (? IS NULL OR nav_id = ?)
+         AND (? IS NULL OR ts >= ?)
+         AND (? IS NULL OR ts <= ?)
+       ORDER BY ts DESC
+       LIMIT ?`,
+      [kind, kind, therapistId, therapistId, sessionId, sessionId, navId, navId, from, from, to, to, limit]
+    );
+    return { events: rows.rows };
+  });
+
+  // GET /api/admin/obs/stats — شمارشِ روزانه‌ی ۱۴روزه به تفکیکِ رویداد، آمارِ صفِ درون‌حافظه‌ای،
+  // اندازه‌ی فایل‌هایِ JSONL، و حجمِ DBِ دو جدول.
+  app.get('/api/admin/obs/stats', async () => {
+    const daily = await query(
+      `SELECT DATE(ts) AS day, event, COUNT(*) AS count
+       FROM obs_events
+       WHERE ts >= DATE_SUB(NOW(), INTERVAL 14 DAY)
+       GROUP BY DATE(ts), event
+       ORDER BY day DESC`
+    );
+
+    let dbSize: { obs_events: number; obs_ui_events: number } = { obs_events: 0, obs_ui_events: 0 };
+    try {
+      const sizeRows = await query(
+        `SELECT table_name, (DATA_LENGTH + INDEX_LENGTH) AS size_bytes
+         FROM information_schema.tables
+         WHERE table_schema = DATABASE() AND table_name IN ('obs_events', 'obs_ui_events')`
+      );
+      for (const r of sizeRows.rows) {
+        if (r.table_name === 'obs_events') dbSize.obs_events = Number(r.size_bytes) || 0;
+        if (r.table_name === 'obs_ui_events') dbSize.obs_ui_events = Number(r.size_bytes) || 0;
+      }
+    } catch {
+      // information_schema ممکن است در بعضی محیط‌های محدودشده در دسترس نباشد — fail-open
+    }
+
+    const logDir = path.join(process.cwd(), 'data', 'logs');
+    let jsonlFiles: Array<{ name: string; bytes: number }> = [];
+    try {
+      if (existsSync(logDir)) {
+        jsonlFiles = readdirSync(logDir)
+          .filter((f) => f.startsWith('obs.jsonl'))
+          .map((f) => {
+            try { return { name: f, bytes: statSync(path.join(logDir, f)).size }; }
+            catch { return { name: f, bytes: 0 }; }
+          });
+      }
+    } catch {
+      // no-op
+    }
+
+    return {
+      daily_counts: daily.rows,
+      queue: obsQueueStats(),
+      jsonl_files: jsonlFiles,
+      db_size_bytes: dbSize,
+    };
   });
 }

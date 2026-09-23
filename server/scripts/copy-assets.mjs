@@ -10,8 +10,12 @@ import { fileURLToPath } from 'node:url';
 const serverDir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // [from, to] — هر دو نسبی به پوشه‌ی server/
+// ⭐ فیکسِ باگِ واقعی (کشف‌شده در deployِ ۲۰۲۶-۰۹-۲۳): فقط migrationهایِ قدیمیِ Postgres
+// کپی می‌شد، نه migrationهایِ فعلیِ MySQL — یعنی یک deployِ فقط-dist (بدونِ server/src)
+// اصلاً پیدایشان نمی‌کرد و resolveMigrationsDirِ migrate.ts خطا می‌داد.
 const ASSETS = [
   ['src/db/migrations', 'dist/db/migrations'],
+  ['src/db/mysql/migrations', 'dist/db/mysql/migrations'],
 ];
 
 let copied = 0;

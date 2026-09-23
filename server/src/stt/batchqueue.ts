@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../db/connection.js';
+import { logEvent } from '../obs/eventLog.js';
 
 export type BatchStatus = 'queued' | 'processing' | 'done' | 'failed';
 
@@ -104,6 +105,7 @@ export async function enqueueBatch(
     );
   }
   console.log(`[batch] queued session=${sessionId} purpose=${purpose} seq=${seq} bytes=${buf.length} baseVersion=${baseVersion}`);
+  logEvent({ event: 'batch.enqueued', sessionId, source: 'job', detail: { purpose, seq, bytes: buf.length } });
   return { baseVersion };
 }
 
@@ -121,15 +123,31 @@ function isLateFile(f: string): boolean {
 // <sessionId>-<seqِ ۶رقمی>-<runId>-<timestamp>[.note|.archive|.late].<webm|ogg|m4a>)
 // تا موقعِ آرشیوکردن برایِ ادمین، ترتیبِ واقعیِ سگمنت، runِ صاحبش، و mimeِ واقعی حفظ بمونه.
 const EXT_ALTERNATION = KNOWN_EXTS.join('|');
-function seqFromFilename(filePath: string): number {
+// فایل‌هایِ خیلی قدیمی (پیش از migration 017، بخشِ runId هنوز نبود): <sessionId>-<seq>-<timestamp>.ext
+const LEGACY_NO_RUN_RE = new RegExp(`^(.+)-(\\d{6})-(\\d+)\\.(?:note\\.|archive\\.|late\\.)?(?:${EXT_ALTERNATION})$`);
+const WITH_RUN_RE = new RegExp(`^(.+)-(\\d{6})-([a-zA-Z0-9]+)-(\\d+)\\.(?:note\\.|archive\\.|late\\.)?(?:${EXT_ALTERNATION})$`);
+
+// ⭐ فیکسِ باگِ واقعی (کشف‌شده در لاگِ deployِ ۲۰۲۶-۰۹-۲۳): برایِ فایلِ خیلی قدیمیِ بدونِ
+// runId، regexِ قبلی (که همیشه runId را الزامی می‌دانست) اصلاً match نمی‌شد؛
+// sessionIdFromFilename در آن حالت کلِ نامِ فایل (شاملِ seq/timestamp/پسوند) را به‌عنوانِ
+// sessionId برمی‌گرداند — که از CHAR(36)ِ ستونِ session_id بلندتر است و INSERT با خطایِ
+// «Data too long for column 'session_id'» شکست می‌خورد (صدایِ همان فایل، چون sweep بدونِ
+// شرط حذف می‌کند، برایِ همیشه از دست می‌رفت). حالا هر دو فرمت (با/بدونِ runId) پارس
+// می‌شوند؛ اگر هیچ‌کدام match نشد، null برمی‌گردد و caller آرشیو را رد می‌کند (فایل هنوز
+// طبقِ سیاستِ ۲۴ساعته حذف می‌شود، فقط دیگر INSERTِ نامعتبر نمی‌زند).
+function parseQueueFilename(filePath: string): { sessionId: string; seq: number; runId: string } | null {
   const base = path.basename(filePath);
-  const m = base.match(new RegExp(`-(\\d{6})-[a-zA-Z0-9]+-\\d+\\.(?:note\\.|archive\\.|late\\.)?(?:${EXT_ALTERNATION})$`));
-  return m ? parseInt(m[1], 10) : 0;
+  const withRun = base.match(WITH_RUN_RE);
+  if (withRun) return { sessionId: withRun[1], seq: parseInt(withRun[2], 10), runId: withRun[3] };
+  const legacy = base.match(LEGACY_NO_RUN_RE);
+  if (legacy) return { sessionId: legacy[1], seq: parseInt(legacy[2], 10), runId: 'legacy' };
+  return null;
+}
+function seqFromFilename(filePath: string): number {
+  return parseQueueFilename(filePath)?.seq ?? 0;
 }
 function runIdFromFilename(filePath: string): string {
-  const base = path.basename(filePath);
-  const m = base.match(new RegExp(`-\\d{6}-([a-zA-Z0-9]+)-\\d+\\.(?:note\\.|archive\\.|late\\.)?(?:${EXT_ALTERNATION})$`));
-  return m ? m[1] : 'legacy';
+  return parseQueueFilename(filePath)?.runId ?? 'legacy';
 }
 function mimeFromFilename(filePath: string): string {
   const base = path.basename(filePath);
@@ -261,6 +279,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
         await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, mimeFromFilename(file), 'durable', runIdFromFilename(file), purpose === 'note' ? 'note' : 'session');
       } catch (e) {
         console.log('[batch] archive-for-admin failed, kept queued:', String(e).slice(0, 160));
+        logEvent({ event: 'audio.archive_failed', sessionId, source: 'job', severity: 'error', detail: { purpose } });
         continue;
       }
       const baseRow = await query('SELECT transcript_version FROM sessions WHERE id = ?', [sessionId]);
@@ -298,19 +317,21 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
         [left.length ? 'queued' : 'done', sessionId]
       );
       console.log(`[batch] finished session=${sessionId} remaining=${left.length}`);
+      if (!left.length) logEvent({ event: 'batch.completed', sessionId, source: 'job', detail: { purpose } });
     }
   } catch (err) {
     console.log('[batch] processing failed:', String(err).slice(0, 160));
+    logEvent({ event: 'batch.failed', sessionId, source: 'job', severity: 'error', detail: { purpose } });
     if (isTranscriptLike) {
       await query(`UPDATE sessions SET batch_status = 'queued', updated_at = NOW() WHERE id = ?`, [sessionId]).catch(() => {});
     }
   }
 }
 
-function sessionIdFromFilename(filePath: string): string {
-  const base = path.basename(filePath);
-  const m = base.match(/^(.*)-\d{6}-[a-zA-Z0-9]+-\d+\.(?:note\.|archive\.)?webm$/);
-  return m ? m[1] : base;
+// null یعنی فرمتِ فایل قابلِ‌شناسایی نیست (خرابی/دستکاریِ دستی) — caller نباید تلاش
+// کند این را به‌عنوانِ sessionId در DB بنویسد (طولش می‌تواند بیشتر از CHAR(36) باشد).
+function sessionIdFromFilename(filePath: string): string | null {
+  return parseQueueFilename(filePath)?.sessionId ?? null;
 }
 
 // پاک‌سازی startup: فایل‌های قدیمی‌تر از RETENTION_MS (نشت دیسک/حریم خصوصی).
@@ -330,12 +351,16 @@ export async function sweepOldBatchFiles(): Promise<void> {
       try {
         const age = now - statSync(p).mtimeMs;
         if (age > RETENTION_MS) {
-          try {
-            const buffer = readFileSync(p);
-            const sessionId = sessionIdFromFilename(p);
-            await archiveAudioForAdmin(sessionId, seqFromFilename(p), buffer, mimeFromFilename(p), 'durable', runIdFromFilename(p), isNoteFile(f) ? 'note' : 'session');
-          } catch (e) {
-            console.log('[batch] pre-sweep archive failed (still sweeping):', String(e).slice(0, 160));
+          const sessionId = sessionIdFromFilename(p);
+          if (sessionId === null) {
+            console.log(`[batch] unparsable filename, dropping without archive: ${f}`);
+          } else {
+            try {
+              const buffer = readFileSync(p);
+              await archiveAudioForAdmin(sessionId, seqFromFilename(p), buffer, mimeFromFilename(p), 'durable', runIdFromFilename(p), isNoteFile(f) ? 'note' : 'session');
+            } catch (e) {
+              console.log('[batch] pre-sweep archive failed (still sweeping):', String(e).slice(0, 160));
+            }
           }
           rmSync(p, { force: true });
           console.log(`[batch] swept old file ${f}`);
@@ -356,6 +381,7 @@ export async function retryQueuedBatches(): Promise<void> {
     for (const f of readdirSync(QUEUE_DIR)) {
       const purpose: BatchPurpose = isNoteFile(f) ? 'note' : isArchiveFile(f) ? 'archive' : isLateFile(f) ? 'late-transcript' : 'transcript';
       const sessionId = sessionIdFromFilename(path.join(QUEUE_DIR, f));
+      if (sessionId === null) continue; // فرمتِ ناشناخته — sweepِ ۲۴ساعته خودش رسیدگی می‌کند
       const key = `${sessionId}:${purpose}`;
       if (seen.has(key)) continue;
       seen.add(key);

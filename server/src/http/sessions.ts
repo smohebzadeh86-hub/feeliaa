@@ -18,7 +18,8 @@ import {
   validateAudioBuffer,
 } from '../stt/batchqueue.js';
 import { getResolveJob, startResolveSpeakers } from '../stt/speakerResolve.js';
-import { listSessionAudio } from '../stt/sessionAudioArchive.js';
+import { listSessionAudio, deleteSessionAudioDirs } from '../stt/sessionAudioArchive.js';
+import { logEvent } from '../obs/eventLog.js';
 import { generateCaseFile } from '../features/case-file/application/generateCaseFile.js';
 import { SqlCaseFileRepository } from '../features/case-file/adapters/repository/caseFileRepository.sql.js';
 import { resolveLLMProvider } from '../features/case-file/adapters/llm/registry.js';
@@ -215,6 +216,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       if (noteText !== null) {
         void maybeAutoGenerateCaseFile(client_id, request.therapistId!);
       }
+      logEvent({ event: 'session.created', sessionId, clientId: client_id, therapistId: request.therapistId, detail: { mode: 'manual' } });
       reply.code(201);
       return {
         session: manual.rows[0],
@@ -229,6 +231,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       [newId, client_id, sessionNum, sessionDate, sessionTime, true]
     );
     const result = await query('SELECT * FROM sessions WHERE id = ?', [newId]);
+    logEvent({ event: 'session.created', sessionId: newId, clientId: client_id, therapistId: request.therapistId, detail: { mode: 'live' } });
 
     reply.code(201);
     return {
@@ -289,17 +292,25 @@ export async function sessionRoutes(app: FastifyInstance) {
 
     const updates: string[] = [];
     const values: unknown[] = [];
-
+    // R5 (subsystem 03 §2/§5): پیش‌بررسیِ زیر (SELECT جدا) به‌تنهایی CAS نیست — بینِ این
+    // SELECT و UPDATEِ پایینِ تابع یک پنجره‌ی race باز بود: دو PUTِ هم‌زمان با همان نسخه‌ی
+    // پایه می‌توانستند هر دو از این چک عبور کنند و هر دو UPDATE موفق شوند (یکی متنِ
+    // دیگری را بی‌صدا overwrite می‌کرد). الان پیش‌بررسی فقط برایِ خطایِ سریع/واضح نگه
+    // داشته شده؛ گاردِ واقعی همان `AND transcript_version = ?`ی اتمیکِ پایینِ همین تابع
+    // است که مستقیماً در WHEREِ UPDATE می‌آید (پیشنهادِ همان سند، بخشِ ۵.۴).
+    let versionGuard: number | undefined;
     if (body.transcript !== undefined) {
-      // DIAG-TEMP: لاگ تشخیصی موقت برای ردیابی گم‌شدن مارکر discontinuity — بعد از پیدا کردن علت حذف شود.
-      console.log(`[diag-transcript] session=${id} incomingVersion=${body.transcript_version} len=${body.transcript.length} tail=${JSON.stringify(body.transcript.slice(-80))}`);
+      // فیکسِ نشتِ حریمِ‌خصوصی (فازِ ۱ِ رصد/حسابرسی، 2026-09-22، LAW-001): این‌جا قبلاً
+      // ۸۰ نویسه‌ی آخرِ متنِ بالینی را مستقیم در stdout لاگ می‌کرد (console.log
+      // [diag-transcript]). جایگزین: فقط متادیتای امن (طول/نسخه) از طریقِ logEvent.
+      logEvent({ event: 'session.transcript_put', sessionId: id, therapistId: request.therapistId, detail: { len: body.transcript.length, version: body.transcript_version } });
       // ✅ Compare-and-swap: اگر caller نسخه‌ی پایه بفرستد و با DB نخورد → 409، نه overwrite.
       // callerهای قدیمی (بدون transcript_version) همچنان پذیرفته‌اند (سازگاری عقبرو).
       if (typeof body.transcript_version === 'number') {
         const curV = await query('SELECT transcript_version FROM sessions WHERE id = ?', [id]);
         const cv: number = curV.rows[0]?.transcript_version ?? 0;
         if (cv !== body.transcript_version) {
-          console.log(`[diag-transcript] session=${id} VERSION-CONFLICT incoming=${body.transcript_version} current=${cv}`);
+          logEvent({ event: 'session.transcript_conflict', sessionId: id, therapistId: request.therapistId, severity: 'warn', detail: { version: body.transcript_version, prev_version: cv } });
           reply.code(409);
           return {
             error: 'نسخه‌ی transcript قدیمی است؛ ابتدا تازه‌سازی کنید',
@@ -307,6 +318,7 @@ export async function sessionRoutes(app: FastifyInstance) {
             current_version: cv,
           };
         }
+        versionGuard = body.transcript_version;
       }
       updates.push(`transcript = ?`);
       values.push(body.transcript);
@@ -371,14 +383,38 @@ export async function sessionRoutes(app: FastifyInstance) {
     updates.push(`updated_at = NOW()`);
     values.push(id);
     values.push(request.therapistId);
-
-    const update = await query(
-      `UPDATE sessions SET ${updates.join(', ')}
-       WHERE id = ? AND client_id IN (SELECT id FROM clients WHERE therapist_id = ?)`,
-      values
-    );
+    // گاردِ اتمیکِ واقعی: اگه transcript_versionِ caller داده شده، همون شرط مستقیم توی
+    // WHEREِ همین UPDATE می‌آید — نه یک SELECTِ جداگانه‌ی قبلی. دو PUTِ هم‌زمان با نسخه‌ی
+    // یکسان دیگر نمی‌توانند هر دو موفق شوند: اولی رَویی که می‌رسد نسخه را +1 می‌کند،
+    // دومی چون `transcript_version = ?`ِ قدیمی دیگر با ردیفِ به‌روزشده نمی‌خورَد rowCount=0
+    // می‌گیرد (نه overwriteِ بی‌صدا).
+    let sql = `UPDATE sessions SET ${updates.join(', ')}
+       WHERE id = ? AND client_id IN (SELECT id FROM clients WHERE therapist_id = ?)`;
+    if (versionGuard !== undefined) {
+      sql += ` AND transcript_version = ?`;
+      values.push(versionGuard);
+    }
+    const update = await query(sql, values);
 
     if (update.rowCount === 0) {
+      if (versionGuard !== undefined) {
+        // یا جلسه/مالکیت پیدا نشد، یا نسخه دقیقاً همین بینِ پیش‌بررسیِ بالا و همین UPDATE
+        // توسطِ یک نویسنده‌ی هم‌زمانِ دیگر عوض شده — تشخیصِ صریح برایِ پیامِ درست:
+        const recheck = await query(
+          'SELECT transcript_version FROM sessions WHERE id = ? AND client_id IN (SELECT id FROM clients WHERE therapist_id = ?)',
+          [id, request.therapistId]
+        );
+        if (recheck.rows.length === 0) {
+          reply.code(404);
+          return { error: 'جلسه یافت نشد' };
+        }
+        reply.code(409);
+        return {
+          error: 'نسخه‌ی transcript قدیمی است؛ ابتدا تازه‌سازی کنید',
+          code: 'version-conflict',
+          current_version: recheck.rows[0].transcript_version,
+        };
+      }
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
@@ -412,6 +448,11 @@ export async function sessionRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
+
+    // LAW-010: بعدِ حذفِ موفقِ ردیفِ DB، فایل‌هایِ آرشیوشده‌ی همین جلسه رویِ دیسک را هم پاک کن
+    // (وگرنه یتیم می‌مانند — cascadeِ DB فقط ردیف را می‌بیند، نه فایل).
+    deleteSessionAudioDirs([id]);
+    logEvent({ event: 'session.deleted', sessionId: id, therapistId: request.therapistId });
 
     return { deleted: id };
   });
@@ -595,6 +636,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     const mime = typeof file.mimetype === 'string' && file.mimetype ? file.mimetype : 'audio/webm';
 
     const { baseVersion } = await enqueueBatch(id, buffer, purpose, seq, runId, mime);
+    logEvent({ event: 'audio.segment_received', sessionId: id, therapistId: request.therapistId, detail: { bytes: buffer.length, seq, purpose } });
     // پردازش ناهمگام؛ اگر egress قطع باشد queued می‌ماند و با retry بعدی جلو می‌رود
     processBatchQueue(id, purpose).catch(() => {});
 

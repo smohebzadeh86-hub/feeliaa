@@ -4,6 +4,7 @@ import { FastifyInstance } from 'fastify';
 import { query } from '../db/connection.js';
 import { requireAuth } from '../auth/guard.js';
 import { getOwnedClient } from '../db/ownership.js';
+import { deleteSessionAudioDirs } from '../stt/sessionAudioArchive.js';
 
 const VALID_CATEGORIES = ['child', 'teen', 'adult'];
 const VALID_GENDERS = ['f', 'm'];
@@ -278,6 +279,11 @@ export async function clientRoutes(app: FastifyInstance) {
         (SELECT COUNT(*) FROM session_notes WHERE session_id IN
           (SELECT id FROM sessions WHERE client_id = ?)) as note_count
     `, [id, id]);
+    // LAW-010: قبل از cascadeِ DB، شناسه‌ی جلسه‌ها را نگه می‌داریم — بعدِ حذف دیگر قابلِ
+    // خواندن نیستند، ولی فایل‌هایِ آرشیوشده‌ی هرکدام (data/session-audio/<sessionId>/)
+    // بدونِ این لیست یتیم می‌مانند.
+    const sessionIdsResult = await query('SELECT id FROM sessions WHERE client_id = ?', [id]);
+    const sessionIds = sessionIdsResult.rows.map((r: { id: string }) => r.id);
 
     const del = await query(
       'DELETE FROM clients WHERE id = ? AND therapist_id = ?',
@@ -288,6 +294,8 @@ export async function clientRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
+
+    deleteSessionAudioDirs(sessionIds);
 
     return {
       deleted: owned.code,

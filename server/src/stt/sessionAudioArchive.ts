@@ -115,7 +115,10 @@ export async function archiveAudioForAdmin(
     ensureArchiveDir();
     const dir = sessionDir(sessionId);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    const maxRow = await query('SELECT MAX(seq) AS m FROM session_audio WHERE session_id = ?', [sessionId]);
+    // seq فقط در همان kind باید پیوسته باشد — kind='note' و kind='session' دو جریانِ
+    // مستقل‌اند؛ قبلاً یک شمارنده‌ی seq مشترک بین هر دو باعثِ gapِ کاذب در
+    // checkSeqContiguous می‌شد (که فقط rows.kind==='session' را چک می‌کند).
+    const maxRow = await query('SELECT MAX(seq) AS m FROM session_audio WHERE session_id = ? AND kind = ?', [sessionId, kind]);
     const nextSeq: number = (maxRow.rows[0]?.m ?? -1) + 1;
     // mimeِ واقعیِ کلاینت (audit صدا/۲۰۲۶-۰۹-۱۶، بخشِ E) — فایرفاکس ogg، سافاری mp4/aac می‌فرستد.
     const ext = extForMime(mime || '');
@@ -161,6 +164,71 @@ export async function getSessionAudioRow(id: string): Promise<SessionAudioRow | 
   return r.rows[0] || null;
 }
 
+// ————————————————— بخشِ رصد/حسابرسی (فازِ ۱، 2026-09-22) —————————————————
+// منطقِ audio_status/transcript_status/pendingCount قبلاً inline در
+// GET /api/admin/sessions/:id/audio بود؛ endpointِ جدیدِ GET
+// /api/admin/sessions/recent به همان منطق نیاز داشت — به‌جایِ دوباره‌نویسی، این‌جا
+// export می‌شود و از هر دو مسیر صدا زده می‌شود.
+export interface DerivedSessionStatus {
+  audioStatus: 'none' | 'syncing' | 'incomplete' | 'complete';
+  audioMissingSegments: number[];
+  transcriptStatus: 'complete' | 'pending' | 'failed' | 'none';
+  pendingCount: number;
+}
+
+export function deriveSessionStatus(
+  sessionAudioRows: SessionAudioRow[],
+  pendingCount: number,
+  session: { batch_status: string | null; realtime_reliable: boolean | null; stt_mode: string | null }
+): DerivedSessionStatus {
+  const onlySession = sessionAudioRows.filter((r) => r.kind === 'session');
+  const { complete: seqComplete, missing: missingSeq } = checkSeqContiguous(onlySession);
+  const audioStatus: DerivedSessionStatus['audioStatus'] =
+    onlySession.length === 0 ? 'none'
+      : pendingCount > 0 ? 'syncing'
+        : !seqComplete ? 'incomplete'
+          : 'complete';
+  const transcriptStatus: DerivedSessionStatus['transcriptStatus'] =
+    session.batch_status === 'failed' ? 'failed'
+      : session.batch_status === 'queued' || session.batch_status === 'processing' ? 'pending'
+        : session.stt_mode === 'realtime' && session.realtime_reliable ? 'complete'
+          : session.batch_status === 'done' ? 'complete'
+            : session.stt_mode ? 'pending' : 'none';
+  return { audioStatus, audioMissingSegments: missingSeq, transcriptStatus, pendingCount };
+}
+
+// بخشِ ۱۱ی audit «zero-loss recording» (2026-09-22): قبل از این، فایلِ نهایی/دانلود صرفاً
+// concatِ ffmpeg بود — هیچ‌جا چک نمی‌شد که seqِ سگمنت‌هایِ kind='session' واقعاً پیوسته‌اند.
+// اگر سگمنتی هیچ‌وقت آپلود نشود (کاربر تبِ مرورگر را قبل از sync کاملاً بست)، فایلِ نهایی
+// بدونِ خطا ولی با gap ساخته می‌شد و هیچ‌جا علامت‌گذاری نمی‌شد. این تابع فقط چک می‌کند،
+// چیزی نمی‌سازد/حذف نمی‌کند — fail-open برایِ خودِ آرشیو دست‌نخورده می‌ماند.
+export function checkSeqContiguous(rows: SessionAudioRow[]): { complete: boolean; missing: number[] } {
+  if (!rows.length) return { complete: true, missing: [] };
+  const seqs = rows.map((r) => r.seq).sort((a, b) => a - b);
+  const missing: number[] = [];
+  for (let i = 0; i <= seqs[seqs.length - 1]; i++) {
+    if (!seqs.includes(i)) missing.push(i);
+  }
+  return { complete: missing.length === 0, missing };
+}
+
+// LAW-010 («حذفِ مراجع/جلسه باید صدای مربوط را هم پاک کند») — قبلاً فقط `ON DELETE CASCADE`
+// ردیفِ DBِ `session_audio` را پاک می‌کرد؛ خودِ فایل‌هایِ رویِ دیسک (`data/session-audio/<id>/`)
+// می‌ماندند و sweepِ ۱۴روزه هم آن‌ها را نمی‌دید (چون ردیفِ متناظرِ DB دیگر وجود نداشت که
+// `created_at`ش چک شود) — صدای یک مراجعِ حذف‌شده برایِ همیشه رویِ دیسک باقی می‌ماند.
+// caller باید این را *بعدِ* موفقیتِ DELETEِ DB صدا بزند (تا صدایی که هنوز به‌درستی حذف
+// نشده — مثلاً owner-check رد شده — پاک نشود). fail-open: خطایِ حذفِ فایل کلِ عملیاتِ
+// حذف را fail نمی‌کند؛ فقط لاگ می‌شود.
+export function deleteSessionAudioDirs(sessionIds: string[]): void {
+  for (const id of sessionIds) {
+    try {
+      rmSync(sessionDir(id), { recursive: true, force: true });
+    } catch (e) {
+      console.log('[session-audio] failed to delete dir for', id, String((e as Error).message || e).slice(-200));
+    }
+  }
+}
+
 // ————————————————— فایلِ کاملِ جلسه (بخشِ F، audit صدا/۲۰۲۶-۰۹-۱۶) —————————————————
 // تصمیمِ صریحِ مالک: پنلِ ادمین باید یک فایلِ کاملِ قابلِ‌دانلود نشان بدهد، نه لیستِ
 // سگمنت‌به‌سگمنت. ذخیره‌سازیِ داخلی (تکه‌تکه، برایِ مقاومت در برابرِ کرش) دست‌نخورده
@@ -168,7 +236,7 @@ export async function getSessionAudioRow(id: string): Promise<SessionAudioRow | 
 // فایل می‌چسباند و کش می‌کند — اگر سگمنتِ جدیدی اضافه نشده (جلسه تمام شده، late-transcript
 // هم چیزی اضافه نکرده)، دوباره ساخته نمی‌شود.
 export type FullAudioResult =
-  | { ok: true; path: string; mime: string }
+  | { ok: true; path: string; mime: string; complete: boolean; missingSegments: number[] }
   | { ok: false; reason: 'no-ffmpeg' | 'no-audio' | 'build-failed'; message: string };
 
 function fullAudioMetaPath(dir: string): string {
@@ -183,6 +251,13 @@ export async function getFullSessionAudio(sessionId: string): Promise<FullAudioR
   return withSessionLock(`full:${sessionId}`, async () => {
     const rows = (await listSessionAudio(sessionId)).filter((r) => r.kind === 'session');
     if (!rows.length) return { ok: false, reason: 'no-audio', message: 'صدایی برایِ این جلسه آرشیو نشده است' };
+    // بخشِ ۵ی audit «zero-loss recording» (2026-09-22): قبلاً این تابع صرفاً هر چه رویِ
+    // دیسک بود را concat می‌کرد — اگه سگمنتی هیچ‌وقت آپلود نشده بود (تبِ مرورگر قبل از
+    // sync بسته شده)، فایلِ نهایی بدونِ خطا ولی با gapِ خاموش ساخته می‌شد. الان همون چکِ
+    // seq (که در `/api/admin/sessions/:id/audio` هم استفاده می‌شود) مستقیماً همینجا هم
+    // محاسبه و در نتیجه برگردانده می‌شود — fail-open: فایل هنوز ساخته/سرو می‌شود، فقط
+    // caller دیگر نمی‌تواند ادعا کند که «کامل» بودنش تضمین‌شده است.
+    const { complete, missing: missingSegments } = checkSeqContiguous(rows);
 
     const dir = sessionDir(sessionId);
     const metaPath = fullAudioMetaPath(dir);
@@ -190,7 +265,7 @@ export async function getFullSessionAudio(sessionId: string): Promise<FullAudioR
     try {
       const meta = JSON.parse(readFileSync(metaPath, 'utf-8')) as { segCount: number; path: string; mime: string };
       if (meta.segCount === rows.length && existsSync(meta.path)) {
-        return { ok: true, path: meta.path, mime: meta.mime };
+        return { ok: true, path: meta.path, mime: meta.mime, complete, missingSegments };
       }
     } catch {
       // فایلِ meta نیست یا خراب است — دوباره می‌سازیم
@@ -236,7 +311,7 @@ export async function getFullSessionAudio(sessionId: string): Promise<FullAudioR
     try {
       writeFileSync(metaPath, JSON.stringify({ segCount: rows.length, path: outPath, mime: outMime }));
     } catch {}
-    return { ok: true, path: outPath, mime: outMime };
+    return { ok: true, path: outPath, mime: outMime, complete, missingSegments };
   });
 }
 
