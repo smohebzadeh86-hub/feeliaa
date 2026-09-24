@@ -23,6 +23,10 @@ import { sweepOldObsEvents } from './obs/sweep.js';
 import { sweepOldBatchFiles, retryQueuedBatches, BATCH_SWEEP_INTERVAL_MS } from './stt/batchqueue.js';
 import { sweepOldSessionAudio } from './stt/sessionAudioArchive.js';
 import { sweepOldResolveJobs } from './stt/speakerResolve.js';
+import { audioUploadRoutes } from './features/audio-upload/uploads.routes.js';
+import { startAudioJobWorker, sweepSonioxOrphans } from './features/audio-upload/jobRunner.js';
+import { sweepStaleUploads } from './features/audio-upload/uploadStore.js';
+import { sweepOldNotifications } from './features/notifications/notify.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -72,6 +76,7 @@ await app.register(clientConfigRoutes);
 await app.register(transcriptionRoutes);
 await app.register(caseFileRoutes);
 await app.register(obsRoutes);
+await app.register(audioUploadRoutes);
 
 // Serve static (فرانت)
 const publicDir = path.join(__dirname, '..', '..', 'public');
@@ -119,6 +124,14 @@ const start = async () => {
     // وقتِ enqueue قبلاً بدونِ رفرشِ صفحه یا ری‌استارتِ سرور هیچ‌وقت دوباره امتحان نمی‌شد.
     try { await retryQueuedBatches(); } catch {}
     setInterval(() => { retryQueuedBatches().catch(() => {}); }, 5 * 60 * 1000);
+    // آپلودِ فایلِ صوتیِ جلسه (migration 023): workerِ DB-محور (بعد از ری‌استارت فوراً ادامه می‌دهد)،
+    // جاروبِ آپلودهایِ رهاشده/یتیم، اعلان‌هایِ قدیمی، و فایل/transcriptionِ یتیمِ رویِ Soniox (F3).
+    await startAudioJobWorker();
+    try { await sweepStaleUploads(); } catch {}
+    setInterval(() => { sweepStaleUploads().catch(() => {}); }, 60 * 60 * 1000);
+    setInterval(() => { sweepOldNotifications().catch(() => {}); }, 24 * 60 * 60 * 1000);
+    void sweepSonioxOrphans();
+    setInterval(() => { sweepSonioxOrphans().catch(() => {}); }, 6 * 60 * 60 * 1000);
     console.log('🌿 Feelia server starting...');
     await app.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`🌿 Feelia server running on http://localhost:${PORT}`);

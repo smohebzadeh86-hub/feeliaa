@@ -64,7 +64,11 @@ export async function generateCaseFile(
     return { record: previous, skipped: true };
   }
 
-  await caseFileRepo.markGenerating(clientId);
+  // ⭐ رفعِ F6: قفل اتمیک گرفته می‌شود (نه چکِ بالا که فقط پیامِ سریع است) — دو تولیدِ هم‌زمان
+  // (مثلاً auto-triggerِ jobِ آپلود + کلیکِ دستیِ تراپیست) دیگر هر دو شروع نمی‌شوند.
+  if (!(await caseFileRepo.claimGenerating(clientId, GENERATING_LOCK_TTL_MS))) {
+    throw new CaseFileGenerationError('busy', 'در حالِ تولید است — چند لحظه صبر کنید');
+  }
 
   try {
     const promptInput = buildCaseFilePrompt(corpus, clientMeta);
@@ -82,23 +86,34 @@ export async function generateCaseFile(
     const draft = await composeWithRepair(llmProvider, promptInput, digest, hooks, buildAnsweredQuestionsBlock(answeredQuestions));
     enforceCaseFileRules(draft);
 
-    const content = mergeCaseFileDraft(opts.force ? null : previous?.content ?? null, draft, corpus);
-
-    const record = await caseFileRepo.upsert(clientId, {
-      content,
-      status: 'ready',
-      model: llmProvider.model,
-      generatedAt: new Date(),
-      generatedFromSessionId: corpus.latestSessionId,
-      corpusSignature: effectiveSignature,
-      errorMessage: null,
-      ...(opts.force
-        ? { forceRegeneratedAt: new Date(), forceRegeneratedBy: opts.therapistId ?? null }
-        : {}),
-    });
+    // ⭐ رفعِ F6 (lost update): تولید چند دقیقه طول می‌کشد و تراپیست در این فاصله ممکن است فیلدی را
+    // ویرایش/تأیید کند (PATCH). قبلاً merge رویِ `previous`ِ لحظه‌ی شروع انجام و کورکورانه نوشته
+    // می‌شد ⇒ ویرایشِ میانه بی‌صدا پاک می‌شد. حالا merge رویِ آخرین نسخه انجام و با CAS رویِ
+    // content_version نوشته می‌شود؛ اگر در همین لحظه نسخه عوض شد، دوباره خوانده و merge می‌شود.
+    let base = await caseFileRepo.get(clientId);
+    let record: CaseFileRecord | null = null;
+    for (let attempt = 0; attempt < 5 && !record; attempt++) {
+      if (attempt > 0) base = await caseFileRepo.get(clientId);
+      const baseContent = base && base.content && Object.keys(base.content).length ? base.content : null;
+      const content = mergeCaseFileDraft(opts.force ? null : baseContent, draft, corpus);
+      record = await caseFileRepo.upsert(clientId, {
+        content,
+        status: 'ready',
+        model: llmProvider.model,
+        generatedAt: new Date(),
+        generatedFromSessionId: corpus.latestSessionId,
+        corpusSignature: effectiveSignature,
+        errorMessage: null,
+        ...(opts.force
+          ? { forceRegeneratedAt: new Date(), forceRegeneratedBy: opts.therapistId ?? null }
+          : {}),
+      }, base ? base.contentVersion : undefined);
+    }
+    if (!record) throw new CaseFileGenerationError('unknown', 'پرونده هم‌زمان در حالِ ویرایش بود — دوباره تلاش کنید');
     logEvent({ event: 'casefile.generated', clientId, therapistId: opts.therapistId, detail: { model: llmProvider.model } });
     return { record, skipped: false };
   } catch (err) {
+    if (err instanceof CaseFileGenerationError && err.code === 'busy') throw err;
     // ⭐ باگِ واقعیِ رفع‌شده: قبلاً هر خطایِ غیرِ CaseFileGenerationError (مثلاً
     // CaseFileValidationError از validateCaseFileDraft) با یک پیامِ عمومیِ بی‌فایده
     // جایگزین می‌شد — دلیلِ واقعیِ شکست هم در پاسخِ API هم در error_message گم می‌شد.

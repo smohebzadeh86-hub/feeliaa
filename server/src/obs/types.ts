@@ -63,6 +63,15 @@ export const OBS_SERVER_EVENTS = [
   'casefile.failed',
   'admin.export',
   'admin.delete',
+  // آپلودِ فایلِ صوتیِ جلسه + jobِ پس‌زمینه (migration 023)
+  'upload.created',
+  'upload.completed',
+  'upload.rejected',
+  'audio_job.stage',
+  'audio_job.retry',
+  'audio_job.done',
+  'audio_job.failed',
+  'soniox.orphan_swept',
   // اجزایِ داخلیِ خودِ لایه‌ی obs
   'obs.queue_overflow',
 ] as const;

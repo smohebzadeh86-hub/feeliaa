@@ -131,6 +131,30 @@ UIِ فعلی فقط برایِ `status='inactive'` رندر می‌شود. جز
 
 `TreatmentRhythm` = `{sessionCount: number, startDate: string|null, avgGapDays: number|null, durationDays: number|null}` — **محاسبه‌ای، نه از LLM** (`application/computeTreatmentRhythm.ts`، از رویِ `sessions.date`ِ جلساتِ `completed`/`recovered`)؛ همیشه زنده است، حتی بدونِ regenerate کردنِ پرونده. `startDate` شمسیِ `YYYY/MM/DD`؛ `avgGapDays`/`durationDays` فقط با ≥۲ جلسه‌ی تاریخ‌دار محاسبه می‌شوند، وگرنه `null` (UI: «در انتظار ثبت»).
 
+**تغییرِ 2026-09-23 (رفعِ F6):** `CaseFileRecord.contentVersion` اضافه شد (CAS). PATCH/items/DELETE/upgrade در تعارضِ هم‌زمان (نسخه بینِ خواندن و نوشتن عوض شد) تا ۵ بار رویِ آخرین نسخه دوباره اعمال می‌شوند؛ اگر باز هم نشد ⇒ `409 {code:"version-conflict"}`. regenerate قفل را اتمیک می‌گیرد (همان `409 busy`).
+
+## ۸.۱ آپلودِ فایلِ صوتی، jobها، اعلان‌ها — `server/src/features/audio-upload/uploads.routes.ts` (همه `auth`، owned) — جدید 2026-09-23
+
+جزئیاتِ رفتار: [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md). مصرف: `feelia-upload.js` (UP) و `index.html` (UI).
+
+| Method | Path | Body | موفق | خطاها | مصرف |
+|---|---|---|---|---|---|
+| POST | `/api/uploads` | `{client_id, file_name, size, mime?, fingerprint (hex 32–128), session_date? (شمسی), consent:true}` | 201 `{upload}` تازه؛ 200 `{upload, resumed:true}` (همان آپلودِ نیمه‌کاره، با `received:number[]`)؛ 200 `{upload, duplicate:true, requeued, job}` (از 2026-09-24: اگر jobِ آن آپلود `failed` و قابلِ ادامه باشد، همان job دوباره در صف می‌رود و `requeued:true`؛ اگر غیرقابلِ ادامه باشد — صدا دیگر نیست یا فایلِ مشکل‌دار — duplicate نیست و آپلودِ تازه ساخته می‌شود) | 400 `consent-required`/`file-too-small` (یا `size` غیرِ integer)/`bad-fingerprint`/تاریخِ نامعتبر، 404 owned، 413 `file-too-large` (>۱GB)، 415 `unsupported-format` (پسوند خارج از allowlist **و** MIME غیرِ `audio/*`/`video/*`)، 429 `too-many-uploads` (>۵ نیمه‌کاره؛ پیش از 429 آپلودهایِ نیمه‌کاره‌ی بی‌فعالیت > ۲۴ساعت خودکار `canceled`/`expired` می‌شوند)، 507 `server-storage-full` | UP |
+| GET | `/api/uploads/:id` | — | `{upload, job\|null}` | 404 | — |
+| PUT | `/api/uploads/:id/chunks/:n` | بایتِ خام `application/octet-stream` (دقیقاً `chunk_size`=۴MB، تکه‌ی آخر باقی‌مانده)؛ هدرِ اختیاریِ `X-Chunk-Sha256` | `{ok:true, n}` — idempotent | 400 `bad-chunk-index`/`bad-chunk-size`، 404، 409 `upload-closed`، 422 `chunk-corrupt` | UP |
+| POST | `/api/uploads/:id/complete` | — | 201 `{upload, job}` (جلسه‌ی `source='upload'` + job، اتمیک)؛ اگر قبلاً complete شده 200 همان | 404، 409 `chunks-missing` (+`missing[]` کامل؛ پیش از 2026-09-24 حداکثر ۵۰) / `upload-closed`، 422 `not-audio`/`no-audio`/`unreadable`/`too-long`، 500 `assemble-failed` | UP |
+| DELETE | `/api/uploads/:id` | — | `{canceled}` | 404، 409 `upload-closed` | UP |
+| GET | `/api/audio-jobs?scope=active\|recent` | — | `{jobs: AudioJobView[]}` (active = فعال یا تمام‌شده در ۱۰ دقیقه‌ی اخیر؛ recent = ۱۴ روز؛ حداکثر ۳۰) | — | UI |
+| GET | `/api/audio-jobs/:id` | — | `{job}` | 404 | — |
+| POST | `/api/audio-jobs/:id/retry` | — | `{job}` — بدونِ آپلودِ دوباره (از نسخه‌ی نرمال‌شده/خامِ رویِ سرور) | 404، 409 `not-failed`، 410 `audio-expired`، 422 (خطایِ دائمیِ فایل: `unreadable`/`no-audio`/`too-long`/`audio-missing`/`audio-expired` — از 2026-09-24 بدونِ استثنایِ «نسخه‌ی نرمال‌شده موجود») | UI |
+| GET | `/api/sessions/:id/audio-job` | — | `{job\|null}` آخرین jobِ جلسه | 404 owned | UI |
+| GET | `/api/notifications` | — | `{notifications[30], unread}` — هر ردیف `{id, kind, client_id, session_id, job_id, error_code, created_at, read_at, client_code, client_alias, session_num}` | — | UI |
+| POST | `/api/notifications/read` | `{ids?: string[] (≤100)}` یا `{all:true}` | `{ok:true}` | — | UI |
+
+`AudioJobView` = `{id, stage:"queued"|"normalizing"|"transcribing"|"case_file"|"done"|"failed", attempts, error_code, duration_ms, case_file_status, transcript_ready, transcript_chars, created_at, updated_at, finished_at, next_attempt_at, session_id, session_num, client_id, client_code, client_alias, original_name}`.
+
+**تغییرِ مرتبط:** `GET /api/clients/:id` حالا `sessions[].batch_status` هم برمی‌گرداند؛ `PUT /api/sessions/:id` پاک‌کردنِ تاریخ را برایِ `source='upload'` هم می‌پذیرد (مثلِ `manual`).
+
 ## ۹. WebSocket (LEGACY — LAW-015) — `server/src/ws/transcription.ts`
 
 هر دو مسیر پشتِ `requireAuth` (کوکی در upgrade) و مالکیتِ جلسه.

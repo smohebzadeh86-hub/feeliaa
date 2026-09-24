@@ -2,10 +2,10 @@
 // حریم خصوصی: صوت خام فقط در این مسیرِ شکست به سرور Feelia می‌آید (نه در حالت عادی)،
 // روی دیسکِ موقتِ سرور می‌ماند تا رونویسی شود، بلافاصله بعد از موفقیت حذف می‌شود،
 // و فایل‌های قدیمی‌تر از ۲۴ ساعت در startup و هر ساعت پاک می‌شوند. هیچ صوتی در DB ذخیره نمی‌شود.
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { query } from '../db/connection.js';
+import { query, pool } from '../db/connection.js';
 import { logEvent } from '../obs/eventLog.js';
 
 export type BatchStatus = 'queued' | 'processing' | 'done' | 'failed';
@@ -221,21 +221,73 @@ export function removeAudioFile(p: string) {
 // label: برایِ purpose='late-transcript' — سگمنتِ append‌شده را صریح به‌عنوانِ صدایِ
 // آفلاینِ بعدِ پایانِ جلسه علامت می‌زند (تصمیمِ مالک، audit صدا/۲۰۲۶-۰۹-۱۶) — بدونِ این،
 // تراپیست فرقِ متنِ زنده و متنِ بازیابی‌شده‌ی دیرهنگام را در پرونده نمی‌دید.
-export async function mergeBatchTranscript(sessionId: string, baseVersion: number, batchText: string, label?: string): Promise<void> {
+//
+// ⭐ رفعِ F1 (audit آپلود، 2026-09-23): merge قبلاً idempotent نبود — اگر سرور بعد از UPDATEِ
+// متن و قبل از removeAudioFile کرش می‌کرد، retry همان متن را دوباره append می‌کرد. همچنین
+// read→write بدونِ قفل بود (نوشتنِ هم‌زمانِ دیگر بینِ آن دو گم می‌شد). حالا همه در یک تراکنش:
+// ردیفِ آرشیوِ همین بایت‌ها (session_id+sha256) با FOR UPDATE قفل می‌شود و transcribed_atِ آن
+// «یک‌بار» بودن را تضمین می‌کند؛ ردیفِ sessions هم FOR UPDATE خوانده می‌شود (append رویِ آخرین متن).
+// خروجی: true اگر همین فراخوانی اعمال کرد، false اگر قبلاً اعمال شده بود.
+export async function applyBatchSegmentOnce(
+  sessionId: string,
+  sha256: string,
+  batchText: string,
+  purpose: BatchPurpose,
+  label?: string
+): Promise<boolean> {
   const text = batchText.trim();
-  if (!text) return;
-  const cur = await query('SELECT transcript, transcript_version FROM sessions WHERE id = ?', [sessionId]);
-  if (!cur.rows.length) return;
-  const currentText: string = cur.rows[0]?.transcript ?? '';
-  const currentVersion: number = cur.rows[0]?.transcript_version ?? 0;
-  const segment = label ? `${label}\n${text}` : text;
-  const merged = currentText ? currentText + '\n\n' + segment : segment;
-  await query(
-    `UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1,
-      realtime_reliable = false, batch_status = 'done', updated_at = NOW() WHERE id = ?`,
-    [merged, sessionId]
-  );
-  console.log(`[batch] merged session=${sessionId} base=${baseVersion} now=${currentVersion}+1 conflict=${currentVersion !== baseVersion}`);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [auditRows] = await conn.query(
+      'SELECT transcribed_at FROM session_audio WHERE session_id = ? AND sha256 = ? FOR UPDATE',
+      [sessionId, sha256]
+    );
+    const audioRow = (auditRows as any[])[0];
+    if (audioRow && audioRow.transcribed_at) {
+      await conn.commit();
+      return false;
+    }
+    if (text) {
+      if (purpose === 'note') {
+        await conn.query(
+          `INSERT INTO session_notes (id, session_id, type, text, wall_clock) VALUES (?, ?, 'voice', ?, ?)`,
+          [randomUUID(), sessionId, text, new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })]
+        );
+      } else {
+        const [curRows] = await conn.query('SELECT transcript FROM sessions WHERE id = ? FOR UPDATE', [sessionId]);
+        const cur = (curRows as any[])[0];
+        if (cur) {
+          const currentText: string = cur.transcript ?? '';
+          const segment = label ? `${label}\n${text}` : text;
+          const merged = currentText ? currentText + '\n\n' + segment : segment;
+          await conn.query(
+            `UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1,
+              realtime_reliable = false, batch_status = 'done', updated_at = NOW() WHERE id = ?`,
+            [merged, sessionId]
+          );
+        }
+      }
+    }
+    if (audioRow) {
+      await conn.query('UPDATE session_audio SET transcribed_at = NOW() WHERE session_id = ? AND sha256 = ?', [sessionId, sha256]);
+    }
+    await conn.commit();
+    console.log(`[batch] applied session=${sessionId} purpose=${purpose} chars=${text.length}`);
+    return true;
+  } catch (e) {
+    try { await conn.rollback(); } catch {}
+    throw e;
+  } finally {
+    conn.release();
+  }
+}
+
+// آیا متنِ همین بایت‌ها قبلاً اعمال شده؟ (پیش‌بررسیِ ارزان قبل از صدا زدنِ Soniox — نگهبانِ
+// واقعی همان قفلِ داخلِ applyBatchSegmentOnce است.)
+async function segmentAlreadyApplied(sessionId: string, sha256: string): Promise<boolean> {
+  const r = await query('SELECT transcribed_at FROM session_audio WHERE session_id = ? AND sha256 = ?', [sessionId, sha256]);
+  return !!r.rows[0]?.transcribed_at;
 }
 
 // پردازش پس‌زمینه: هر فایل با API واقعیِ async (stt-async-v5) رونویسی می‌شه — نه با
@@ -297,6 +349,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
     const { readFileSync } = await import('node:fs');
     const { transcribeFileAsync } = await import('./asyncTranscribe.js');
     const { archiveAudioForAdmin } = await import('./sessionAudioArchive.js');
+    let appliedLate = false;
     for (const file of files) {
       let buffer: Buffer;
       try { buffer = readFileSync(file); } catch { continue; }
@@ -316,8 +369,13 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
         dropUnrecoverable(sessionId, file, purpose, buffer.length, 'bad-container');
         continue;
       }
-      const baseRow = await query('SELECT transcript_version FROM sessions WHERE id = ?', [sessionId]);
-      const baseVersion: number = baseRow.rows[0]?.transcript_version ?? 0;
+      const sha256 = createHash('sha256').update(buffer).digest('hex');
+      if (await segmentAlreadyApplied(sessionId, sha256)) {
+        // کرشِ قبلی بعد از اعمالِ متن و قبل از حذفِ فایل — فقط تمیزکاری، بدونِ رونویسی/appendِ دوباره.
+        removeAudioFile(file);
+        console.log(`[batch] segment already applied, dropped duplicate session=${sessionId} purpose=${purpose}`);
+        continue;
+      }
       console.log(`[batch] processing session=${sessionId} purpose=${purpose} bytes=${buffer.length} (async API)`);
       let text = '';
       try {
@@ -330,21 +388,13 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
         console.log('[batch] async transcribe error, kept queued (already archived):', String(e).slice(0, 160));
         continue; // این فایل توی صف می‌مونه؛ صدا از قبل آرشیو شده، فقط رونویسی عقب افتاده
       }
-      if (text && text.trim()) {
-        if (purpose === 'note') {
-          await query(
-            `INSERT INTO session_notes (id, session_id, type, text, wall_clock)
-             VALUES (?, ?, 'voice', ?, ?)`,
-            [randomUUID(), sessionId, text.trim(), new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })]
-          );
-        } else {
-          await mergeBatchTranscript(sessionId, baseVersion, text, purpose === 'late-transcript' ? LATE_TRANSCRIPT_LABEL : undefined);
-        }
-      } else {
-        // ⭐ سکوت هم نتیجه‌ی موفقِ رونویسیه، نه شکست — قبلاً این حالت برایِ همیشه توی
-        // صف می‌موند (و بعدِ ۲۴ ساعت بدونِ آرشیو پاک می‌شد، پایینِ همین فایل).
-        console.log(`[batch] empty result (silence, treated as success) session=${sessionId} purpose=${purpose}`);
-      }
+      // ⭐ سکوت (متنِ خالی) هم نتیجه‌ی موفقِ رونویسی است، نه شکست — applyBatchSegmentOnce در آن
+      // حالت فقط سگمنت را «اعمال‌شده» علامت می‌زند.
+      const applied = await applyBatchSegmentOnce(
+        sessionId, sha256, text || '', purpose,
+        purpose === 'late-transcript' ? LATE_TRANSCRIPT_LABEL : undefined
+      );
+      if (applied && text && text.trim() && purpose === 'late-transcript') appliedLate = true;
       removeAudioFile(file);
       console.log(`[batch] segment done session=${sessionId} purpose=${purpose}`);
     }
@@ -356,6 +406,12 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       );
       console.log(`[batch] finished session=${sessionId} remaining=${left.length}`);
       if (!left.length) logEvent({ event: 'batch.completed', sessionId, source: 'job', detail: { purpose } });
+    }
+    // ⭐ رفعِ F8: متنِ late-transcript رویِ جلسه‌ی از‌قبل‌completedشده اضافه می‌شد ولی هیچ‌وقت به
+    // پرونده نمی‌رسید (هیچ triggerی نبود). همان سیاستِ مرکزیِ auto-generate صدا زده می‌شود.
+    if (appliedLate) {
+      const { triggerCaseFileForSession } = await import('../features/case-file/application/autoTrigger.js');
+      void triggerCaseFileForSession(sessionId, 'late-transcript');
     }
   } catch (err) {
     console.log('[batch] processing failed:', String(err).slice(0, 160));

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "pnpm --filter server dev",
     "test:rt": "node scripts/rt-harness.cjs",
-    "test:cf": "pnpm --filter server exec tsx ../scripts/case-file-harness.ts"
+    "test:cf": "pnpm --filter server exec tsx ../scripts/case-file-harness.ts",
+    "test:up": "pnpm --filter server exec tsx ../scripts/upload-harness.ts"
   }
 }

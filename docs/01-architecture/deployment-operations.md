@@ -86,6 +86,8 @@ nginx رویِ پورتِ ۳۰۰۰ به `feelia-mysql` وصل است (`ss -tlnp`
 عملیاتِ ops رویِ production، حتماً با `pm2 jlist` وضعیتِ `online`/`stopped` را دوباره تأیید کنید؛
 هیچ‌وقت فرض نکنید نامِ آشناتر (`feelia`) همان پروسه‌ی زنده است.
 
+**کانفیگِ زنده‌ی nginx (خوانده‌شده با `nginx -T`، 2026-09-24):** `/etc/nginx/sites-enabled/feelia` — ۸۰→۳۰۱ به https؛ رویِ ۴۴۳ `client_max_body_size 50m` و یک `location /` با `proxy_pass http://127.0.0.1:3000`، هدرهایِ Upgrade/Connection، `proxy_read_timeout 300s`، `proxy_send_timeout 300s`؛ بدونِ gzip/هدرهایِ امنیتیِ کانفیگِ مرجع. برایِ آپلودِ صدا (تکه‌ی ۴MB، `complete` تا ۳۰۰ث) کافی است؛ تغییری داده نشد. نکته: regenerateِ پرونده (همگام تا ~۱۰ دقیقه) از ۳۰۰ث بیشتر است — UI با 504 polling می‌کند.
+
 **کانفیگِ مرجعِ nginx:** [`deploy/nginx/feelia.conf`](../../deploy/nginx/feelia.conf) (2026-09-23) — کانفیگِ زنده‌ی سرور
 هنوز خوانده نشده (تلاشِ قبلی بدونِ `-i` کلید رد شد؛ از 2026-09-23 با کلیدِ §۴.۱ دسترسی هست)؛ قبل از اعمال با `nginx -T` مقایسه و فقط بلوک‌هایِ لازم ادغام شود.
 نکاتِ حیاتی: `proxy_read_timeout` ≥ ۶۶۰ث برایِ `POST /api/clients/:id/case-file/regenerate` (درخواستِ همگامِ چنددقیقه‌ای؛

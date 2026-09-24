@@ -19,51 +19,11 @@ import {
 } from '../stt/batchqueue.js';
 import { getResolveJob, startResolveSpeakers } from '../stt/speakerResolve.js';
 import { listSessionAudio, deleteSessionAudioDirs } from '../stt/sessionAudioArchive.js';
+import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
 import { logEvent } from '../obs/eventLog.js';
-import { generateCaseFile } from '../features/case-file/application/generateCaseFile.js';
-import { SqlCaseFileRepository } from '../features/case-file/adapters/repository/caseFileRepository.sql.js';
-import { resolveLLMProvider } from '../features/case-file/adapters/llm/registry.js';
-
-const autoCaseFileRepo = new SqlCaseFileRepository();
-
-// خودکارسازیِ تولیدِ پرونده بعدِ پایانِ کاملِ جلسه (فازِ ۲ِ Module 08) — fire-and-forget:
-// هرگز پاسخِ HTTPِ اصلیِ ثبت/به‌روزرسانیِ جلسه را بلاک یا fail نمی‌کند. قفلِ نرم و
-// corpus_signature در generateCaseFile خودش از دوبار-تولیدِ هم‌زمان (مثلاً کلیکِ دستیِ
-// هم‌زمانِ تراپیست) جلوگیری می‌کند — منطقِ اضافه‌ای اینجا لازم نیست.
-async function maybeAutoGenerateCaseFile(clientId: string, therapistId: string): Promise<void> {
-  try {
-    const therapistRow = await query(
-      'SELECT case_file_auto_generate, case_file_enabled FROM therapists WHERE id = ?',
-      [therapistId]
-    );
-    // فیچرِ پرونده فقط برایِ حسابِ دارایِ case_file_enabled (migration 022) — همان گاردِ requireCaseFileAccess.
-    if (!therapistRow.rows[0]?.case_file_enabled) return;
-    if (therapistRow.rows[0]?.case_file_auto_generate !== true) return;
-
-    const clientRow = await query(
-      'SELECT category, gender, alias, status FROM clients WHERE id = ? AND therapist_id = ?',
-      [clientId, therapistId]
-    );
-    const client = clientRow.rows[0];
-    // فعلاً فقط مراجعینِ غیرفعال — هم‌راستا با محدودیتِ فعلیِ UIِ بخشِ پرونده؛
-    // گسترش به مراجعینِ فعال به فازِ بعدی موکول شده.
-    if (!client || client.status !== 'inactive') return;
-
-    const llmProvider = resolveLLMProvider();
-    await generateCaseFile(
-      clientId,
-      { category: client.category ?? null, gender: client.gender ?? null, alias: client.alias ?? null },
-      { llmProvider, caseFileRepo: autoCaseFileRepo },
-      { therapistId }
-    );
-  } catch (err) {
-    // خطاها فقط لاگ می‌شوند — بدونِ افشایِ متنِ بالینی (LAW-001). وضعیتِ رکورد در
-    // client_case_file.status='error' می‌ماند (خودِ generateCaseFile این را ثبت می‌کند)؛
-    // تراپیست هروقت وارد شد می‌تواند دستی دوباره تلاش کند.
-    console.log('[case-file] auto-generate ناموفق برایِ client=' + clientId + ':', err instanceof Error ? err.message : String(err));
-  }
-}
-
+// خودکارسازیِ تولیدِ پرونده بعدِ پایانِ کاملِ جلسه (فازِ ۲ِ Module 08) — سیاستِ مرکزی حالا در
+// features/case-file/application/autoTrigger.ts است (jobِ آپلودِ صدا هم از همان استفاده می‌کند).
+import { maybeAutoGenerateCaseFile } from '../features/case-file/application/autoTrigger.js';
 // ⭐ پردازش صدا در background — با API واقعیِ async (stt-async-v5)، نه وانمودِ
 // زنده‌بودن رویِ موتورِ realtime (که طبقِ docsِ Soniox دقتِ تشخیصِ گوینده‌ی پایین‌تری داره)
 // ⭐ باگِ واقعیِ کشف‌شده (2026-09-18): برایِ جلسه‌ی دستی/آرشیو، auto-generate رویِ لحظه‌ی
@@ -105,6 +65,18 @@ async function processVoiceNoteInBackground(
   } catch (err) {
     console.log('[voice-note] background error:', String(err));
   }
+}
+
+// تداخلِ شماره‌ی جلسه (UNIQUE uq_sessions_client_num) یا deadlockِ کوتاهِ InnoDB بینِ دو ساختِ هم‌زمان ⇒ قابلِ تکرار.
+// تا ۱۵ بار با فاصله‌ی تصادفیِ کوتاهِ رو‌به‌افزایش (هر دور فقط یکی از رقبا برنده می‌شود؛ jitter هم‌زمانیِ دوباره را می‌شکند).
+export const SESSION_NUM_MAX_RETRIES = 15;
+export function sessionNumRetryPause(attempt: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, 5 + Math.floor(Math.random() * 20 * (attempt + 1))));
+}
+export function isSessionNumConflict(err: unknown): boolean {
+  const e = err as { code?: string; errno?: number; message?: string };
+  if (e?.code === 'ER_LOCK_DEADLOCK' || e?.errno === 1213) return true;
+  return e?.code === 'ER_DUP_ENTRY' && /uq_sessions_client_num|session_num/.test(String(e?.message || ''));
 }
 
 export async function sessionRoutes(app: FastifyInstance) {
@@ -174,11 +146,12 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'مراجع غیرفعال است؛ ابتدا او را به فعال‌ها بازگردانید', code: 'client-inactive' };
     }
 
-    const lastNum = await query(
-      'SELECT COALESCE(MAX(session_num), 0) + 1 as next FROM sessions WHERE client_id = ?',
-      [client_id]
-    );
-    const sessionNum = lastNum.rows[0].next;
+    // ⭐ رفعِ M7 (audit 2026-09-24): شماره‌ی جلسه MAX+1 است و UNIQUE(client_id, session_num) دارد. ساختِ هم‌زمانِ دو
+    // جلسه برایِ یک مراجع (مثلاً شروعِ جلسه‌ی زنده درست هم‌زمان با پایانِ آپلودِ فایلِ صوتیِ همان مراجع، یا دو کلیک)
+    // قبلاً یکی را با 500 شکست می‌داد. حالا با شماره‌ی تازه دوباره تلاش می‌شود — هیچ جلسه‌ای گم نمی‌شود و شماره‌یِ
+    // جلسه‌هایِ موجود هرگز عوض نمی‌شود.
+    const nextSessionNum = async (): Promise<number> =>
+      (await query('SELECT COALESCE(MAX(session_num), 0) + 1 as next FROM sessions WHERE client_id = ?', [client_id])).rows[0].next;
 
     if (isManual) {
       const noteText = typeof note === 'string' && note.trim() ? note.trim() : null;
@@ -186,26 +159,31 @@ export async function sessionRoutes(app: FastifyInstance) {
       // یک تراکنشِ اتمیک: جلسه بدونِ یادداشتش (یا برعکس) نیمه‌کاره ساخته نمی‌شود.
       // (نسخه‌ی Postgres یک CTEِ نویسنده بود — MySQL از INSERT درونِ WITH پشتیبانی
       // نمی‌کند، پس همان اتمیک‌بودن با تراکنشِ صریح تأمین شده.)
-      const conn = await pool.getConnection();
-      try {
-        await conn.beginTransaction();
-        await conn.query(
-          `INSERT INTO sessions (id, client_id, session_num, date, start_time, consent, status, source)
-           VALUES (?, ?, ?, ?, ?, false, 'completed', 'manual')`,
-          [sessionId, client_id, sessionNum, sessionDate, sessionTime]
-        );
-        if (noteText !== null) {
+      for (let attempt = 0; ; attempt++) {
+        const sessionNum = await nextSessionNum();
+        const conn = await pool.getConnection();
+        try {
+          await conn.beginTransaction();
           await conn.query(
-            `INSERT INTO session_notes (id, session_id, type, text) VALUES (?, ?, 'note_after', ?)`,
-            [randomUUID(), sessionId, noteText]
+            `INSERT INTO sessions (id, client_id, session_num, date, start_time, consent, status, source)
+             VALUES (?, ?, ?, ?, ?, false, 'completed', 'manual')`,
+            [sessionId, client_id, sessionNum, sessionDate, sessionTime]
           );
+          if (noteText !== null) {
+            await conn.query(
+              `INSERT INTO session_notes (id, session_id, type, text) VALUES (?, ?, 'note_after', ?)`,
+              [randomUUID(), sessionId, noteText]
+            );
+          }
+          await conn.commit();
+          break;
+        } catch (err) {
+          await conn.rollback();
+          if (isSessionNumConflict(err) && attempt < SESSION_NUM_MAX_RETRIES) { await sessionNumRetryPause(attempt); continue; }
+          throw err;
+        } finally {
+          conn.release();
         }
-        await conn.commit();
-      } catch (err) {
-        await conn.rollback();
-        throw err;
-      } finally {
-        conn.release();
       }
       const manual = await query('SELECT * FROM sessions WHERE id = ?', [sessionId]);
       // ⭐ باگِ واقعیِ کشف‌شده (2026-09-18): trigger زدن اینجا بدونِ قیدِ noteText یک
@@ -227,11 +205,20 @@ export async function sessionRoutes(app: FastifyInstance) {
     }
 
     const newId = randomUUID();
-    await query(
-      `INSERT INTO sessions (id, client_id, session_num, date, start_time, consent, status)
-       VALUES (?, ?, ?, ?, ?, ?, 'in_progress')`,
-      [newId, client_id, sessionNum, sessionDate, sessionTime, true]
-    );
+    for (let attempt = 0; ; attempt++) {
+      const sessionNum = await nextSessionNum();
+      try {
+        await query(
+          `INSERT INTO sessions (id, client_id, session_num, date, start_time, consent, status)
+           VALUES (?, ?, ?, ?, ?, ?, 'in_progress')`,
+          [newId, client_id, sessionNum, sessionDate, sessionTime, true]
+        );
+        break;
+      } catch (err) {
+        if (isSessionNumConflict(err) && attempt < SESSION_NUM_MAX_RETRIES) { await sessionNumRetryPause(attempt); continue; }
+        throw err;
+      }
+    }
     const result = await query('SELECT * FROM sessions WHERE id = ?', [newId]);
     logEvent({ event: 'session.created', sessionId: newId, clientId: client_id, therapistId: request.therapistId, detail: { mode: 'live' } });
 
@@ -352,7 +339,8 @@ export async function sessionRoutes(app: FastifyInstance) {
       if (dateIsEmpty) {
         // ⭐ پاک‌کردنِ تاریخ فقط برایِ جلسه‌ی دستی معنا دارد («بدونِ تاریخ» — تصمیمِ مالک،
         // migration 014). جلسه‌ی زنده/کامل باید همیشه تاریخِ واقعی داشته باشد.
-        if (owned.source !== 'manual') {
+        // جلسه‌ی ساخته‌شده از فایلِ آپلودی (migration 023) هم مثلِ دستی تاریخِ اختیاری دارد.
+        if (owned.source !== 'manual' && owned.source !== 'upload') {
           reply.code(400);
           return { error: INVALID_DATE_ERROR };
         }
@@ -440,6 +428,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'جلسه یافت نشد' };
     }
 
+    const sonioxRefs = await collectUploadSonioxRefs([id]);
     const del = await query(
       `DELETE FROM sessions
        WHERE id = ? AND client_id IN (SELECT id FROM clients WHERE therapist_id = ?)`,
@@ -454,6 +443,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     // LAW-010: بعدِ حذفِ موفقِ ردیفِ DB، فایل‌هایِ آرشیوشده‌ی همین جلسه رویِ دیسک را هم پاک کن
     // (وگرنه یتیم می‌مانند — cascadeِ DB فقط ردیف را می‌بیند، نه فایل).
     deleteSessionAudioDirs([id]);
+    releaseSonioxRefs(sonioxRefs);
     logEvent({ event: 'session.deleted', sessionId: id, therapistId: request.therapistId });
 
     return { deleted: id };

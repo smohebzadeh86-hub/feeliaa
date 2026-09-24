@@ -18,6 +18,22 @@
 | `version-conflict` | 409 | `PUT /api/sessions/:id` (+ `current_version`) | CAS شکست خورد | `persistConfirmed`: GET → اگر سرور طولانی‌تر/برابر، سرور برنده؛ وگرنه یک PUT دیگر با نسخه‌ی تازه |
 | `client-inactive` | 409 | `POST /api/sessions` (mode زنده) | مراجع غیرفعال است؛ جلسه‌ی زنده‌ی جدید ساخته نمی‌شود (ادامه‌ی جلسه‌ی نیمه‌تمامِ قبلی و `mode:"manual"` آزادند) | UI: بنرِ خطا؛ در حالتِ عادی رخ نمی‌دهد چون کارت و پرونده برای مراجعِ غیرفعال دکمه‌ی شروع ندارند |
 | `no-key` | 500 (realtime-session) / 200 `ok:false` (check) | `stt.ts`، `tempkey.ts` | `SONIOX_API_KEY` تنظیم نیست | durable-only |
+| `version-conflict` (پرونده) | 409 | PATCH/items/DELETE/upgradeِ case-file (2026-09-23) | CASِ `content_version` بعد از ۵ تلاش | UI: پیامِ خطا؛ کاربر دوباره تلاش می‌کند |
+| `consent-required`، `file-too-small`، `bad-fingerprint` | 400 | `POST /api/uploads` | ورودیِ نامعتبر | UP: خطایِ دائمی (فایل رها می‌شود) |
+| `file-too-large` | 413 | همان | > ۱GB | همان |
+| `unsupported-format` | 415 | همان | پسوند خارج از allowlist و MIMEِ غیرِ `audio/*`/`video/*` (2026-09-24) | همان |
+| `too-many-uploads` | 429 | همان | > ۵ آپلودِ نیمه‌کاره، بعد از آزادسازیِ خودکارِ نیمه‌کاره‌هایِ بی‌فعالیت > ۲۴ساعت (2026-09-24) | UP: خطا با امکانِ تلاشِ دوباره؛ «بستنِ» کارتِ خطا حالا آپلودِ سرور را هم لغو می‌کند |
+| `server-storage-full` | 507 | همان | فضایِ دیسک < ۲×حجم + ۵۱۲MB | همان |
+| `bad-chunk-index`، `bad-chunk-size` | 400 | `PUT …/chunks/:n` | شماره/حجمِ تکه نادرست | UP: خطا |
+| `chunk-corrupt` | 422 | همان | sha256 نخورد | UP: همان تکه دوباره |
+| `upload-closed` | 409 | chunks/complete/DELETE | آپلود دیگر `uploading` نیست | UP: خطایِ دائمی |
+| `chunks-missing` | 409 | `complete` (+`missing[]`) | تکه‌ای نرسیده | UP: همان تکه‌ها و دوباره complete |
+| `not-audio`، `no-audio`، `unreadable`، `too-long` | 422 | `complete` (و `error_code`ِ job) | فایل صوتی نیست / بی‌صدا / خراب / > ۳۰۰ دقیقه | UI: پیامِ فارسی، بدونِ «تلاشِ دوباره» |
+| `assemble-failed` | 500 | `complete` | الحاقِ تکه‌ها رویِ دیسک ناموفق | UP: تلاشِ دوباره |
+| `not-failed` | 409 | `POST /api/audio-jobs/:id/retry` | job در جریان/تمام‌شده | — |
+| `audio-expired` | 410 | همان (و `error_code`ِ job) | صدا دیگر رویِ سرور نیست (۱۴ روز) | UI: «دوباره آپلود کنید» |
+
+**`audio_jobs.error_code`** (در `notifications.error_code` هم): `soniox-unavailable`، `soniox-error`، `soniox-timeout`، `soniox-lost`، `soniox-unknown-status`، `no-ffmpeg`، `normalize-failed` (گذرا — retryِ خودکار، بعد از ۳ شکست `failed` با همین کد و قابلِ «تلاشِ دوباره»؛ پیش از 2026-09-24 به `unreadable` تبدیل می‌شد)، `quota-wait` (2026-09-24، رفعِ L6: **خطا نیست** — job در `transcribing` منتظرِ آزادشدنِ سقفِ روزانه است؛ UI پیامِ «خودکار ادامه می‌یابد»)، `internal-error` (2026-09-24: ۵ خطایِ غیرمنتظره‌ی پشتِ‌سرِ‌همِ worker ⇒ `failed`، قابلِ «تلاشِ دوباره»)؛ `no-audio`، `unreadable`، `too-long`، `audio-missing`، `audio-expired` (دائمی). نگاشتِ فارسی: `PROC_ERR` در `index.html`.
 | `mint-transport` | 503 | `tempkey.ts` | DNS/TCP/TLS به Soniox | durable-only / reconnect |
 | `mint-timeout` | 503 | `tempkey.ts` | >10s | همان |
 | `mint-rejected` | 502 | `tempkey.ts` | Soniox رد کرد (کلید/سقف) | همان |

@@ -38,6 +38,7 @@
 | 03 | Transcript Integrity | `PUT /api/sessions/:id`، `persistConfirmed`، `mergeBatchTranscript`، `noteDiscontinuity`، `ws/transcription.ts` (نوشتن‌های legacy) |
 | 04 | Legacy WS Proxy (P1) | `ws/transcription.ts`، `ws/p1.ts`، `stt/soniox.ts`، `SonioxDirect`/`connectWS`/`startMic`/`handleMsg` در index |
 | 05 | Session Audio Archive & Speaker Resolve | `stt/sessionAudioArchive.ts`، `stt/speakerResolve.ts`، روت‌های admin audio و resolve-speakers |
+| 06 | [Audio Upload Pipeline](../07-subsystems/06-audio-upload-pipeline.md) (2026-09-23، ماژولِ 04) | `server/src/features/audio-upload/{uploads.routes,uploadStore,media,jobMachine,jobRunner}.ts`، `features/notifications/notify.ts`، `features/case-file/application/autoTrigger.ts`، `public/feelia-upload.js`؛ در index: `openAudioUploadModal`، `startAudioUpload`، `renderTray`، `refreshProcessing`، `jobCardHtml`، `renderSessionUploadJob`؛ جداول `audio_uploads`/`audio_jobs`/`notifications` |
 
 ## ۴. فایل‌های بدونِ ماژول
 

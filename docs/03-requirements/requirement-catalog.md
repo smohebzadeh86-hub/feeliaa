@@ -72,6 +72,13 @@
 | REQ-052 | abort از هر state بدونِ promiseِ معلق یا نشتِ mic/WS/recorder؛ صفِ صدای جلسه پاک می‌شود | `RTSession.abort` | IMPL |
 | REQ-053 | finish مبتنی بر رویدادِ `finished` با timeoutِ صریحِ ۸s | `RTSession.finish` | IMPL |
 | REQ-054 | mint یا WS دیررس پس از finish/abort نادیده گرفته و بسته می‌شود | `connEpoch`، `openDirectWS` | IMPL |
+| REQ-055 | (2026-09-23، دستورِ مالک) تراپیست می‌تواند فایلِ صوتیِ جلسه‌ای را که بیرون از فیلیا ضبط شده آپلود کند؛ هر فایل یک جلسه‌ی تازه (`source='upload'`) با تأییدِ صریحِ رضایت می‌سازد؛ فرمت‌هایِ رایج (از جمله amr/3gp/wma/ویدیوی mp4) بدونِ تبدیلِ دستی؛ حداکثر ۱GB و ۳۰۰ دقیقه | `features/audio-upload/*`، `feelia-upload.js` | IMPL |
+| REQ-056 | آپلود تکه‌تکه (۴MB) و قابلِ ادامه است: قطعیِ شبکه/رفرش/بستنِ تب هرگز از صفر شروع نمی‌کند؛ انتخابِ فایل در حالتِ آفلاین تا وصل‌شدن منتظر می‌ماند؛ همان فایل دوباره ثبت نمی‌شود | `feelia-upload.js`، `uploads.routes.ts`، `uploadStore.ts` | IMPL (فقط تستِ mock/UI) |
+| REQ-057 | بعد از «دریافت شد» پردازش کاملاً سمتِ سرور و مستقل از مرورگر است؛ jobِ DB-محور با lease؛ ری‌استارت هیچ jobی را گم نمی‌کند | `jobRunner.ts` | IMPL (هارنس؛ ری‌استارتِ واقعی تست نشد) |
+| REQ-058 | متنِ هر فایل دقیقاً یک بار ثبت می‌شود (retry/کرش ⇒ بدونِ تکرار)؛ فقط append، هرگز جایگزینی (LAW-008) | `jobMachine.ts`، `sqlJobStore.applyTranscriptOnce` | IMPL (هارنس) |
+| REQ-059 | اعلانِ پایدار فقط از رویدادِ واقعیِ backend (متن آماده/بی‌گفتار/ناموفق، پرونده به‌روز/ناموفق)، بدونِ تکرار، بدونِ متنِ بالینی؛ شکست actionable با «تلاشِ دوباره» بدونِ آپلودِ دوباره | `notify.ts`، `uploads.routes.ts`، `index.html` (سینی) | IMPL (mock/UI) |
+| REQ-061 | (تصمیمِ مالک 2026-09-24) آپلود برایِ مراجعِ فعال و غیرفعال یکسان در دسترس است و مسیرش با **ذخیره‌ی متن با تفکیکِ گوینده** در جلسه تمام می‌شود؛ پرونده فعلاً از این مسیر ساخته نمی‌شود (`UPLOAD_CASE_FILE` خاموش) | `jobMachine.ts#uploadCaseFileEnabled`، `jobRunner.ts#applyTranscriptOnce`، `index.html#jobCardHtml` | IMPL (هارنس H25–H26 + E2Eِ واقعی) |
+| REQ-060 | (رفعِ F1) هر سگمنتِ صفِ batch فقط یک بار merge می‌شود، با قفلِ ردیف | `batchqueue.ts#applyBatchSegmentOnce` | IMPL (بدونِ تستِ DB) |
 
 ## 05 — Notes & Signs ([PRD](../04-modules/05-notes-and-signs/module-prd.md))
 

@@ -17,7 +17,11 @@
 | `PROXY_URL` | `stt/tempkey.ts`، `stt/asyncTranscribe.ts`، `stt/soniox.ts` | — | خیر | ممکن است credential داشته باشد | egressِ سرور به Soniox |
 | `ADMIN_PHONE` | `http/auth.ts` | — | خیر | نیمه‌حساس | شماره‌ای که در register/login ادمین می‌شود |
 | `CLARITY_PROJECT_ID` | `http/clientConfig.ts` | — (خاموش) | خیر | خیر | باید `^[a-z0-9]{6,20}$`؛ فقط در production |
-| `FFMPEG_PATH` | `stt/speakerResolve.ts` | `ffmpeg` | خیر | خیر | باینریِ ffmpeg |
+| `FFMPEG_PATH` | `stt/speakerResolve.ts`، `stt/sessionAudioArchive.ts`، `features/audio-upload/media.ts` | `ffmpeg` | برایِ آپلودِ فایلِ صوتی عملاً بله | خیر | باینریِ ffmpeg؛ نبودش ⇒ jobِ آپلود با `no-ffmpeg` در backoff می‌ماند |
+| `SONIOX_ORPHAN_SWEEP` | `features/audio-upload/jobRunner.ts` | خاموش | **رویِ production: `1`** (در `/root/feeliaa-mysql/.env` ست شد 2026-09-24؛ dry-run پیش از آن: ۱ transcription + ۱ فایلِ یتیمِ 2026-09-16) | خیر | **جدید 2026-09-23.** فقط `1` پاک‌سازیِ فایل/transcriptionِ یتیمِ فیلیا رویِ Soniox را فعال می‌کند. رویِ dev عمداً خاموش — کلیدِ Soniox بینِ dev و production مشترک است و DBِ dev از jobهایِ زنده‌ی production خبر ندارد |
+| `UPLOAD_DAILY_AUDIO_MINUTES` | `features/audio-upload/jobRunner.ts` (`quotaWaitMsForJob`) | `600` | ست نشده (پیش‌فرض ۶۰۰) | خیر | **جدید 2026-09-24 (رفعِ L6).** سقفِ دقیقه‌ی صدایِ رونویسی‌شده‌ی آپلودی برایِ هر تراپیست در ۲۴ ساعتِ غلتان. بیش از آن ⇒ job **صف می‌ماند** (`error_code='quota-wait'`، چکِ دوباره هر ۳۰ دقیقه) — هرگز رد/failed نمی‌شود؛ اولین job همیشه اجرا می‌شود؛ `0` ⇒ بدونِ سقف |
+| `UPLOAD_CASE_FILE` | `features/audio-upload/jobMachine.ts#uploadCaseFileEnabled` | خاموش | خیر | خیر | **جدید 2026-09-24 (تصمیمِ مالک).** مسیرِ آپلودِ فایلِ صوتی برایِ مراجعِ فعال و غیرفعال با «ذخیره‌ی متن» تمام می‌شود (`audio_jobs.case_file_status='disabled'`)؛ فقط `1` مرحله‌ی پرونده را بعد از متن روشن می‌کند (UI هم ثابتِ `UPLOAD_SHOW_CASE_FILE_STEP` در `index.html` را دارد که باید هم‌زمان `true` شود) |
+| `CASE_FILE_AUTO_ACTIVE_CLIENTS` | `features/case-file/application/autoTrigger.ts` | خاموش | خیر | خیر | **جدید 2026-09-23 (پی‌ریزی، تصمیمِ مالک «الان نه»).** `1` ⇒ تولیدِ خودکارِ پرونده برایِ مراجعِ **فعال** هم (امروز فقط غیرفعال) |
 | `OPENAI_API_KEY` | `features/case-file/adapters/llm/openai.adapter.ts` | — | فقط اگر `LLM_PROVIDER=openai` | **بله** | نبود → 502 `llm-failed` روی regenerate |
 | `OPENAI_CASE_FILE_MODEL` | همان | — (عمداً بدونِ fallbackِ hardcode‌شده — تصمیمِ مالک) | **الزامی** اگر `LLM_PROVIDER=openai` | خیر | نبود → 502 `llm-failed` روی regenerate |
 | `OPENROUTER_API_KEY` | `features/case-file/adapters/llm/openrouter.adapter.ts` | — | فقط اگر `LLM_PROVIDER=openrouter` | **بله** | نبود → 502 `llm-failed` روی regenerate |
@@ -52,7 +56,16 @@
 | obs rate-limit | ۲۰ درخواست + ۱۵۰۰ رویداد/دقیقه به‌ازایِ تراپیست | `http/obs.ts` |
 | `FeeliaObs`: `MAX_BUF` / `BATCH_MAX` / flush دوره‌ای | 200 / 50 / ۱۵ثانیه | `public/feelia-obs.js` |
 | `FeeliaObs` backoff | [5s, 15s, 60s, 300s]، reset روی هر 2xx | `public/feelia-obs.js` |
-| `POLL_INTERVAL_MS` / `POLL_TIMEOUT_MS` / timeoutِ درخواست | 2000 / ۱۰ دقیقه / 20000 | `stt/asyncTranscribe.ts` |
+| `POLL_INTERVAL_MS` / سقفِ poll / timeoutِ درخواست | 2000 / **۱۰ دقیقه + ۱ دقیقه به ازایِ هر MB** (`pollTimeoutForBytes`، رفعِ F2، 2026-09-23؛ قبلاً ثابتِ ۱۰ دقیقه) / 20000 (آپلودِ stream: 60000 idle) | `stt/asyncTranscribe.ts` |
+| آپلودِ فایلِ صوتی: `CHUNK_SIZE` / `MAX_UPLOAD_BYTES` / `MAX_ACTIVE_UPLOADS_PER_THERAPIST` / نگهداریِ نیمه‌کاره | ۴MB / ۱GB (تصمیمِ مالک) / ۵ / ۷ روز | `features/audio-upload/uploadStore.ts` (2026-09-23) |
+| `MAX_DURATION_MS` | ۳۰۰ دقیقه (سقفِ Soniox؛ تصمیمِ مالک) | `features/audio-upload/media.ts` |
+| نرمال‌سازی | Opus/Ogg mono 16kHz 32kbps (fallback AAC/M4A 48kbps)؛ timeout = max(۵ دقیقه، طولِ صدا/۱۰) | `media.ts` |
+| workerِ jobها: tick / هم‌زمانی / lease / heartbeat | ۳s / ۲ / ۲۰ دقیقه / ۶۰s | `features/audio-upload/jobRunner.ts` |
+| `BACKOFF_MS` / `MAX_ATTEMPTS` / busyِ پرونده | [30s, 2m, 10m, 30m, 1h, 3h] / 6 / هر ۲ دقیقه تا ۱۵ بار | `features/audio-upload/jobMachine.ts` |
+| `CHEAP_RETRY_MS` / `CHEAP_MAX_ATTEMPTS` (2026-09-24) | 20s ثابت / 90 (~۳۰ دقیقه) — فقط وقتی transcription رویِ Soniox ساخته شده و poll/دریافتِ متن شکست خورده؛ در startupِ worker هم `next_attempt_at` ِ این jobها حداکثر NOW+20s می‌شود | `jobMachine.ts`، `jobRunner.ts#startAudioJobWorker` |
+| تکرارِ خطایِ شبکه‌ایِ درخواستِ Soniox (2026-09-24) | فقط GET/DELETE: ۳ تکرار با [1s, 2s, 4s] رویِ خطایِ سطحِ شبکه (TLS/socket/timeout/…)؛ POST هرگز | `stt/asyncTranscribe.ts#request` |
+| مهلتِ یک transcription | ۳۰ دقیقه + طولِ صدا | `jobMachine.ts#transcriptionDeadlineMs` |
+| sweeps (2026-09-23) | آپلودهایِ رهاشده/یتیم: ساعتی + startup؛ اعلان‌ها: روزانه (نگهداری ۳۰ روز)؛ یتیم‌هایِ Soniox: startup + هر ۶ ساعت (فقط با `SONIOX_ORPHAN_SWEEP=1`، آستانه‌ی ۲۴ ساعت) | `index.ts` |
 | ffmpeg timeout / پاکسازیِ job | ۵ دقیقه / ۲ ساعت | `stt/speakerResolve.ts` |
 | موتورِ سرور: `RECONNECT_BASE_DELAY`، `MAX_RECONNECT`، `CONNECT_TIMEOUT`، `FINALIZE_TIMEOUT`، `MAX_BUFFER_CHUNKS` | 1000، 6، 8000، 8000، 200 | `stt/soniox.ts` |
 | `P1_PARAMS` | GRACE 60s، REORDER 2s، HANDOVER 5s، BUFFER_MAX 100، FORWARDED_SET_MAX 2000 | `ws/p1.ts` |
@@ -80,6 +93,14 @@
 | `DURABLE_FLUSH_GUARD_MS` | **commitنشده — جدید، 10000** (قبلاً hardcode `1500` در `stopDurableSegment`) — نگهبانی که اگه `onstop` هیچ‌وقت fire نشه، `finish()`/`pause()` را برایِ همیشه قفل نمی‌کند |
 | `AUDIO_DB_NAME` / `AUDIO_DB_VERSION` / `AUDIO_STORE` | `feelia-audio` / 1 / `segments` |
 | `AUDIO_QUEUE_MAX_BYTES` | 300MB |
+
+### `public/feelia-upload.js` (2026-09-23)
+| ثابت | مقدار |
+|---|---|
+| IndexedDB | `feelia-uploads` / نسخه 1 / store `tasks` (keyPath `key` = `<fingerprint>:<clientId>`) |
+| اثرِ انگشت | sha256 از نام/حجم/lastModified + ۱MBِ اول و آخر |
+| تکرارِ هر تکه | backoff `min(30s, 2^n s)` تا ۸ بار، سپس هر ۱۵s تا بی‌نهایت؛ timeoutِ XHR 120s |
+| poll ِ سینی (`index.html`) | ۵s وقتی کاری فعال است، وگرنه ۳۰s؛ poll ِ صفحه‌ی جلسه ۴s |
 | live recorder timeslice / durable timeslice | 250ms / 1000ms |
 | getUserMedia | `echoCancellation`، `noiseSuppression`، `autoGainControl` = true |
 

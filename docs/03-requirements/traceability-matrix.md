@@ -47,6 +47,9 @@
 | REQ-099 | platform | `http/sessions.ts` `[diag-transcript]` | none | code-read → CONTRADICTED |
 | REQ-100 | platform | `index.ts` `register(multipart)` | none | node_modules read → verified limit |
 
+| REQ-055…059 | [04](../04-modules/04-transcription/module-prd.md) / [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md) | `server/src/features/audio-upload/*`، `features/notifications/notify.ts`، `public/feelia-upload.js` | `scripts/upload-harness.ts` (H1–H24، `pnpm test:up`) | harness 24/24 + mock-UI + **E2Eِ واقعی** (Soniox/LLM/MySQL، ۶۰ دقیقه، kill ِ سرور، UIِ واقعی) — [verification](../../verification/2026-09-23-audio-upload-pipeline.md) §۴.۱ |
+| REQ-060 | 04 | `stt/batchqueue.ts#applyBatchSegmentOnce` | E2E موقت (C3 + mutation، F8-real) | MySQLِ واقعی — همان verification |
+
 ## شکاف‌های پوشش (برای master plan)
 1. هیچ تستِ backend (auth، مالکیت، CAS، admin guards، batch merge).
 2. harness با صفِ IndexedDB هم‌گام نیست (6 FAIL در WT).

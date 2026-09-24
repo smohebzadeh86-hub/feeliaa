@@ -5,6 +5,7 @@ import path from 'node:path';
 import { query } from '../db/connection.js';
 import { requireAdmin } from '../auth/guard.js';
 import { listSessionAudio, getSessionAudioRow, getFullSessionAudio, deleteSessionAudioDirs, deriveSessionStatus } from '../stt/sessionAudioArchive.js';
+import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
 import { pendingAudiosFor } from '../stt/batchqueue.js';
 import { logEvent, obsQueueStats } from '../obs/eventLog.js';
 
@@ -420,8 +421,10 @@ export async function adminRoutes(app: FastifyInstance) {
       [id]
     );
     const sessionIds = sessionIdsResult.rows.map((r: { id: string }) => r.id);
+    const sonioxRefs = await collectUploadSonioxRefs(sessionIds);
     await query('DELETE FROM therapists WHERE id = ?', [id]);
     deleteSessionAudioDirs(sessionIds);
+    releaseSonioxRefs(sonioxRefs);
     logEvent({ event: 'admin.delete', therapistId: request.therapistId, detail: { kind: 'therapist' } });
 
     return { deleted: existing.rows[0].phone };
@@ -439,8 +442,10 @@ export async function adminRoutes(app: FastifyInstance) {
     // LAW-010: همان دلیلِ بالا — قبل از cascade شناسه‌ی جلسه‌ها را نگه می‌داریم.
     const sessionIdsResult = await query('SELECT id FROM sessions WHERE client_id = ?', [id]);
     const sessionIds = sessionIdsResult.rows.map((r: { id: string }) => r.id);
+    const sonioxRefs = await collectUploadSonioxRefs(sessionIds);
     await query('DELETE FROM clients WHERE id = ?', [id]);
     deleteSessionAudioDirs(sessionIds);
+    releaseSonioxRefs(sonioxRefs);
     logEvent({ event: 'admin.delete', therapistId: request.therapistId, detail: { kind: 'client' } });
 
     return { deleted: existing.rows[0].code };

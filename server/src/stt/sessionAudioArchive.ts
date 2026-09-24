@@ -4,7 +4,7 @@
 // قابلِ‌شنیدنه — نه تراپیست، نه هیچ کاربرِ عادی.
 import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../db/connection.js';
 import { extForMime, mimeForExt } from './batchqueue.js';
@@ -73,7 +73,7 @@ function sessionDir(sessionId: string): string {
   return path.join(ARCHIVE_DIR, safe);
 }
 
-export type AudioSource = 'durable' | 'offline';
+export type AudioSource = 'durable' | 'offline' | 'upload';
 export type AudioKind = 'session' | 'note';
 
 // قفلِ per-session: بدونِ این، دو archiveAudioForAdmin هم‌زمان رویِ یک جلسه ممکنه
@@ -133,6 +133,68 @@ export async function archiveAudioForAdmin(
       [randomUUID(), sessionId, nextSeq, filePath, bytes, mime, source, String(runId).slice(0, 64), kind, sha256, durationMs]
     );
     void clientSeq; // فقط برایِ لاگ/دیباگ نگه داشته می‌شه، دیگه seqِ نهایی نیست
+  });
+}
+
+// نسخه‌ی مسیر-محورِ archiveAudioForAdmin برایِ فایلِ آپلودشده‌ی نرمال‌شده (migration 023) — فایلِ
+// چندساعته هرگز کامل در RAM نمی‌آید: sha256 به‌صورتِ stream، و خودِ فایل با rename جابه‌جا می‌شود.
+// idempotent مثلِ نسخه‌ی buffer: همان بایت‌ها ⇒ همان ردیف (نسخه‌ی تازه پاک می‌شود).
+export async function archiveAudioFileForAdmin(
+  sessionId: string,
+  srcPath: string,
+  mime: string,
+  runId: string
+): Promise<{ path: string; sha256: string; durationMs: number | null }> {
+  const sha256 = await sha256OfFile(srcPath);
+  return withSessionLock(sessionId, async () => {
+    const existing = await query(
+      'SELECT path, duration_ms FROM session_audio WHERE session_id = ? AND sha256 = ?',
+      [sessionId, sha256]
+    );
+    if (existing.rows.length && existsSync(existing.rows[0].path)) {
+      try { rmSync(srcPath, { force: true }); } catch {}
+      return { path: existing.rows[0].path, sha256, durationMs: existing.rows[0].duration_ms ?? null };
+    }
+    ensureArchiveDir();
+    const dir = sessionDir(sessionId);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    const maxRow = await query("SELECT MAX(seq) AS m FROM session_audio WHERE session_id = ? AND kind = 'session'", [sessionId]);
+    const nextSeq: number = (maxRow.rows[0]?.m ?? -1) + 1;
+    const ext = extForMime(mime);
+    const filePath = path.join(dir, `${String(nextSeq).padStart(6, '0')}.${ext}`);
+    renameSync(srcPath, filePath);
+    try {
+      const durationMs = await probeDurationMs(filePath);
+      const bytes = statSync(filePath).size;
+      if (existing.rows.length) {
+        // ردیفِ قدیمی بود ولی فایلش نه (پاک‌شده) — همان ردیف را به فایلِ تازه وصل کن.
+        await query('UPDATE session_audio SET path = ?, bytes = ?, duration_ms = ? WHERE session_id = ? AND sha256 = ?',
+          [filePath, bytes, durationMs, sessionId, sha256]);
+      } else {
+        await query(
+          `INSERT INTO session_audio (id, session_id, seq, path, bytes, mime, source, run_id, kind, sha256, duration_ms)
+           VALUES (?, ?, ?, ?, ?, ?, 'upload', ?, 'session', ?, ?)`,
+          [randomUUID(), sessionId, nextSeq, filePath, bytes, mime, String(runId).slice(0, 64), sha256, durationMs]
+        );
+      }
+      return { path: filePath, sha256, durationMs };
+    } catch (e) {
+      // ⭐ رفعِ M4 (audit 2026-09-24): جلسه وسطِ نرمال‌سازی حذف شد (INSERT با FK شکست می‌خورد) یا ثبت ناموفق بود ⇒
+      // فایلِ جابه‌جاشده بدونِ ردیف می‌ماند و sweepOldSessionAudio (که فقط ردیف‌ها را می‌بیند) هرگز پاکش نمی‌کرد (LAW-010).
+      try { rmSync(filePath, { force: true }); } catch {}
+      try { if (readdirSync(dir).length === 0) rmSync(dir, { recursive: true, force: true }); } catch {}
+      throw e;
+    }
+  });
+}
+
+function sha256OfFile(p: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const h = createHash('sha256');
+    const rs = createReadStream(p);
+    rs.on('data', (c) => h.update(c));
+    rs.on('error', reject);
+    rs.on('end', () => resolve(h.digest('hex')));
   });
 }
 
@@ -227,6 +289,11 @@ export function deleteSessionAudioDirs(sessionIds: string[]): void {
       console.log('[session-audio] failed to delete dir for', id, String((e as Error).message || e).slice(-200));
     }
   }
+  // فایل‌هایِ آپلودِ صدا (data/uploads/<uploadId>، migration 023) — ردیف‌هایِ audio_uploads با
+  // cascade حذف شده‌اند؛ هر پوشه‌ای که دیگر ردیفِ متناظر ندارد همین‌جا پاک می‌شود (هر ۴ مسیرِ حذف).
+  void import('../features/audio-upload/uploadStore.js')
+    .then((m) => m.sweepOrphanUploadDirs())
+    .catch(() => {});
 }
 
 // ————————————————— فایلِ کاملِ جلسه (بخشِ F، audit صدا/۲۰۲۶-۰۹-۱۶) —————————————————

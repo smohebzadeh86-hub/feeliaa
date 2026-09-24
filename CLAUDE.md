@@ -41,6 +41,7 @@ CLAUDE.md (همین فایل)
 | نوع task | اسنادِ لازم |
 |---|---|
 | هر چیزی درباره‌ی رونویسیِ زنده، reconnect، pause/resume | `docs/07-subsystems/01-browser-realtime-engine.md`، `03-transcript-integrity.md`، `docs/04-modules/04-transcription/` |
+| آپلودِ فایلِ صوتیِ جلسه، jobِ پس‌زمینه، اعلان‌ها | `docs/07-subsystems/06-audio-upload-pipeline.md` |
 | صدا، صف آفلاین، batch fallback، یادداشتِ صوتیِ ناموفق | `docs/07-subsystems/02-audio-durability-batch-fallback.md`، `05-session-audio-archive-speaker-resolve.md` |
 | `/ws/t`، `/ws/voice`، `SonioxDirect` | `docs/07-subsystems/04-legacy-ws-proxy-p1.md` (مسیرِ LEGACY — قانون LAW-015) |
 | مراجعین | `docs/04-modules/02-client-management/` |
@@ -101,13 +102,17 @@ pnpm test:rt
 pnpm test:cf
 ```
 ```bash
+pnpm test:up
+```
+```bash
 cd server && npx tsc --noEmit
 ```
 
 - `pnpm dev` = `pnpm --filter server dev` (tsx watch، cwd = `server/`، `.env` از `server/.env`، پورت پیش‌فرض 3000).
 - `pnpm test:rt` = harness موتورِ realtime (`scripts/rt-harness.cjs`) — بدونِ شبکه/DB. وضعیتِ فعلی: بخش 20 Master Reference.
 - `pnpm test:cf` = harness پرونده‌ی درمان (`scripts/case-file-harness.ts`، اجرا با tsx) — بدونِ شبکه/DB/LLMِ واقعی؛ دادهٔ ساختگی.
-- تستِ خودکارِ backend یا CI وجود ندارد.
+- `pnpm test:up` = harness pipelineِ آپلودِ فایلِ صوتی (`scripts/upload-harness.ts`، 2026-09-23) — ماشینِ حالتِ job با portهایِ جعلی (بدونِ DB/Soniox) + ffmpegِ واقعی رویِ فایل‌هایِ ساختگی.
+- تستِ خودکارِ backend با DB یا CI وجود ندارد.
 
 ## ۹. رفتارِ Agent
 

@@ -15,6 +15,7 @@ feeliaa/
 ├── .gitignore                         T
 ├── .claude/launch.json                U  کانفیگِ dev server
 ├── diag-collect.sh                    T  ابزارِ تشخیصِ read-only production
+├── deploy/nginx/feelia.conf           U  کانفیگِ مرجعِ nginx (REFERENCE؛ با کانفیگِ زنده مقایسه نشده — deployment-operations §4)
 ├── feelia-design-system.html          T  مرجعِ طراحی
 ├── session_assistant_v11 (3).html     T  HISTORICAL: نمونه‌ی بدون سرور
 ├── soniox.html                        U  کپیِ مستنداتِ Soniox (شخص ثالث)
@@ -24,7 +25,8 @@ feeliaa/
 │   ├── index.html                     T  SPA کامل (تا commit `54a17fd`)
 │   ├── feelia-rt.js                   T  موتورِ realtime (تا commit `54a17fd`)
 │   ├── feelia-analytics.js            U  Clarity
-│   └── feelia-obs.js                  U  جدید، فازِ ۱ِ رصد/حسابرسی (2026-09-22) — تله‌متریِ کلیک/ناوبریِ سمتِ کلاینت به `/api/obs/events`
+│   ├── feelia-obs.js                  U  جدید، فازِ ۱ِ رصد/حسابرسی (2026-09-22) — تله‌متریِ کلیک/ناوبریِ سمتِ کلاینت به `/api/obs/events`
+│   └── feelia-upload.js               U  جدید 2026-09-23 — موتورِ آپلودِ تکه‌تکه/قابلِ ادامه‌ی فایلِ صوتیِ جلسه (IndexedDB `feelia-uploads`)
 │
 ├── server/
 │   ├── package.json, tsconfig.json    T
@@ -40,7 +42,9 @@ feeliaa/
 │       ├── http/ admin.ts M · auth.ts M · clients.ts T (تا `54a17fd`) · sessions.ts T (تا `54a17fd`) · stt.ts M · clientConfig.ts U · sessionDate.ts T (نرمال‌سازیِ تاریخ/ساعتِ شمسیِ جلسه، `54a17fd`) · obs.ts U (جدید، فازِ ۱: `POST /api/obs/events`)
 │       ├── obs/   U — جدید، فازِ ۱ِ رصد/حسابرسی (2026-09-22): types.ts، redact.ts (نقطه‌ی اجرایِ LAW-001، `sanitizeDetail`/`isSafeToken`)، fileSink.ts (JSONLِ چرخشی، بدونِ dependency)، eventLog.ts (صفِ درون‌حافظه‌ای + drain به DB، `logEvent`/`logUiEvents`)، httpHook.ts (`registerObsHooks`)، sweep.ts (`sweepOldObsEvents`)
 │       ├── stt/  batchqueue.ts M · soniox.ts M · tempkey.ts T · asyncTranscribe.ts U · sessionAudioArchive.ts U (+ `deriveSessionStatus` جدید، فازِ ۱) · speakerResolve.ts U
-│       ├── features/case-file/  U — جدید 2026-09-17: AI Case File (Ports & Adapters)
+│       ├── features/case-file/  U — جدید 2026-09-17: AI Case File (Ports & Adapters)؛ `application/autoTrigger.ts` (2026-09-23، سیاستِ مرکزیِ تولیدِ خودکار)
+│       ├── features/audio-upload/  U — جدید 2026-09-23: آپلودِ فایلِ صوتیِ جلسه + jobِ پس‌زمینه ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))
+│       ├── features/notifications/ U — جدید 2026-09-23: اعلان‌هایِ پایدار (`notify.ts`)
 │       │   ├── domain/     types.ts، errors.ts، validate.ts، normalizeText.ts (جدید 2026-09-19)، findings.ts (جدید 2026-09-20: واحدِ «یافته»، شناسه‌ی فکت، finalizeCouple)
 │       │   ├── ports/      llmProvider.port.ts، caseFileRepo.port.ts
 │       │   ├── application/ aggregateClientCorpus.ts، renderDigest.ts (جدید 2026-09-19)، buildCaseFilePrompt.ts، mergeTherapistEdits.ts، applyFieldPatch.ts، generateCaseFile.ts، repairLoop.ts (جدید 2026-09-19)، upgradeLegacyContent.ts (جدید 2026-09-20: ارتقایِ پرونده‌ی قدیمی بدونِ LLM)
@@ -52,6 +56,7 @@ feeliaa/
 │
 ├── scripts/rt-harness.cjs             T  تستِ FeeliaRT
 ├── scripts/case-file-harness.ts       T  تستِ پرونده‌ی درمان (findings/merge/patch/repairLoop؛ بدونِ شبکه/DB) — 2026-09-20
+├── scripts/upload-harness.ts          U  تستِ pipelineِ آپلودِ صدا (`pnpm test:up`؛ ماشینِ حالت با portهایِ جعلی + ffmpegِ واقعی) — 2026-09-23
 │
 ├── docs/
 │   ├── README.md                      U

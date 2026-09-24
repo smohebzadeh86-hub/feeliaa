@@ -32,6 +32,7 @@ const IGNORABLE_ERRNOS = new Set([
   1091, // ER_CANT_DROP_FIELD_OR_KEY — DROP CONSTRAINT روی چیزی که وجود ندارد
   3822, // ER_DUP_CHECK_CONSTRAINT
   3823, // ER_CHECK_CONSTRAINT_DUP_NAME (برخی نسخه‌های MySQL)
+  3821, // ER_CHECK_CONSTRAINT_NOT_FOUND — DROP CHECK رویِ constraintی که قبلاً حذف شده (migration 023)
 ]);
 
 async function runStatement(sql: string, file: string): Promise<void> {

@@ -5,6 +5,7 @@ import { query } from '../db/connection.js';
 import { requireAuth } from '../auth/guard.js';
 import { getOwnedClient } from '../db/ownership.js';
 import { deleteSessionAudioDirs } from '../stt/sessionAudioArchive.js';
+import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
 
 const VALID_CATEGORIES = ['child', 'teen', 'adult'];
 const VALID_GENDERS = ['f', 'm'];
@@ -122,7 +123,7 @@ export async function clientRoutes(app: FastifyInstance) {
     }
 
     const sessionsResult = await query(`
-      SELECT id, session_num, date, start_time, duration_ms, status, source, created_at
+      SELECT id, session_num, date, start_time, duration_ms, status, source, batch_status, created_at
       FROM sessions
       WHERE client_id = ?
       ORDER BY session_num DESC
@@ -284,6 +285,7 @@ export async function clientRoutes(app: FastifyInstance) {
     // بدونِ این لیست یتیم می‌مانند.
     const sessionIdsResult = await query('SELECT id FROM sessions WHERE client_id = ?', [id]);
     const sessionIds = sessionIdsResult.rows.map((r: { id: string }) => r.id);
+    const sonioxRefs = await collectUploadSonioxRefs(sessionIds);
 
     const del = await query(
       'DELETE FROM clients WHERE id = ? AND therapist_id = ?',
@@ -296,6 +298,7 @@ export async function clientRoutes(app: FastifyInstance) {
     }
 
     deleteSessionAudioDirs(sessionIds);
+    releaseSonioxRefs(sonioxRefs);
 
     return {
       deleted: owned.code,

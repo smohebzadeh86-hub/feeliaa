@@ -10,4 +10,6 @@
 | 04 | [Legacy WS Proxy (P1)](04-legacy-ws-proxy-p1.md) | `server/src/ws/*`، `stt/soniox.ts`، بخش‌های legacy در `index.html` | پروتکلِ ordering پیچیده؛ frozen | LAW-015 |
 | 05 | [Session Audio Archive & Speaker Resolve](05-session-audio-archive-speaker-resolve.md) | `stt/sessionAudioArchive.ts`، `stt/speakerResolve.ts`، روت‌های admin | نگهداریِ صدا، تعارضِ رضایت، ffmpeg | LAW-005، LAW-009، LAW-010 |
 
-subsystemهایی که **وجود ندارند** و ساخته نشده‌اند: پرداخت، اعلان/پیامک، جستجو، صفِ پیامِ مستقل، cache.
+| 06 | [Audio Upload Pipeline](06-audio-upload-pipeline.md) (2026-09-23) | `server/src/features/audio-upload/*`، `features/notifications/notify.ts`، `public/feelia-upload.js` | آپلودِ بزرگ رویِ شبکه‌ی ضعیف، jobِ پس‌زمینه‌ی DB-محور، exactly-onceِ متن، اعلان | LAW-004، LAW-008، LAW-009، LAW-010، LAW-013 |
+
+subsystemهایی که **وجود ندارند** و ساخته نشده‌اند: پرداخت، پیامک/Web Push، جستجو، صفِ پیامِ مستقل، cache. (اعلانِ درون‌اپِ پایدار از 2026-09-23 در subsystem 06 هست.)

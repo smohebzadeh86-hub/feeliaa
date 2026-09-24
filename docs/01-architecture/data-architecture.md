@@ -9,9 +9,12 @@
 | MySQL (production، از 2026-09-16؛ Postgres قبلی روی سرور نگه داشته شده برایِ rollback) | حساب‌ها، نشست‌های auth، مراجعین، جلسات + متن، یادداشت/علائم، متادیتای صدای آرشیو | بسیار بالا | نامحدود تا حذف |
 | `<cwd>/data/batch-queue/` | فایل‌های `.webm` در انتظارِ رونویسی/آرشیو | بسیار بالا | تا موفقیت؛ فایل‌های قدیمی‌تر از ۲۴h در startup حذف |
 | `<cwd>/data/session-audio/<sessionId>/NNNNNN.webm` | آرشیوِ صدا برای ادمین | بسیار بالا | ۱۴ روز (startup + هر ۲۴h) |
+| `<cwd>/data/uploads/<uploadId>/` (2026-09-23، تأییدِ مالک، LAW-010) | تکه‌هایِ آپلودِ فایلِ صوتیِ جلسه + `source.*`ِ الحاق‌شده | بسیار بالا | نیمه‌کاره: ۷ روز بی‌فعالیت؛ کامل: تا پایانِ نرمال‌سازی (حداکثر ۱۴ روز)؛ پوشه‌ی بی‌ردیف (حذفِ جلسه/مراجع/تراپیست) فوراً حذف — [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md) |
+| MySQL `audio_uploads`/`audio_jobs`/`notifications` (023) | متادیتایِ آپلود/job (نامِ فایلِ اصلی، شناسه‌هایِ Soniox)، اعلان‌ها (بدونِ متنِ بالینی) | بالا | cascade با تراپیست/مراجع/جلسه؛ اعلان‌ها ۳۰ روز |
+| مرورگر IndexedDB `feelia-uploads/tasks` (2026-09-23) | **خودِ فایلِ صوتیِ انتخاب‌شده** تا پایانِ آپلود (برایِ ادامه بعد از رفرش) | بسیار بالا | حذف بعد از «دریافت شد»/تکراری/لغو یا خطایِ دائمی؛ به therapistId گره خورده |
 | `os.tmpdir()/feelia-speaker-resolve-*` | concatِ موقتِ ffmpeg | بسیار بالا | حذف در `finally` |
 | حافظه‌ی پروسه | P1 records (شاملِ hint و بافرِ صدا)، jobهای resolve (متنِ preview)، mintHits | بالا | تا ری‌استارت؛ jobها >۲h حذف |
-| Soniox | فایل و transcriptionِ async | بسیار بالا | در `finally` حذف می‌شوند (`deleteTranscription`، `deleteFile`) |
+| Soniox | فایل و transcriptionِ async | بسیار بالا | در `finally` حذف می‌شوند (`deleteTranscription`، `deleteFile`)؛ jobِ آپلود بعد از ثبتِ متن/شکستِ دائمی حذف می‌کند؛ یتیم‌هایِ بعد از کرش با `sweepSonioxOrphans` (فقط با `SONIOX_ORPHAN_SWEEP=1`، > ۲۴h) — رفعِ F3، 2026-09-23 |
 | مرورگر IndexedDB `feelia-audio/segments` | سگمنت‌های ۶۰ثانیه‌ای صدا | بسیار بالا | تا آپلودِ موفق/abort؛ سقفِ کل ۳۰۰MB |
 | مرورگر localStorage | `feelia_active_session`، `feelia_direct`، `feelia_ux_consent_v1:<therapistId>` | متوسط (شناسه) | نامحدود |
 | مرورگر sessionStorage | `p1c-<sessionId>` | پایین | تب |
@@ -99,6 +102,8 @@ flowchart LR
   AR -->|">14d"| X2["حذف فایل + ردیف"]
   AR -->|ffmpeg concat| RS["resolve-speakers"]
 ```
+
+**مسیرِ آپلودِ فایل (2026-09-23):** `File` → IndexedDB `feelia-uploads` → تکه‌هایِ ۴MB → `data/uploads/<id>` → `source.*` → ffmpeg (Opus) → `data/session-audio/<sessionId>/` (`session_audio.source='upload'`، ۱۴ روز) → Soniox async → متن در `sessions.transcript` (exactly-once با `audio_jobs.transcript_applied_at`). جزئیات: [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md).
 
 ### 4.4 حذف
 | عمل | اثر در DB | اثر روی فایل‌ها |

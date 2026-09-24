@@ -2,7 +2,13 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-23 (شب) — آخرین رویداد: **AUDIT+FIX: بررسیِ کانفیگِ nginx؛ 504ِ کاذبِ تولیدِ پرونده در فرانت
+> **آخرین به‌روزرسانی:** 2026-09-24 — آخرین رویداد: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
+> health ok، `SONIOX_ORPHAN_SWEEP=1`، nginxِ زنده کافی بود و تغییری نکرد). پیش از آن: auditِ باگ و رفعِ B2، B3، M1–M4، M6 و L*؛
+> `test:up` 29/29 و E2Eِ DBِ dev 13/13. commit نشده.** قبل‌ترش: **مسیرِ آپلود (فعال و غیرفعال) فقط تا ذخیره‌ی متن؛ پرونده خاموش پشتِ
+> `UPLOAD_CASE_FILE`؛ `test:up` 26/26 + E2Eِ واقعی PASS.** قبل‌ترش: **تستِ کاملِ واقعیِ فیچرِ آپلود (Soniox/LLM/MySQL، فایلِ ۶۰دقیقه‌ای،
+> kill ِ سرور، هم‌زمانی، mutation) — همه PASS؛ ۳ باگِ UI پیدا و رفع شد؛ fixtureها پاک شدند.** قبل‌ترش: **پیاده‌سازیِ فیچرِ «آپلودِ فایلِ صوتیِ جلسه» (migration 023، jobِ پس‌زمینه،
+> اعلان‌ها) + رفعِ F1–F8 از auditِ همین روز؛ `test:up` 24/24، `test:cf` 108/108، `tsc` تمیز؛ commit/deploy نشده؛ تستِ واقعی با DB/Soniox
+> مجاز نشد.** قبل‌ترش: **AUDIT (read-only) فاز ۰/۱ی همان فیچر.** قبل‌ترش: **AUDIT+FIX: بررسیِ کانفیگِ nginx؛ 504ِ کاذبِ تولیدِ پرونده در فرانت
 > رفع شد + کانفیگِ مرجعِ `deploy/nginx/feelia.conf`** (deploy/commit نشده؛ کانفیگِ زنده خوانده نشد).
 > قبل‌ترش: **BUG+FIX+DEPLOY (hotfix) از تستِ قطعِ اینترنتِ مالک رویِ
 > production: رونویسی بعد از وصل‌شدنِ دوباره نمی‌آمد («Audio decode error»)، متنِ صدایِ دوره‌ی قطعی گم می‌شد، مرورگرِ مالک
@@ -387,6 +393,158 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-24 — CODE + TEST + DEPLOY — رفعِ M5، M7، L2، L6 (بدونِ از دست رفتنِ داده) و deployِ دوم
+- **دستورِ مالک:** «همشون رو رفع کن … به امن‌ترین شیوه که هیچ دیتایی از بین نره».
+- **رفع:** M5 (مودالِ خروج با آپلودِ ناتمام: بماند/پاک شود/ماندن؛ آپلودِ سرور حفظ)؛ M7 (شماره‌گذاریِ دوباره عمداً نه + retryِ تداخلِ شماره تا ۱۵ بار در زنده/دستی/complete)؛
+  L2 (Web Locks، `other-tab`، takeover، لغوِ هم‌گام)؛ L6 (`UPLOAD_DAILY_AUDIO_MINUTES`، پیش‌فرض ۶۰۰؛ صف با `quota-wait`، نه رد)؛ + شروعِ دوباره به‌جایِ حذف در `upload-closed`.
+- **تست:** `test:up` 31/31، `test:cf` 108/108، `test:rt` 55/0، `tsc` تمیز؛ E2Eِ DBِ dev (M7 ×۳ و L6) PASS با fixtures remaining 0 (دورِ اولِ M7 شکست خورد ⇒ سقفِ retry و jitter اضافه شد)؛
+  UIِ دوتب، takeover و مودالِ خروج در Browser pane PASS.
+- **production:** deployِ دوم (backupِ کد، migrationی نبود، health ok). jobِ واقعیِ مالک پیش‌تر موفق بود (chars=959).
+- **FINDING:** خطاهایِ `No audio received` (400) از مسیرِ رونویسیِ زنده در لاگِ production — بررسی نشد.
+- **اسناد:** subsystem 06، configuration-catalog، error-code-catalog، [verification](verification/2026-09-24-audio-upload-bug-audit.md) §۸. **عامل:** این نشست. commit نشده.
+
+### 2026-09-24 — TEST + DEPLOY + MIGRATION + CONFIG — E2Eِ رفع‌هایِ آپلود رویِ MySQLِ dev و deployِ فیچرِ آپلودِ صدا به production
+- **مجوز:** مالک صریحاً «کاملا اجازه میدم» برایِ تستِ DBِ dev با دادهٔ آزمایشی و B1 رویِ production.
+- **E2E dev:** 13/13 PASS (B2، B3، L1، L4، L7، retry/M1، M3 حذفِ جلسه و مراجع، M4). fixtureِ canary بدونِ رمز و با Sonioxِ mock. fixtures remaining: 0.
+  اسکریپتِ موقت حذف شد. M2 (شمارنده‌ی runJob) رویِ DB تست نشد.
+- **production:** nginxِ زنده `client_max_body_size 50m` / `proxy_read_timeout 300s` دارد ⇒ بدونِ تغییر. backupِ DB، کد و `.env` در `/root/backups/`.
+  deployِ working tree، `pnpm install`، `SONIOX_ORPHAN_SWEEP=1` (dry-run پیش از آن: ۱+۱ یتیمِ 2026-09-16)، و `pm2 restart` انجام شد.
+  **migration 023 applied**؛ health ok. smoke: جدول‌ها و CHECK درست، `feelia-upload.js` 200، مسیرهایِ آپلود 401 بدونِ نشست، PUTِ ۴MB از nginx رد نشد.
+  sweep ۱+۱ را پاک کرد. هنگامِ ری‌استارت هیچ جلسه‌ی زنده‌ای نبود.
+- **⚠ توجه:** کلِ working treeِ commit‌نشده deploy شد (فیچرِ آپلود، F1–F8، رفع‌هایِ امروز). **هنوز commit نشده.**
+- **باز:** آپلودِ واقعی روی production با حسابِ مالک (قدمِ اولِ تست)، M5، M7، L2، L6.
+- **اسناد:** subsystem 06 (وضعیت و §۹.۴)، deployment-operations (nginxِ زنده)، configuration-catalog، [verification](verification/2026-09-24-audio-upload-bug-audit.md) §۷.
+  **عامل:** این نشست.
+
+### 2026-09-24 — CODE + TEST + DOCS — رفعِ باگ‌هایِ auditِ آپلودِ صدا (B2، B3، M1–M4، M6، L1، L3–L5، L7)
+- **دستورِ مالک:** «شروع کن به حل کردن» (بعد از auditِ همین روز).
+- **رفع:** بن‌بستِ «تکراری» بعد از شکست (requeue یا آپلودِ تازه)؛ لغوِ سرور هنگامِ «بستنِ» کارتِ خطا + آزادسازیِ نیمه‌کاره‌هایِ بی‌فعالیت > ۲۴ساعت پیش از 429؛
+  `normalize-failed` به‌جایِ `unreadable`؛ سقفِ ۵ خطایِ غیرمنتظره ⇒ `internal-error`؛ پاک‌سازیِ Soniox در هر ۴ مسیرِ حذف و برایِ jobِ در حالِ اجرا؛
+  پاک‌کردنِ فایلِ آرشیوِ بی‌ردیف؛ هشدارِ تاریخِ پیشنهادی؛ پذیرشِ MIMEِ صوتی؛ جلوگیری از taskِ تکراری؛ `missing[]` کامل؛ لغوِ کاملِ taskها با خروج؛ `size` integer.
+- **فایل‌ها:** `features/audio-upload/{uploads.routes,jobMachine,jobRunner}.ts`، `stt/sessionAudioArchive.ts`، `http/{sessions,clients,admin}.ts`، `public/feelia-upload.js`،
+  `public/index.html`، `scripts/upload-harness.ts` (H27، H28).
+- **تست:** `test:up` 29/29، `test:cf` 108/108، `tsc` تمیز؛ ۴ سناریویِ UI در Browser pane با mock backend PASS. مسیرهایِ SQL رویِ MySQLِ واقعی اجرا **نشد**.
+- **باز:** B1 (nginx/deploy/migrationِ production)، M5 (فایل در مرورگر)، M7، L2، L6 — جزئیات در verification.
+- **اسناد:** subsystem 06، api-catalog، error-code-catalog، [verification](verification/2026-09-24-audio-upload-bug-audit.md) §۶. **عامل:** این نشست. commit نشده.
+
+### 2026-09-24 — AUDIT + FINDING — بررسیِ باگ‌هایِ فیچرِ آپلودِ صدا پیش از تست (read-only، بدونِ تغییرِ کد)
+- **درخواستِ مالک:** همه‌ی باگ‌هایِ احتمالیِ فیچرِ آپلودِ ویس قبل از تست بررسی و گزارش شود.
+- **یافته‌هایِ مهم:** B1 کانفیگِ nginxِ production تأیید نشده است (اگر سقفِ بدنه 1m باشد، همه‌ی تکه‌ها 413 می‌گیرند و آپلود فوراً شکست می‌خورد).
+  B2 بعد از شکستِ دائمیِ job (`audio-expired`/`unreadable`) آپلودِ دوباره‌ی همان فایل «تکراری» رد می‌شود؛ بن‌بست است (`uploads.routes.ts:157-169`).
+  B3 «بستن»ِ کارتِ خطا ردیفِ `uploading` را روی سرور لغو نمی‌کند و سقفِ ۵ آپلودِ نیمه‌کاره تا ۷ روز تراپیست را با 429 قفل می‌کند.
+  همچنین M1–M7 (از جمله: شکستِ گذرایِ نرمال‌سازی به‌صورتِ «فایل خراب» و بدونِ retry گزارش می‌شود؛ خطایِ غیرمنتظره در runJob بی‌پایان تکرار می‌شود؛
+  حذفِ جلسه وسطِ رونویسی صدا را روی Soniox باقی می‌گذارد) و L1–L7.
+- **تست:** `pnpm test:up` 27/27، `tsc` تمیز. هیچ کد، DB یا سرورِ دیگری لمس نشد.
+- **Evidence:** [verification/2026-09-24-audio-upload-bug-audit.md](verification/2026-09-24-audio-upload-bug-audit.md). **عامل:** این نشست. رفعی انجام نشد (منتظرِ دستورِ مالک).
+
+### 2026-09-24 — INCIDENT + FIX — «سرویسِ تبدیل به متن موقتاً در دسترس نیست» در آپلودِ مالک (شبکه‌ی ناپایدارِ سرور→Soniox)
+- **گزارشِ مالک:** jobِ آپلودِ خودش (۶ دقیقه صدا، ماشینِ dev) پیامِ «موقتاً در دسترس نیست» می‌داد.
+- **تشخیص (با شواهد):** فایل و transcription رویِ Soniox ساخته شده بودند و Soniox `completed` برمی‌گرداند؛ شکست در poll/دریافتِ متن بود.
+  درخواستِ مستقیمِ دریافتِ متن از همان ماشین: ۸–۱۰ ثانیه و در ۱ از ۳ بار «Client network socket disconnected before secure TLS
+  connection» (مسیرِ `PROXY_URL`؛ آدرسِ شبکه‌ی ماشین هم وسطِ کار عوض شد). طراحیِ قبلی هر قطعیِ لحظه‌ای را یک تلاشِ کامل حساب می‌کرد با
+  backoffِ فزاینده (۳۰ث→۲د→۱۰د→**۳۰د**) — در حالی که متن آماده بود؛ لاگ هم علتِ واقعی را نشان نمی‌داد.
+- **رفع:** (۱) `stt/asyncTranscribe.ts` — GET/DELETE در خطایِ سطحِ شبکه ۳ بار (۱/۲/۴ث) تکرار می‌شوند (POST نه — ضدِ منبعِ تکراری)؛
+  (۲) `jobMachine.ts` — شکستِ poll/دریافتِ متن وقتی transcription رویِ Soniox هست = «تلاشِ ارزان»: هر ۲۰ث، تا ۹۰ بار؛ لاگ حالا علتِ خطا را
+  می‌نویسد (بدونِ داده‌ی بالینی)؛ (۳) `jobRunner.ts` — در startup، `next_attempt_at` ِ این jobها حداکثر NOW+20s.
+- **تست / تأیید:** `tsc` تمیز؛ `pnpm test:up` **27/27** (جدید H4b)؛ دریافتِ متنِ واقعی از Soniox بعد از رفع ۳/۳ موفق؛ jobِ مالک بعد از ری‌استارتِ
+  خودکارِ سرورِ dev بلافاصله `done` شد (متن ذخیره، `case_file_status=disabled`). هیچ UPDATEِ دستی رویِ دیتایِ مالک انجام نشد؛ فقط خواندنِ
+  وضعیتِ job (بدونِ خواندنِ متن).
+- **اسناد:** configuration-catalog. **عامل:** این نشست. commit نشده.
+
+### 2026-09-24 — CODE (UX) — دکمه‌ی «آپلود صوت» رویِ کارتِ مراجع (فعال و غیرفعال)
+- **گزارشِ مالک:** «هیچ جایی برای آپلود صوت نیست، نه توی فعال‌ها نه غیرفعال‌ها». ریشه: دکمه فقط داخلِ صفحه‌ی جزئیاتِ مراجع
+  (`#detailUploadBtn`) بود و از فهرستِ مراجعین دیده نمی‌شد. (همچنین سرورِ dev که «بالا» گزارش شده بود با بسته‌شدنِ pane خوابیده بود — دوباره اجرا شد.)
+- **رفع:** `public/index.html` — دکمه‌ی ghostِ «آپلود صوت» (آیکن + متن، `card-upload-btn`) در ردیفِ دکمه‌هایِ هر کارتِ مراجع، بیرون از شرطِ
+  فعال/غیرفعال ⇒ رویِ هر دو تب؛ همان `openAudioUploadModal` با `currentClient=c`. دکمه‌ی داخلِ صفحه‌ی مراجع هم ماند.
+- **تست / تأیید:** سرورِ dev + Browser pane (فقط مشاهده/باز و بستنِ مودال با حسابِ QAِ لوکالِ موجود؛ هیچ آپلودی): کارت ⇒ دکمه‌هایِ
+  «شروع جلسه | آپلود صوت»؛ کلیک ⇒ مودالِ آپلود برایِ همان مراجع باز شد، در همان صفحه‌ی فهرست. کارتِ غیرفعال در این حساب نبود (کد مشترک است).
+  اسکرین‌شات ممکن نشد (pane پنهان بود).
+- **عامل:** این نشست. commit نشده.
+
+### 2026-09-24 — DECISION + CODE + TEST — مسیرِ آپلود فقط تا «ذخیره‌ی متن» (فعال و غیرفعال)؛ پرونده بعداً
+- **تصمیمِ مالک:** «برای مراجعین فعال هم اضافه بشه، اما در نهایت همون متنش ذخیره بشه؛ برای غیرفعال هم فعلاً فقط متن … تبدیل به پرونده بعدش، الان نه».
+- **چه شد:** دکمه‌ی آپلود از قبل برایِ هر دو گروه نمایش داده می‌شد (`#detailUploadBtn`، بدونِ شرطِ status) — تغییر نکرد. مرحله‌ی پرونده از
+  پایانِ مسیر حذف شد: ماشینِ حالت (`jobMachine.ts`) حالا `nextStage` را به `applyTranscriptOnce` می‌دهد؛ پیش‌فرض `done` با
+  `case_file_status='disabled'` (در همان تراکنشِ ثبتِ متن). سوئیچِ آینده: `UPLOAD_CASE_FILE=1` (سرور) + `UPLOAD_SHOW_CASE_FILE_STEP` (UI).
+  UI: stepperِ ۳مرحله‌ای «دریافت ← تبدیل به متن ← متن ذخیره شد» و پیامِ «متن با تفکیکِ گوینده در این جلسه ذخیره شد». retry رویِ jobِ
+  متن‌ثبت‌شده ⇒ ۴۰۹. سیاستِ پرونده‌ی جلسه‌ی زنده/late-transcript (`autoTrigger.ts`) دست نخورد.
+- **فایل‌ها:** `server/src/features/audio-upload/{jobMachine,jobRunner,uploads.routes}.ts`، `public/index.html`، `scripts/upload-harness.ts`.
+- **اسنادِ به‌روزشده:** subsystem 06 (بنرِ تصمیم)، configuration-catalog (`UPLOAD_CASE_FILE`)، requirement-catalog (REQ-061).
+- **تست / تأیید:** `tsc` تمیز؛ `pnpm test:up` **26/26** (جدید: H25 مسیرِ متن‌فقط، H26 پیش‌فرضِ env). **E2Eِ واقعی** (سرورِ dev + MySQL + Sonioxِ واقعی،
+  دادهٔ ساختگی): مراجعِ فعال (m4a) و مراجعِ غیرفعال با auto-generate روشن (AMR/3gp) ⇒ هر دو `done/disabled`، متنِ ۲گوینده‌ای، نسخه ۱، فقط اعلانِ
+  `transcript_ready`، **هیچ ردیفِ `client_case_file` ساخته نشد**؛ UIِ واقعی (کلیکِ «شروعِ آپلود» برایِ مراجعِ فعال) ⇒ stepperِ ۳مرحله‌ای.
+  fixtureهایِ QA (۲ تراپیست، ۳ جلسه، ۳ آپلود، ۳ پوشه) حذف شدند؛ `remaining`=0.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** commit/deploy نشده. سرورِ dev رویِ پورتِ 3000 بالا مانده (به درخواستِ قبلیِ مالک).
+
+### 2026-09-23 — TEST + CODE — تستِ کاملِ واقعیِ فیچرِ آپلودِ صدا (Soniox/LLM/MySQLِ واقعی) + ۳ رفعِ UI
+- **دستورِ مالک:** «کامل تست‌هاشو انجام بده» (بعد از اینکه قبلاً فقط سرورِ dev مجاز شده بود).
+- **چه شد:** ۳۰+ سناریویِ واقعی با دادهٔ کاملاً ساختگی (TTSِ دوصدایی)، شاملِ فایلِ **۶۰ دقیقه‌ایِ ۶۳۵MB** و **kill ِ سرور وسطِ رونویسی**
+  (ادامه‌ی همان transcriptionِ Soniox، lease در startup آزاد شد)، هم‌زمانیِ exactly-once (C1/C3) و CAS/قفل (C4/C5) رویِ MySQL،
+  **F6 رویِ LLMِ واقعی** (دو ویرایشِ حینِ تولید ماندند)، F8 با صفِ batch، retry بدونِ آپلود، سکوت، فرمت‌هایِ AMR/ویدیو، حذف/sweep،
+  و UIِ واقعی رویِ سرورِ واقعی. **mutation:** حذفِ `FOR UPDATE` ⇒ C1/C3 شکستند (۵× اعمال)؛ برگرداندنِ منطقِ قدیمِ F6 ⇒ ویرایش پاک شد —
+  هر دو فوراً بازگردانده شدند. همه PASS (تنها شکستِ اولیه: E8 از اسکریپت چون dev به `PROXY_URL` نیاز دارد؛ با کلاینتِ سرور PASS).
+- **Fixture:** دو تراپیستِ QA مستقیم در DBِ لوکال (بدونِ ثبت‌نام، `password_hash` نامعتبر)؛ در پایان حذف (cascade) + ۷ پوشه؛ `remaining`=0.
+  حسابِ Soniox قبل/بعد یکسان (۸ فایل/۲۳ transcriptionِ قدیمیِ نامرتبط — دست‌نخورده؛ نشانه‌ی واقعی‌بودنِ F3).
+- **کد (رفعِ UI پیداشده در همین تست):** `public/index.html` — نامِ فایل در مودال (شکستنِ وسطِ کلمه ⇒ ellipsis + جابه‌جاییِ «تغییرِ فایل»)،
+  اسکرولِ افقیِ سینی در عرضِ باریک، بازسازیِ بی‌دلیلِ DOMِ سینی هر ۵ ثانیه (کلیکِ گم‌شده).
+- **اسنادِ به‌روزشده:** [verification](verification/2026-09-23-audio-upload-pipeline.md) §۴.۱/§۵، subsystem 06 §۹.
+- **تست / تأیید:** بعد از همه: `tsc` تمیز، `test:up` 24/24، `test:cf` 108/108، syntaxِ فرانت OK.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** تست‌نشده: گفتارِ فارسی، حافظه‌ی سرور، `sweepSonioxOrphans` (عمداً). **FINDING نامرتبط:** `.transcript-box` متنِ
+  انگلیسی را bidi اشتباه نشان می‌دهد («?week»). commit/deploy نشده.
+
+### 2026-09-23 — DECISION + CODE + MIGRATION + DOCS + TEST — فیچرِ «آپلودِ فایلِ صوتیِ جلسه» + رفعِ F1–F8
+- **تصمیم‌هایِ مالک (در همین گفتگو):** (۱) **متنِ رضایت دست نخورد** («متن رضایت رو دست نزن») ⇒ ثبت به‌عنوانِ نقضِ آگاهانه‌ی LAW-009؛
+  (۲) نگهداریِ ۱۴روزه اوکی ⇒ محلِ جدیدِ `data/uploads` تحتِ LAW-010 ثبت شد؛ (۳) سقفِ ۱GB و ۳۰۰ دقیقه؛ (۴) «همه را پیاده‌سازی کن»
+  (مرحله‌ی A و B)؛ (۵) پرونده برایِ مراجعِ فعال «الان نه، ولی پی‌ریزی» ⇒ `CASE_FILE_AUTO_ACTIVE_CLIENTS` (پیش‌فرض خاموش)؛
+  (۶) «ترتیب را خودت چک کن» ⇒ اول رفعِ باگ‌ها، بعد فیچر. برایِ تستِ واقعی فقط «اجرایِ سرورِ dev» مجاز شد (نه حسابِ canary، نه Sonioxِ واقعی، نه ری‌استارت).
+- **رفعِ باگ‌ها (audit همین روز):** F1 `batchqueue.ts#applyBatchSegmentOnce` — merge در تراکنش با قفلِ ردیف و `session_audio.transcribed_at` (exactly-once)؛
+  F2 سقفِ poll متناسب با حجم (`pollTimeoutForBytes`) + تحملِ خطایِ گذرایِ poll؛ F3 `sweepSonioxOrphans` (فقط با `SONIOX_ORPHAN_SWEEP=1`)؛
+  F4 آپلودِ stream از دیسک به Soniox (`uploadFileFromPath`) + آرشیوِ مسیر-محور؛ F5 آپلودِ تکه‌ایِ ۴MB (دیگر به سقفِ multipart/nginx نمی‌خورد)؛
+  F6 CAS رویِ `client_case_file.content_version` در تولید و همه‌ی PATCHها + قفلِ اتمیکِ `claimGenerating`؛ F7 UI پرونده‌ی سالمِ قبلی را حینِ
+  تولید/بعد از شکست پنهان نمی‌کند؛ F8 سیاستِ مرکزیِ `autoTrigger.ts` + trigger بعد از late-transcript. **باگِ تازه‌ی کشف‌شده حینِ کار و رفع‌شده:**
+  `getTranscriptTokens` پاسخِ خطایِ Soniox را آرایه‌ی خالی برمی‌گرداند و صفِ batch آن را «سکوت = موفق» تلقی و فایل را حذف می‌کرد (متن بی‌صدا گم می‌شد).
+- **فیچر:** migration `023_audio_upload_pipeline.sql` (جداول `audio_uploads`/`audio_jobs`/`notifications`، دو ستون، CHECKِ `source` با `upload`)؛
+  `server/src/features/audio-upload/` (routes، uploadStore، media با ffmpeg و whitelist، jobMachine، jobRunner با lease/heartbeat)،
+  `features/notifications/notify.ts`، `public/feelia-upload.js` (تکه‌تکه، قابلِ ادامه، IndexedDB، آفلاین)، UI در `index.html`
+  (دکمه/مودالِ آپلود، سینیِ «پردازش‌ها و اعلان‌ها» با زنگوله، stepperِ ۴مرحله‌ای، وضعیت در صفحه و فهرستِ جلسه)، `migrate.ts` (errno 3821)،
+  `clients.ts` (`batch_status` در فهرست)، `sessions.ts` (تاریخِ اختیاری برایِ upload؛ انتقالِ auto-trigger)، `index.ts` (worker + sweeps).
+- **اسنادِ به‌روزشده:** subsystem جدیدِ [06](docs/07-subsystems/06-audio-upload-pipeline.md) + README؛ api-catalog §8/§8.1؛ error-code-catalog؛
+  database-catalog؛ data-architecture؛ configuration-catalog؛ requirement-catalog (REQ-055…060)؛ traceability؛ PRDِ 04؛ module-map؛ repository-map
+  (⚠ این فایل از قبل توسطِ نشستِ دیگری تغییرِ commitنشده داشت — فقط خط اضافه شد)؛ project-laws (LAW-009/010)؛ `deploy/nginx/feelia.conf`؛ CLAUDE.md
+  (`pnpm test:up`، ردیفِ جدولِ §۴)؛ Master Reference §20–22.
+- **تست / تأیید:** `tsc` تمیز؛ `pnpm test:up` **24/24** (+ mutation check)؛ `pnpm test:cf` **108/108**؛ UI در Browser pane با mock (شبکه‌ی ناپایدار،
+  رفرش وسطِ آپلود، آفلاین، تکراری، شکست+retry، موبایل/روشن/تاریک)؛ سرورِ dev: migration اعمال و با `information_schema` تأیید، ۴۰۱ برایِ همه‌ی
+  endpointهایِ جدید. جزئیات: [verification](verification/2026-09-23-audio-upload-pipeline.md). **انجام نشد:** مسیرِ کاملِ واقعی با DB/Soniox، ری‌استارتِ واقعی،
+  اجرایِ واقعیِ SQLِ idempotency/CAS.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** commit/deploy نشده. قبل از deploy: `SONIOX_ORPHAN_SWEEP=1` در envِ production، ادغامِ دو location در nginxِ زنده، و
+  تستِ end-to-end با حسابِ canary (نیازمندِ مجوز). تعارضِ متنِ رضایت (R1) حالا عمیق‌تر است — تصمیمِ مالک.
+
+### 2026-09-23 — AUDIT + FINDING — فاز ۰/۱ برایِ فیچرِ «آپلودِ فایلِ صوتیِ جلسه» (read-only، بدونِ تغییرِ کد)
+- **چه شد:** به درخواستِ مالک (بازخوردِ تراپیست: اینترنتِ کلینیک ناپایدار، نیاز به آپلودِ فایلِ ضبط‌شده پس از جلسه)، auditِ
+  مسیرِ Audio→Transcript→Case File→Notification و نقدِ پرامتِ پیشنهادی. **هیچ کد/سند/migrationی تغییر نکرد** (فقط همین ورودی).
+- **موجود و قابلِ reuse:** صفِ فایل‌محورِ `data/batch-queue` + workerِ retryِ ۵دقیقه‌ای و sweepِ ۲۴ساعته (`server/src/stt/batchqueue.ts`)،
+  رونویسیِ async با diarization (`server/src/stt/asyncTranscribe.ts`، `stt-async-v5`)، آرشیوِ idempotent با sha256
+  (`sessionAudioArchive.ts`)، جلسه‌ی `source=manual` (`http/sessions.ts:183`)، `maybeAutoGenerateCaseFile` + merge با حفاظتِ
+  `reviewedByTherapist`/`addedByTherapist` (`mergeTherapistEdits.ts`)، Notificationِ مرورگری فقط برایِ پرونده و فقط حینِ بازبودنِ تب (`index.html:3752`).
+- **FINDINGها (همه INFERRED از کد، بازتولید نشده):**
+  F1 `mergeBatchTranscript` idempotent نیست — کرش بینِ UPDATE و `removeAudioFile` ⇒ retry همان متن را دوباره append می‌کند (`batchqueue.ts:233,348`)؛ UPDATE هم گاردِ CAS در WHERE ندارد.
+  F2 `POLL_TIMEOUT_MS`=۱۰دقیقه ثابت؛ فایلِ طولانی ⇒ timeout ⇒ حذفِ transcription ⇒ retry هر ۵ دقیقه ⇒ حلقه‌ی بی‌پایانِ هزینه تا sweepِ ۲۴ساعته (`asyncTranscribe.ts:14`).
+  F3 کرش حینِ poll ⇒ فایل/transcriptionِ صدایِ بالینی رویِ Soniox یتیم می‌ماند (تا ۳۰ روز، و از سهمیه‌ی ۱۰۰۰ فایل) — هیچ sweepِ سمتِ Soniox وجود ندارد.
+  F4 کلِ فایل در RAM (`file.toBuffer()`، `readFileSync`، `Buffer.concat` در `uploadFile`) — برایِ فایلِ جلسه‌ی واقعی (WAV صدها MB) خطرناک.
+  F5 سقف‌ها: multipart ۱۰MB (`index.ts:61`)، `MAX_AUDIO_BYTES` ۵۰MB، nginxِ مرجع ۱۲m (کانفیگِ زنده نامعلوم) — فایلِ ۶۰دقیقه‌ایِ m4a/wav رد می‌شود.
+  F6 generateCaseFile «lost update» دارد: `previous` در شروع خوانده و چند دقیقه بعد upsert می‌شود؛ PATCHِ تراپیست در این فاصله بی‌صدا پاک می‌شود (`generateCaseFile.ts:44,85`؛ PATCH وضعیتِ generating را چک نمی‌کند). چکِ قفلِ generating هم اتمیک نیست.
+  F7 شکستِ یک بازتولیدِ پس‌زمینه کلِ پرونده‌ی آماده‌ی قبلی را در UI پنهان می‌کند (`index.html:4352` فقط پیامِ خطا).
+  F8 merge ِ batch/late-transcript هیچ triggerِ پرونده ندارد؛ `maybeAutoGenerateCaseFile` فقط برایِ مراجعِ **غیرفعال** + `case_file_enabled` + toggleِ روشن (`sessions.ts:40-50`) — با «هر آپلود ⇒ پرونده» تعارضِ محصولی دارد.
+  F9 LAW-009/R1 هنوز باز: `index.html:880,1095` می‌گویند «صدا هیچ‌جا ذخیره نمی‌شود» — فیچرِ آپلود صریحاً صدا را رویِ سرور نگه می‌دارد ⇒ بدونِ اصلاحِ متن ممنوع.
+  F10 وضعیتِ پردازش فقط یک ستونِ `sessions.batch_status` است (بدونِ job/attempt/error)؛ نوتیفیکیشنِ سروری/پایدار وجود ندارد.
+- **Soniox (مستنداتِ رسمی، WebFetch):** async فرمت‌های aac/aiff/amr/asf/flac/mp3/ogg/wav/webm/m4a/mp4؛ سقفِ ۳۰۰ دقیقه برایِ هر فایل؛ ۱۰۰ درخواستِ pending؛ webhook پشتیبانی می‌شود.
+- **تست / تأیید:** `cd server && npx tsc --noEmit` → تمیز؛ `pnpm test:cf` → 108 PASS / 0 FAIL. `test:rt` اجرا نشد (هیچ تغییری در `feelia-rt.js` نبود).
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** منتظرِ تصمیم‌هایِ مالک (متنِ رضایت، محلِ جدیدِ ذخیره‌ی صدا طبقِ LAW-010، سیاستِ trigger پرونده، سقفِ حجم) و دستورِ صریحِ «اجرا». پیاده‌سازی شروع نشده.
 
 ### 2026-09-23 — GIT — commit و push ِ مستنداتِ عملیاتِ production (`71b0863`)
 

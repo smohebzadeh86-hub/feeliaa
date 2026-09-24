@@ -43,6 +43,9 @@
 | `020_therapist_case_file_auto_generate.sql` | **commitنشده**، فقط MySQL | ستونِ `therapists.case_file_auto_generate BOOLEAN NULL` — تنظیمِ سه‌حالته‌ی سطحِ‌تراپیست برایِ خودکارسازیِ تولیدِ پرونده بعدِ پایانِ جلسه (فازِ ۲ِ Module 08؛ `NULL`=هنوز پرسیده نشده، `TRUE`/`FALSE`=پاسخِ صریح، همیشه قابلِ‌تغییر). افزودنیِ خالص. ✅ رویِ MySQLِ standaloneِ لوکال apply شد (خودکار با ری‌استارتِ `tsx watch`) و با لاگِ migration runner تأیید شد؛ end-to-endِ واقعی (auto-trigger با OpenRouترِ واقعی روی یک مراجعِ canaryِ غیرفعال + تأییدِ خاموش/روشنِ toggle) هم موفق بود — جزئیات: [verification](../../verification/2026-09-18-case-file-auto-trigger-and-style-fixes.md) |
 | `021_observability_events.sql` | **commitنشده**، فقط MySQL | دو جدولِ جدیدِ `obs_events`/`obs_ui_events` — لایه‌ی رصد/حسابرسیِ فازِ ۱ (پلنِ تأییدشده‌ی مالک، 2026-09-22). افزودنیِ خالص، بدونِ لمسِ جدولِ موجود. ✅ رویِ MySQLِ لوکالِ dev اعمال شد (خودکار، با ری‌استارتِ `tsx watch` بعدِ ذخیره‌ی فایل)؛ با `DESCRIBE`/`_migrations` و اجرایِ مجددِ دستیِ همان دو `CREATE TABLE IF NOT EXISTS` (بدونِ خطا) تأیید شد. جزئیات: بخشِ ۲.۱ همین فایل. |
 
+| `022_therapist_case_file_enabled.sql` | tracked، فقط MySQL | `therapists.case_file_enabled` (نگاه کنید به PROJECT_STATUS) |
+| `023_audio_upload_pipeline.sql` | **commitنشده**، فقط MySQL (2026-09-23) | سه جدولِ جدید `audio_uploads`، `audio_jobs`، `notifications` ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))؛ `session_audio.transcribed_at` (رفعِ F1)؛ `client_case_file.content_version` (رفعِ F6)؛ CHECKِ `sessions_source_check` حالا `live\|manual\|upload` (DROP + ADD — errno 3821 در `migrate.ts` قابلِ چشم‌پوشی شد). افزودنی؛ هیچ ردیفِ موجودی تغییر نمی‌کند. ✅ رویِ MySQLِ لوکالِ dev با startِ سرور اعمال شد و با `information_schema` تأیید شد (جدول‌ها، ستون‌ها، CHECKها) |
+
 جدولِ سیستمی: `_migrations(id SERIAL, name TEXT UNIQUE, applied_at TIMESTAMPTZ)` — ساخته‌شده در `migrate.ts` (نسخه‌ی Postgres؛ معادلِ MySQL همان نقش را با `AUTO_INCREMENT`/`DATETIME` دارد — بخشِ ۲ همین فایل را برایِ وضعیتِ فعلیِ دوگانگیِ schema ببینید).
 
 ## ۲. جداول
@@ -128,7 +131,8 @@
 | path | TEXT NOT NULL | مسیرِ مطلقِ فایل روی دیسکِ سرور |
 | bytes | INTEGER NOT NULL | |
 | mime | TEXT | |
-| source | TEXT NOT NULL | پیش‌فرض `'durable'`؛ `'offline'` رزرو |
+| source | TEXT NOT NULL | پیش‌فرض `'durable'`؛ `'offline'` رزرو؛ **`'upload'` (023)** برایِ نسخه‌ی نرمال‌شده‌ی فایلِ آپلودی |
+| transcribed_at | DATETIME NULL | **(023، رفعِ F1)** زمانی که متنِ همین بایت‌ها (session+sha256) در صفِ batch اعمال شد — تضمینِ exactly-once؛ ردیف‌هایِ قبل از 023 `NULL` |
 | duration_ms | INTEGER NULL | **(016، 2026-09-16)** از ری‌ماکسِ ffmpeg هنگامِ آرشیو؛ `NULL` اگر ffmpeg نبود/خطا داد یا سگمنت قبل از 016 آرشیو شده — بدونِ backfill خودکار |
 | created_at | TIMESTAMPTZ | `idx_session_audio_created` برای sweep |
 
@@ -147,6 +151,15 @@
 | therapist_edited_at | DATETIME | yes | | آخرین PATCH دستیِ تراپیست |
 | force_regenerated_at / force_regenerated_by | DATETIME / CHAR(36) | yes | | فقط وقتی `force=true` در regenerate — لاگِ عملِ خطرناکِ «دورریختنِ همه‌ی تاییدها» |
 | error_message | TEXT | yes | | آخرین خطای `CaseFileGenerationError` |
+| content_version (023) | INT | no | 0 | CAS رویِ `content` — هر نوشتن +۱؛ تولید و PATCHها با `WHERE content_version = ?` می‌نویسند (رفعِ F6) |
+
+### `audio_uploads` / `audio_jobs` / `notifications` (023) — آپلودِ فایلِ صوتیِ جلسه
+
+| جدول | ستون‌هایِ کلیدی | نکته |
+|---|---|---|
+| `audio_uploads` | `id` PK، `therapist_id`/`client_id` FK CASCADE، `session_id` FK CASCADE (بعد از complete)، `fingerprint`، `original_name` (sanitize، فقط نمایش)، `size_bytes BIGINT`، `chunk_size`، `chunks_total`، `session_date`، `status` CHECK `uploading\|complete\|failed\|canceled`، `error_code` | تکه‌ها رویِ دیسک (`data/uploads/<id>/`)، نه DB. index `(therapist_id, fingerprint)` برایِ dedupe/ادامه |
+| `audio_jobs` | `id` PK، `upload_id` UNIQUE FK، `session_id`/`client_id`/`therapist_id` FK CASCADE، `stage` CHECK `queued\|normalizing\|transcribing\|case_file\|done\|failed`، `attempts`، `next_attempt_at`، `locked_until` (lease)، `source_path`، `normalized_path`، `duration_ms`، `soniox_file_id`، `soniox_transcription_id`، `transcription_started_at`، `transcript_applied_at` (exactly-once)، `transcript_chars`، `case_file_status` (`running\|waiting\|done\|failed\|skipped\|not_applicable\|busy_gave_up`)، `error_code`، `finished_at` | index `(stage, next_attempt_at)` برایِ worker |
+| `notifications` | `id` PK، `therapist_id` FK، `kind` (`transcript_ready\|transcript_empty\|processing_failed\|case_file_updated\|case_file_failed`)، `client_id`/`session_id` FK CASCADE، `job_id`، `error_code`، `read_at` | `UNIQUE(job_id, kind)` ⇒ retry اعلانِ تکراری نمی‌سازد. **بدونِ متنِ بالینی** (فقط kind + شناسه). نگهداری ۳۰ روز |
 
 ### ۲.۱ `obs_events` / `obs_ui_events` (021) — لایه‌ی رصد/حسابرسی، فازِ ۱
 
@@ -187,8 +200,9 @@
 | `session_notes.type` | `note_during`، `note_after`، `sign`، `voice` | UI، batch/voice-note |
 | `session_notes.sign_type` | `گریان`، `لرزش`، `تنش عضلانی`، `سکوت طولانی`، `خشم`، `پرخاشگری`، `اتصال چشمی گریزان`، `خواب‌آلودگی`، `بی‌قراری` | `.sign-chip[data-sign]` |
 | `clients.status_reason` (UI) | `ناتوانی مالی`، `ظرفیت روحی/زمانی`، `روند تکمیل شد`، `سایر` + متنِ آزاد؛ «نامشخص» → null (فقط در ساختِ مراجع از تبِ غیرفعال)؛ سرور trim و حداکثر ۲۰۰ کاراکتر | `deactivateClientModal`، `newClientModal` |
-| `sessions.source` | `live`، `manual` | `POST /api/sessions` (`mode`) |
-| `session_audio.source` | `durable` (و `offline` در type) | `sessionAudioArchive.ts` |
+| `sessions.source` | `live`، `manual`، `upload` (023) | `POST /api/sessions` (`mode`)؛ `POST /api/uploads/:id/complete` |
+| `sessions.stt_mode` (افزوده) | `upload` (023) | `jobRunner.ts` |
+| `session_audio.source` | `durable`، `upload` (023) (و `offline` در type) | `sessionAudioArchive.ts` |
 | `client_case_file.status` | `ready`، `generating`، `error`، `stale` | `features/case-file/adapters/repository/caseFileRepository.sql.ts` |
 
 ## ۴. کوئری‌های حساس به عملکرد
