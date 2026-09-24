@@ -7,7 +7,6 @@ import { FastifyInstance } from 'fastify';
 import { requireAuth } from '../auth/guard.js';
 import { getOwnedSession } from '../db/ownership.js';
 import { logEvent } from '../obs/eventLog.js';
-import { SonioxEngine } from '../stt/soniox.js';
 import {
   SONIOX_WS_URL,
   TEMP_KEY_EXPIRES_IN_SECONDS,
@@ -46,13 +45,15 @@ export async function sttRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
 
   // GET /api/stt/check — diagnostic مسیر واقعی production:
-  //   ۱) mint temp-key (control-plane لازم برای Browser→Soniox) — ملاک ok
-  //   ۲) اتصال آزمایشی proxy قدیمی VPS→Soniox — فقط info (legacy)
+  //   mint temp-key (control-plane لازم برای Browser→Soniox) — ملاک ok
+  // ⭐ (2026-09-24، تصمیمِ مالک — گزینه‌ی B) probeِ legacyِ «اتصالِ آزمایشیِ VPS→Soniox» حذف شد: نتیجه‌اش
+  // (`proxy`) هیچ‌جا خوانده نمی‌شد، به ازایِ هر preflight یک WSِ master-key باز می‌کرد (LAW-015)، ~۱ث (تا ۸ث)
+  // به check اضافه می‌کرد، و چون بدونِ صدا finalize می‌فرستاد، Soniox هر بار «No audio received» (400) می‌داد که
+  // در لاگ شبیهِ خطایِ رونویسی بود (verification/2026-09-24-stt-check-no-audio-log.md).
   // ⚠️ این check نباید شروع session را بلاک کند (فرانت جدید آن را gate نمی‌کند)؛
   // چون failure realtime باید داخل lifecycle با reconnect/fallback مدیریت شود.
   // ⭐ code ماشینی برای افتراق علت:
   // 'no-key' | 'mint-transport' | 'mint-timeout' | 'mint-rejected' (مسیر اصلی)
-  // 'proxy-*': وضعیت legacy (روی ok اثر ندارد).
   // ⚠️ مقدار هیچ کلیدی (اصلی یا موقت) هرگز لاگ/برگردانده نمی‌شود.
   app.get('/api/stt/check', async () => {
     const masterKey = process.env.SONIOX_API_KEY;
@@ -61,7 +62,7 @@ export async function sttRoutes(app: FastifyInstance) {
       return { ok: false, code: 'no-key', error: 'کلید Soniox روی سرور تنظیم نشده' };
     }
 
-    // ۱) mint آزمایشی — با client_reference_id مشخصِ diagnostic (در usage logs قابل ردیابی)
+    // mint آزمایشی — با client_reference_id مشخصِ diagnostic (در usage logs قابل ردیابی)
     let mintOk = false;
     let mintCode = 'mint-transport';
     let mintError = 'ارتباط با سرویس Soniox برای صدور credential برقرار نشد';
@@ -84,47 +85,10 @@ export async function sttRoutes(app: FastifyInstance) {
       );
     }
 
-    // ۲) legacy proxy probe — best-effort، با همان timeout موتور (۸s)، روی ok اثر ندارد
-    let proxy: { ok: boolean; code?: string } = { ok: false, code: 'proxy-unknown' };
-    try {
-      proxy = await new Promise<{ ok: boolean; code?: string }>((resolve) => {
-        let settled = false;
-        const engine = new SonioxEngine(masterKey, {
-          onPreview: () => {},
-          onStatus: () => {},
-          onFinished: () => {},
-          onError: (message) => {
-            if (settled) return;
-            settled = true;
-            resolve({ ok: false, code: 'proxy-soniox-error' });
-          },
-        });
-        engine
-          .start()
-          .then(() => {
-            if (settled) return;
-            settled = true;
-            engine.stop().catch(() => {});
-            resolve({ ok: true });
-          })
-          .catch((err) => {
-            if (settled) return;
-            settled = true;
-            const cause = err instanceof Error ? err.message : String(err);
-            console.log(
-              `[stt-check] proxy probe code=proxy-transport key_len=${masterKey.length} cause=${cause.slice(0, 120)}`
-            );
-            resolve({ ok: false, code: 'proxy-transport' });
-          });
-      });
-    } catch {
-      proxy = { ok: false, code: 'proxy-transport' };
-    }
-
     if (mintOk) {
-      return { ok: true, code: 'mint-ok', proxy, websocket_url: SONIOX_WS_URL };
+      return { ok: true, code: 'mint-ok', websocket_url: SONIOX_WS_URL };
     }
-    return { ok: false, code: mintCode, error: mintError, proxy };
+    return { ok: false, code: mintCode, error: mintError };
   });
 
   // POST /api/stt/realtime-session — صدور Temporary API Key برای اتصال مستقیم مرورگر.

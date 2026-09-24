@@ -24,6 +24,8 @@ export function uploadCaseFileEnabled(): boolean {
   return process.env.UPLOAD_CASE_FILE === '1';
 }
 
+export interface SourcePart { uploadId: string; path: string; }
+
 export interface AudioJob {
   id: string;
   uploadId: string;
@@ -33,6 +35,8 @@ export interface AudioJob {
   stage: JobStage;
   attempts: number;
   sourcePath: string | null;
+  // آپلودِ چندبخشی (migration 025): همه‌ی بخش‌ها به ترتیب؛ null برایِ آپلودِ تک‌فایلی.
+  sourceParts: SourcePart[] | null;
   normalizedPath: string | null;
   durationMs: number | null;
   sonioxFileId: string | null;
@@ -66,7 +70,7 @@ export interface SonioxPort {
 
 export interface MediaPort {
   probe(filePath: string): Promise<ProbeResult>;
-  normalize(srcPath: string, outBase: string, durationMs: number | null): Promise<NormalizeResult>;
+  normalize(srcPath: string | string[], outBase: string, durationMs: number | null): Promise<NormalizeResult>;
 }
 
 export interface JobDeps {
@@ -172,16 +176,25 @@ async function stepNormalize(job: AudioJob, deps: JobDeps): Promise<StepResult> 
     await deps.store.update(job, { stage: 'transcribing', attempts: 0, errorCode: null, nextAttemptInMs: 0 });
     return CONTINUE;
   }
-  if (!job.sourcePath || !deps.fileExists(job.sourcePath)) return permanent(job, deps, 'audio-missing');
+  // چندبخشی: همه‌ی بخش‌ها به ترتیب؛ هر بخش جدا probe می‌شود و مدت‌ها جمع (سقفِ Soniox برایِ کلِ فایلِ نهایی است).
+  const parts = job.sourceParts && job.sourceParts.length ? job.sourceParts : null;
+  const sources = parts ? parts.map((p) => p.path) : job.sourcePath ? [job.sourcePath] : [];
+  if (!sources.length || sources.some((p) => !deps.fileExists(p))) return permanent(job, deps, 'audio-missing');
 
-  const probe = await deps.media.probe(job.sourcePath);
-  if (!probe.ok) {
-    if (probe.reason === 'no-ffmpeg') return transient(job, deps, 'no-ffmpeg');
-    return permanent(job, deps, probe.reason === 'no-audio' ? 'no-audio' : 'unreadable');
+  let totalMs: number | null = 0;
+  for (const src of sources) {
+    const probe = await deps.media.probe(src);
+    if (!probe.ok) {
+      if (probe.reason === 'no-ffmpeg') return transient(job, deps, 'no-ffmpeg');
+      return permanent(job, deps, probe.reason === 'no-audio' ? 'no-audio' : 'unreadable');
+    }
+    totalMs = totalMs !== null && probe.durationMs !== null ? totalMs + probe.durationMs : null;
+    if (probe.durationMs !== null && probe.durationMs > MAX_DURATION_MS) return permanent(job, deps, 'too-long');
   }
-  if (probe.durationMs !== null && probe.durationMs > MAX_DURATION_MS) return permanent(job, deps, 'too-long');
+  if (totalMs !== null && totalMs > MAX_DURATION_MS) return permanent(job, deps, 'too-long');
+  const probe = { durationMs: totalMs };
 
-  const norm = await deps.media.normalize(job.sourcePath, deps.normalizedOutBase(job), probe.durationMs);
+  const norm = await deps.media.normalize(parts ? sources : sources[0], deps.normalizedOutBase(job), probe.durationMs);
   if (!norm.ok || !norm.outPath || !norm.mime) {
     // فایلی که probe شد ولی تبدیل نمی‌شود: یکی‌دو بار دیگر و بعد شکست. ⭐ رفعِ M1 (audit 2026-09-24): کدِ نهایی
     // 'normalize-failed' است، نه 'unreadable' — علت ممکن است سمتِ سرور باشد (دیسکِ پر، timeout/killِ ffmpeg زیرِ بار)؛
@@ -192,12 +205,13 @@ async function stepNormalize(job: AudioJob, deps: JobDeps): Promise<StepResult> 
   const archived = await deps.archive(job.sessionId, norm.outPath, norm.mime, 'upload-' + job.id.replace(/-/g, '').slice(0, 24));
   const durationMs = archived.durationMs ?? norm.durationMs ?? probe.durationMs;
   await deps.store.update(job, {
-    stage: 'transcribing', normalizedPath: archived.path, durationMs, sourcePath: null,
+    stage: 'transcribing', normalizedPath: archived.path, durationMs, sourcePath: null, ...(parts ? { sourceParts: null } : {}),
     attempts: 0, errorCode: null, nextAttemptInMs: 0,
   });
   if (durationMs) await deps.store.setSessionDuration(job.sessionId, durationMs);
   // فایلِ خامِ اصلی دیگر لازم نیست — نسخه‌ی نرمال‌شده در آرشیوِ ۱۴روزه است (LAW-010).
   deps.removeUploadDir(job.uploadId);
+  if (parts) for (const p of parts) if (p.uploadId !== job.uploadId) deps.removeUploadDir(p.uploadId);
   return CONTINUE;
 }
 

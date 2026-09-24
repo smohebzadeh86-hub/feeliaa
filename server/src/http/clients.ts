@@ -5,6 +5,7 @@ import { query } from '../db/connection.js';
 import { requireAuth } from '../auth/guard.js';
 import { getOwnedClient } from '../db/ownership.js';
 import { deleteSessionAudioDirs } from '../stt/sessionAudioArchive.js';
+import { logEvent } from '../obs/eventLog.js';
 import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
 
 const VALID_CATEGORIES = ['child', 'teen', 'adult'];
@@ -35,7 +36,7 @@ export async function clientRoutes(app: FastifyInstance) {
     const result = await query(`
       SELECT
         c.id, c.code, c.alias, c.created_at,
-        c.status, c.status_reason, c.category, c.gender, c.pinned_at,
+        c.status, c.status_reason, c.category, c.gender, c.pinned_at, c.recording_consent_at,
         COUNT(s.id) as session_count,
         MAX(s.date) as last_session_date
       FROM clients c
@@ -45,6 +46,22 @@ export async function clientRoutes(app: FastifyInstance) {
       ORDER BY c.created_at DESC
     `, [request.therapistId]);
     return { clients: result.rows };
+  });
+
+  // DELETE /api/clients/:id/recording-consent — لغوِ رضایتِ یک‌باره‌ی ضبط/رونویسی (migration 024).
+  // مراجع رضایتش را پس گرفت ⇒ از جلسه/آپلودِ بعدی دوباره پرسیده می‌شود. جلسه‌ها و متن‌هایِ قبلی دست‌نخورده می‌مانند.
+  app.delete('/api/clients/:id/recording-consent', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const r = await query(
+      'UPDATE clients SET recording_consent_at = NULL WHERE id = ? AND therapist_id = ?',
+      [id, request.therapistId]
+    );
+    if (r.rowCount === 0) {
+      reply.code(404);
+      return { error: 'مراجع یافت نشد' };
+    }
+    logEvent({ event: 'client.consent_revoked', therapistId: request.therapistId, clientId: id });
+    return { recording_consent_at: null };
   });
 
   // ⭐ GET /api/recovered — جلسات قطع‌شده‌ی همین تراپیست (یک query)

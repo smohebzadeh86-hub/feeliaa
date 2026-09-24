@@ -14,6 +14,10 @@
  * هر کار به therapistId گره خورده و برایِ حسابِ دیگرِ همین مرورگر ادامه داده نمی‌شود. خروج با آپلودِ ناتمام
  * (index.html) از تراپیست می‌پرسد فایل بماند (دستگاهِ شخصی) یا پاک شود (کامپیوترِ مشترک — purgeLocal).
  * چندتب: Web Locks — هر فایل فقط در یک تب آپلود می‌شود (withTaskLock).
+ *
+ * چندبخشی (migration 025، startGroup): چند فایلِ یک جلسه ⇒ هر فایل یک task با groupId/partIndex/partsTotal مشترک.
+ * بخش‌ها به ترتیب (یکی‌یکی) آپلود می‌شوند؛ بخشِ رسیده ⇒ 'part-done'؛ رسیدنِ آخرین بخش ⇒ سرور یک جلسه می‌سازد و
+ * بخش‌ها را به همین ترتیب به هم وصل و یک‌جا رونویسی می‌کند. لغو/خطایِ دائمیِ یک بخش ⇒ کلِ گروه لغو می‌شود.
  */
 (function () {
   'use strict';
@@ -22,9 +26,10 @@
   var EDGE = 1024 * 1024;
   var MAX_CHUNK_RETRIES = 8;
   var PERMANENT_CODES = ['consent-required', 'file-too-small', 'file-too-large', 'unsupported-format', 'bad-fingerprint',
-    'not-audio', 'no-audio', 'unreadable', 'too-long', 'upload-closed', 'read-failed'];
+    'not-audio', 'no-audio', 'unreadable', 'too-long', 'upload-closed', 'read-failed', 'group-closed', 'part-mismatch', 'bad-part'];
 
   var tasks = {};          // key → task (حالتِ درون‌حافظه‌ای برایِ UI)
+  var groupChains = {};    // groupId → Promise: بخش‌هایِ یک گروه یکی‌یکی آپلود می‌شوند (ترتیب + پهنای‌باندِ کامل برایِ هر بخش)
   // «لغو» در یک تب به تب‌هایِ دیگرِ فیلیا هم برسد (همان فایل ممکن است آن‌جا در حالِ آپلود باشد — L2).
   var bc = null;
   try { if (typeof BroadcastChannel !== 'undefined') bc = new BroadcastChannel('feelia-upload'); } catch (e) {}
@@ -101,6 +106,14 @@
     });
   }
 
+  function newUuid() {
+    if (crypto.randomUUID) return crypto.randomUUID();
+    var b = crypto.getRandomValues(new Uint8Array(16));
+    b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
+    var h = hex(b.buffer);
+    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  }
+
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function waitOnline() {
     if (navigator.onLine) return Promise.resolve();
@@ -169,7 +182,24 @@
       key: task.key, therapistId: task.therapistId, clientId: task.clientId, clientLabel: task.clientLabel,
       sessionDate: task.sessionDate, fileName: task.fileName, size: task.size, mime: task.mime,
       fingerprint: task.fingerprint, uploadId: task.uploadId || null, createdAt: task.createdAt, file: task.file,
+      groupId: task.groupId || null, partIndex: task.partIndex, partsTotal: task.partsTotal || null,
     }).catch(function () { task.persistable = false; });
+  }
+
+  function groupTasks(groupId) {
+    return Object.keys(tasks).map(function (k) { return tasks[k]; }).filter(function (t) { return t.groupId === groupId; });
+  }
+
+  // لغوِ کلِ گروه (سرور + این تب). keepKey: کارتِ خطایِ همان بخشی که علتِ لغو بود بماند تا تراپیست پیامش را ببیند.
+  function cancelGroup(groupId, keepKey) {
+    groupTasks(groupId).forEach(function (t) {
+      if (t.key === keepKey) return;
+      stopTask(t);
+      idbDelete(t.key);
+      delete tasks[t.key];
+    });
+    jsonReq('DELETE', '/api/upload-groups/' + groupId).catch(function () {});
+    emit();
   }
 
   function finishTask(task, state, extra) {
@@ -212,7 +242,15 @@
     if (task.running) return;
     task.running = true;
     task.canceled = false;
-    withTaskLock(task, function () { return runBody(task); }).then(function () { task.running = false; }, function () { task.running = false; });
+    var go = function () {
+      if (task.canceled || tasks[task.key] !== task) { task.running = false; return; }
+      return withTaskLock(task, function () { return runBody(task); }).then(function () { task.running = false; }, function () { task.running = false; });
+    };
+    if (!task.groupId) { go(); return; }
+    // بخشِ گروه: پشتِ بخش‌هایِ قبلیِ همین گروه در صف (بخشی که منتظر است «در صف» نمایش داده می‌شود).
+    if (task.state !== 'error' && task.state !== 'paused-auth') setState(task, 'queued');
+    var prev = groupChains[task.groupId] || Promise.resolve();
+    groupChains[task.groupId] = prev.then(go, go);
   }
 
   async function runBody(task) {
@@ -238,9 +276,24 @@
       var extra = { errorCode: code, errorMessage: (e && e.message) || 'آپلود ناموفق بود' };
       // خطایی که با تلاشِ دوباره درست نمی‌شود ⇒ فایل رها می‌شود؛ بقیه (مثلاً خطایِ سرور) فایل را نگه
       // می‌دارند تا «تلاشِ دوباره» بدونِ انتخابِ دوباره ممکن باشد.
-      if (PERMANENT_CODES.indexOf(code) !== -1) finishTask(task, 'error', extra);
-      else setState(task, 'error', extra);
+      if (PERMANENT_CODES.indexOf(code) !== -1) {
+        finishTask(task, 'error', extra);
+        // یک بخشِ غیرقابلِ‌قبول ⇒ جلسه ساخته نمی‌شود؛ بقیه‌ی بخش‌ها بی‌فایده آپلود نشوند.
+        if (task.groupId) cancelGroup(task.groupId, task.key);
+      } else setState(task, 'error', extra);
     }
+  }
+
+  // بخشی رسید ولی جلسه منتظرِ بقیه است — فایل دیگر لازم نیست (رویِ سرور است).
+  function finishPart(task, res) {
+    finishTask(task, 'part-done', { partsReceived: res && res.parts_received });
+  }
+
+  // جلسه‌ی گروه ساخته شد ⇒ کارت‌هایِ «بخش رسید» دیگر لازم نیستند.
+  function clearGroupParts(task) {
+    if (!task.groupId) return;
+    groupTasks(task.groupId).forEach(function (t) { if (t !== task && t.state === 'part-done') delete tasks[t.key]; });
+    delete groupChains[task.groupId];
   }
 
   async function uploadOnce(task) {
@@ -249,10 +302,12 @@
       await waitOnlineWithState(task);
       setState(task, 'starting');
       try {
-        init = await jsonReq('POST', '/api/uploads', {
+        var body = {
           client_id: task.clientId, file_name: task.fileName, size: task.size, mime: task.mime,
           fingerprint: task.fingerprint, session_date: task.sessionDate || undefined, consent: true,
-        });
+        };
+        if (task.groupId) { body.group_id = task.groupId; body.part_index = task.partIndex; body.parts_total = task.partsTotal; }
+        init = await jsonReq('POST', '/api/uploads', body);
         break;
       } catch (e) {
         if (task.canceled) return;
@@ -262,9 +317,11 @@
       }
     }
     if (init.duplicate) {
+      clearGroupParts(task);
       finishTask(task, 'duplicate', { job: init.job || null, requeued: !!init.requeued, sessionId: init.upload && init.upload.session_id });
       return;
     }
+    if (init.part_done) { finishPart(task, init); return; }
     task.uploadId = init.upload.id;
     task.chunkSize = init.upload.chunk_size;
     task.chunksTotal = init.upload.chunks_total;
@@ -302,6 +359,8 @@
         throw e;
       }
     }
+    if (done.part_done) { finishPart(task, done); return; }
+    clearGroupParts(task);
     finishTask(task, 'done', { job: done.job, sessionId: done.upload && done.upload.session_id });
   }
 
@@ -375,13 +434,16 @@
           progress: t.size ? Math.min(1, sent / t.size) : 0, sentBytes: sent,
           job: t.job || null, requeued: !!t.requeued, sessionId: t.sessionId || null, errorCode: t.errorCode || null, errorMessage: t.errorMessage || null,
           needsFile: !!t.needsFile, createdAt: t.createdAt,
+          groupId: t.groupId || null, partIndex: t.partIndex, partsTotal: t.partsTotal || null,
         };
-      }).sort(function (a, b) { return b.createdAt - a.createdAt; });
+      }).sort(function (a, b) {
+        return (b.createdAt - a.createdAt) || ((a.partIndex || 0) - (b.partIndex || 0));
+      });
     },
     isBusy: function () {
       return Object.keys(tasks).some(function (k) {
         var s = tasks[k].state;
-        return s === 'hashing' || s === 'starting' || s === 'uploading' || s === 'retrying' || s === 'finalizing' || s === 'waiting-network';
+        return s === 'hashing' || s === 'queued' || s === 'starting' || s === 'uploading' || s === 'retrying' || s === 'finalizing' || s === 'waiting-network';
       });
     },
     start: function (opts) {
@@ -413,6 +475,42 @@
         return task;
       });
     },
+    // چند فایلِ یک جلسه (به همین ترتیب). opts: {files, clientId, clientLabel, sessionDate}
+    startGroup: function (opts) {
+      var files = opts.files || [];
+      if (files.length < 2) return FeeliaUpload.start({ file: files[0], clientId: opts.clientId, clientLabel: opts.clientLabel, sessionDate: opts.sessionDate });
+      var groupId = newUuid();
+      var createdAt = Date.now();
+      var list = files.map(function (file, i) {
+        var task = {
+          key: groupId + ':' + i, therapistId: therapistId, clientId: opts.clientId, clientLabel: opts.clientLabel || '',
+          sessionDate: opts.sessionDate || '', fileName: file.name, size: file.size, mime: file.type || '',
+          file: file, state: 'hashing', createdAt: createdAt, persistable: true, doneBytes: 0, inflightBytes: 0,
+          groupId: groupId, partIndex: i, partsTotal: files.length,
+        };
+        tasks[task.key] = task;
+        return task;
+      });
+      emit();
+      // اثرِ انگشت و ذخیره در IndexedDB برایِ همه پیش از شروع ⇒ رفرش وسطِ بخشِ اول، بخش‌هایِ بعدی را گم نمی‌کند.
+      return list.reduce(function (p, task) {
+        return p.then(function () {
+          if (task.canceled) return;
+          return fingerprint(task.file).then(function (fp) {
+            task.fingerprint = fp;
+            return persist(task);
+          });
+        });
+      }, Promise.resolve()).then(function () {
+        list.forEach(function (task) { if (!task.canceled && tasks[task.key] === task) run(task); });
+        return list;
+      }).catch(function () {
+        var bad = list.filter(function (t) { return !t.fingerprint; })[0] || list[0];
+        finishTask(bad, 'error', { errorCode: 'read-failed', errorMessage: 'خواندنِ فایل از دستگاه ممکن نشد' });
+        cancelGroup(groupId, bad.key);
+        return list;
+      });
+    },
     // بعد از ورود: کارهایِ نیمه‌کاره‌ی همین حساب از IndexedDB ادامه می‌یابند.
     resumePending: function () {
       if (!therapistId || !window.indexedDB) return Promise.resolve();
@@ -421,6 +519,8 @@
         if (tasks[k].state === 'paused-auth' && tasks[k].therapistId === therapistId) run(tasks[k]);
       });
       return idbAll().then(function (items) {
+        // بخش‌هایِ هر گروه به ترتیب در صف بروند.
+        items.sort(function (a, b) { return (a.createdAt - b.createdAt) || ((a.partIndex || 0) - (b.partIndex || 0)); });
         items.forEach(function (rec) {
           if (rec.therapistId !== therapistId || tasks[rec.key]) return;
           var task = {
@@ -428,6 +528,7 @@
             sessionDate: rec.sessionDate, fileName: rec.fileName, size: rec.size, mime: rec.mime,
             fingerprint: rec.fingerprint, uploadId: rec.uploadId, file: rec.file, createdAt: rec.createdAt,
             state: 'starting', persistable: true, doneBytes: 0, inflightBytes: 0,
+            groupId: rec.groupId || null, partIndex: rec.partIndex, partsTotal: rec.partsTotal || null,
           };
           tasks[rec.key] = task;
           if (!rec.file) { task.state = 'error'; task.needsFile = true; task.errorCode = 'file-lost'; task.errorMessage = 'فایل در این مرورگر نگه داشته نشد — لطفاً دوباره انتخابش کنید'; return; }
@@ -441,6 +542,8 @@
       if (!t) return;
       stopTask(t);
       if (!fromOtherTab && bc) try { bc.postMessage({ type: 'cancel', key: key }); } catch (e) {}
+      // بخشی از یک جلسه‌ی چندبخشی ⇒ بدونِ آن جلسه ساخته نمی‌شود ⇒ کلِ گروه لغو.
+      if (t.groupId) { cancelGroup(t.groupId); return; }
       if (t.uploadId && t.state !== 'done' && t.state !== 'duplicate') jsonReq('DELETE', '/api/uploads/' + t.uploadId).catch(function () {});
       idbDelete(key);
       delete tasks[key];
@@ -451,6 +554,7 @@
       if (!t || t.running) return;
       // رفعِ B3 (audit 2026-09-24): بستنِ کارتِ خطا یعنی رهاکردنِ آپلود ⇒ ردیفِ نیمه‌کاره‌ی سرور هم لغو شود؛ وگرنه تا
       // ۷ روز جزوِ سقفِ ۵ آپلودِ هم‌زمان می‌ماند. (برایِ آپلودِ complete/failed سرور 409 می‌دهد — بی‌اثر.)
+      if (t.groupId && t.state === 'error') { idbDelete(key); delete tasks[key]; cancelGroup(t.groupId); return; }
       if (t.uploadId && t.state === 'error') jsonReq('DELETE', '/api/uploads/' + t.uploadId).catch(function () {});
       idbDelete(key);
       delete tasks[key];

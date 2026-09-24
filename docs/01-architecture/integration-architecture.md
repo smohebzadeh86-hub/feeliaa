@@ -9,7 +9,7 @@
 | Soniox Realtime `wss://stt-rt.soniox.com/transcribe-websocket` | Browser → | WebSocket | `feelia-rt.js` (`openDirectWS`) | temp key در پیامِ اول | صدای زنده + متن | reconnect → FAILED → durable/batch |
 | Soniox Temp Key `POST {SONIOX_API_BASE}/v1/auth/temporary-api-key` | Server → | HTTPS | `stt/tempkey.ts` | `Bearer SONIOX_API_KEY` | شناسه‌ی `feelia:<therapistId>:<sessionId>` | 503/502 → کلاینت durable-only |
 | Soniox Files/Transcriptions (`/v1/files`, `/v1/transcriptions`) | Server → | HTTPS | `stt/asyncTranscribe.ts` | Bearer master | فایلِ صدا | فایل در صف می‌ماند؛ `batch_status=queued` |
-| Soniox Realtime (سمتِ سرور) | Server → | WebSocket (`ws`) | `stt/soniox.ts` | master key در پیامِ اول | صدا | فقط legacy و probeِ `/api/stt/check` |
+| Soniox Realtime (سمتِ سرور) | Server → | WebSocket (`ws`) | `stt/soniox.ts` | master key در پیامِ اول | صدا | فقط legacy (`/ws/t`، `/ws/voice`)؛ probeِ `/api/stt/check` حذف شد 2026-09-24 |
 | Microsoft Clarity `https://www.clarity.ms/tag/<id>` | Browser → | script + collect | `feelia-analytics.js` | Project ID عمومی | رفتارِ UI (masked) | خاموشیِ بی‌صدا |
 | Google Fonts (Vazirmatn) | Browser → | CSS/فونت | `index.html` `<link>` | — | IP کاربر | fallback فونت |
 | ffmpeg | Server (پروسه‌ی محلی) | `execFile` | `stt/speakerResolve.ts` | — | صدا | resolve-speakers خطا |

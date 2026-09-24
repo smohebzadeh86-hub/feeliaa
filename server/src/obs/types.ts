@@ -67,11 +67,15 @@ export const OBS_SERVER_EVENTS = [
   'upload.created',
   'upload.completed',
   'upload.rejected',
+  'upload.part_received', // آپلودِ چندبخشی (migration 025): یک بخش رسید، جلسه منتظرِ بقیه
   'audio_job.stage',
   'audio_job.retry',
   'audio_job.done',
   'audio_job.failed',
   'soniox.orphan_swept',
+  // رضایتِ ضبط/رونویسی یک‌بار برایِ هر مراجع (migration 024) — ردِ حسابرسیِ ثبت و لغو
+  'client.consent_recorded',
+  'client.consent_revoked',
   // اجزایِ داخلیِ خودِ لایه‌ی obs
   'obs.queue_overflow',
 ] as const;

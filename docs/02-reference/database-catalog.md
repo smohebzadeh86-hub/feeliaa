@@ -45,6 +45,8 @@
 
 | `022_therapist_case_file_enabled.sql` | tracked، فقط MySQL | `therapists.case_file_enabled` (نگاه کنید به PROJECT_STATUS) |
 | `023_audio_upload_pipeline.sql` | **commitنشده**، فقط MySQL (2026-09-23) | سه جدولِ جدید `audio_uploads`، `audio_jobs`، `notifications` ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))؛ `session_audio.transcribed_at` (رفعِ F1)؛ `client_case_file.content_version` (رفعِ F6)؛ CHECKِ `sessions_source_check` حالا `live\|manual\|upload` (DROP + ADD — errno 3821 در `migrate.ts` قابلِ چشم‌پوشی شد). افزودنی؛ هیچ ردیفِ موجودی تغییر نمی‌کند. ✅ رویِ MySQLِ لوکالِ dev با startِ سرور اعمال شد و با `information_schema` تأیید شد (جدول‌ها، ستون‌ها، CHECKها) |
+| `024_client_recording_consent.sql` | commitنشده، فقط MySQL (2026-09-24)؛ **رویِ production اعمال شد 2026-09-25** (backupِ DB پیش از آن) | `clients.recording_consent_at DATETIME NULL` — رضایتِ یک‌باره برایِ هر مراجع (دستورِ مالک). افزودنی، بدونِ backfill (رضایتِ «همان جلسه»ی قدیمی دائمی تفسیر نمی‌شود). ✅ رویِ MySQLِ dev اعمال و با E2E تأیید شد |
+| `025_upload_multi_part.sql` | commitنشده، فقط MySQL (2026-09-25)؛ ✅ **رویِ MySQLِ dev اعمال شد** (E2E، با `information_schema` تأیید)؛ production: نه | آپلودِ چندبخشی برایِ یک جلسه: `audio_uploads.group_id CHAR(36)`، `part_index INT`، `parts_total INT`، `duration_ms INT` (همه NULL‌پذیر) + index `idx_audio_uploads_group (therapist_id, group_id)`؛ `audio_jobs.source_parts TEXT` (JSONِ `[{uploadId, path}]`). افزودنی، بدونِ backfill؛ آپلودِ تک‌فایلی بدونِ تغییر (همه NULL) |
 
 جدولِ سیستمی: `_migrations(id SERIAL, name TEXT UNIQUE, applied_at TIMESTAMPTZ)` — ساخته‌شده در `migrate.ts` (نسخه‌ی Postgres؛ معادلِ MySQL همان نقش را با `AUTO_INCREMENT`/`DATETIME` دارد — بخشِ ۲ همین فایل را برایِ وضعیتِ فعلیِ دوگانگیِ schema ببینید).
 
@@ -85,6 +87,7 @@
 | category | TEXT | yes | | CHECK `child|teen|adult` (بعد از 009) |
 | gender | TEXT | yes | | CHECK `f|m`؛ اپ فقط برای teen/adult |
 | pinned_at | DATETIME | yes | | بعد از 015 (فقط MySQL)؛ غیرِnull یعنی سنجاق‌شده به صفحه‌ی اول؛ با `status→inactive` خودکار null می‌شود |
+| recording_consent_at | DATETIME | yes | | بعد از 024 (2026-09-24)؛ زمانِ **اولین** رضایتِ صریحِ ضبط/رونویسی (جلسه‌ی زنده یا آپلود) — «یک بار برایِ هر مراجع». NULL = پرسیده می‌شود. لغو ⇒ NULL. بدونِ backfill |
 
 ### `sessions`
 | ستون | نوع | null | پیش‌فرض | نکته |
@@ -157,8 +160,8 @@
 
 | جدول | ستون‌هایِ کلیدی | نکته |
 |---|---|---|
-| `audio_uploads` | `id` PK، `therapist_id`/`client_id` FK CASCADE، `session_id` FK CASCADE (بعد از complete)، `fingerprint`، `original_name` (sanitize، فقط نمایش)، `size_bytes BIGINT`، `chunk_size`، `chunks_total`، `session_date`، `status` CHECK `uploading\|complete\|failed\|canceled`، `error_code` | تکه‌ها رویِ دیسک (`data/uploads/<id>/`)، نه DB. index `(therapist_id, fingerprint)` برایِ dedupe/ادامه |
-| `audio_jobs` | `id` PK، `upload_id` UNIQUE FK، `session_id`/`client_id`/`therapist_id` FK CASCADE، `stage` CHECK `queued\|normalizing\|transcribing\|case_file\|done\|failed`، `attempts`، `next_attempt_at`، `locked_until` (lease)، `source_path`، `normalized_path`، `duration_ms`، `soniox_file_id`، `soniox_transcription_id`، `transcription_started_at`، `transcript_applied_at` (exactly-once)، `transcript_chars`، `case_file_status` (`running\|waiting\|done\|failed\|skipped\|not_applicable\|busy_gave_up`)، `error_code`، `finished_at` | index `(stage, next_attempt_at)` برایِ worker |
+| `audio_uploads` | `id` PK، `therapist_id`/`client_id` FK CASCADE، `session_id` FK CASCADE (بعد از complete)، `fingerprint`، `original_name` (sanitize، فقط نمایش)، `size_bytes BIGINT`، `chunk_size`، `chunks_total`، `session_date`، `status` CHECK `uploading\|complete\|failed\|canceled`، `error_code`؛ (025) `group_id`، `part_index`، `parts_total`، `duration_ms` — بخشِ `complete` با `session_id` NULL = بخشِ رسیده‌ی منتظرِ بقیه‌ی گروه | تکه‌ها رویِ دیسک (`data/uploads/<id>/`)، نه DB. index `(therapist_id, fingerprint)` برایِ dedupe/ادامه، `(therapist_id, group_id)` برایِ گروه |
+| `audio_jobs` | `id` PK، `upload_id` UNIQUE FK، `session_id`/`client_id`/`therapist_id` FK CASCADE، `stage` CHECK `queued\|normalizing\|transcribing\|case_file\|done\|failed`، `attempts`، `next_attempt_at`، `locked_until` (lease)، `source_path`، `source_parts` (025، JSONِ بخش‌ها به ترتیب؛ `upload_id` = بخشِ ۰)، `normalized_path`، `duration_ms`، `soniox_file_id`، `soniox_transcription_id`، `transcription_started_at`، `transcript_applied_at` (exactly-once)، `transcript_chars`، `case_file_status` (`running\|waiting\|done\|failed\|skipped\|not_applicable\|busy_gave_up`)، `error_code`، `finished_at` | index `(stage, next_attempt_at)` برایِ worker |
 | `notifications` | `id` PK، `therapist_id` FK، `kind` (`transcript_ready\|transcript_empty\|processing_failed\|case_file_updated\|case_file_failed`)، `client_id`/`session_id` FK CASCADE، `job_id`، `error_code`، `read_at` | `UNIQUE(job_id, kind)` ⇒ retry اعلانِ تکراری نمی‌سازد. **بدونِ متنِ بالینی** (فقط kind + شناسه). نگهداری ۳۰ روز |
 
 ### ۲.۱ `obs_events` / `obs_ui_events` (021) — لایه‌ی رصد/حسابرسی، فازِ ۱

@@ -15,7 +15,7 @@ import {
 } from '../../stt/asyncTranscribe.js';
 import { probeMedia, normalizeAudio } from './media.js';
 import { uploadDir, removeUploadDir } from './uploadStore.js';
-import { stepJob, giveUpJob, uploadCaseFileEnabled, type AudioJob, type JobDeps, type JobPatch, type JobStore, type CaseFileJobStatus } from './jobMachine.js';
+import { stepJob, giveUpJob, uploadCaseFileEnabled, type AudioJob, type JobDeps, type JobPatch, type JobStore, type CaseFileJobStatus, type SourcePart } from './jobMachine.js';
 import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
 
 export const UPLOAD_TRANSCRIPT_LABEL_PREFIX = '[متنِ فایلِ صوتیِ آپلودشده]';
@@ -24,10 +24,24 @@ const HEARTBEAT_MS = 60_000;
 const TICK_MS = 3_000;
 const CONCURRENCY = 2;
 
+// audio_jobs.source_parts (migration 025): JSONِ [{uploadId, path}] به ترتیبِ بخش‌ها؛ نامعتبر/خالی ⇒ null (تک‌فایلی).
+export function parseSourceParts(raw: unknown): SourcePart[] | null {
+  if (!raw) return null;
+  try {
+    const v = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!Array.isArray(v) || !v.length) return null;
+    return v.filter((p) => p && typeof p.uploadId === 'string' && typeof p.path === 'string')
+      .map((p) => ({ uploadId: p.uploadId, path: p.path }));
+  } catch {
+    return null;
+  }
+}
+
 function rowToJob(r: any): AudioJob {
   return {
     id: r.id, uploadId: r.upload_id, therapistId: r.therapist_id, clientId: r.client_id, sessionId: r.session_id,
-    stage: r.stage, attempts: Number(r.attempts || 0), sourcePath: r.source_path, normalizedPath: r.normalized_path,
+    stage: r.stage, attempts: Number(r.attempts || 0), sourcePath: r.source_path, sourceParts: parseSourceParts(r.source_parts),
+    normalizedPath: r.normalized_path,
     durationMs: r.duration_ms ?? null, sonioxFileId: r.soniox_file_id, sonioxTranscriptionId: r.soniox_transcription_id,
     transcriptionStartedAt: r.transcription_started_at ? new Date(r.transcription_started_at) : null,
     transcriptAppliedAt: r.transcript_applied_at ? new Date(r.transcript_applied_at) : null,
@@ -39,6 +53,7 @@ const COLS: Record<string, string> = {
   stage: 'stage', attempts: 'attempts', sourcePath: 'source_path', normalizedPath: 'normalized_path',
   durationMs: 'duration_ms', sonioxFileId: 'soniox_file_id', sonioxTranscriptionId: 'soniox_transcription_id',
   transcriptionStartedAt: 'transcription_started_at', caseFileStatus: 'case_file_status', errorCode: 'error_code',
+  sourceParts: 'source_parts',
 };
 
 export const sqlJobStore: JobStore = {
@@ -48,7 +63,8 @@ export const sqlJobStore: JobStore = {
     for (const [k, col] of Object.entries(COLS)) {
       if ((patch as any)[k] !== undefined) {
         sets.push(`${col} = ?`);
-        vals.push((patch as any)[k]);
+        const v = (patch as any)[k];
+        vals.push(k === 'sourceParts' && v !== null ? JSON.stringify(v) : v);
         (job as any)[k] = (patch as any)[k];
       }
     }

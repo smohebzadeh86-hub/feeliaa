@@ -16,6 +16,7 @@ export const CHUNK_SIZE = 4 * 1024 * 1024; // زیرِ سقفِ ۱۲MBِ nginx؛
 export const MAX_UPLOAD_BYTES = 1024 * 1024 * 1024; // ۱GB (تصمیمِ مالک)
 export const INCOMPLETE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000; // آپلودِ نیمه‌کاره حداکثر ۷ روز منتظرِ ادامه می‌ماند
 export const MAX_ACTIVE_UPLOADS_PER_THERAPIST = 5;
+export const MAX_PARTS_PER_SESSION = 10; // آپلودِ چندبخشی (migration 025) — هم‌گام با UPLOAD_MAX_PARTS در index.html
 
 const ID_RE = /^[0-9a-f-]{36}$/;
 
@@ -67,10 +68,14 @@ export function receivedChunks(uploadId: string, sizeBytes: number, chunkSize: n
 }
 
 // الحاقِ stream‌یِ تکه‌ها به source.<ext>؛ بعد از تأییدِ حجمِ نهایی، تکه‌ها پاک می‌شوند.
+export function assembledPath(uploadId: string, ext: string): string {
+  const safeExt = /^[a-z0-9]{1,6}$/.test(ext) ? ext : 'bin';
+  return path.join(uploadDir(uploadId), `source.${safeExt}`);
+}
+
 export async function assembleUpload(uploadId: string, chunksTotal: number, sizeBytes: number, ext: string): Promise<string> {
   const dir = uploadDir(uploadId);
-  const safeExt = /^[a-z0-9]{1,6}$/.test(ext) ? ext : 'bin';
-  const out = path.join(dir, `source.${safeExt}`);
+  const out = assembledPath(uploadId, ext);
   const tmp = out + '.assembling';
   const ws = createWriteStream(tmp);
   try {
@@ -134,6 +139,16 @@ export async function sweepStaleUploads(): Promise<void> {
     );
     for (const row of stale.rows) {
       await query(`UPDATE audio_uploads SET status = 'canceled', error_code = 'expired' WHERE id = ? AND status = 'uploading'`, [row.id]);
+      removeUploadDir(row.id);
+    }
+    // چندبخشی (migration 025): بخشِ رسیده‌ای که جلسه‌اش هرگز ساخته نشد (بخشِ دیگرش رها/لغو شد) — همان ۷ روز.
+    const waiting = await query(
+      `SELECT id FROM audio_uploads WHERE status = 'complete' AND session_id IS NULL AND group_id IS NOT NULL
+         AND updated_at < (NOW() - INTERVAL ? SECOND)`,
+      [Math.floor(INCOMPLETE_RETENTION_MS / 1000)]
+    );
+    for (const row of waiting.rows) {
+      await query(`UPDATE audio_uploads SET status = 'canceled', error_code = 'expired' WHERE id = ? AND session_id IS NULL`, [row.id]);
       removeUploadDir(row.id);
     }
     const old = await query(

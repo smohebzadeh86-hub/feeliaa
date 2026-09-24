@@ -19,7 +19,7 @@
 | `client-inactive` | 409 | `POST /api/sessions` (mode زنده) | مراجع غیرفعال است؛ جلسه‌ی زنده‌ی جدید ساخته نمی‌شود (ادامه‌ی جلسه‌ی نیمه‌تمامِ قبلی و `mode:"manual"` آزادند) | UI: بنرِ خطا؛ در حالتِ عادی رخ نمی‌دهد چون کارت و پرونده برای مراجعِ غیرفعال دکمه‌ی شروع ندارند |
 | `no-key` | 500 (realtime-session) / 200 `ok:false` (check) | `stt.ts`، `tempkey.ts` | `SONIOX_API_KEY` تنظیم نیست | durable-only |
 | `version-conflict` (پرونده) | 409 | PATCH/items/DELETE/upgradeِ case-file (2026-09-23) | CASِ `content_version` بعد از ۵ تلاش | UI: پیامِ خطا؛ کاربر دوباره تلاش می‌کند |
-| `consent-required`، `file-too-small`، `bad-fingerprint` | 400 | `POST /api/uploads` | ورودیِ نامعتبر | UP: خطایِ دائمی (فایل رها می‌شود) |
+| `consent-required`، `file-too-small`، `bad-fingerprint` | 400 | `POST /api/uploads` (و `consent-required` از 2026-09-24 در `POST /api/sessions` زنده هم؛ فقط وقتی مراجع رضایتِ ثبت‌شده ندارد) | ورودیِ نامعتبر | UP: خطایِ دائمی (فایل رها می‌شود) |
 | `file-too-large` | 413 | همان | > ۱GB | همان |
 | `unsupported-format` | 415 | همان | پسوند خارج از allowlist و MIMEِ غیرِ `audio/*`/`video/*` (2026-09-24) | همان |
 | `too-many-uploads` | 429 | همان | > ۵ آپلودِ نیمه‌کاره، بعد از آزادسازیِ خودکارِ نیمه‌کاره‌هایِ بی‌فعالیت > ۲۴ساعت (2026-09-24) | UP: خطا با امکانِ تلاشِ دوباره؛ «بستنِ» کارتِ خطا حالا آپلودِ سرور را هم لغو می‌کند |
@@ -28,6 +28,9 @@
 | `chunk-corrupt` | 422 | همان | sha256 نخورد | UP: همان تکه دوباره |
 | `upload-closed` | 409 | chunks/complete/DELETE | آپلود دیگر `uploading` نیست | UP: خطایِ دائمی |
 | `chunks-missing` | 409 | `complete` (+`missing[]`) | تکه‌ای نرسیده | UP: همان تکه‌ها و دوباره complete |
+| `bad-part` | 400 | `POST /api/uploads` (چندبخشی، 2026-09-25) | `group_id`/`part_index`/`parts_total` نامعتبر (بیش از ۱۰ بخش، …) | UP: خطایِ دائمی، کلِ گروه لغو |
+| `part-mismatch` | 409 | همان | همان بخشِ همان گروه قبلاً با فایلِ دیگری شروع شده | همان |
+| `group-closed` | 409 | `POST /api/uploads`، `complete` | بخشی از گروه رد (`failed`) یا لغو شده است | همان — «فایل‌ها را دوباره انتخاب کنید» |
 | `not-audio`، `no-audio`، `unreadable`، `too-long` | 422 | `complete` (و `error_code`ِ job) | فایل صوتی نیست / بی‌صدا / خراب / > ۳۰۰ دقیقه | UI: پیامِ فارسی، بدونِ «تلاشِ دوباره» |
 | `assemble-failed` | 500 | `complete` | الحاقِ تکه‌ها رویِ دیسک ناموفق | UP: تلاشِ دوباره |
 | `not-failed` | 409 | `POST /api/audio-jobs/:id/retry` | job در جریان/تمام‌شده | — |
@@ -38,7 +41,7 @@
 | `mint-timeout` | 503 | `tempkey.ts` | >10s | همان |
 | `mint-rejected` | 502 | `tempkey.ts` | Soniox رد کرد (کلید/سقف) | همان |
 | `mint-ok` | 200 | `/api/stt/check` | سالم | — |
-| `proxy-unknown` / `proxy-transport` / `proxy-soniox-error` | در `proxy.code` پاسخِ check | `stt.ts` | وضعیتِ مسیرِ legacy؛ روی `ok` اثر ندارد | فقط اطلاع |
+| ~~`proxy-unknown` / `proxy-transport` / `proxy-soniox-error`~~ | — | — | **حذف شد 2026-09-24** همراهِ probeِ legacyِ `/api/stt/check` | — |
 | `llm-failed` | 502 | `case-file/domain/errors.ts` (`CaseFileGenerationError`) | فراخوانیِ OpenAI ناموفق (شبکه/کلید/rate-limit) یا `OPENAI_API_KEY` تنظیم نشده | UI: پیامِ خطا + دکمه‌ی تلاشِ دوباره؛ `client_case_file.status='error'` |
 | `llm-invalid-output` | 502 | همان | پاسخِ خالی یا JSONِ نامعتبر/ناسازگار با schema | همان |
 | `unknown` (case-file) | 502 | همان | خطایِ دیگر در `generateCaseFile` | همان |

@@ -121,7 +121,7 @@ nginx باید WebSocket upgrade را برای `/ws/*` پشتیبانی کند (
 | موضوع | وضعیت |
 |---|---|
 | Health | `GET /api/health` → `{status: ok|degraded, database}` |
-| تشخیصِ STT | `GET /api/stt/check` (نیازمندِ auth) — mint آزمایشی + probeِ legacy |
+| تشخیصِ STT | `GET /api/stt/check` (نیازمندِ auth) — فقط mintِ آزمایشی (probeِ legacy 2026-09-24 حذف شد) |
 | ابزارِ تشخیصِ read-only | `diag-collect.sh` (`--check-cookie`، `--soniox-egress`، شنودِ زنده) با mask کردنِ secretها |
 | لاگ‌ها | stdout (Fastify JSON، `redact` روی کوکی/Authorization از فازِ ۱ِ رصد/حسابرسی، 2026-09-22 — `LOG_LEVEL`) + `console.log` با پیشوند؛ نگهداری/rotationِ stdout نامعلوم. **جدید:** `<cwd>/data/logs/obs.jsonl` — لاگِ ساختارمندِ همه‌ی رویدادهایِ obs (فایلِ دائمی، مستقل از DB)، چرخشِ اندازه‌محورِ دستی (بدونِ dependency، `obs/fileSink.ts`): هر فایل ≤۸MB، حداکثر ۵ فایلِ چرخیده (`obs.jsonl.1`..`.5`) → **سقفِ سختِ دیسک ~۴۸MB**. `data/` (شاملِ `data/logs/`) gitignored و هرگز commit نمی‌شود. |
 | مانیتورینگ/alert | وجود ندارد |

@@ -31,7 +31,7 @@ server/src/
 │   ├── batchqueue.ts      صفِ فایلِ صدا، processBatchQueue، mergeBatchTranscript، sweep
 │   ├── sessionAudioArchive.ts  آرشیوِ ادمین + sweep ۱۴روزه
 │   ├── speakerResolve.ts  concat با ffmpeg + رونویسیِ async + job map
-│   └── soniox.ts          SonioxEngine (WS سمتِ سرور؛ فقط legacy و /api/stt/check)
+│   └── soniox.ts          SonioxEngine (WS سمتِ سرور؛ فقط legacy)
 └── ws/
     ├── transcription.ts   /ws/t/:sessionId (P1)، /ws/voice/:sessionId
     └── p1.ts              state و پارامترهای ordering/grace

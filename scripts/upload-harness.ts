@@ -4,7 +4,7 @@
 // تولیدشده در پوشه‌ی موقت اجرا می‌شود (اگر ffmpeg نباشد SKIP).
 // اجرا: pnpm test:up
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync, existsSync, rmSync, statSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -134,7 +134,7 @@ function makeDeps(w: World, script: SonioxScript = {}, extra: Partial<JobDeps> =
 function newJob(w: World, over: Partial<AudioJob> = {}): AudioJob {
   const job: AudioJob = {
     id: 'job-' + (w.jobs.size + 1), uploadId: 'up-1', therapistId: 'th-1', clientId: 'cl-1', sessionId: 'se-1',
-    stage: 'queued', attempts: 0, sourcePath: '/uploads/up-1/source.m4a', normalizedPath: null, durationMs: null,
+    stage: 'queued', attempts: 0, sourcePath: '/uploads/up-1/source.m4a', sourceParts: null, normalizedPath: null, durationMs: null,
     sonioxFileId: null, sonioxTranscriptionId: null, transcriptionStartedAt: null, transcriptAppliedAt: null,
     caseFileStatus: null, errorCode: null, ...over,
   };
@@ -461,6 +461,50 @@ async function main() {
     assert.equal(parseProbe('Input #0\n  Stream #0:0: Video: h264').hasAudio, false);
   });
 
+  // ————— آپلودِ چندبخشی (migration 025، 2026-09-25) —————
+  const threeParts = [
+    { uploadId: 'up-1', path: '/uploads/up-1/source.m4a' },
+    { uploadId: 'up-2', path: '/uploads/up-2/source.wav' },
+    { uploadId: 'up-3', path: '/uploads/up-3/source.mp4' },
+  ];
+  await t('H30 چندبخشی: هر بخش probe، normalize با آرایه‌ی مسیرها به همان ترتیب، مدتِ جمع، حذفِ پوشه‌یِ همه‌ی بخش‌ها، یک متن', async () => {
+    const w = newWorld(); const probed: string[] = []; let normArg: unknown = null;
+    const deps = makeDeps(w, {}, {
+      media: {
+        async probe(p: string) { probed.push(p); return { ok: true, hasAudio: true, durationMs: 60_000 }; },
+        async normalize(src: string | string[], outBase: string, dur: number | null) {
+          normArg = { src, dur }; const p = outBase + '.ogg'; w.files.add(p); return { ok: true, outPath: p, mime: 'audio/ogg', durationMs: 180_000 };
+        },
+      },
+      async archive(_s: string, filePath: string) { const p = '/archive/' + path.basename(filePath); w.files.add(p); return { path: p, durationMs: 180_000 }; },
+    });
+    threeParts.forEach((p) => w.files.add(p.path));
+    const job = newJob(w, { sourceParts: threeParts });
+    await drive(w, deps, job.id);
+    const s = w.jobs.get(job.id)!;
+    assert.equal(s.stage, 'done');
+    assert.deepEqual(probed, threeParts.map((p) => p.path));
+    assert.deepEqual(normArg, { src: threeParts.map((p) => p.path), dur: 180_000 });
+    assert.deepEqual([...w.removedUploadDirs].sort(), ['up-1', 'up-2', 'up-3']);
+    assert.equal(s.sourceParts, null);
+    assert.equal(w.transcripts.get('se-1'), 'گوینده ۱: سلام');
+    assert.equal(w.notifications.filter((n) => n.kind === 'transcript_ready').length, 1);
+  });
+  await t('H31 چندبخشی: مجموعِ بخش‌ها > ۳۰۰ دقیقه ⇒ too-long بدونِ normalize؛ بخشِ گم‌شده ⇒ audio-missing', async () => {
+    const w = newWorld(); let norms = 0;
+    const deps = makeDeps(w, {}, { media: { probe: async () => ({ ok: true, hasAudio: true, durationMs: 120 * 60_000 }), normalize: async () => { norms++; return { ok: false }; } } });
+    threeParts.forEach((p) => w.files.add(p.path));
+    const job = newJob(w, { sourceParts: threeParts });
+    await drive(w, deps, job.id);
+    assert.equal(w.jobs.get(job.id)!.errorCode, 'too-long');
+    assert.equal(norms, 0);
+    const w2 = newWorld(); const deps2 = makeDeps(w2);
+    w2.files.add(threeParts[0].path); w2.files.add(threeParts[2].path);
+    const j2 = newJob(w2, { sourceParts: threeParts });
+    await drive(w2, deps2, j2.id);
+    assert.equal(w2.jobs.get(j2.id)!.errorCode, 'audio-missing');
+  });
+
   // ————— ffmpegِ واقعی —————
   let ffmpegOk = true;
   try { execFileSync(process.env.FFMPEG_PATH || 'ffmpeg', ['-version'], { stdio: 'ignore' }); } catch { ffmpegOk = false; }
@@ -515,6 +559,28 @@ async function main() {
         assert.equal(r.ok, true, r.error);
         const out = statSync(r.outPath!).size;
         assert.ok(out * 20 < src, `src=${src} out=${out}`);
+      });
+      await t('H33 normalize چندبخشی (ffmpegِ واقعی): m4aِ استریو ۴۴k + wavِ mono 8k سکوت + ویدیوی mp4 ⇒ یک Ogg، مدتِ جمع، ترتیب حفظ', async () => {
+        ff(['-f', 'lavfi', '-i', 'anullsrc=r=8000:cl=mono', '-t', '3', path.join(dir, 'silence.wav')]);
+        const vol = (file: string, ss: number) => {
+          const r = spawnSync(process.env.FFMPEG_PATH || 'ffmpeg', ['-hide_banner', '-ss', String(ss), '-t', '1', '-i', file, '-af', 'volumedetect', '-f', 'null', '-'], { encoding: 'utf8' });
+          const m = /mean_volume:\s*(-?[\d.]+|-inf)/.exec(r.stderr || '');
+          return m ? (m[1] === '-inf' ? -200 : Number(m[1])) : -200;
+        };
+        const r = await normalizeAudio([path.join(dir, 'a.m4a'), path.join(dir, 'silence.wav'), path.join(dir, 'video.mp4')], path.join(dir, 'multi'), 11000);
+        assert.equal(r.ok, true, r.error);
+        assert.equal(readFileSync(r.outPath!).subarray(0, 4).toString('latin1'), 'OggS');
+        assert.ok(r.durationMs !== null && Math.abs((r.durationMs || 0) - 11000) < 400, 'duration=' + r.durationMs);
+        // ترتیب: ۰–۴ث تُن، ۴–۷ث سکوت، ۷–۱۱ث تُن.
+        assert.ok(vol(r.outPath!, 1) > -40, 'first part audible');
+        assert.ok(vol(r.outPath!, 5) < -60, 'second part silent');
+        assert.ok(vol(r.outPath!, 8.5) > -40, 'third part audible');
+        const r2 = await normalizeAudio([path.join(dir, 'silence.wav'), path.join(dir, 'a.m4a')], path.join(dir, 'multi2'), 7000);
+        assert.ok(vol(r2.outPath!, 1) < -60 && vol(r2.outPath!, 4.5) > -40, 'order follows the array');
+      });
+      await t('H34 normalize چندبخشی: بخشِ playlist (whitelist برایِ هر ورودی) ⇒ شکست، بدونِ خواندنِ URL', async () => {
+        const r = await normalizeAudio([path.join(dir, 'a.m4a'), path.join(dir, 'list.mp3')], path.join(dir, 'multi-bad'), 8000);
+        assert.equal(r.ok, false);
       });
     }
   } finally {

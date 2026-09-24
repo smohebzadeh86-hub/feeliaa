@@ -21,6 +21,7 @@ import { getResolveJob, startResolveSpeakers } from '../stt/speakerResolve.js';
 import { listSessionAudio, deleteSessionAudioDirs } from '../stt/sessionAudioArchive.js';
 import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
 import { logEvent } from '../obs/eventLog.js';
+import { hasStoredConsent, recordClientConsent } from './clientConsent.js';
 // خودکارسازیِ تولیدِ پرونده بعدِ پایانِ کاملِ جلسه (فازِ ۲ِ Module 08) — سیاستِ مرکزی حالا در
 // features/case-file/application/autoTrigger.ts است (jobِ آپلودِ صدا هم از همان استفاده می‌کند).
 import { maybeAutoGenerateCaseFile } from '../features/case-file/application/autoTrigger.js';
@@ -101,11 +102,6 @@ export async function sessionRoutes(app: FastifyInstance) {
     }
     const isManual = mode === 'manual';
 
-    if (!isManual && !consent) {
-      reply.code(400);
-      return { error: 'رضایت مراجع الزامی است' };
-    }
-
     // ⭐ برایِ ثبتِ جلسه‌ی گذشته، تاریخ اختیاری‌ست (تصمیمِ مالک، 2026-09-15): تراپیست ممکنه
     // دقیقِ تاریخِ پرونده‌ی قدیمی رو نداشته باشه؛ اگه نفرسته، به‌جایِ fallbackِ نادرستِ «امروز»
     // (migration 014) به‌صراحت NULL ذخیره می‌شه — «بدونِ تاریخ». جلسه‌ی زنده همچنان همیشه
@@ -137,6 +133,13 @@ export async function sessionRoutes(app: FastifyInstance) {
     if (!client) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
+    }
+
+    // LAW-009: جلسه‌ی زنده فقط با رضایتِ صریح. رضایتِ یک‌باره‌ی ثبت‌شده‌ی همین مراجع (migration 024) هم معتبر است؛
+    // رضایتِ تازه (consent:true) برایِ دفعاتِ بعد ثبت می‌شود — پس از ساختِ موفقِ جلسه (پایین).
+    if (!isManual && consent !== true && !hasStoredConsent(client)) {
+      reply.code(400);
+      return { error: 'رضایت مراجع الزامی است', code: 'consent-required' };
     }
 
     // ⭐ مراجعِ غیرفعال جلسه‌ی زنده‌ی جدید نمی‌گیرد (کارت هم دکمه‌ی شروع ندارد). ادامه‌ی
@@ -221,11 +224,13 @@ export async function sessionRoutes(app: FastifyInstance) {
     }
     const result = await query('SELECT * FROM sessions WHERE id = ?', [newId]);
     logEvent({ event: 'session.created', sessionId: newId, clientId: client_id, therapistId: request.therapistId, detail: { mode: 'live' } });
+    if (consent === true) await recordClientConsent(client_id, request.therapistId!);
+    const consentRow = await query('SELECT recording_consent_at FROM clients WHERE id = ?', [client_id]);
 
     reply.code(201);
     return {
       session: result.rows[0],
-      client: { code: client.code, alias: client.alias },
+      client: { code: client.code, alias: client.alias, recording_consent_at: consentRow.rows[0]?.recording_consent_at ?? null },
     };
   });
 

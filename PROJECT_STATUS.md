@@ -2,7 +2,7 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-24 — آخرین رویداد: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
+> **آخرین به‌روزرسانی:** 2026-09-25 — آخرین رویداد: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — migration 025 (اعمال‌شده رویِ dev)؛ `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16؛ commit/deploy نشده.** قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
 > health ok، `SONIOX_ORPHAN_SWEEP=1`، nginxِ زنده کافی بود و تغییری نکرد). پیش از آن: auditِ باگ و رفعِ B2، B3، M1–M4، M6 و L*؛
 > `test:up` 29/29 و E2Eِ DBِ dev 13/13. commit نشده.** قبل‌ترش: **مسیرِ آپلود (فعال و غیرفعال) فقط تا ذخیره‌ی متن؛ پرونده خاموش پشتِ
 > `UPLOAD_CASE_FILE`؛ `test:up` 26/26 + E2Eِ واقعی PASS.** قبل‌ترش: **تستِ کاملِ واقعیِ فیچرِ آپلود (Soniox/LLM/MySQL، فایلِ ۶۰دقیقه‌ای،
@@ -393,6 +393,80 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-25 — TEST (E2E) + MIGRATION(dev) — آپلودِ چندبخشی رویِ MySQLِ dev: 16/16 PASS
+- **مجوز:** «اره تستِ E2E رو انجام بده».
+- اسکریپتِ موقتِ `server/e2e-tmp/` (حذف شد)؛ fixtureهایِ canary؛ Sonioxِ جعلی؛ ffmpeg و آرشیوِ واقعی؛ سرورِ dev خاموش بود.
+- **migration 025 رویِ DBِ dev اعمال شد.**
+- پوشش: رسیدنِ نامرتبِ بخش‌ها، ادامه، `part-mismatch`، مالکیت، ساختِ یک جلسه/یک job، retry، اجرایِ کاملِ job (ترتیبِ صدا با volumedetect تأیید شد)، لغوِ گروه، `not-audio`، `too-long`ِ مجموع، sweep، رگرسیونِ تک‌فایلی، هم‌زمانیِ completeها (۳ دور ⇒ یک جلسه).
+- پاک‌سازی کامل: ۰ ردیف و ۰ پوشه باقی ماند.
+- [verification](verification/2026-09-25-upload-multi-part.md). commit/deploy نشده. **عامل:** این نشست.
+
+### 2026-09-25 — CODE + MIGRATION + TEST + DOCS — آپلودِ چند فایل برایِ یک جلسه + آیکونِ SVGِ حذف
+- **دستورِ مالک:** «وقتی داره ویس اپلود میکنه یه SVG برای حذف باشه» و «بتونه تیکه‌تیکه و چند ویس هم اپلود کنه»؛ در پاسخِ سؤال: «ویس‌ها مربوط به همون جلسه‌ان و به ترتیبِ اپلود ترنسکریپت بشه».
+- **طراحی:** هر فایل یک آپلودِ عادی با `group_id`/`part_index`/`parts_total`؛ رسیدنِ آخرین بخش ⇒ یک جلسه + **یک job**؛ job بخش‌ها را به ترتیب با ffmpeg (`concat`) به یک فایل وصل و **یک‌جا** رونویسی می‌کند تا تفکیکِ گوینده در کلِ جلسه یکدست بماند.
+- **کد:** migration `025_upload_multi_part.sql` (افزودنی)؛ `uploads.routes.ts` (پارامترهایِ گروه، `finalizeGroup`، `DELETE /api/upload-groups/:id`)؛ `jobMachine.ts`/`jobRunner.ts` (`sourceParts`)؛ `media.ts` (normalize با چند ورودی)؛ `uploadStore.ts` (sweepِ بخش‌هایِ منتظر > ۷ روز)؛ `obs/types.ts` (`upload.part_received`)؛ `public/feelia-upload.js` (`startGroup`، زنجیره‌ی ترتیبی، لغوِ گروه)؛ `public/index.html` (مودالِ چندفایلی با سطل/بالا/پایین؛ آیکونِ سطل رویِ کارتِ آپلود).
+- **تست:** `tsc` تمیز؛ `pnpm test:up` **35/35** (۴ تستِ تازه، شاملِ ffmpegِ واقعی با بررسیِ ترتیب)؛ تستِ UI در Browser pane با mock backend (داده‌ی canary): حذف/جابه‌جایی، آپلودِ ترتیبی، لغوِ گروه وسطِ کار، ادامه بعد از رفرش، تک‌فایلی، عرضِ ۳۷۵px. [verification](verification/2026-09-25-upload-multi-part.md).
+- **تست‌نشده:** مسیرِ سرور رویِ MySQLِ واقعی (نیازمندِ مجوزِ E2E رویِ DBِ dev)؛ Sonioxِ واقعی. migration 025 رویِ هیچ DBای اعمال نشده.
+- **وضعیت:** commit نشده، deploy نشده. اسناد: subsystem 06 §۲.۱، api-catalog، error-code-catalog، database-catalog. **عامل:** این نشست.
+
+### 2026-09-25 — FINDING — تیکِ رضایت در مودالِ آپلود هنوز دیده می‌شود
+- **گزارشِ مالک:** اسکرین‌شاتِ مودالِ آپلود برایِ CL-KNMA با تیکِ رضایت. درخواست کرد رضایت برایِ هر مراجع فقط یک بار پرسیده شود.
+- **audit (فقط خواندن):**
+  - این رفتار از قبل پیاده و deploy شده است (رویدادِ بالا).
+  - `renderAudioUploadConsent` در `public/index.html` تیک را فقط وقتی نشان می‌دهد که `recording_consent_at` خالی باشد.
+  - `feelia-upload.js` مقدارِ `consent:true` را می‌فرستد و `uploads.routes.ts` آن را ثبت می‌کند.
+  - `[hidden]{display:none!important}` وجود دارد.
+- **علتِ محتمل:** migration 024 بدونِ backfill اعمال شد (۰ مراجع با رضایت). برایِ همین هر مراجع بعد از deploy یک بار دیگر پرسیده می‌شود.
+- **پیشنهاد (اجرا نشده، منتظرِ مجوز):** backfill رویِ prod برایِ مراجعانی که جلسه‌ای با `consent=1` دارند. تغییری در کد داده نشد. **عامل:** این نشست.
+
+### 2026-09-25 — DEPLOY + MIGRATION — رضایتِ یک‌باره برایِ هر مراجع رویِ production
+- **مجوز:** «انجامش بده، deploy کن».
+- جلسه/آپلود/jobِ فعال نبود. **backupِ DB** (`feelia-pre-024-*.sql`، Dump completed) و backupِ کد گرفته شد. deploy انجام شد و **migration 024 applied**؛ health ok.
+- **smoke:** ستون (datetime، nullable) موجود است. ۳۰ مراجع و ۴۱ جلسه دست‌نخورده‌اند. ۰ مراجع با رضایت (بدونِ backfill). UI سرو می‌شود. endpointِ لغو بدونِ نشست 401 می‌دهد. online (restarts=8).
+- **اسناد:** [verification](verification/2026-09-25-client-consent-once.md) §deploy، database-catalog. commit نشده. **عامل:** این نشست.
+
+### 2026-09-25 — DECISION + CODE + MIGRATION + TEST + DOCS — رضایتِ ضبط/رونویسی یک بار برایِ هر مراجع
+- **دستورِ مالک:** «برای هر مراجع فقط یه بار رضایت بده».
+- **تغییر:**
+  - migration **024** (`clients.recording_consent_at`، additive، بدونِ backfill).
+  - `http/clientConsent.ts` (جدید). `POST /api/sessions` و `POST /api/uploads` رضایتِ ثبت‌شده را می‌پذیرند و اولین `consent:true` را ثبت می‌کنند.
+  - `DELETE /api/clients/:id/recording-consent` برایِ لغو. رویدادهایِ `client.consent_recorded` و `client.consent_revoked`.
+  - UI: جعبه‌ی رضایت و تیکِ آپلود فقط اگر ثبت نشده؛ دکمه‌ی «مراجع رضایتش را پس گرفته». متنِ رضایت دست نخورد.
+- **تست:** E2Eِ DBِ dev 11/11 (fixtures 0)، UI در Browser pane PASS، `test:rt` 55/0، `test:cf` 108/108، `test:up` 31/31، `tsc` تمیز.
+- **اسناد:** LAW-009، api-catalog، error-code-catalog، database-catalog، subsystem 06،
+  [verification](verification/2026-09-25-client-consent-once.md). **deploy نشده** (منتظرِ مجوز). commit نشده. **عامل:** این نشست.
+
+### 2026-09-24 — DEPLOY + FINDING — deployِ رفعِ دکمه‌هایِ کارتِ مراجع (فقط `public/index.html`)
+- **دستورِ مالک:** «deploy کن».
+- **FINDING:** `public/index.html`ِ working tree علاوه بر این رفع، کارِ commit‌نشده‌ی نشستِ دیگری را دارد («رضایتِ یک‌باره برایِ هر مراجع»، وابسته به migration 024 و `DELETE /api/clients/:id/recording-consent`) که رویِ production نیست. کلِ فایل deploy **نشد**.
+- **روش:** نسخه‌ی production دانلود شد و فقط همان ۲ hunkِ این رفع (CSSِ `.client-actions` + خطِ `has-3`) رویش اعمال شد؛ diff با production فقط همین بود. backup: `/root/backups/index-before-cardbtns-20260924T202700Z.html`. جایگزینیِ اتمیک (`mv`)، بدونِ ری‌استارت (استاتیک از دیسک، `no-cache`).
+- **تأیید:** sha256ِ فایلِ سرور = فایلِ محلیِ deploy (`dfa2c856…`)؛ صفحه‌ی live `200` و شاملِ `has-3`. **عامل:** این نشست. commit نشده.
+
+### 2026-09-24 — CODE + TEST — رفعِ درهم‌رفتنِ دکمه‌هایِ کارتِ مراجع (شروع جلسه / آپلود صوت / پرونده)
+- **گزارشِ مالک (با اسکرین‌شات):** رویِ کارت‌هایی که «پرونده» دارند (`case_file_enabled`) سه دکمه در یک ردیف جا نمی‌شدند و «آپلود صوت» بریده/درهم بود.
+- **تغییر (فقط `public/index.html`):** CSSِ `.client-actions` — با ۳ دکمه کلاسِ `has-3` (در `renderClientCard`) → grid: دکمه‌ی اصلی یک ردیفِ کامل، دو دکمه‌ی ghost زیرش نصف‌به‌نصف با padding افقیِ کمتر. حالتِ دو دکمه: `card-upload-btn` عرضِ طبیعی (`flex:0 0 auto`) تا در عرضِ کمینه‌ی کارت بریده نشود. بدونِ تغییرِ رفتار.
+- **تست:** browser pane با کارتِ ساختگی (بدونِ داده‌ی واقعی)، هر دو حالت: هیچ دکمه‌ای overflow ندارد (`scrollWidth<=clientWidth`). deploy نشده. commit نشده. **عامل:** این نشست.
+
+### 2026-09-24 — CODE + TEST + DEPLOY + DOCS — حذفِ probeِ legacy از `GET /api/stt/check` (گزینه‌ی B)
+- **دستورِ مالک:** «گزینه B رو اجرا کن».
+- **تغییر:** `server/src/http/stt.ts` — probeِ WSِ master-key و فیلدِ `proxy` حذف شد. `ok` فقط از mint. `index.html` فقط کامنت. `/ws/t`، `/ws/voice` و `SonioxEngine` دست‌نخورده ماندند.
+- **تست:** dev ۳ بار `ok:true mint-ok`، ۰ خطایِ Soniox. production (پروسه‌ی جدا) ۳۴۰ms در برابرِ ۶۵۰ تا ۷۶۰ms قبلی، ۰ خطا. `test:rt` 55/0، `test:cf` 108/108، `test:up` 31/31، `tsc` تمیز.
+- **deploy:** backupِ کد، بدونِ جلسه‌ی فعال، health ok. خطِ مبنایِ پایش: ۲۴ «No audio received» در لاگِ pm2 — نباید بالا برود.
+- **اسناد:** api-catalog، error-code-catalog، deployment-operations، integration-architecture، application-architecture، subsystem 04، master-implementation-plan (P3-1 جزئی)،
+  [verification](verification/2026-09-24-stt-check-no-audio-log.md). **عامل:** این نشست. commit نشده.
+
+### 2026-09-24 — AUDIT + FINDING — ریشه‌یِ `"No audio received."` در لاگِ production (read-only، بدونِ تغییرِ کد)
+- **ریشه:** probeِ legacy در `GET /api/stt/check` (`http/stt.ts:87-122`) اتصالِ WS به Soniox را باز می‌کند و بدونِ فرستادنِ صدا `stop()` (finalize + پایانِ صدا) را صدا می‌زند ⇒ Soniox 400 می‌دهد.
+  بازتولید رویِ dev: `stop` ⇒ خطا، `abort` ⇒ بدونِ خطا. در production ۰ خط `forwarding chunk` بود (مسیرِ `/ws/t` استفاده نشده).
+- **اثر:** رونویسیِ زنده سالم است. فقط لاگِ گمراه‌کننده، یک اتصالِ master-key به ازایِ هر preflight، و حدودِ ۱ ثانیه تأخیرِ check. نتیجه‌ی probe (`proxy`) جایی خوانده نمی‌شود.
+- **پلن (منتظرِ تصمیمِ مالک):** A) `stop()` ⇒ `abort()` در probe (حداقلی). B) حذفِ probe (بخشی از P3-1 / LAW-015).
+- **Evidence:** [verification](verification/2026-09-24-stt-check-no-audio-log.md). **عامل:** این نشست.
+
+### 2026-09-24 — GIT — commitِ محلیِ فیچرِ آپلودِ صدا و رفع‌هایِ audit (`ab8ae43`، push نشد)
+- ۴۶ فایل: کد (`server/src`، `public/`، `scripts/upload-harness.ts`)، migration 023، `deploy/nginx/feelia.conf`، اسناد و سه فایلِ verification — همان چیزی که رویِ production است.
+- عمداً بیرون ماند: `.claude/`، `feelia-f9b0a9c.tar`، `feelia-mysql-deploy.tar.gz`، `package-lock.json`، `server-deploy/`، `soniox.html` (HISTORICAL/محلی). هیچ `.env`/آرشیو/`data` stage نشد.
+- push به `origin/feat/clarity` انجام **نشد** (فقط با درخواستِ مالک). **عامل:** این نشست.
 
 ### 2026-09-24 — CODE + TEST + DEPLOY — رفعِ M5، M7، L2، L6 (بدونِ از دست رفتنِ داده) و deployِ دوم
 - **دستورِ مالک:** «همشون رو رفع کن … به امن‌ترین شیوه که هیچ دیتایی از بین نره».

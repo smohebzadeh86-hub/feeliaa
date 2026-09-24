@@ -103,11 +103,22 @@ export interface NormalizeResult {
   error?: string;
 }
 
+// ورودی و نگاشتِ صدا. چندبخشی (migration 025): هر بخش ورودیِ جدا با همان whitelistها؛ اولین جریانِ صوتیِ هر
+// بخش به mono/16kHz/fltp یکسان می‌شود (پیش‌نیازِ فیلترِ concat) و به ترتیبِ آرایه پشتِ هم قرار می‌گیرد.
+function sourceArgs(src: string | string[]): string[] {
+  const list = Array.isArray(src) ? src : [src];
+  if (list.length === 1) return [...inputArgs(list[0]), '-map', '0:a:0'];
+  const inputs = list.flatMap((p) => ['-protocol_whitelist', 'file', '-format_whitelist', FORMAT_WHITELIST, '-i', p]);
+  const prep = list.map((_, i) => `[${i}:a:0]aresample=16000,aformat=sample_fmts=fltp:sample_rates=16000:channel_layouts=mono[a${i}]`).join(';');
+  const filter = `${prep};${list.map((_, i) => `[a${i}]`).join('')}concat=n=${list.length}:v=0:a=1[out]`;
+  return ['-hide_banner', '-nostdin', ...inputs, '-filter_complex', filter, '-map', '[out]'];
+}
+
 // خروجی: Opus/Ogg. اگر ffmpegِ نصب‌شده libopus نداشت، AAC/M4A (Soniox هر دو را می‌پذیرد).
-export async function normalizeAudio(srcPath: string, outBase: string, sourceDurationMs: number | null): Promise<NormalizeResult> {
+export async function normalizeAudio(srcPath: string | string[], outBase: string, sourceDurationMs: number | null): Promise<NormalizeResult> {
   // زمانِ مجاز متناسب با طولِ صدا (تبدیل معمولاً ۵۰–۲۰۰ برابر سریع‌تر از real-time است).
   const timeoutMs = Math.max(5 * 60 * 1000, Math.ceil((sourceDurationMs || 0) / 10));
-  const common = [...inputArgs(srcPath), '-map', '0:a:0', '-vn', '-sn', '-dn', '-ac', '1', '-ar', '16000'];
+  const common = [...sourceArgs(srcPath), '-vn', '-sn', '-dn', '-ac', '1', '-ar', '16000'];
   const opusOut = outBase + '.ogg';
   let r = await run(['-y', ...common, '-c:a', 'libopus', '-b:a', '32k', '-application', 'voip', opusOut], timeoutMs);
   if (r.code === 0) {

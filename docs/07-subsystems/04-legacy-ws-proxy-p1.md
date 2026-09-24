@@ -23,7 +23,7 @@
 `SonioxEngine` ساده؛ باینری → Soniox؛ `finalize` → `stop` → متنِ غیرخالی → `session_notes(voice)`. بستنِ socket → `stop`.
 
 ## ۴. `SonioxEngine` (سرور)
-WS با `ws`، `PROXY_URL`، reconnect تا ۶ بار با backoff نمایی، بافرِ ۲۰۰ chunk، `stop()` با resolverهای ثبت‌شده (fix `7f7a80c`)، `abort()` بدونِ finalize، `prefix` برای ادامه‌ی متن، حذفِ `<end>/<fin>` (fix `17dd11a`). استفاده‌ی غیرِ legacy: probe در `GET /api/stt/check`.
+WS با `ws`، `PROXY_URL`، reconnect تا ۶ بار با backoff نمایی، بافرِ ۲۰۰ chunk، `stop()` با resolverهای ثبت‌شده (fix `7f7a80c`)، `abort()` بدونِ finalize، `prefix` برای ادامه‌ی متن، حذفِ `<end>/<fin>` (fix `17dd11a`). استفاده‌ی غیرِ legacy: ~~probe در `GET /api/stt/check`~~ — حذف شد 2026-09-24 (هر بار «No audio received» در لاگ می‌ساخت؛ [verification](../../verification/2026-09-24-stt-check-no-audio-log.md)).
 
 ## ۵. `SonioxDirect` (فرانت)
 نسخه‌ی اولیه‌ی اتصالِ مستقیم (قبل از FeeliaRT): mint → WS با `enable_endpoint_detection:true` (از 2026-09-14 با مسیرِ اصلی یکسان است؛ C6 بسته شد) → فقط یک اتصال، هر خطا/close → proxy. متن هر ۱۰s با `saveDirectTranscript` (PUT بدونِ نسخه) ذخیره می‌شود. ابزارهای دستیِ کنسول: `SonioxDirect.quickTest(id)`، `liveTest(id, s)`.
