@@ -4767,6 +4767,9 @@ function renderCaseFile(){
   }else{
     c.roadmap.forEach(function(r){
       const pendingHere=cfPendingNewItem&&cfPendingNewItem.kind==='roadmap'&&cfPendingNewItem.id===r.id;
+      // برچسبِ دلیل اگر تکرارِ خودِ گام باشد نمایش داده نمی‌شود (هم‌راستا با isRoadmapWhyDuplicate سرور)
+      const nrm=function(s){return String(s||'').replace(/[‌ً-ْ؟?.،,:!«»]/g,' ').replace(/ي/g,'ی').replace(/ك/g,'ک').replace(/\s+/g,' ').trim();};
+      const whyN=nrm(r.why);if(whyN&&nrm(r.question).indexOf(whyN)>=0)r={...r,why:''};
       html+='<details class="cf-step" data-cf-id="roadmap.'+r.id+'"'+((caseFileEditMode||pendingHere)?' open':'')+'><summary><span class="cf-step-num '+r.priority+'">'+r.priority.slice(1)+'</span>'+
             '<span class="cf-step-q">'+escapeHtml(r.question)+'</span>'+(r.why?'<span class="cf-step-why '+r.priority+'">'+escapeHtml(r.why)+'</span>':'')+'<span class="cf-toggle"><span class="cf-toggle-txt">توضیح</span>'+CF_CHEV+'</span></summary>'+
             '<div class="cf-step-detail">'+(pendingHere?cfInlineEditHtml('roadmap.'+r.id+'.detail',r.detail,true):fieldHtml('roadmap.'+r.id+'.detail',r.detail,true))+cfDelBtn('roadmap',r)+'</div></details>';

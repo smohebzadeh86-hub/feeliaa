@@ -170,6 +170,14 @@ function normalizeCoupleKeys(draft: CaseFileDraft): void {
 const PRIORITY_RANK: Record<string, number> = { p1: 1, p2: 2, p3: 3, p4: 4 };
 const ROADMAP_DETAIL_PREFIX = 'نقش در مسیر درمان:';
 
+const normRoadmapText = (s: string) =>
+  s.replace(/[‌ً-ْ؟?.،,:!«»]/g, ' ').replace(/ي/g, 'ی').replace(/ك/g, 'ک').replace(/\s+/g, ' ').trim();
+
+export function isRoadmapWhyDuplicate(question: string, why: string): boolean {
+  const q = normRoadmapText(question), w = normRoadmapText(why);
+  return !!w && (q === w || q.includes(w));
+}
+
 export function enforceCaseFileRules(draft: CaseFileDraft): void {
   normalizeCoupleKeys(draft);
   // مدل گاهی یک آیتمِ medication با name خالی برمی‌گرداند (مثلاً وقتی دارویی مطرح نشده)؛
@@ -184,6 +192,8 @@ export function enforceCaseFileRules(draft: CaseFileDraft): void {
     // برچسبِ دلیل: ۲ تا ۴ کلمه
     const words = r.why.trim().split(/\s+/).filter(Boolean);
     if (words.length > 4) r.why = words.slice(0, 4).join(' ');
+    // برچسبِ دلیل نباید تکرارِ خودِ گام باشد (لایه‌یِ دوم باید «چرا» بگوید، نه تیتر را دوباره)
+    if (isRoadmapWhyDuplicate(r.question, r.why)) r.why = '';
     const d = r.detail.trim();
     if (d && !d.startsWith(ROADMAP_DETAIL_PREFIX)) r.detail = `${ROADMAP_DETAIL_PREFIX} ${d}`;
   }

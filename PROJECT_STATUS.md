@@ -394,6 +394,13 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-25 — CODE — نقشه‌راهِ جلسه‌ی بعد: گام به‌شکلِ سوال/اقدام، برچسبِ دلیلِ غیرتکراری
+- مشکل (گزارشِ مالک با اسکرین‌شات): `question` تیترِ موضوع بود («شدت علائم») و `why` همان کلمه را تکرار می‌کرد؛ لایه‌یِ «سوال → دلیلِ کوتاه → توضیح» از سندِ طراحی پیاده نمی‌شد.
+- `buildCaseFilePrompt.ts` قاعده‌ی ۱۵: question = یک خطِ اقدام‌محور/سوالی (نه تیتر)؛ why = دلیلِ ۲–۴ کلمه‌ای که question را تکرار نکند.
+- `validate.ts`: `isRoadmapWhyDuplicate` + در `enforceCaseFileRules` اگر why تکرار/زیرمجموعه‌یِ question باشد خالی می‌شود.
+- `public/index.html`: همان قاعده در رندر تا پرونده‌هایِ ذخیره‌شده‌یِ قبلی هم برچسبِ تکراری نشان ندهند. متنِ question در پرونده‌هایِ قدیمی تا regenerate عوض نمی‌شود.
+- تست: `tsc --noEmit` پاک؛ `pnpm test:cf` 108 PASS / 0 FAIL. تستِ LLMِ واقعی و مرورگر انجام نشد. commit نشده.
+
 ### 2026-09-25 — GIT + DEPLOY — push ِ `feat/clarity` و deployِ `baa9165` (production = HEAD)
 - **مجوز:** «انجام بده» (push + deployِ `baa9165`).
 - **push:** `1eae6c9..32ea9bc` به `origin/feat/clarity` (۹ commit؛ merge به `main` نشده).
