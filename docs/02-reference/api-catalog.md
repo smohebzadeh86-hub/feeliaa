@@ -38,7 +38,7 @@
 | PATCH | `/api/clients/:id/category` | `{category: "child"|"teen"|"adult"|null, gender?: "f"|"m"|null}` | `{client}` | 400، 404 | UI |
 | PATCH | `/api/clients/:id/pin` | `{pinned: boolean}` | `{client}`؛ صفحه‌ی اول (نمای «امروز») مراجعِ سنجاق‌شده را نشان می‌دهد | 400 (`pinned` غیرِ boolean)، 404 | UI (2026-09-16، سنجاق به صفحه‌ی اول) |
 | DELETE | `/api/clients/:id` | — | `{deleted: code, cascade:{session_count, note_count}}` | 404 | UI |
-| DELETE | `/api/clients/:id/recording-consent` | — | `{recording_consent_at:null}` — لغوِ رضایتِ یک‌باره (2026-09-24). جلسه‌هایِ قبلی دست‌نخورده؛ رویدادِ `client.consent_revoked` | 404 (غیرمالک) | UI |
+| DELETE | `/api/clients/:id/recording-consent` | — | `{recording_consent_at:null}` — لغوِ رضایتِ یک‌باره (2026-09-24). جلسه‌هایِ قبلی دست‌نخورده؛ رویدادِ `client.consent_revoked` | 404 (غیرمالک) | بدونِ caller (دکمه‌ی UI در 2026-09-25 به دستورِ مالک حذف شد) |
 
 ## ۴. Sessions و Notes — `server/src/http/sessions.ts` (همه `auth`)
 

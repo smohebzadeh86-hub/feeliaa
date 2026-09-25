@@ -979,12 +979,7 @@ input::-ms-reveal{display:none}
         <button class="btn btn-ghost" onclick="declineConsentAndExit()">موافق نیست</button>
         <button class="btn btn-primary" onclick="setConsent(true)">موافق است</button>
       </div>
-      <div style="font-size:12px;color:var(--gold-deep);opacity:.85;margin-top:10px;line-height:1.8">این رضایت یک بار برایِ این مراجع ثبت می‌شود و در جلسه‌هایِ بعدی دوباره پرسیده نمی‌شود؛ هر وقت مراجع رضایتش را پس گرفت، می‌توانید لغوش کنید.</div>
-    </div>
-    <!-- رضایتِ یک‌باره‌ی ثبت‌شده‌ی همین مراجع (migration 024) — به‌جایِ پرسیدنِ دوباره -->
-    <div class="banner info" id="consentStoredRow" hidden style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-      <span id="consentStoredText"></span>
-      <button class="link-btn" style="font-size:12.5px" onclick="revokeClientConsent()">مراجع رضایتش را پس گرفته</button>
+      <div style="font-size:12px;color:var(--gold-deep);opacity:.85;margin-top:10px;line-height:1.8">این رضایت یک بار برایِ این مراجع ثبت می‌شود و در جلسه‌هایِ بعدی دوباره پرسیده نمی‌شود.</div>
     </div>
     <div id="preflightBox" style="margin-bottom:14px">
       <div class="banner info" id="preflightMicRow">در حال بررسی میکروفون…</div>
@@ -1251,7 +1246,6 @@ input::-ms-reveal{display:none}
     <div id="audioUploadDateHint" style="font-size:12px;color:var(--muted);margin-top:6px" hidden></div>
     <div style="margin-bottom:14px"></div>
     <label class="up-consent" id="audioUploadConsentLabel"><input type="checkbox" id="audioUploadConsent" onchange="updateAudioUploadButton()"> مراجع به ضبط و رونویسیِ این جلسه رضایت داده است.</label>
-    <div class="up-consent" id="audioUploadConsentStored" hidden style="cursor:default;justify-content:space-between;flex-wrap:wrap"><span id="audioUploadConsentStoredText"></span><button class="link-btn" style="font-size:12px" onclick="revokeClientConsent()">پس گرفته است</button></div>
     <div class="up-note">بعد از شروع، آپلود در پس‌زمینه ادامه پیدا می‌کند و اگر اینترنت قطع شود از همان‌جا ادامه می‌دهد. وقتی «دریافت شد» را دیدید، دیگر لازم نیست صفحه باز بماند — تبدیل به متن رویِ سرور انجام می‌شود و خبرتان می‌کنیم.</div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeAudioUploadModal()">انصراف</button>
@@ -2348,49 +2342,22 @@ function resetConsent(){
   const cb=$('consentBox');
   if(cb)cb.hidden=false;
   consent=false;
-  const sr=$('consentStoredRow');
-  if(sr)sr.hidden=true;
   updateStartButtonState();
 }
 // ===== رضایتِ یک‌باره برایِ هر مراجع (migration 024، دستورِ مالک 2026-09-24) =====
 // سرور زمانِ اولین رضایت را در clients.recording_consent_at نگه می‌دارد (با شروعِ جلسه‌ی زنده یا آپلودِ فایل)؛
-// از آن به بعد نه جعبه‌ی رضایتِ جلسه و نه تیکِ مودالِ آپلود دوباره پرسیده می‌شوند. لغو ⇒ دوباره پرسیده می‌شود.
+// از آن به بعد نه جعبه‌ی رضایتِ جلسه و نه تیکِ مودالِ آپلود نمایش داده می‌شوند — هیچ متنِ جایگزینی هم
+// نمایش داده نمی‌شود (دستورِ مالک 2026-09-25: مراجعِ بدونِ رضایت اصلاً نمی‌آید، پس دکمه‌ی لغو لازم نیست).
 function clientConsentDate(c){return c&&c.recording_consent_at?c.recording_consent_at:null;}
-function consentStoredLabel(c){
-  const at=clientConsentDate(c);
-  let d='';
-  try{d=toFa(toJalali(new Date(at)));}catch(e){}
-  return 'رضایتِ این مراجع برایِ ضبط و رونویسی'+(d?' از '+d:'')+' ثبت شده است.';
-}
 function applyStoredConsent(c){
   if(!clientConsentDate(c))return;
   consent=true;
   $('consentBox').hidden=true;
-  $('consentStoredText').textContent=consentStoredLabel(c);
-  $('consentStoredRow').hidden=false;
   updateStartButtonState();
 }
 function markClientConsent(clientId,at){
   if(currentClient&&currentClient.id===clientId)currentClient.recording_consent_at=at;
   try{(allClients||[]).forEach(function(c){if(c.id===clientId)c.recording_consent_at=at;});}catch(e){}
-}
-function revokeClientConsent(){
-  if(!currentClient)return;
-  const c=currentClient;
-  showGenericConfirm({
-    title:'لغوِ رضایتِ مراجع',
-    text:'رضایتِ ثبت‌شده‌ی '+c.code+(c.alias?' — '+c.alias:'')+' لغو شود؟ از جلسه یا آپلودِ بعدی دوباره پرسیده می‌شود. جلسه‌ها و متن‌هایِ قبلی دست‌نخورده می‌مانند.',
-    okLabel:'لغوِ رضایت',
-    onConfirm:async function(){
-      try{
-        await api('/api/clients/'+c.id+'/recording-consent',{method:'DELETE'});
-        markClientConsent(c.id,null);
-        if(!$('screenSetup').hidden)resetConsent();
-        if($('audioUploadModal').classList.contains('open'))renderAudioUploadConsent();
-        showBanner('info','رضایتِ مراجع لغو شد؛ دفعه‌ی بعد دوباره پرسیده می‌شود.');
-      }catch(e){showBanner('error',e.message||'لغوِ رضایت ناموفق بود');}
-    },
-  });
 }
 
 // ===== احراز هویت =====
@@ -7168,8 +7135,6 @@ function suggestAudioUploadDate(){
 function renderAudioUploadConsent(){
   const stored=!!clientConsentDate(currentClient);
   $('audioUploadConsentLabel').hidden=stored;
-  $('audioUploadConsentStored').hidden=!stored;
-  if(stored)$('audioUploadConsentStoredText').textContent=consentStoredLabel(currentClient);
   updateAudioUploadButton();
 }
 function audioUploadConsentOk(){return !!clientConsentDate(currentClient)||$('audioUploadConsent').checked;}
