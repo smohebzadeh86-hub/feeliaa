@@ -96,7 +96,8 @@ export interface JobDeps {
   soniox: SonioxPort;
   media: MediaPort;
   archive(sessionId: string, filePath: string, mime: string, runId: string): Promise<{ path: string; durationMs: number | null }>;
-  caseFile(clientId: string, therapistId: string, ctx: { jobId: string; sessionId: string }): Promise<'not_applicable' | 'skipped' | 'generated' | 'busy' | 'failed'>;
+  // lastAttempt=false ⇒ خطایِ گذرایِ LLM به‌صورتِ 'transient' برمی‌گردد (بدونِ اعلانِ شکست) تا job دوباره تلاش کند.
+  caseFile(clientId: string, therapistId: string, ctx: { jobId: string; sessionId: string; lastAttempt: boolean }): Promise<'not_applicable' | 'skipped' | 'generated' | 'busy' | 'failed' | 'transient'>;
   // آیا بعد از ثبتِ متن، مرحله‌ی پرونده اجرا شود؟ (uploadCaseFileAllowed — فعلاً پیش‌فرض خاموش؛ تصمیمِ مالک 2026-09-25)
   caseFileAfterUpload(job: AudioJob): boolean | Promise<boolean>;
   fileExists(p: string): boolean;
@@ -114,6 +115,9 @@ export const BACKOFF_MS = [30_000, 2 * 60_000, 10 * 60_000, 30 * 60_000, 60 * 60
 export const MAX_ATTEMPTS = BACKOFF_MS.length;
 export const CASE_FILE_BUSY_RETRY_MS = 2 * 60_000;
 export const CASE_FILE_BUSY_MAX = 15; // ~۳۰ دقیقه منتظرِ تولیدِ هم‌زمانِ دیگر
+// خطایِ گذرایِ LLM (قطعِ شبکه/timeout/429/5xx — مثلاً ECONNRESETِ OpenRouter در E2E 2026-09-25): تا ۳ تلاشِ دوباره با این فاصله‌ها،
+// بعد شکستِ نهایی با اعلان. شمارنده همان attemptsِ مرحله‌ی پرونده است (مشترک با busy).
+export const CASE_FILE_TRANSIENT_RETRY_MS = [60_000, 5 * 60_000, 15 * 60_000];
 
 // مهلتِ یک transcription رویِ Soniox: ۳۰ دقیقه + طولِ خودِ صدا (Soniox معمولاً بسیار سریع‌تر است).
 export function transcriptionDeadlineMs(durationMs: number | null): number {
@@ -315,7 +319,14 @@ async function stepTranscribe(job: AudioJob, deps: JobDeps): Promise<StepResult>
 async function stepCaseFile(job: AudioJob, deps: JobDeps): Promise<StepResult> {
   // UI از همین ستون «پرونده در حالِ به‌روزرسانی» را نشان می‌دهد (تولید چند دقیقه طول می‌کشد).
   await deps.store.update(job, { caseFileStatus: 'running' });
-  const outcome = await deps.caseFile(job.clientId, job.therapistId, { jobId: job.id, sessionId: job.sessionId });
+  const lastAttempt = job.attempts >= CASE_FILE_TRANSIENT_RETRY_MS.length;
+  const outcome = await deps.caseFile(job.clientId, job.therapistId, { jobId: job.id, sessionId: job.sessionId, lastAttempt });
+  if (outcome === 'transient' && !lastAttempt) {
+    const delay = CASE_FILE_TRANSIENT_RETRY_MS[Math.min(job.attempts, CASE_FILE_TRANSIENT_RETRY_MS.length - 1)];
+    await deps.store.update(job, { attempts: job.attempts + 1, nextAttemptInMs: delay, caseFileStatus: 'waiting', errorCode: 'case-file-retry' });
+    deps.log(`[audio-job] ${job.id} case-file transient, retry in ${Math.round(delay / 1000)}s`);
+    return WAIT;
+  }
   if (outcome === 'busy') {
     const attempts = job.attempts + 1;
     if (attempts > CASE_FILE_BUSY_MAX) {
@@ -326,7 +337,7 @@ async function stepCaseFile(job: AudioJob, deps: JobDeps): Promise<StepResult> {
     return WAIT;
   }
   const map: Record<string, CaseFileJobStatus> = {
-    not_applicable: 'not_applicable', skipped: 'skipped', generated: 'done', failed: 'failed',
+    not_applicable: 'not_applicable', skipped: 'skipped', generated: 'done', failed: 'failed', transient: 'failed',
   };
   await deps.store.finish(job, map[outcome] || 'failed');
   return WAIT;

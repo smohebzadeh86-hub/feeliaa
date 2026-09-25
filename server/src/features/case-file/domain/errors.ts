@@ -3,9 +3,12 @@
 
 export class CaseFileGenerationError extends Error {
   code: 'llm-failed' | 'llm-invalid-output' | 'no-corpus' | 'busy' | 'unknown';
-  constructor(code: CaseFileGenerationError['code'], message: string) {
+  // خطایِ گذرایِ شبکه/سرویس (قطعِ اتصال، timeout، 429، 5xx) — تلاشِ دوباره‌ی بعدی احتمالاً موفق است.
+  transient: boolean;
+  constructor(code: CaseFileGenerationError['code'], message: string, opts: { transient?: boolean } = {}) {
     super(message);
     this.code = code;
+    this.transient = !!opts.transient;
     this.name = 'CaseFileGenerationError';
   }
 }

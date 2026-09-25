@@ -624,6 +624,56 @@ async function main() {
     try { rmSync(dir, { recursive: true, force: true }); } catch {}
   }
 
+  await t('H38 خطایِ گذرایِ LLM در مرحله‌ی پرونده ⇒ waiting/case-file-retry با فاصله‌ی ۶۰ث، بدونِ اعلانِ شکست؛ تلاشِ بعد موفق ⇒ done/done', async () => {
+    const w = newWorld();
+    const calls: boolean[] = [];
+    let n = 0;
+    const deps = makeDeps(w, {}, { caseFile: async (_c, _t, ctx) => { calls.push(ctx.lastAttempt); w.caseFileCalls++; return n++ === 0 ? 'transient' : 'generated'; } });
+    const job = newJob(w);
+    // قدم‌به‌قدم تا اولین فراخوانیِ پرونده (drive بعد از WAIT فوراً ادامه می‌دهد و تلاشِ دوم را هم اجرا می‌کرد).
+    for (let i = 0; i < 20 && w.caseFileCalls === 0; i++) await stepJob({ ...w.jobs.get(job.id)! }, deps);
+    let s = w.jobs.get(job.id)!;
+    assert.equal(s.stage, 'case_file');
+    assert.equal(s.caseFileStatus, 'waiting');
+    assert.equal(s.errorCode, 'case-file-retry');
+    assert.equal(s.nextAttemptInMs, 60_000);
+    assert.ok(!w.notifications.some((x) => x.kind === 'processing_failed'));
+    await drive(w, deps, job.id);
+    s = w.jobs.get(job.id)!;
+    assert.equal(s.stage, 'done'); assert.equal(s.caseFileStatus, 'done');
+    assert.deepEqual(calls, [false, false]);
+  });
+
+  await t('H39 خطایِ گذرایِ مداومِ LLM ⇒ ۳ تلاشِ دوباره (۱، ۵، ۱۵ دقیقه) و تلاشِ چهارم با lastAttempt=true ⇒ done/failed؛ متن دست‌نخورده', async () => {
+    const w = newWorld();
+    const calls: boolean[] = [];
+    const delays: number[] = [];
+    const deps = makeDeps(w, {}, { caseFile: async (_c, _t, ctx) => { calls.push(ctx.lastAttempt); return ctx.lastAttempt ? 'failed' : 'transient'; } });
+    const origUpdate = deps.store.update;
+    deps.store.update = async (j, p) => { if (p.errorCode === 'case-file-retry' && p.nextAttemptInMs) delays.push(p.nextAttemptInMs); await origUpdate(j, p); };
+    const job = newJob(w);
+    await drive(w, deps, job.id);
+    const s = w.jobs.get(job.id)!;
+    assert.equal(s.stage, 'done'); assert.equal(s.caseFileStatus, 'failed');
+    assert.deepEqual(calls, [false, false, false, true]);
+    assert.deepEqual(delays, [60_000, 5 * 60_000, 15 * 60_000]);
+    assert.equal(w.transcripts.get('se-1'), 'گوینده ۱: سلام');
+  });
+
+  await t('H40 isTransientLlmError: شبکه/timeout/429/5xx گذرا؛ 400/401/404 و خطایِ کلید نه', async () => {
+    const { isTransientLlmError } = await import('../server/src/features/case-file/adapters/llm/chatJson.js');
+    const withStatus = (status: number) => Object.assign(new Error('x'), { status });
+    assert.equal(isTransientLlmError(new Error('Invalid response body while trying to fetch https://openrouter.ai/api/v1/chat/completions: read ECONNRESET')), true);
+    assert.equal(isTransientLlmError(Object.assign(new Error('Connection error.'), { name: 'APIConnectionError' })), true);
+    assert.equal(isTransientLlmError(Object.assign(new Error('Request timed out.'), { name: 'APIConnectionTimeoutError' })), true);
+    assert.equal(isTransientLlmError(withStatus(429)), true);
+    assert.equal(isTransientLlmError(withStatus(502)), true);
+    assert.equal(isTransientLlmError(withStatus(400)), false);
+    assert.equal(isTransientLlmError(withStatus(401)), false);
+    assert.equal(isTransientLlmError(withStatus(404)), false);
+    assert.equal(isTransientLlmError(new Error('کلید OpenRouter روی سرور تنظیم نشده')), false);
+  });
+
   await t('H37 assembleUpload با ۳۰ تکه: فایلِ نهایی بایت‌به‌بایت درست، بدونِ MaxListenersExceededWarning (FINDINGِ لاگِ production 2026-09-25)', async () => {
     const { writeChunk, assembleUpload, removeUploadDir, UPLOAD_ROOT } = await import('../server/src/features/audio-upload/uploadStore.js');
     const dataDir = path.dirname(UPLOAD_ROOT);

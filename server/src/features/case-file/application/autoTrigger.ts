@@ -17,11 +17,13 @@ export function autoGenerateAllowedForActiveClients(): boolean {
   return process.env.CASE_FILE_AUTO_ACTIVE_CLIENTS === '1';
 }
 
-export type AutoCaseFileOutcome = 'not_applicable' | 'skipped' | 'generated' | 'busy' | 'failed';
+export type AutoCaseFileOutcome = 'not_applicable' | 'skipped' | 'generated' | 'busy' | 'failed' | 'transient';
 
 export interface AutoTriggerOptions {
   // برایِ jobِ آپلود: اعلانِ نتیجه (پرونده به‌روز شد / ناموفق) با همین job_id ثبت می‌شود.
   notify?: { jobId?: string | null; sessionId?: string | null };
+  // jobِ آپلود خودش دوباره تلاش می‌کند: خطایِ گذرایِ LLM ⇒ 'transient' بدونِ اعلانِ شکست (اعلان فقط در تلاشِ آخر).
+  retryTransient?: boolean;
 }
 
 export async function maybeAutoGenerateCaseFile(
@@ -59,6 +61,10 @@ export async function maybeAutoGenerateCaseFile(
     return skipped ? 'skipped' : 'generated';
   } catch (err) {
     if (err instanceof CaseFileGenerationError && err.code === 'busy') return 'busy';
+    if (opts.retryTransient && err instanceof CaseFileGenerationError && err.transient) {
+      console.log('[case-file] auto-generate خطایِ گذرا برایِ client=' + clientId + ' — jobِ آپلود دوباره تلاش می‌کند');
+      return 'transient';
+    }
     // خطاها فقط لاگ می‌شوند — بدونِ افشایِ متنِ بالینی (LAW-001). وضعیتِ رکورد در
     // client_case_file.status='error' می‌ماند (خودِ generateCaseFile این را ثبت می‌کند).
     console.log('[case-file] auto-generate ناموفق برایِ client=' + clientId + ':', err instanceof Error ? err.message : String(err));

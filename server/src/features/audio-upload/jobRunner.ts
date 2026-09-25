@@ -203,7 +203,9 @@ export function productionDeps(): JobDeps {
     },
     media: { probe: probeMedia, normalize: normalizeAudio },
     archive: (sessionId, filePath, mime, runId) => archiveAudioFileForAdmin(sessionId, filePath, mime, runId),
-    caseFile: (clientId, therapistId, ctx) => maybeAutoGenerateCaseFile(clientId, therapistId, { notify: ctx }),
+    caseFile: (clientId, therapistId, ctx) => maybeAutoGenerateCaseFile(clientId, therapistId, {
+      notify: { jobId: ctx.jobId, sessionId: ctx.sessionId }, retryTransient: !ctx.lastAttempt,
+    }),
     caseFileAfterUpload: uploadCaseFileAllowedForJob,
     fileExists: (p) => existsSync(p),
     quotaWaitMs: quotaWaitMsForJob,

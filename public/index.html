@@ -7196,6 +7196,7 @@ function jobMessage(job){
     if(job.error_code)return 'سرویسِ تبدیل به متن موقتاً در دسترس نیست — خودکار دوباره تلاش می‌کنیم. لازم نیست کاری بکنید.';
     return 'در حالِ تبدیل به متن و تفکیکِ گوینده‌ها… '+(job.duration_ms?'(صدایِ '+fmtDurationFa(job.duration_ms)+')':'');
   }
+  if(job.stage==='case_file'&&job.error_code==='case-file-retry')return 'متن آماده است؛ سرویسِ ساختِ پرونده موقتاً در دسترس نبود — خودکار دوباره تلاش می‌کنیم. لازم نیست کاری بکنید.';
   if(job.stage==='case_file')return job.case_file_status==='waiting'?'متن آماده است؛ پرونده منتظرِ پایانِ یک به‌روزرسانیِ دیگر است…':'متن آماده است؛ پرونده در حالِ به‌روزرسانی…';
   if(!job.transcript_ready||!job.transcript_chars)return 'در این فایل گفتاری تشخیص داده نشد.';
   if(job.case_file_status==='disabled')return 'متن با تفکیکِ گوینده در این جلسه ذخیره شد.';
