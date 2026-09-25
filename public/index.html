@@ -7201,16 +7201,28 @@ function jobMessage(job){
   if(job.case_file_status==='disabled')return 'متن با تفکیکِ گوینده در این جلسه ذخیره شد.';
   if(job.case_file_status==='done')return 'متن آماده است و پرونده به‌روز شد.';
   if(job.case_file_status==='failed')return 'متن آماده است؛ به‌روزرسانیِ خودکارِ پرونده ناموفق بود (از بخشِ پرونده دوباره تلاش کنید).';
+  if(job.case_file_status==='busy_gave_up')return 'متن آماده است؛ پرونده خودکار به‌روز نشد (به‌روزرسانیِ دیگری در جریان بود) — از بخشِ پرونده «به‌روزرسانی» را بزنید.';
   return 'متن آماده است.';
+}
+// مرحله‌ی «پرونده» فقط وقتی نمایش داده می‌شود که job واقعاً در مسیرِ پرونده است (سرور: uploadCaseFileAllowed در
+// jobMachine.ts — فعلاً پیش‌فرض خاموش، تصمیمِ مالک 2026-09-25). پیش از ثبتِ متن ملاک case_file_planned ِ سرور است؛
+// بعد از آن case_file_status.
+function jobHasCaseFileStep(job){
+  const cf=job.case_file_status;
+  if(cf==='disabled')return false;
+  if(UPLOAD_SHOW_CASE_FILE_STEP)return true;
+  if(job.stage==='case_file'||cf==='running'||cf==='waiting')return true;
+  if(job.transcript_ready)return !!cf&&cf!=='not_applicable';
+  if(job.stage==='failed')return false;
+  return job.case_file_planned===true;
 }
 function jobCardHtml(job,opts){
   opts=opts||{};
   let st=jobStepState(job);
   let labels=['دریافت','تبدیل به متن','متن آماده','پرونده'];
-  // تصمیمِ مالک (2026-09-24): مسیرِ آپلود فعلاً با ذخیره‌ی متن تمام می‌شود ⇒ مرحله‌ی «پرونده» نمایش داده نمی‌شود.
-  // سرور این را با case_file_status='disabled' اعلام می‌کند؛ پیش از پایان، از done/failed بودنِ job معلوم نیست ⇒
-  // UPLOAD_SHOW_CASE_FILE_STEP=false (هم‌گام با پیش‌فرضِ خاموشِ UPLOAD_CASE_FILE در سرور).
-  if(!UPLOAD_SHOW_CASE_FILE_STEP||job.case_file_status==='disabled'){
+  // تصمیمِ مالک (2026-09-24): آپلودِ مراجعِ فعال با ذخیره‌ی متن تمام می‌شود ⇒ مرحله‌ی «پرونده» نمایش داده نمی‌شود
+  // (سرور: case_file_status='disabled'). مراجعِ غیرفعال (2026-09-25) ⇒ jobHasCaseFileStep.
+  if(!jobHasCaseFileStep(job)){
     st=st.slice(0,3);
     labels=['دریافت','تبدیل به متن','متن ذخیره شد'];
   }

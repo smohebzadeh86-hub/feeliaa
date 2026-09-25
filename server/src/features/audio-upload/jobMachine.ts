@@ -16,12 +16,30 @@ import { MAX_DURATION_MS } from './media.js';
 
 export type JobStage = 'queued' | 'normalizing' | 'transcribing' | 'case_file' | 'done' | 'failed';
 export type CaseFileJobStatus = 'not_applicable' | 'skipped' | 'done' | 'failed' | 'busy_gave_up';
-// 'disabled' در ستونِ case_file_status یعنی: مسیرِ آپلود عمداً به پرونده نمی‌رسد (UPLOAD_CASE_FILE خاموش).
+// 'disabled' در ستونِ case_file_status یعنی: مسیرِ آپلود عمداً به پرونده نمی‌رسد (uploadCaseFileAllowed=false).
 
-// تصمیمِ مالک (2026-09-24): مسیرِ آپلود — برایِ مراجعِ فعال و غیرفعال — فعلاً با «ذخیره‌ی متن» تمام می‌شود؛
-// تبدیل به پرونده بعداً. مرحله‌ی case_file در کد می‌ماند و فقط با UPLOAD_CASE_FILE=1 فعال می‌شود.
+// تصمیمِ مالک (2026-09-24): مسیرِ آپلود — برایِ مراجعِ فعال — با «ذخیره‌ی متن» تمام می‌شود؛
+// UPLOAD_CASE_FILE=1 مرحله‌ی پرونده را برایِ همه روشن می‌کند.
 export function uploadCaseFileEnabled(): boolean {
   return process.env.UPLOAD_CASE_FILE === '1';
+}
+
+// مراجعِ غیرفعال (پیاده‌سازی 2026-09-25): جلسه‌هایِ ضبط‌شده‌ی قبلی با آپلود به پرونده تبدیل می‌شوند — همان سیاستِ جلسه‌ی
+// زنده/دستی (autoTrigger.ts): فیچرِ پرونده برایِ حساب (case_file_enabled) + «پرونده‌ی خودکار» روشن.
+// ⭐ تصمیمِ مالک (همان روز، بعد از E2E): «فعلاً فقط متن ذخیره بشه» ⇒ پشتِ UPLOAD_CASE_FILE_INACTIVE=1، پیش‌فرض خاموش.
+// خاموش ⇒ مسیر با ذخیره‌ی متن تمام می‌شود (disabled)؛ «به‌روزرسانی»ِ دستیِ پرونده متنِ آپلودی را هم می‌خواند.
+export function uploadCaseFileInactiveEnabled(): boolean {
+  return process.env.UPLOAD_CASE_FILE_INACTIVE === '1';
+}
+export interface UploadCaseFileContext {
+  clientStatus: string | null;
+  caseFileEnabled: boolean;
+  autoGenerate: boolean | null;
+}
+export function uploadCaseFileAllowed(ctx: UploadCaseFileContext): boolean {
+  if (uploadCaseFileEnabled()) return true;
+  if (!uploadCaseFileInactiveEnabled()) return false;
+  return ctx.clientStatus === 'inactive' && ctx.caseFileEnabled === true && ctx.autoGenerate === true;
 }
 
 export interface SourcePart { uploadId: string; path: string; }
@@ -79,8 +97,8 @@ export interface JobDeps {
   media: MediaPort;
   archive(sessionId: string, filePath: string, mime: string, runId: string): Promise<{ path: string; durationMs: number | null }>;
   caseFile(clientId: string, therapistId: string, ctx: { jobId: string; sessionId: string }): Promise<'not_applicable' | 'skipped' | 'generated' | 'busy' | 'failed'>;
-  // آیا بعد از ثبتِ متن، مرحله‌ی پرونده اجرا شود؟ (تصمیمِ مالک 2026-09-24: فعلاً نه — نه برایِ فعال، نه غیرفعال)
-  caseFileAfterUpload(): boolean;
+  // آیا بعد از ثبتِ متن، مرحله‌ی پرونده اجرا شود؟ (uploadCaseFileAllowed — فعلاً پیش‌فرض خاموش؛ تصمیمِ مالک 2026-09-25)
+  caseFileAfterUpload(job: AudioJob): boolean | Promise<boolean>;
   fileExists(p: string): boolean;
   // رفعِ L6 (audit 2026-09-24): سقفِ هزینه‌ی Soniox برایِ هر تراپیست. >0 یعنی «فعلاً صبر کن» (میلی‌ثانیه) — job هرگز
   // به‌خاطرِ سقف رد/failed نمی‌شود؛ صدا رویِ سرور می‌ماند و بعداً خودکار ادامه می‌یابد. نبودِ این port ⇒ بدونِ سقف.
@@ -286,7 +304,7 @@ async function stepTranscribe(job: AudioJob, deps: JobDeps): Promise<StepResult>
     // متن رویِ Soniox آماده است؛ فقط دریافت شکست خورد ⇒ تلاشِ ارزانِ کوتاه‌مدت.
     return transient(job, deps, 'soniox-unavailable', {}, e, true);
   }
-  const res = await deps.store.applyTranscriptOnce(job, text, deps.caseFileAfterUpload() ? 'case_file' : 'done');
+  const res = await deps.store.applyTranscriptOnce(job, text, (await deps.caseFileAfterUpload(job)) ? 'case_file' : 'done');
   deps.log(`[audio-job] ${job.id} transcript ${res} chars=${text.trim().length}`);
   // متن ذخیره شد (یا قبلاً شده بود) ⇒ صدا/متن رویِ Soniox دیگر لازم نیست (حریمِ خصوصی).
   await cleanupRemote(job, deps);

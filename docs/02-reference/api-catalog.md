@@ -155,7 +155,7 @@ UIِ فعلی فقط برایِ `status='inactive'` رندر می‌شود. جز
 | GET | `/api/notifications` | — | `{notifications[30], unread}` — هر ردیف `{id, kind, client_id, session_id, job_id, error_code, created_at, read_at, client_code, client_alias, session_num}` | — | UI |
 | POST | `/api/notifications/read` | `{ids?: string[] (≤100)}` یا `{all:true}` | `{ok:true}` | — | UI |
 
-`AudioJobView` = `{id, stage:"queued"|"normalizing"|"transcribing"|"case_file"|"done"|"failed", attempts, error_code, duration_ms, case_file_status, transcript_ready, transcript_chars, created_at, updated_at, finished_at, next_attempt_at, session_id, session_num, client_id, client_code, client_alias, original_name}`.
+`AudioJobView` = `{id, stage:"queued"|"normalizing"|"transcribing"|"case_file"|"done"|"failed", attempts, error_code, duration_ms, case_file_status, transcript_ready, transcript_chars, created_at, updated_at, finished_at, next_attempt_at, session_id, session_num, client_id, client_code, client_alias, client_status, case_file_planned, original_name, parts_total}` (2026-09-25: `client_status` وضعیتِ فعلیِ مراجع؛ `case_file_planned` = خروجیِ `uploadCaseFileAllowed` با وضعیتِ فعلی — UI پیش از ثبتِ متن با آن مرحله‌ی «پرونده» را نشان می‌دهد؛ پیش‌فرض false).
 
 **تغییرِ مرتبط:** `GET /api/clients/:id` حالا `sessions[].batch_status` هم برمی‌گرداند؛ `PUT /api/sessions/:id` پاک‌کردنِ تاریخ را برایِ `source='upload'` هم می‌پذیرد (مثلِ `manual`).
 

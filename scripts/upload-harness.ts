@@ -1,4 +1,4 @@
-// هارنسِ pipelineِ آپلودِ صدا (migration 023) — بدونِ DB/شبکه/Sonioxِ واقعی؛ دادهٔ ساختگی.
+﻿// هارنسِ pipelineِ آپلودِ صدا (migration 023) — بدونِ DB/شبکه/Sonioxِ واقعی؛ دادهٔ ساختگی.
 // ماشینِ حالت (jobMachine.ts) با portهایِ جعلی تست می‌شود: idempotency، ری‌استارت، retry/backoff،
 // خطایِ دائمی، تکرار، سکوت، پرونده‌ی busy. بخشِ media با ffmpegِ واقعی رویِ فایل‌هایِ ساختگیِ
 // تولیدشده در پوشه‌ی موقت اجرا می‌شود (اگر ffmpeg نباشد SKIP).
@@ -433,6 +433,43 @@ async function main() {
     process.env.UPLOAD_CASE_FILE = '1';
     assert.equal(uploadCaseFileEnabled(), true);
     if (prev === undefined) delete process.env.UPLOAD_CASE_FILE; else process.env.UPLOAD_CASE_FILE = prev;
+  });
+
+  await t('H35 (تصمیمِ مالک 2026-09-25) سیاست: پیش‌فرض همه فقط متن؛ با UPLOAD_CASE_FILE_INACTIVE=1 فقط غیرفعال + فیچرِ پرونده + خودکارِ روشن ⇒ پرونده', async () => {
+    const { uploadCaseFileAllowed } = await import('../server/src/features/audio-upload/jobMachine.js');
+    const prev = process.env.UPLOAD_CASE_FILE;
+    const prevI = process.env.UPLOAD_CASE_FILE_INACTIVE;
+    delete process.env.UPLOAD_CASE_FILE;
+    delete process.env.UPLOAD_CASE_FILE_INACTIVE;
+    const base = { clientStatus: 'inactive', caseFileEnabled: true, autoGenerate: true as boolean | null };
+    assert.equal(uploadCaseFileAllowed(base), false, 'پیش‌فرض: غیرفعال هم فقط متن');
+    process.env.UPLOAD_CASE_FILE_INACTIVE = 'true';
+    assert.equal(uploadCaseFileAllowed(base), false, 'فقط «1» روشن می‌کند');
+    process.env.UPLOAD_CASE_FILE_INACTIVE = '1';
+    assert.equal(uploadCaseFileAllowed(base), true);
+    assert.equal(uploadCaseFileAllowed({ ...base, clientStatus: 'active' }), false, 'مراجعِ فعال همچنان فقط متن');
+    assert.equal(uploadCaseFileAllowed({ ...base, caseFileEnabled: false }), false, 'حسابِ بدونِ فیچرِ پرونده');
+    assert.equal(uploadCaseFileAllowed({ ...base, autoGenerate: false }), false, 'پرونده‌ی خودکار خاموش');
+    assert.equal(uploadCaseFileAllowed({ ...base, autoGenerate: null }), false, 'هنوز پاسخ نداده (NULL)');
+    process.env.UPLOAD_CASE_FILE = '1';
+    assert.equal(uploadCaseFileAllowed({ ...base, clientStatus: 'active' }), true, 'سوئیچِ سراسری همچنان کار می‌کند');
+    if (prev === undefined) delete process.env.UPLOAD_CASE_FILE; else process.env.UPLOAD_CASE_FILE = prev;
+    if (prevI === undefined) delete process.env.UPLOAD_CASE_FILE_INACTIVE; else process.env.UPLOAD_CASE_FILE_INACTIVE = prevI;
+  });
+
+  await t('H36 تصمیمِ پرونده per-job (async) است: jobِ مراجعِ غیرفعال ⇒ case_file ⇒ پرونده یک بار؛ jobِ مراجعِ فعال ⇒ done/disabled', async () => {
+    const w = newWorld();
+    const seen: string[] = [];
+    const deps = makeDeps(w, {}, { caseFileAfterUpload: async (job) => { seen.push(job.clientId); return job.clientId === 'cl-inactive'; } });
+    const a = newJob(w, { clientId: 'cl-inactive', sessionId: 'se-a' });
+    await drive(w, deps, a.id);
+    const b = newJob(w, { clientId: 'cl-active', sessionId: 'se-b', uploadId: 'up-2' });
+    await drive(w, deps, b.id);
+    const sa = w.jobs.get(a.id)!; const sb = w.jobs.get(b.id)!;
+    assert.equal(sa.stage, 'done'); assert.equal(sa.caseFileStatus, 'done');
+    assert.equal(sb.stage, 'done'); assert.equal(sb.caseFileStatus, 'disabled');
+    assert.equal(w.caseFileCalls, 1, 'پرونده فقط برایِ غیرفعال');
+    assert.deepEqual(seen, ['cl-inactive', 'cl-active'], 'تصمیم یک بار، هنگامِ ثبتِ متن');
   });
 
   // ————— توابعِ خالص —————

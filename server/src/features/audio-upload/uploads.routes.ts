@@ -30,7 +30,7 @@ import {
 } from './uploadStore.js';
 import { ACCEPTED_EXTENSIONS, MAX_DURATION_MS, extensionOf, probeMedia, sniffObviouslyNotAudio } from './media.js';
 import { wakeAudioJobWorker, parseSourceParts } from './jobRunner.js';
-import { uploadCaseFileEnabled } from './jobMachine.js';
+import { uploadCaseFileEnabled, uploadCaseFileAllowed } from './jobMachine.js';
 import { existsSync } from 'node:fs';
 import { hasStoredConsent, recordClientConsent } from '../../http/clientConsent.js';
 import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../../http/sessions.js';
@@ -78,11 +78,12 @@ function uploadView(u: any, received?: number[]) {
 
 const JOB_SELECT = `SELECT j.id, j.stage, j.attempts, j.error_code, j.duration_ms, j.case_file_status,
     j.transcript_applied_at, j.transcript_chars, j.created_at, j.updated_at, j.finished_at, j.next_attempt_at,
-    j.session_id, j.client_id, j.upload_id, s.session_num, c.code AS client_code, c.alias AS client_alias,
-    u.original_name, u.parts_total
+    j.session_id, j.client_id, j.upload_id, s.session_num, c.code AS client_code, c.alias AS client_alias, c.status AS client_status,
+    u.original_name, u.parts_total, t.case_file_enabled AS t_case_file_enabled, t.case_file_auto_generate AS t_case_file_auto_generate
   FROM audio_jobs j
   JOIN sessions s ON s.id = j.session_id
   JOIN clients c ON c.id = j.client_id
+  JOIN therapists t ON t.id = j.therapist_id
   JOIN audio_uploads u ON u.id = j.upload_id`;
 
 function jobView(j: any) {
@@ -104,6 +105,13 @@ function jobView(j: any) {
     client_id: j.client_id,
     client_code: j.client_code,
     client_alias: j.client_alias,
+    client_status: j.client_status ?? null,
+    // پیش از ثبتِ متن: آیا این job (با وضعیتِ فعلی) به مرحله‌ی پرونده می‌رود؟ تنها منبعِ UI برایِ stepper (همان uploadCaseFileAllowed).
+    case_file_planned: uploadCaseFileAllowed({
+      clientStatus: j.client_status ?? null,
+      caseFileEnabled: !!j.t_case_file_enabled,
+      autoGenerate: j.t_case_file_auto_generate === null || j.t_case_file_auto_generate === undefined ? null : !!j.t_case_file_auto_generate,
+    }),
     original_name: j.original_name,
     parts_total: j.parts_total ?? null,
   };
@@ -125,7 +133,9 @@ function failedJobRetryability(job: any): { ok: true; stage: string } | { ok: fa
   if (DEAD_JOB_CODES.includes(job.error_code)) {
     return { ok: false, status: 422, code: job.error_code, error: 'این فایل قابلِ پردازش نیست — تلاشِ دوباره کمکی نمی‌کند' };
   }
-  if (job.transcript_applied_at && !uploadCaseFileEnabled()) {
+  // متن ثبت شده ⇒ تنها کارِ باقی مرحله‌ی پرونده است؛ فقط jobی که واقعاً در آن مرحله شکست خورد (running/waiting —
+  // مراجعِ غیرفعال، تصمیمِ مالک 2026-09-25) دوباره به صف می‌رود.
+  if (job.transcript_applied_at && !uploadCaseFileEnabled() && !['running', 'waiting'].includes(job.case_file_status)) {
     return { ok: false, status: 409, code: 'not-failed', error: 'متنِ این جلسه قبلاً ذخیره شده است' };
   }
   return { ok: true, stage: job.transcript_applied_at ? 'case_file' : hasNormalized ? 'transcribing' : 'normalizing' };

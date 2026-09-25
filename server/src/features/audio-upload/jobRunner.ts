@@ -15,7 +15,7 @@ import {
 } from '../../stt/asyncTranscribe.js';
 import { probeMedia, normalizeAudio } from './media.js';
 import { uploadDir, removeUploadDir } from './uploadStore.js';
-import { stepJob, giveUpJob, uploadCaseFileEnabled, type AudioJob, type JobDeps, type JobPatch, type JobStore, type CaseFileJobStatus, type SourcePart } from './jobMachine.js';
+import { stepJob, giveUpJob, uploadCaseFileEnabled, uploadCaseFileAllowed, type AudioJob, type JobDeps, type JobPatch, type JobStore, type CaseFileJobStatus, type SourcePart } from './jobMachine.js';
 import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
 
 export const UPLOAD_TRANSCRIPT_LABEL_PREFIX = '[متنِ فایلِ صوتیِ آپلودشده]';
@@ -173,6 +173,23 @@ export const sqlJobStore: JobStore = {
   },
 };
 
+// وضعیتِ لحظه‌ی ثبتِ متن خوانده می‌شود (مراجعی که وسطِ پردازش فعال/غیرفعال شد، وضعیتِ فعلی‌اش ملاک است).
+export async function uploadCaseFileAllowedForJob(job: AudioJob): Promise<boolean> {
+  const r = await query(
+    `SELECT c.status, t.case_file_enabled, t.case_file_auto_generate
+       FROM clients c JOIN therapists t ON t.id = c.therapist_id
+      WHERE c.id = ? AND c.therapist_id = ?`,
+    [job.clientId, job.therapistId]
+  );
+  const row = r.rows[0];
+  if (!row) return uploadCaseFileEnabled();
+  return uploadCaseFileAllowed({
+    clientStatus: row.status ?? null,
+    caseFileEnabled: !!row.case_file_enabled,
+    autoGenerate: row.case_file_auto_generate === null || row.case_file_auto_generate === undefined ? null : !!row.case_file_auto_generate,
+  });
+}
+
 export function productionDeps(): JobDeps {
   return {
     store: sqlJobStore,
@@ -187,7 +204,7 @@ export function productionDeps(): JobDeps {
     media: { probe: probeMedia, normalize: normalizeAudio },
     archive: (sessionId, filePath, mime, runId) => archiveAudioFileForAdmin(sessionId, filePath, mime, runId),
     caseFile: (clientId, therapistId, ctx) => maybeAutoGenerateCaseFile(clientId, therapistId, { notify: ctx }),
-    caseFileAfterUpload: uploadCaseFileEnabled,
+    caseFileAfterUpload: uploadCaseFileAllowedForJob,
     fileExists: (p) => existsSync(p),
     quotaWaitMs: quotaWaitMsForJob,
     normalizedOutBase: (job) => path.join(uploadDir(job.uploadId), 'normalized'),
