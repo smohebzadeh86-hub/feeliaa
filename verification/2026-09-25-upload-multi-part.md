@@ -55,4 +55,4 @@
 ## تست‌نشده (صادقانه)
 - رونویسیِ واقعی با Soniox رویِ فایلِ وصل‌شده (مرحله‌ی Soniox همان کدِ تک‌فایلی است؛ فقط ورودیِ آن تغییر کرده).
 - مسیرِ کاملِ مرورگر ← سرورِ واقعی (UI با mock تست شد، سرور با inject).
-- deploy نشده؛ commit نشده.
+- ~~deploy نشده؛ commit نشده~~ ⇒ commit `45b0482` و deploy به production (همان روز). smoke رویِ production: migration 025 applied، health ok، فایل‌هایِ تازه از nginx سرو می‌شوند، routeهایِ تازه 401 بدونِ نشست. آپلودِ واقعیِ چندفایلی رویِ production انجام نشد.
