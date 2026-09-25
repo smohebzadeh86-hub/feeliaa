@@ -2,7 +2,7 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-25 — آخرین رویداد: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — migration 025 (اعمال‌شده رویِ dev)؛ `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16؛ commit/deploy نشده.** قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
+> **آخرین به‌روزرسانی:** 2026-09-25 — آخرین رویداد: **تلاشِ دوباره‌ی خودکار برایِ خطایِ گذرایِ LLM در پرونده‌ی آپلود + E2Eِ کامل از UIِ واقعی (۵ سناریو PASS)؛ `test:up` 41/41؛ commitهای جدا.** پیش از آن: **رفعِ `MaxListenersExceededWarning` در `assembleUpload` (الحاقِ تکه‌هایِ آپلودِ ≥۱۰ تکه؛ بی‌ضرر برایِ داده)؛ `test:up` 38/38 با mutation-check؛ deploy شد به production (health ok)؛ commit نشده.** پیش از آن: **deploy به production: آپلود فعلاً برایِ همه فقط متن؛ مسیرِ «مراجعِ غیرفعال ⇒ پرونده» (E2Eِ واقعی PASS) رویِ سرور هست ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است؛ health ok؛ commit نشده.** پیش از آن: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — commit `45b0482` (push نشده) و deploy به production؛ migration 025 applied؛ health ok.** پیش از آن: `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16. قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
 > health ok، `SONIOX_ORPHAN_SWEEP=1`، nginxِ زنده کافی بود و تغییری نکرد). پیش از آن: auditِ باگ و رفعِ B2، B3، M1–M4، M6 و L*؛
 > `test:up` 29/29 و E2Eِ DBِ dev 13/13. commit نشده.** قبل‌ترش: **مسیرِ آپلود (فعال و غیرفعال) فقط تا ذخیره‌ی متن؛ پرونده خاموش پشتِ
 > `UPLOAD_CASE_FILE`؛ `test:up` 26/26 + E2Eِ واقعی PASS.** قبل‌ترش: **تستِ کاملِ واقعیِ فیچرِ آپلود (Soniox/LLM/MySQL، فایلِ ۶۰دقیقه‌ای،
@@ -255,7 +255,7 @@
 | ریشه‌ی واقعیِ «realtimeِ یادداشتِ صوتی وصل نمی‌شه» | ✅ **رفع و commit شد** (`2551943`) — مالک تأیید کرد جلسه‌ی اصلی مشکلی نداشت، فقط یادداشت؛ چون کدِ اتصال بینِ این دو مشترکه، دنبالِ چیزی گشتیم که *قبل*ِ اون کدِ مشترک فرق می‌کرد: `POST /api/stt/realtime-session` (mintِ credential) رویِ جلسه‌ی `completed` همیشه ۴۰۰ می‌داد، بدونِ تفکیکِ purpose — و تنها نقطه‌ی UIِ یادداشتِ صوتی (Wrapup) همیشه *بعد*ِ completed‌شدن اجرا می‌شه. یعنی یادداشتِ صوتی هیچ‌وقت credential نمی‌گرفت، حتی قبل از تلاش برایِ WS. با پارامترِ `purpose` ('note'/'transcript') رفع شد؛ رفتارِ جلسه‌ی اصلی (که purpose نمی‌فرسته) دست‌نخورده ماند. تأیید شد مستقیم رویِ سرورِ لوکال: `purpose=note` رویِ جلسه‌ی completed حالا `200`+`api_key` واقعی می‌ده (قبلاً ۴۰۰) | 2026-09-14 | [ui-ux-audit §ریشه‌ی realtime](docs/05-plans/ui-ux-audit-2026-09-14.md#رفعِ-ریشه‌ی-واقعیِ-realtimeِ-یادداشتِ-صوتی--2026-09-14) |
 | Clarity (محلی) | ✅ route 10/10، sandbox 41/41 | 2026-09-14 | [evidence](verification/2026-09-14-clarity-test-pass.md) |
 | Clarity (تولید، دادهٔ واقعی) | ❗ کد درست کار می‌کند ولی **صفر traffic رسیده** — `ERR_CONNECTION_CLOSED` به `clarity.ms` از مرورگرِ مالک، تأییدشده با Data Export API (`Traffic:[]`). علتِ محتملِ INFERRED: فیلترینگِ شبکه (VPN/ISP/سراسری) — هنوز تفکیک نشده | 2026-09-14 | §7 Event Log (FINDING) |
-| Production | `feelia.ir` = پروسه‌ی pm2 `feelia-mysql` در `/root/feeliaa-mysql` (checkoutِ بدونِ git، deploy با tar) = **working treeِ `8bf9387` + hotfixِ commitنشده‌ی 2026-09-23 عصر** (دُمِ liveRec رویِ WSِ تازه، بازنویسیِ متنِ batch در rebaseِ 409، `Cache-Control: no-cache`، سؤالِ پرونده فقط با `case_file_enabled`)؛ migrationها تا `022`. `/root/feeliaa` (پروسه‌ی `feelia`) stopped و قدیمی است | 2026-09-23 | §7 Event Log — BUG+FIX+DEPLOY 2026-09-23 (hotfix) |
+| Production | `feelia.ir` = پروسه‌ی pm2 `feelia-mysql` در `/root/feeliaa-mysql` (checkoutِ بدونِ git، deploy با tar) = **commitِ `45b0482` + working treeِ commitنشده‌ی 2026-09-25** (UIِ رضایت بدونِ متن/لغو؛ سیاستِ پرونده‌ی آپلود با `UPLOAD_CASE_FILE_INACTIVE` — تنظیم‌نشده ⇒ آپلود فقط متن)؛ migrationها تا `025`. `/root/feeliaa` (پروسه‌ی `feelia`) stopped و قدیمی است | 2026-09-25 | §7 Event Log — DEPLOY 2026-09-25 («فعلاً فقط متن») |
 | مستندات | ✅ ساختارِ کامل؛ ❗ هیچ سندی توسطِ مالک review نشده | 2026-09-14 | [documentation-map](docs/00-governance/documentation-map.md) |
 | ریسکِ بحرانیِ باز | ❗ R1 (متنِ رضایت ↔ ذخیره‌ی صدا، UI-05/UX-004)؛ ❗ **R15** (یادداشت/علامت در شکستِ ذخیره بی‌صدا از دست می‌رود، UX-001)، **R16** (متنِ یادداشت‌ها در پرونده نمایش داده نمی‌شود، UX-002)، **R17** (خروج در حالتِ ضبطِ محلی با میکروفونِ روشن، UX-003) — هر سه در HEAD `8347fbb` و production؛ R12–R14 محلی رفع شد ولی روی production هنوز فعال | 2026-09-14 | [Master Reference §22](PROJECT_MASTER_REFERENCE.md) |
 | UX audit | 42 یافته (Critical ۵، High ۱۴، Medium ۱۸، Low ۵)؛ پس از commitهای هم‌زمان: ۷ جزئی رفع، ۰ کامل؛ ۱۲ سؤالِ باز؛ roadmap = PROPOSED | 2026-09-14 | [UX_AUDIT_REPORT](docs/05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) |
@@ -393,6 +393,137 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-25 — CODE + TEST (E2E کامل از UI) — تلاشِ دوباره‌ی خودکار برایِ خطایِ گذرایِ LLM در پرونده‌ی آپلود
+- **دستورِ مالک:** «حل کن تمامِ مشکلات رو که … کاربر هیچ مشکلی نداشته باشه، تستِ کامل رو انجام بده و بعدش تیکه‌تیکه کامیت کن».
+- **رفع:** خطایِ گذرایِ OpenRouter (ECONNRESETِ E2Eِ قبلی) در مرحله‌ی پرونده‌ی jobِ آپلود ⇒ `waiting` + `case-file-retry`، تلاشِ دوباره بعد از ۱/۵/۱۵ دقیقه، اعلانِ شکست
+  فقط در تلاشِ آخر (`errors.ts`، `chatJson.ts#isTransientLlmError`، `autoTrigger.ts#retryTransient`، `jobMachine.ts`، `jobRunner.ts`، پیامِ UI). مسیرِ جلسه‌ی زنده عوض نشد.
+  در production تا روشن‌شدنِ `UPLOAD_CASE_FILE_INACTIVE` اثری ندارد.
+- **تست:** `test:up` **41/41** (H38–H40)، `test:cf` 108/108، `tsc` تمیز. **E2Eِ واقعی از UI** (dev + Soniox + OpenRouter، canary): تک‌فایل با کلیکِ واقعی،
+  فایلِ ۶۶MBِ ۱۷تکه (بدونِ هشدارِ MaxListeners)، دوبخشی، غیرفعال با سوئیچِ خاموش (فقط متن)، غیرفعال با سوئیچِ روشنِ موقت (پرونده `ready`) — همه PASS.
+  پاک‌سازی کامل، `server/.env` برگشت. جزئیات: [verification](verification/2026-09-25-upload-full-e2e-ui.md).
+- **اسناد:** subsystem 06، error-code-catalog (`case-file-retry`). deploy نشده (رویِ production بی‌اثر است تا سوئیچ روشن شود). **عامل:** این نشست.
+
+### 2026-09-25 — DEPLOY — رفعِ `MaxListenersExceededWarning` (`assembleUpload`) رویِ production
+- **مجوز:** «دیپلوی کن رو سرور».
+- **پیش از deploy:** `test:up` 38/38، `test:cf` 108/108، `tsc` تمیز، build موفق (dist شاملِ رفع). تنها فایلِ کدِ متفاوت با production: `uploadStore.ts` (prod `efd98f44` ⇒ لوکال `3e65ef45`)؛
+  `jobMachine.ts` و `index.html` از قبل یکسان. جلسه‌ی زنده ۰، آپلودِ در جریان ۰، jobِ فعال ۰. migration ندارد.
+- **deploy** (deployment-operations §۵): backupِ کد `/root/feeliaa-mysql-backup-before-assemble-fix-20260925T082253Z.tar.gz`؛ tar (۰ ورودیِ `.env`/`data`/`node_modules`)
+  ← extract ← `pnpm install --frozen-lockfile` ← `pm2 restart feelia-mysql --update-env`؛ tarِ موقت حذف شد.
+- **تأیید:** health `ok/connected`؛ online، restarts=11، pid 98987؛ `uploadStore.ts` رویِ دیسک = `3e65ef45` و dist شاملِ رفع؛ `025 already applied`؛ `POST /api/uploads` بدونِ نشست ⇒ 401؛
+  `index.html`ِ سروشده `2073d260` (بدونِ تغییر)؛ `UPLOAD_CASE_FILE*` همچنان تنظیم‌نشده (آپلود فقط متن). خطِ هشدارِ باقی در لاگ مالِ pid قدیمیِ 85051 است.
+- **تست‌نشده رویِ production:** آپلودِ واقعیِ ≥۱۰ تکه بعد از deploy (رفع با H37 + mutation لوکال تأیید شده). commit نشده. **عامل:** این نشست.
+
+### 2026-09-25 — BUG + FIX + TEST — `MaxListenersExceededWarning` در الحاقِ تکه‌هایِ آپلود (`assembleUpload`)
+- **دستورِ مالک:** «MaxListenersExceededWarning یعنی چی، بررسیش کن» (FINDINGِ deployِ قبلی).
+- **ریشه:** `server/src/features/audio-upload/uploadStore.ts#assembleUpload` همه‌ی تکه‌ها را با `pipeline(readStream, ws, {end:false})` در حلقه رویِ **یک** `WriteStream`
+  می‌ریخت؛ هر دور شنونده‌هایِ `error/close/finish/end` رویِ همان stream می‌ماند ⇒ از ۱۰ تکه (~۳۶MB) به بالا هشدارِ Node. نشتِ محدود به عمرِ همان
+  یک stream (بعد از الحاق آزاد می‌شد)؛ فایلِ نهایی درست بود — **هیچ داده‌ای خراب/گم نشده**.
+- **شاهدِ production (فقط خواندن):** ۴ خطِ error.log یک رویدادند (همان ۴ نوع شنونده، pid 85051)؛ تنها آپلودِ ≥۱۰ تکه در ۱۴ روز: 09-24 23:27، ۹۵ تکه، `complete`.
+- **بازتولیدِ لوکال:** ۱۰/۱۱/۳۰ تکه ⇒ هشدار (بایت‌ها درست). **رفع:** هر تکه با `WriteStream`ِ جداگانه (`flags: 'w'` برایِ اولی، `'a'` برایِ بقیه) و `pipeline`ِ کامل
+  که خودش stream را می‌بندد ⇒ بعد از رفع: بدونِ هشدار، بایت‌ها درست.
+- **تست:** H37ِ تازه در `scripts/upload-harness.ts` (۳۰ تکه: برابریِ بایت‌به‌بایت + صفر هشدار؛ پوشه‌ی `data/`ِ ساخته‌شده پاک می‌شود). **mutation:** با `uploadStore.ts`ِ
+  HEAD ⇒ H37 FAIL (37/1)؛ با رفع ⇒ `test:up` **38/38**. `tsc` تمیز.
+- deploy: رویدادِ بالا؛ commit نشده. **عامل:** این نشست.
+
+### 2026-09-25 — DEPLOY — «فعلاً فقط متن» + مسیرِ خاموشِ «غیرفعال ⇒ پرونده» رویِ production
+- **مجوز:** «دیپلوی کن رو سرور».
+- **پیش از deploy (لوکال):** `test:up` 37/37، `test:cf` 108/108، `test:rt` exit 0، `tsc` تمیز، `pnpm --filter server run build` موفق (dist شاملِ `UPLOAD_CASE_FILE_INACTIVE`/`case_file_planned`).
+- **پیش‌بررسیِ production (فقط خواندن):** `feelia-mysql` online (restarts=9)؛ ۳ فایلِ سرور = `45b0482`، `index.html` = `1db48e03` (نسخه‌ی deployشده‌ی UIِ رضایت)؛
+  diffِ `index.html`ِ prod با لوکال فقط hunkهایِ همین کار؛ جلسه‌ی زنده ۰، آپلودِ در جریان ۰، jobِ فعال ۰؛ `UPLOAD_CASE_FILE*` در `.env` تنظیم نیست.
+- **deploy** (deployment-operations §۵؛ migration ندارد ⇒ backupِ DB لازم نبود): backupِ کد `/root/feeliaa-mysql-backup-before-upload-inactive-20260925T080623Z.tar.gz`
+  ← tar (بدونِ `.env`/`data`/`node_modules`، بررسی شد) ← extract ← `pnpm install --frozen-lockfile` («Already up to date») ← `pm2 restart feelia-mysql --update-env`.
+- **تأیید:** health `ok/connected`؛ online، restarts=10، pid تازه؛ `[db] ✓ 025 (already applied)`؛ hashهایِ رویِ دیسک = لوکال (`925b4bb7`، `4f0220ed`، `038846bf`، `2073d260`)؛
+  `index.html`ِ سروشده از nginx = `2073d260` و شاملِ `jobHasCaseFileStep`؛ `GET /api/audio-jobs` و `POST /api/uploads` بدونِ نشست ⇒ 401؛ سوئیچ‌ها همچنان تنظیم‌نشده
+  ⇒ **رفتارِ production: آپلودِ همه‌ی مراجعین فقط متن** (مثلِ قبل). tarِ موقت رویِ سرور حذف شد.
+- **FINDING (نامرتبط، از قبل):** ۴ `MaxListenersExceededWarning` (WriteStream) در error.log از پروسه‌ی قبلی (pid 85051)؛ پروسه‌ی تازه (98139) هنوز ندارد. → بررسی و رفع در رویدادِ بالا (`assembleUpload`).
+- **تست‌نشده رویِ production:** آپلودِ واقعی بعد از deploy (smoke با داده‌ی واقعی انجام نشد).
+- commit نشده (production از working tree است). **عامل:** این نشست.
+
+### 2026-09-25 — DECISION + CODE + TEST — «فعلاً فقط متن»: پرونده از آپلودِ غیرفعال پشتِ `UPLOAD_CASE_FILE_INACTIVE` (پیش‌فرض خاموش)
+- **دستورِ مالک:** «الان می‌خوام متن فعلاً ذخیره بشه … بعدش اگه خواستم پرونده ساخته بشه، چون پرونده الان برای همه‌ی کاربرها فعال نیست».
+- **تغییر:** `jobMachine.ts` — `uploadCaseFileInactiveEnabled()` (`UPLOAD_CASE_FILE_INACTIVE === '1'`) پیش‌شرطِ مسیرِ غیرفعال در `uploadCaseFileAllowed`.
+  `uploads.routes.ts` — `JOB_SELECT` به `therapists` join می‌شود و `jobView.case_file_planned` (همان تابع) را برمی‌گرداند. `public/index.html` —
+  `jobHasCaseFileStep` پیش از ثبتِ متن از `case_file_planned` می‌خواند (دیگر حدسِ سمتِ کلاینت نیست ⇒ روشن‌کردن فقط با env)؛ جمله‌ی «پرونده خودکار
+  به‌روز می‌شود» از مودالِ آپلود برداشته شد. هارنس: H27/H28ِ این کار (شماره‌ی تکراری با تست‌هایِ M1/M2) ⇒ **H35/H36**؛ H35 پیش‌فرضِ خاموش را هم چک می‌کند.
+- **رفتارِ فعلی:** آپلود برایِ فعال و غیرفعال ⇒ `done/disabled`، فقط متن (مثلِ 2026-09-24). «به‌روزرسانی»ِ دستیِ پرونده متنِ آپلودی را می‌خواند.
+  روشن‌کردنِ بعدی: `UPLOAD_CASE_FILE_INACTIVE=1` در `.env`ِ پروسه‌ی زنده + ری‌استارت.
+- **تست:** `pnpm test:up` **37/37**؛ `tsc` تمیز؛ `server/.env` هیچ‌کدام از دو سوئیچ را ندارد. UI (Browser pane، jobِ ساختگی): `case_file_planned:false` ⇒ ۳ مرحله
+  حتی برایِ غیرفعال؛ `true` ⇒ ۴ مرحله؛ مودال متنِ قبلی. E2Eِ واقعیِ قبلی (رویدادِ زیر) مسیرِ روشن را پوشش می‌دهد؛ مسیرِ خاموش همان مسیرِ E2Eِ S2/S3 است.
+- **اسنادِ به‌روزشده:** subsystem 06، configuration-catalog (متغیرِ تازه)، requirement-catalog (REQ-061)، api-catalog (`case_file_planned`)، verification.
+- commit/deploy نشده. **عامل:** این نشست.
+
+### 2026-09-25 — TEST (E2E واقعی) — آپلودِ مراجعِ غیرفعال ⇒ پرونده: PASS
+- **مجوزِ مالک:** «تست E2E واقعی رو انجام بده».
+- **محیط:** سرورِ dev با کدِ جدید (workerِ واقعی) + MySQLِ dev + Sonioxِ واقعی + OpenRouterِ واقعی؛ صدای TTSِ ساختگیِ دوگوینده؛ fixtureهایِ canary.
+- **نتیجه:** غیرفعال + خودکارِ روشن ⇒ `case_file` ⇒ `done/done`، پرونده `ready` با هر ۴ حقیقتِ کاشته‌شده، اعلانِ `case_file_updated`. فعال ⇒ `done/disabled`
+  بدونِ پرونده. غیرفعال + خودکارِ خاموش ⇒ `done/disabled` بدونِ پرونده. UIِ واقعیِ سینی: ۴ مرحله برایِ غیرفعال، ۳ برایِ فعال.
+  دورِ اولِ S1 با `ECONNRESET`ِ OpenRouter در compose شکست خورد (گذرا، نه این تغییر) ⇒ `done/failed` + `case_file_failed` + پیامِ درستِ UI؛ دورِ دوم موفق.
+- **پاک‌سازی:** fixtureها، ۴ پوشه‌ی صدا و ۴ پوشه‌ی آپلود حذف؛ `remaining=0`؛ اسکریپتِ موقت حذف؛ سرورِ dev خاموش شد (مثلِ قبل).
+- **FINDING (نامرتبط، رفع نشد):** شکستِ گذرایِ OpenRouter در jobِ آپلود دوباره تلاش نمی‌شود (`case_file_status=failed`، job تمام)؛ تراپیست باید دستی «به‌روزرسانی» بزند.
+- جزئیات: [verification](verification/2026-09-25-upload-case-file-inactive.md). commit/deploy نشده. **عامل:** این نشست.
+
+### 2026-09-25 — DECISION + CODE + TEST — آپلودِ صدا برایِ مراجعِ غیرفعال ⇒ پرونده (فعال‌ها همچنان فقط متن)
+- **دستورِ مالک:** «مکانیزمِ آپلود … برایِ مراجعینِ غیرفعال هم باشه، چون ممکنه جلساتی ضبط شده باشه و بخوان به پرونده تبدیلش کنن». این تصمیمِ
+  2026-09-24 («برایِ غیرفعال هم فعلاً فقط متن») را برایِ غیرفعال‌ها لغو می‌کند.
+- **audit:** دکمه‌ی آپلود از قبل برایِ غیرفعال‌ها بود (کارت + صفحه‌ی مراجع) و سرور هم آپلود را برایشان رد نمی‌کرد؛ گپِ واقعی: مسیر برایِ همه
+  با `case_file_status='disabled'` تمام می‌شد (سوئیچِ سراسریِ `UPLOAD_CASE_FILE` خاموش). corpusِ پرونده (`aggregateClientCorpus`) جلسه‌ی
+  `source='upload'` را از قبل می‌خواند (status=`completed`) ⇒ فقط مرحله‌ی خودکارِ پرونده کم بود.
+- **تغییر:**
+  - `jobMachine.ts`: `uploadCaseFileAllowed({clientStatus, caseFileEnabled, autoGenerate})` — `UPLOAD_CASE_FILE=1` یا (مراجعِ **غیرفعال** + `case_file_enabled`
+    + `case_file_auto_generate=true`؛ همان شرط‌هایِ `autoTrigger.ts`). port ِ `caseFileAfterUpload(job)` حالا per-job و async است.
+  - `jobRunner.ts`: `uploadCaseFileAllowedForJob` — وضعیتِ مراجع/حساب لحظه‌ی ثبتِ متن از DB خوانده می‌شود.
+  - `uploads.routes.ts`: `client_status` در view ِ job؛ retry ِ jobِ شکست‌خورده بعد از ثبتِ متن فقط اگر در مرحله‌ی پرونده (`running`/`waiting`) بوده.
+  - `public/index.html`: `jobHasCaseFileStep` — stepperِ ۴مرحله‌ای (… ← پرونده) فقط برایِ jobِ مسیرِ پرونده؛ پیامِ `busy_gave_up`؛ مودالِ آپلود برایِ
+    غیرفعالِ واجدِ شرایط می‌گوید «پرونده خودکار به‌روز می‌شود».
+  - مراجعِ فعال: بدونِ تغییر (`done/disabled`). «پرونده‌ی خودکار» خاموش/بی‌پاسخ ⇒ فقط متن؛ «به‌روزرسانی»ِ دستیِ پرونده متنِ آپلودی را هم می‌خواند.
+- **تست:** `pnpm test:up` **37/37** (جدید: H27 سیاست، H28 تصمیمِ per-job فعال/غیرفعال). `tsc --noEmit` تمیز. UI در Browser pane رویِ `public/index.html`
+  با jobهایِ ساختگی: غیرفعال ⇒ ۴ مرحله + پیامِ پرونده؛ فعال/بدونِ فیچر/خودکارِ خاموش/فایلِ بی‌گفتار ⇒ ۳ مرحله؛ متنِ مودال درست.
+  ⚠️ E2Eِ واقعی (MySQL + Soniox + LLM) اجرا نشد — نیازمندِ مجوز.
+- **اسنادِ به‌روزشده:** subsystem 06، configuration-catalog (`UPLOAD_CASE_FILE`)، requirement-catalog (REQ-061)، api-catalog (`client_status`)،
+  [verification](verification/2026-09-25-upload-case-file-inactive.md).
+- commit/deploy نشده. **عامل:** این نشست.
+
+### 2026-09-25 — DEPLOY — UIِ رضایت بدونِ متن/دکمه‌ی لغو رویِ production
+- **مجوز:** «deploy کن».
+- **پیش از deploy:**
+  - diffِ `public/index.html`ِ prod با فایلِ محلی فقط همین تغییر بود.
+  - یک اصلاحِ ظاهری انجام شد: شکستنِ خطِ بعد از `</label>` در مودالِ آپلود.
+- **backup:** `/root/backups/index.html.before-consent-ui-20260924T221243Z`.
+- **deploy:** فقط فایلِ `public/index.html` جایگزین شد (atomic mv). سرور/DB دست نخورد و ری‌استارت لازم نبود.
+- **smoke:**
+  - sha256 ِ فایلِ محلی، فایلِ رویِ دیسک و صفحه‌ی سروشده یکی است (`1db48e03…`).
+  - صفحه‌ی سروشده ۰ ارجاع به `revokeClientConsent`/`consentStoredRow` دارد.
+  - health 200 است و `feelia-mysql` online است (restarts=9؛ در deployِ دیروز 8 بود و این deploy ری‌استارت نکرد).
+- commit نشده. **عامل:** این نشست.
+
+### 2026-09-25 — DECISION + CODE + DOCS — حذفِ متنِ «رضایت ثبت شده» و دکمه‌ی «پس گرفته»
+- **دستورِ مالک:** «یه بار که رضایت داد دیگه متنی نمایش داده نشه». دلیل: مراجعی که رضایت ندهد اصلاً جلسه نمی‌آید.
+- **تغییر (`public/index.html`):**
+  - `consentStoredRow` در صفحه‌ی شروعِ جلسه و `audioUploadConsentStored` در مودالِ آپلود حذف شدند.
+  - `consentStoredLabel` و `revokeClientConsent` حذف شدند.
+  - عبارتِ «لغوش کنید» از خطِ توضیحی برداشته شد.
+  - سرور دست نخورد. `DELETE …/recording-consent` بدونِ caller ماند.
+- **تست:** اسکریپت‌هایِ inline با `node --check` OK بودند. منطقِ هر دو حالت (با رضایت و بدونِ رضایت) در Browser pane PASS شد.
+- **اسناد:** LAW-009، api-catalog، [verification](verification/2026-09-25-client-consent-once.md). **deploy نشده**، commit نشده. **عامل:** این نشست.
+
+### 2026-09-25 — GIT + DEPLOY + MIGRATION — آپلودِ چندبخشی: commit `45b0482` و deploy به production
+- **مجوز:** «کامیت کن و deploy کن».
+- **پیش از commit:** `test:rt` 55/55، `test:cf` 108/108، `test:up` 35/35، `tsc` تمیز، build موفق.
+- **commit `45b0482`** رویِ `feat/clarity`. push نشده.
+  - شاملِ کارِ قبلاً deployشده ولی commitنشده هم هست: رضایتِ یک‌باره (024، `clientConsent.ts`) و رفعِ `/api/stt/check`. فایل‌ها با هم مخلوط بودند و production هم از همین working tree اجرا می‌شد.
+  - بیرون ماند: `.claude/`، tarها، `server-deploy/`، `package-lock.json`، `soniox.html`.
+- **deploy** طبقِ رویه‌ی deployment-operations §۵ (tar، scp، extract، `pnpm install --frozen-lockfile`، `pm2 restart`):
+  - پیش‌بررسی (فقط خواندن): جلسه‌ی زنده ۰، آپلودِ در جریان ۰، jobِ فعال ۰.
+  - backupِ کد: `/root/feeliaa-mysql-backup-before-45b0482.tar.gz`.
+  - backupِ DB: `/root/feelia-pre-025-2026-09-24T22-01-50-248Z.sql` (۸۰۹KB، «Dump completed»؛ هشدارِ tablespace بی‌اثر است).
+  - **migration 025 applied**؛ health ok.
+  - تأیید شد: ستون‌ها و index در `information_schema`.
+  - فایل‌هایِ تازه از مسیرِ nginx سرو می‌شوند (`startGroup`، `renderAudioUploadFiles`).
+  - routeهایِ `DELETE /api/upload-groups/:id` و `POST /api/uploads` بدونِ نشست ⇒ 401 (نه 404).
+  - stderr فقط هشدارِ deprecationِ قدیمیِ Fastify دارد.
+  - فایل‌هایِ موقت رویِ سرور پاک شدند.
+- **تست‌نشده رویِ production:** آپلودِ واقعیِ چندفایلی با Soniox (smoke با داده‌ی واقعی انجام نشد). **عامل:** این نشست.
 
 ### 2026-09-25 — TEST (E2E) + MIGRATION(dev) — آپلودِ چندبخشی رویِ MySQLِ dev: 16/16 PASS
 - **مجوز:** «اره تستِ E2E رو انجام بده».

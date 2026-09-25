@@ -1,6 +1,6 @@
 # Subsystem 06 — آپلودِ فایلِ صوتیِ جلسه و pipelineِ پس‌زمینه
 
-> **وضعیت:** ACTIVE-CANONICAL (مالکِ جزئیاتِ این مسیر) · ایجاد 2026-09-23 · commit نشده · **deploy شد به production 2026-09-24** (migration 023 اعمال شد؛ `SONIOX_ORPHAN_SWEEP=1`). · **2026-09-25:** آپلودِ چندبخشی (§۲.۱، migration 025) — پیاده‌سازی و تست‌شده، **deploy نشده**.
+> **وضعیت:** ACTIVE-CANONICAL (مالکِ جزئیاتِ این مسیر) · ایجاد 2026-09-23 · commit نشده · **deploy شد به production 2026-09-24** (migration 023 اعمال شد؛ `SONIOX_ORPHAN_SWEEP=1`). · **2026-09-25:** آپلودِ چندبخشی (§۲.۱، migration 025) — commit `45b0482`، **deploy شد به production** (migration 025 applied). · **2026-09-25 (بعدتر):** سیاستِ پرونده‌ی آپلود (`UPLOAD_CASE_FILE_INACTIVE`، خاموش) + `case_file_planned` — deploy شد؛ commit نشده.
 > **منشأ:** بازخوردِ تراپیست (اینترنتِ کلینیک ناپایدار است؛ باید بتوان صدایِ ضبط‌شده را بعداً وارد کرد) + دستورِ صریحِ مالک.
 > **کد:** `server/src/features/audio-upload/` (`uploads.routes.ts`، `uploadStore.ts`، `media.ts`، `jobMachine.ts`، `jobRunner.ts`)،
 > `server/src/features/notifications/notify.ts`، `server/src/features/case-file/application/autoTrigger.ts`، `public/feelia-upload.js`،
@@ -10,6 +10,17 @@
 > («در نهایت همون متنش ذخیره بشه … تبدیل به پرونده باشه بعدش، الان نه»). job بعد از ثبتِ متن مستقیم `done` با `case_file_status='disabled'`
 > می‌شود؛ UI سه مرحله نشان می‌دهد (دریافت ← تبدیل به متن ← متن ذخیره شد). مرحله‌ی `case_file` (§۴، §۷) در کد و تست باقی است و با
 > `UPLOAD_CASE_FILE=1` + `UPLOAD_SHOW_CASE_FILE_STEP=true` روشن می‌شود. تنها اعلانِ این مسیر: `transcript_ready`/`transcript_empty`/`processing_failed`.
+>
+> **🔶 تصمیمِ مالک (2026-09-25):** «فعلاً متن ذخیره بشه؛ بعداً اگه خواستم پرونده» (پرونده هنوز برایِ همه‌ی تراپیست‌ها فعال نیست) ⇒ **پیش‌فرض
+> هنوز برایِ همه فقط متن است.** مسیرِ «مراجعِ غیرفعال ⇒ پرونده» پیاده و با E2Eِ واقعی تأیید شده ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است.
+> `jobMachine.ts#uploadCaseFileAllowed`: job بعد از ثبتِ متن به `case_file` می‌رود اگر `UPLOAD_CASE_FILE=1` **یا** (`UPLOAD_CASE_FILE_INACTIVE=1` +
+> مراجع `inactive` + `therapists.case_file_enabled` + `case_file_auto_generate=true`) — وضعیت لحظه‌ی ثبتِ متن خوانده می‌شود
+> (`jobRunner.ts#uploadCaseFileAllowedForJob`)؛ وگرنه `done/disabled`. UI (`jobHasCaseFileStep`) پیش از ثبتِ متن از `case_file_planned`ِ سرور
+> (همان تابع) می‌خواند ⇒ روشن‌کردن فقط با env است، بدونِ تغییرِ فرانت. «به‌روزرسانی»ِ دستیِ پرونده همیشه متنِ جلسه‌هایِ آپلودی را هم می‌خواند.
+> **خطایِ گذرایِ LLM در مرحله‌ی پرونده (2026-09-25):** `chatJson.ts#isTransientLlmError` (بدونِ status/قطعِ اتصال/timeout، یا 408/429/5xx) ⇒
+> `CaseFileGenerationError.transient`؛ `autoTrigger` با `retryTransient` ⇒ `'transient'` بدونِ اعلان؛ `stepCaseFile` ⇒ `waiting` + `error_code='case-file-retry'`،
+> تلاشِ دوباره بعد از ۱، ۵، ۱۵ دقیقه (`CASE_FILE_TRANSIENT_RETRY_MS`)؛ تلاشِ چهارم `lastAttempt` ⇒ شکستِ عادی (`done/failed` + `case_file_failed`). مسیرِ جلسه‌ی زنده تغییری نکرد.
+> **الحاقِ تکه‌ها (2026-09-25):** `uploadStore.ts#assembleUpload` هر تکه را با `WriteStream`ِ جداگانه (append) می‌نویسد — رفعِ `MaxListenersExceededWarning` برایِ ≥۱۰ تکه.
 
 ## ۱. هدف و مرز
 
