@@ -394,6 +394,14 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-25 — GIT + DEPLOY — push ِ `feat/clarity` و deployِ `baa9165` (production = HEAD)
+- **مجوز:** «انجام بده» (push + deployِ `baa9165`).
+- **push:** `1eae6c9..32ea9bc` به `origin/feat/clarity` (۹ commit؛ merge به `main` نشده).
+- **پیش از deploy:** `test:up` 41/41، `test:cf` 108/108، `tsc` تمیز، build موفق؛ جلسه‌ی زنده/آپلود/jobِ فعال ۰.
+- **deploy** (§۵، بدونِ migration): backup `/root/feeliaa-mysql-backup-before-baa9165-20260925T154102Z.tar.gz` ← tar (۰ `.env`/`data`) ← extract ← `pnpm install` ← `pm2 restart`.
+- **تأیید:** health ok؛ online، restarts=12، pid 107490، ۰ خطِ stderr (به‌جز deprecationِ Fastify)؛ hashِ ۸ فایلِ مرتبط رویِ سرور = HEAD؛ `index.html`ِ سروشده `2b18ef3d`؛
+  routeها بدونِ نشست 401؛ `UPLOAD_CASE_FILE*` تنظیم‌نشده ⇒ آپلود فقط متن (تلاشِ دوباره‌ی گذرا تا روشن‌شدنِ سوئیچ بی‌اثر). **عامل:** این نشست.
+
 ### 2026-09-25 — GIT — commitهایِ جدا برایِ کارِ امروز (رویِ `feat/clarity`، push نشده)
 - **دستورِ مالک:** «… بعدش تیکه‌تیکه کامیت کن».
 - `8a2a82d` UIِ رضایت بدونِ متن/دکمه‌ی لغو (deployشده) · `91ad119` سندِ اعمالِ 025 رویِ production · `58e12ee` پرونده از آپلودِ غیرفعال پشتِ
