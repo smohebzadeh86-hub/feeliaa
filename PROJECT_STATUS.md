@@ -394,6 +394,11 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-25 — GIT + DEPLOY — commit و deployِ `b73197d` (نقشه‌راه؛ production = HEAD)
+- **مجوز:** «حله دیپلوی کن». commit `b73197d` (push نشده).
+- **deploy** (§۵، بدونِ migration): build موفق ← tar (۰ `.env`/`data`) ← backup `/root/feeliaa-mysql-backup-before-b73197d-20260925T160402Z.tar.gz` ← extract ← `pnpm install` ← `pm2 restart`.
+- **تأیید:** health ok/connected؛ online، restarts=13؛ stderr فقط deprecationِ Fastify؛ `isRoadmapWhyDuplicate` در `dist/validate.js` و `public/index.html`ِ سرور حاضر. تستِ مرورگری/LLMِ واقعی انجام نشد.
+
 ### 2026-09-25 — CODE — نقشه‌راهِ جلسه‌ی بعد: گام به‌شکلِ سوال/اقدام، برچسبِ دلیلِ غیرتکراری
 - مشکل (گزارشِ مالک با اسکرین‌شات): `question` تیترِ موضوع بود («شدت علائم») و `why` همان کلمه را تکرار می‌کرد؛ لایه‌یِ «سوال → دلیلِ کوتاه → توضیح» از سندِ طراحی پیاده نمی‌شد.
 - `buildCaseFilePrompt.ts` قاعده‌ی ۱۵: question = یک خطِ اقدام‌محور/سوالی (نه تیتر)؛ why = دلیلِ ۲–۴ کلمه‌ای که question را تکرار نکند.
