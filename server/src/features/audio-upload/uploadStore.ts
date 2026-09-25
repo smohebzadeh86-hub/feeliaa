@@ -77,13 +77,11 @@ export async function assembleUpload(uploadId: string, chunksTotal: number, size
   const dir = uploadDir(uploadId);
   const out = assembledPath(uploadId, ext);
   const tmp = out + '.assembling';
-  const ws = createWriteStream(tmp);
-  try {
-    for (let n = 0; n < chunksTotal; n++) {
-      await pipeline(createReadStream(path.join(dir, chunkName(n))), ws, { end: false });
-    }
-  } finally {
-    await new Promise<void>((resolve) => ws.end(() => resolve()));
+  // هر تکه با WriteStreamِ جداگانه (append) و pipelineِ کامل که خودش stream را می‌بندد. قبلاً یک WriteStream
+  // با pipeline(..., {end:false}) در حلقه استفاده می‌شد: هر دور شنونده‌هایِ error/close/finish/end رویِ همان stream
+  // جمع می‌شدند ⇒ MaxListenersExceededWarning برایِ هر فایلِ ≥۱۰ تکه (~۳۶MB) در لاگِ production (2026-09-25).
+  for (let n = 0; n < chunksTotal; n++) {
+    await pipeline(createReadStream(path.join(dir, chunkName(n))), createWriteStream(tmp, { flags: n === 0 ? 'w' : 'a' }));
   }
   const size = statSync(tmp).size;
   if (size !== sizeBytes) {

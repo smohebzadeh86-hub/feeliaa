@@ -624,6 +624,28 @@ async function main() {
     try { rmSync(dir, { recursive: true, force: true }); } catch {}
   }
 
+  await t('H37 assembleUpload با ۳۰ تکه: فایلِ نهایی بایت‌به‌بایت درست، بدونِ MaxListenersExceededWarning (FINDINGِ لاگِ production 2026-09-25)', async () => {
+    const { writeChunk, assembleUpload, removeUploadDir, UPLOAD_ROOT } = await import('../server/src/features/audio-upload/uploadStore.js');
+    const dataDir = path.dirname(UPLOAD_ROOT);
+    const hadData = existsSync(dataDir);
+    const warnings: string[] = [];
+    const onWarn = (w: Error) => { if (w.name === 'MaxListenersExceededWarning') warnings.push(w.message); };
+    process.on('warning', onWarn);
+    const id = '00000000-0000-4000-8000-' + String(Date.now()).slice(-12).padStart(12, '0');
+    try {
+      const CH = 1024; const N = 30; const parts: Buffer[] = [];
+      for (let n = 0; n < N; n++) { const b = Buffer.alloc(CH, n); parts.push(b); writeChunk(id, n, b); }
+      const out = await assembleUpload(id, N, CH * N, 'm4a');
+      await new Promise((r) => setImmediate(r));
+      assert.ok(readFileSync(out).equals(Buffer.concat(parts)), 'ترتیب و محتوایِ تکه‌ها حفظ شد');
+      assert.deepEqual(warnings, []);
+    } finally {
+      process.off('warning', onWarn);
+      removeUploadDir(id);
+      if (!hadData) rmSync(dataDir, { recursive: true, force: true });
+    }
+  });
+
   console.log(`\n${pass} PASS / ${fail} FAIL`);
   if (fail) process.exit(1);
 }
