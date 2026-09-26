@@ -580,6 +580,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     const q = request.query as any;
     const purpose = (
       q?.purpose === 'note' ? 'note' : q?.purpose === 'archive' ? 'archive' :
+      q?.purpose === 'note-archive' ? 'note-archive' :
       q?.purpose === 'late-transcript' ? 'late-transcript' : 'transcript'
     ) as import('../stt/batchqueue.js').BatchPurpose;
     // seq: ترتیبِ واقعیِ ضبطِ این سگمنت (از کلاینت) — برایِ اسمِ فایل و مرتب‌سازیِ درست،

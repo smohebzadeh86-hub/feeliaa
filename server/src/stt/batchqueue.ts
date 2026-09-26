@@ -33,7 +33,10 @@ export function queueDir(): string {
 //   'note' → صوتِ یادداشت صوتیِ ناموفق، فقط به‌صورت session_notes(type='voice') ثبت می‌شود.
 //   'archive' → صدایِ جلسه‌ای که realtime توش کاملاً موفق بود — نیازی به رونویسیِ
 //               دوباره نیست (متن از قبل درسته)، فقط برایِ بازبینیِ ادمین آرشیو می‌شه.
-export type BatchPurpose = 'transcript' | 'late-transcript' | 'note' | 'archive';
+//   'note-archive' → صدایِ یادداشتِ صوتی‌ای که realtime‌اش موفق بود و UI متنش را خودش ثبت کرده
+//               (2026-09-26): فقط آرشیو با kind='note'. قبلاً با purpose=note دوباره رونویسی و یک
+//               یادداشتِ صوتیِ تکراری ساخته می‌شد.
+export type BatchPurpose = 'transcript' | 'late-transcript' | 'note' | 'archive' | 'note-archive';
 
 export const LATE_TRANSCRIPT_LABEL = '[بخشِ ضبط‌شده در زمانِ قطعیِ اینترنت — بعداً رونویسی شد]';
 
@@ -48,6 +51,7 @@ export const LATE_TRANSCRIPT_LABEL = '[بخشِ ضبط‌شده در زمانِ 
 function markerFor(purpose: BatchPurpose): string {
   if (purpose === 'note') return '.note.';
   if (purpose === 'archive') return '.archive.';
+  if (purpose === 'note-archive') return '.notearchive.';
   if (purpose === 'late-transcript') return '.late.';
   return '.';
 }
@@ -136,14 +140,17 @@ function isArchiveFile(f: string): boolean {
 function isLateFile(f: string): boolean {
   return f.includes('.late.');
 }
+function isNoteArchiveFile(f: string): boolean {
+  return f.includes('.notearchive.');
+}
 
 // seq/run/mime از اسمِ فایل استخراج می‌شه (فرمت:
 // <sessionId>-<seqِ ۶رقمی>-<runId>-<timestamp>[.note|.archive|.late].<webm|ogg|m4a>)
 // تا موقعِ آرشیوکردن برایِ ادمین، ترتیبِ واقعیِ سگمنت، runِ صاحبش، و mimeِ واقعی حفظ بمونه.
 const EXT_ALTERNATION = KNOWN_EXTS.join('|');
 // فایل‌هایِ خیلی قدیمی (پیش از migration 017، بخشِ runId هنوز نبود): <sessionId>-<seq>-<timestamp>.ext
-const LEGACY_NO_RUN_RE = new RegExp(`^(.+)-(\\d{6})-(\\d+)\\.(?:note\\.|archive\\.|late\\.)?(?:${EXT_ALTERNATION})$`);
-const WITH_RUN_RE = new RegExp(`^(.+)-(\\d{6})-([a-zA-Z0-9]+)-(\\d+)\\.(?:note\\.|archive\\.|late\\.)?(?:${EXT_ALTERNATION})$`);
+const LEGACY_NO_RUN_RE = new RegExp(`^(.+)-(\\d{6})-(\\d+)\\.(?:note\\.|archive\\.|late\\.|notearchive\\.)?(?:${EXT_ALTERNATION})$`);
+const WITH_RUN_RE = new RegExp(`^(.+)-(\\d{6})-([a-zA-Z0-9]+)-(\\d+)\\.(?:note\\.|archive\\.|late\\.|notearchive\\.)?(?:${EXT_ALTERNATION})$`);
 
 // ⭐ فیکسِ باگِ واقعی (کشف‌شده در لاگِ deployِ ۲۰۲۶-۰۹-۲۳): برایِ فایلِ خیلی قدیمیِ بدونِ
 // runId، regexِ قبلی (که همیشه runId را الزامی می‌دانست) اصلاً match نمی‌شد؛
@@ -192,7 +199,8 @@ function filesFor(sessionId: string, purpose: BatchPurpose): string[] {
       if (purpose === 'note') return isNoteFile(f);
       if (purpose === 'archive') return isArchiveFile(f);
       if (purpose === 'late-transcript') return isLateFile(f);
-      return !isNoteFile(f) && !isArchiveFile(f) && !isLateFile(f);
+      if (purpose === 'note-archive') return isNoteArchiveFile(f);
+      return !isNoteFile(f) && !isArchiveFile(f) && !isLateFile(f) && !isNoteArchiveFile(f);
     })
     .sort()
     .map((f) => path.join(QUEUE_DIR, f));
@@ -317,14 +325,14 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
   const files = pendingAudiosFor(sessionId, purpose);
   if (!files.length) return;
 
-  if (purpose === 'archive') {
+  if (purpose === 'archive' || purpose === 'note-archive') {
     const { readFileSync } = await import('node:fs');
     const { archiveAudioForAdmin } = await import('./sessionAudioArchive.js');
     for (const file of files) {
       let buffer: Buffer;
       try { buffer = readFileSync(file); } catch { continue; }
       try {
-        await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, mimeFromFilename(file), 'durable', runIdFromFilename(file), 'session');
+        await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, mimeFromFilename(file), 'durable', runIdFromFilename(file), purpose === 'note-archive' ? 'note' : 'session');
         removeAudioFile(file);
         console.log(`[batch] archived (no transcribe) session=${sessionId} seq=${seqFromFilename(file)}`);
       } catch (e) {
@@ -350,6 +358,10 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
     const { transcribeFileAsync } = await import('./asyncTranscribe.js');
     const { archiveAudioForAdmin } = await import('./sessionAudioArchive.js');
     let appliedLate = false;
+    // ⭐ (2026-09-26، جلسه‌ی cee2e5d2 در تستِ واقعی): اگر همه‌ی سگمنت‌ها غیرقابلِ‌رونویسی بودند،
+    // وضعیت قبلاً 'done' می‌شد — انگار رونویسی موفق بوده. حالا فقط وقتی هیچ سگمنتی اعمال نشده، 'failed'.
+    let droppedCount = 0;
+    let appliedCount = 0;
     for (const file of files) {
       let buffer: Buffer;
       try { buffer = readFileSync(file); } catch { continue; }
@@ -367,11 +379,13 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       // دوباره به Soniox آپلود و رد می‌شد و batch_status برایِ همیشه 'queued' می‌ماند.
       if (!looksLikeValidContainer(buffer, extFromFilename(file))) {
         dropUnrecoverable(sessionId, file, purpose, buffer.length, 'bad-container');
+        droppedCount++;
         continue;
       }
       const sha256 = createHash('sha256').update(buffer).digest('hex');
       if (await segmentAlreadyApplied(sessionId, sha256)) {
         // کرشِ قبلی بعد از اعمالِ متن و قبل از حذفِ فایل — فقط تمیزکاری، بدونِ رونویسی/appendِ دوباره.
+        appliedCount++;
         removeAudioFile(file);
         console.log(`[batch] segment already applied, dropped duplicate session=${sessionId} purpose=${purpose}`);
         continue;
@@ -383,6 +397,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       } catch (e) {
         if (isPermanentTranscribeError(e)) {
           dropUnrecoverable(sessionId, file, purpose, buffer.length, 'soniox-invalid-audio');
+          droppedCount++;
           continue;
         }
         console.log('[batch] async transcribe error, kept queued (already archived):', String(e).slice(0, 160));
@@ -395,17 +410,18 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
         purpose === 'late-transcript' ? LATE_TRANSCRIPT_LABEL : undefined
       );
       if (applied && text && text.trim() && purpose === 'late-transcript') appliedLate = true;
+      appliedCount++;
       removeAudioFile(file);
       console.log(`[batch] segment done session=${sessionId} purpose=${purpose}`);
     }
     if (isTranscriptLike) {
       const left = pendingAudiosFor(sessionId, purpose);
-      await query(
-        `UPDATE sessions SET batch_status = ?, updated_at = NOW() WHERE id = ?`,
-        [left.length ? 'queued' : 'done', sessionId]
-      );
-      console.log(`[batch] finished session=${sessionId} remaining=${left.length}`);
-      if (!left.length) logEvent({ event: 'batch.completed', sessionId, source: 'job', detail: { purpose } });
+      const allUnrecoverable = !left.length && droppedCount > 0 && appliedCount === 0;
+      const next: BatchStatus = left.length ? 'queued' : allUnrecoverable ? 'failed' : 'done';
+      await query(`UPDATE sessions SET batch_status = ?, updated_at = NOW() WHERE id = ?`, [next, sessionId]);
+      console.log(`[batch] finished session=${sessionId} status=${next} remaining=${left.length} dropped=${droppedCount}`);
+      if (next === 'done') logEvent({ event: 'batch.completed', sessionId, source: 'job', detail: { purpose } });
+      if (next === 'failed') logEvent({ event: 'batch.failed', sessionId, source: 'job', severity: 'warn', detail: { purpose, reason: 'all-unrecoverable', dropped: droppedCount } });
     }
     // ⭐ رفعِ F8: متنِ late-transcript رویِ جلسه‌ی از‌قبل‌completedشده اضافه می‌شد ولی هیچ‌وقت به
     // پرونده نمی‌رسید (هیچ triggerی نبود). همان سیاستِ مرکزیِ auto-generate صدا زده می‌شود.
@@ -454,7 +470,7 @@ export async function sweepOldBatchFiles(): Promise<void> {
           } else {
             try {
               const buffer = readFileSync(p);
-              await archiveAudioForAdmin(sessionId, seqFromFilename(p), buffer, mimeFromFilename(p), 'durable', runIdFromFilename(p), isNoteFile(f) ? 'note' : 'session');
+              await archiveAudioForAdmin(sessionId, seqFromFilename(p), buffer, mimeFromFilename(p), 'durable', runIdFromFilename(p), isNoteFile(f) || isNoteArchiveFile(f) ? 'note' : 'session');
             } catch (e) {
               console.log('[batch] pre-sweep archive failed (still sweeping):', String(e).slice(0, 160));
             }
@@ -465,6 +481,43 @@ export async function sweepOldBatchFiles(): Promise<void> {
       } catch {}
     }
   } catch {}
+  await reconcileStaleBatchStatuses();
+}
+
+// ⭐ باگِ واقعی (تستِ واقعی 2026-09-21، جلسه‌ی cee2e5d2): sweepِ بالا فایلِ صف را بعد از ۲۴ ساعت پاک
+// می‌کرد ولی sessions.batch_status را دست نمی‌زد — جلسه برای همیشه 'queued' می‌ماند (پنلِ ادمین «در انتظار»
+// نشان می‌داد) درحالی‌که دیگر هیچ صدایی برایِ رونویسی وجود نداشت. هر جلسه‌ی live/manual که 'queued'/'processing'
+// است، هیچ فایلِ transcript/late در صف ندارد و بیش از STALE_BATCH_MS دست نخورده، صادقانه 'failed' می‌شود.
+// جلسه‌های آپلودی (source='upload') مالکِ جدا دارند (audio_jobs/jobRunner) و این‌جا لمس نمی‌شوند.
+// صدایِ همان سگمنت‌ها پیش از sweep در آرشیوِ ادمین (session_audio) نوشته شده و می‌ماند.
+const STALE_BATCH_MS = 60 * 60 * 1000;
+export async function reconcileStaleBatchStatuses(): Promise<number> {
+  let fixed = 0;
+  try {
+    const r = await query(
+      `SELECT id FROM sessions
+        WHERE batch_status IN ('queued', 'processing')
+          AND (source IS NULL OR source <> 'upload')
+          AND updated_at < NOW() - INTERVAL ? SECOND`,
+      [Math.floor(STALE_BATCH_MS / 1000)]
+    );
+    for (const row of r.rows as { id: string }[]) {
+      if (pendingAudiosFor(row.id, 'transcript').length || pendingAudiosFor(row.id, 'late-transcript').length) continue;
+      const u = await query(
+        `UPDATE sessions SET batch_status = 'failed', updated_at = NOW()
+          WHERE id = ? AND batch_status IN ('queued', 'processing')`,
+        [row.id]
+      );
+      if (u.rowCount) {
+        fixed++;
+        console.log(`[batch] stale batch_status reconciled to failed session=${row.id}`);
+        logEvent({ event: 'batch.failed', sessionId: row.id, source: 'job', severity: 'warn', detail: { reason: 'stale-no-audio' } });
+      }
+    }
+  } catch (e) {
+    console.log('[batch] reconcile failed:', String(e).slice(0, 160));
+  }
+  return fixed;
 }
 
 // workerِ دوره‌ای: فایل‌هایِ صفی که موقعِ enqueue شکستِ egress/کلید داشتن (مثلاً
@@ -476,7 +529,8 @@ export async function retryQueuedBatches(): Promise<void> {
     ensureDir();
     const seen = new Set<string>();
     for (const f of readdirSync(QUEUE_DIR)) {
-      const purpose: BatchPurpose = isNoteFile(f) ? 'note' : isArchiveFile(f) ? 'archive' : isLateFile(f) ? 'late-transcript' : 'transcript';
+      const purpose: BatchPurpose = isNoteFile(f) ? 'note' : isArchiveFile(f) ? 'archive' : isLateFile(f) ? 'late-transcript'
+        : isNoteArchiveFile(f) ? 'note-archive' : 'transcript';
       const sessionId = sessionIdFromFilename(path.join(QUEUE_DIR, f));
       if (sessionId === null) continue; // فرمتِ ناشناخته — sweepِ ۲۴ساعته خودش رسیدگی می‌کند
       const key = `${sessionId}:${purpose}`;

@@ -88,8 +88,9 @@ globalThis.fetch = async (url, opts = {}) => {
     const purpose = q.get('purpose') || 'transcript';
     // ⭐ archive فقط آرشیو می‌شود، هرگز رونویسی — قبلاً mock آن را هم در batchQueue می‌گذاشت و
     // سگمنتی که اشتباهاً archive گرفته بود (مثلاً آخرین سگمنتِ finish در FAILED) تست را سبز نگه می‌داشت.
-    if (purpose !== 'archive') (purpose === 'note' ? noteQueue : batchQueue).push({ sessionId: m[1] });
-    return json(202, { status: purpose === 'archive' ? 'archived' : 'queued', purpose });
+    const archiveOnly = purpose === 'archive' || purpose === 'note-archive';
+    if (!archiveOnly) (purpose === 'note' ? noteQueue : batchQueue).push({ sessionId: m[1] });
+    return json(202, { status: archiveOnly ? 'archived' : 'queued', purpose });
   }
   m = url.match(/^\/api\/sessions\/([^/?]+)\/batch-status$/);
   if (m) {
@@ -632,6 +633,80 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     RT.forget(s26);
     delete navigator.wakeLock;
     ok('T34 wake lock held through pause, released on finish', acqDuring === 1 && relDuringPause === 0 && rel === 1 && acq === 1, 'acq=' + acq + ' rel=' + rel);
+  }
+
+  // ——— audit تستِ واقعی (2026-09-26) ———
+  // T35: WSِ جلسه‌ی قبلی که دیر (وسطِ جلسه‌ی بعدی) با 1006 بسته می‌شود، به نامِ جلسه‌ی *خودش* ثبت می‌شود
+  // و جلسه‌ی جاری را دست نمی‌زند (قبلاً FeeliaObs session_id/run_id سراسری داشت).
+  {
+    const obsLog = [];
+    window.FeeliaObs = { event: (name, detail, ctx) => obsLog.push({ name, detail, ctx }), setSession() {} };
+    newSession('s35a'); newSession('s35b');
+    const a = RT.createSession('s35a', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const pa = a.start(); await sleep(5); serverOpen(FakeWS.last); await pa;
+    const wsA = FakeWS.last;
+    wsA.close = function () { this.readyState = 2; }; // closing handshake بی‌پاسخ — onclose بعداً می‌رسد
+    await a.finish(); RT.forget(a);
+    const b = RT.createSession('s35b', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const pb = b.start(); await sleep(5); serverOpen(FakeWS.last); await pb;
+    obsLog.length = 0;
+    wsA.readyState = 3; wsA.onclose({ code: 1006, wasClean: false });
+    const closeEv = obsLog.find((e) => e.name === 'rt.ws_close');
+    ok('T35 late close of previous session WS attributed to that session, current untouched',
+      closeEv && closeEv.ctx && closeEv.ctx.session_id === 's35a' && closeEv.ctx.run_id === a.runId && b.state === 'ACTIVE' &&
+      !obsLog.some((e) => e.name === 'rt.reconnect_scheduled'),
+      JSON.stringify(closeEv && closeEv.ctx) + ' b=' + b.state);
+    await b.pause(); await sleep(5);
+    const bPause = obsLog.find((e) => e.name === 'rt.state_change' && e.detail.state === 'MANUAL_PAUSED');
+    ok('T35 current session events carry its own ids', !!(bPause && bPause.ctx && bPause.ctx.session_id === 's35b' && bPause.ctx.run_id === b.runId));
+    await b.finish(); RT.forget(b);
+    delete window.FeeliaObs;
+  }
+
+  // T36: یادداشتِ صوتیِ موفق (realtime) → صدایش فقط آرشیو (purpose=note-archive)، هرگز purpose=note
+  // (رونویسیِ دوباره = یادداشتِ صوتیِ تکراری کنارِ همانی که UI از متنِ زنده ثبت کرده). صف هم خالی می‌شود.
+  {
+    newSession('s36');
+    const n = RT.createSession('s36', { mode: 'note', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const pn = n.start(); await sleep(5); serverOpen(FakeWS.last); await pn;
+    ok('T36/T37 isSessionActive while voice note records', RT.isSessionActive('s36') === true);
+    serverTokens(FakeWS.last, [{ text: 'یادداشت', is_final: true }]);
+    await n.stopDurableSegment(); n.startDurable(); // یک چرخشِ ۱۵ثانیه‌ای
+    const fin = n.finish(); await sleep(5);
+    serverTokens(FakeWS.last, [], true);
+    const outN = await fin;
+    await sleep(80);
+    const up = fetchUrls.filter((u) => u.includes('/sessions/s36/batch-audio'));
+    const left = await RT.audioQueue.listForSession('s36');
+    ok('T36 reliable voice note audio archived as note-archive, never re-transcribed',
+      outN.reliable && up.length >= 2 && up.every((u) => u.includes('purpose=note-archive')) && left.length === 0 &&
+      !noteQueue.some((q) => q.sessionId === 's36'),
+      up.join(',') + ' left=' + left.length);
+    ok('T37 isSessionActive false after finish', RT.isSessionActive('s36') === false);
+    RT.forget(n);
+  }
+
+  // T38: حینِ ACTIVE، صفِ durable هر ARCHIVE_DRAIN_MS آپلود می‌شود (نه فقط در finish)؛ finish تایمر را پاک می‌کند.
+  {
+    const realSetInterval = globalThis.setInterval;
+    const captured = [];
+    globalThis.setInterval = function (fn, ms) { const id = realSetInterval(fn, ms); if (ms === 60000) captured.push(fn); return id; };
+    newSession('s38');
+    const s38 = RT.createSession('s38', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p38 = s38.start(); await sleep(5); serverOpen(FakeWS.last); await p38;
+    globalThis.setInterval = realSetInterval;
+    await s38.stopDurableSegment(); s38.startDurable();
+    await s38.stopDurableSegment(); s38.startDurable();
+    const before = fetchUrls.filter((u) => u.includes('/sessions/s38/batch-audio')).length;
+    captured.forEach((fn) => fn());
+    await sleep(80);
+    const mid = fetchUrls.filter((u) => u.includes('/sessions/s38/batch-audio'));
+    const leftMid = await RT.audioQueue.listForSession('s38');
+    ok('T38 archive segments uploaded during ACTIVE session', before === 0 && mid.length === 2 && mid.every((u) => u.includes('purpose=archive')) && leftMid.length === 0,
+      'before=' + before + ' mid=' + mid.length + ' left=' + leftMid.length);
+    await s38.finish(); await sleep(50);
+    ok('T38 finish clears archive drain timer', !s38.archiveDrainTimer && s38.state === 'COMPLETED');
+    RT.forget(s38);
   }
 
   console.log(results.map((r) => r[0]).join('\n'));

@@ -345,7 +345,10 @@
   //  - event(name, {..detail..})  → رویدادِ ساختاریافته (kind='client_event')، برایِ
   //    obs_events سمتِ سرور (که run_id/detail JSON دارد) — نه obs_ui_events.
   //  - event(name, number)        → شکلِ سادهِ فازِ ۱ (lifecycle/value_num)، دست‌نخورده.
-  function event(name, arg) {
+  // ctx (اختیاری): {session_id, run_id} صاحبِ واقعیِ رویداد — بر مقدارِ سراسریِ setSession مقدم است.
+  // (2026-09-26) WSِ جلسه‌ی قبلی ممکن است دقیقه‌ها بعد، وسطِ جلسه‌ی بعدی بسته شود؛ بدونِ ctx رویدادش به نامِ
+  // جلسه‌ی جاری ثبت می‌شد.
+  function event(name, arg, ctx) {
     try {
       var evName = safeToken(typeof name === 'string' ? name : null);
       if (!evName) return;
@@ -354,6 +357,10 @@
         citem.event = evName;
         citem.detail = sanitizeClientDetail(arg);
         citem.run_id = runId;
+        if (ctx && typeof ctx === 'object') {
+          if (typeof ctx.session_id === 'string' && ctx.session_id) citem.session_id = ctx.session_id;
+          if (typeof ctx.run_id === 'string' && ctx.run_id) citem.run_id = ctx.run_id;
+        }
         pushRaw(citem);
         return;
       }

@@ -1017,6 +1017,12 @@ input::-ms-reveal{display:none}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
       شروع جلسه و رونویسی
     </button>
+    <!-- (تستِ واقعی 2026-09-24) بعد از ساختِ مراجع، اپ مستقیم به این صفحه می‌آید و دکمه‌ی آپلود فقط در پرونده بود؛
+         تراپیستی که فایلِ ضبط‌شده داشت یک جلسه‌ی زنده‌ی خالیِ چندثانیه‌ای می‌ساخت تا به پرونده برسد. -->
+    <button class="btn btn-secondary btn-block" id="setupUploadBtn" style="margin-top:10px" onclick="openAudioUploadFromSetup()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      به‌جایش فایلِ صوتیِ ضبط‌شده را آپلود می‌کنم
+    </button>
     <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="goBackToClients()">بازگشت</button>
   </section>
 
@@ -2610,6 +2616,10 @@ async function sweepOrphanedAudioQueue(){
     const sessionIds=await q.listSessionIdsWithPending();
     for(const sid of sessionIds){
       if(sid&&sid===activeSid)continue;
+      // ⭐ (2026-09-26) feelia_active_session بعد از پایانِ جلسه پاک می‌شود، ولی یادداشتِ صوتیِ Wrapup هنوز
+      // RTSessionِ زنده‌ی همین session است — بدونِ این چک، سگمنتِ ۱۵ثانیه‌ایِ اولِ یادداشتِ در حالِ ضبط با
+      // purpose=note رونویسی و یک یادداشتِ صوتیِ تکراری ساخته می‌شد.
+      if(window.FeeliaRT.isSessionActive&&window.FeeliaRT.isSessionActive(sid))continue;
       await window.FeeliaRT.withAudioLock(sid,async function(){
         const pending=await q.listForSession(sid);
         for(const rec of pending){
@@ -3923,14 +3933,16 @@ function showDeleteSession(id,num){
 function closeDeleteSession(){$('deleteSessionModal').classList.remove('open');deleteTargetSession=null;}
 async function confirmDeleteSession(){
   if(!deleteTargetSession)return;
+  // ⭐ باگِ واقعی (تستِ واقعی 2026-09-24: DELETE → 404 «جلسه یافت نشد»): closeDeleteSession() همین متغیر را
+  // null می‌کند و درخواست قبلاً به /api/sessions/null می‌رفت — حذفِ جلسه از پرونده‌ی مراجع هرگز کار نمی‌کرد.
+  const id=deleteTargetSession;
   closeDeleteSession();
   try{
-    await api('/api/sessions/'+deleteTargetSession,{method:'DELETE'});
+    await api('/api/sessions/'+id,{method:'DELETE'});
     uxTrack('session_deleted');
     showBanner('info','جلسه حذف شد.');
     if(currentClient)openClientDetail(currentClient.id);
   }catch(e){showBanner('error',e.message);}
-  deleteTargetSession=null;
 }
 
 async function openClientDetail(clientId,opts){
@@ -7108,8 +7120,17 @@ function fmtDurationFa(ms){
 }
 function uploadExtOf(name){const m=/\.([a-zA-Z0-9]{1,6})$/.exec(String(name||''));return m?m[1].toLowerCase():'';}
 
+// از صفحه‌ی Setup: بعد از شروعِ آپلود به پرونده‌ی همین مراجع می‌رویم (همان‌جا وضعیتِ پردازش دیده می‌شود)،
+// نه اینکه تراپیست رویِ صفحه‌ی «جلسه‌ی جدید» بماند. انصراف از مودال روی Setup می‌ماند.
+let audioUploadFromSetup=false;
+function openAudioUploadFromSetup(){
+  if(!currentClient)return;
+  openAudioUploadModal();
+  audioUploadFromSetup=true;
+}
 function openAudioUploadModal(){
   if(!currentClient)return;
+  audioUploadFromSetup=false;
   audioUploadFiles=[];
   audioUploadDateVal='';
   audioUploadDateTouched=false;
@@ -7124,6 +7145,7 @@ function openAudioUploadModal(){
 }
 function closeAudioUploadModal(){
   $('audioUploadModal').classList.remove('open');
+  audioUploadFromSetup=false;
   audioUploadFiles=[];
 }
 function showAudioUploadError(msg){const e=$('audioUploadErr');e.textContent=msg;e.hidden=!msg;}
@@ -7250,7 +7272,9 @@ function startAudioUpload(){
     opts.file=audioUploadFiles[0].file;
     window.FeeliaUpload.start(opts);
   }
+  const fromSetup=audioUploadFromSetup;
   closeAudioUploadModal();
+  if(fromSetup)openClientDetail(currentClient.id);
   procFastUntil=Date.now()+10*60000;
   // بعد از پایانِ همین کلیک (وگرنه شنونده‌ی «کلیکِ بیرون» سینی را بلافاصله می‌بندد)
   setTimeout(openTray,0);

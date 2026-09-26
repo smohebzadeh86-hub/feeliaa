@@ -69,8 +69,25 @@ flowchart TB
 | intent | چه وقت |
 |---|---|
 | `note` | `self.mode === 'note'` |
+| `note-archive` | (2026-09-26) نه در لحظه‌ی ضبط: رکوردهایِ `note`ِ **همان run** در `finish()`ِ موفقِ یادداشتِ صوتی، زیرِ قفل در IndexedDB به این برچسب عوض می‌شوند (`AudioQueueDB.retag`) → فقط آرشیو با `kind='note'` |
 | `transcript` | `state ∈ {RECONNECTING, NETWORK_PAUSED, FAILED}` |
 | `archive` | وگرنه (پیش‌فرض؛ رکوردهایِ قدیمی‌ترِ بدونِ این فیلد هم همین را می‌گیرند) |
+
+**رفعِ یادداشتِ صوتیِ تکراری (2026-09-26، audit تستِ واقعی):** در مسیرِ موفقِ `finish()`، `archiveQueuedAudioOnly`
+فقط برایِ `persist` (جلسه) صدا زده می‌شد؛ سگمنت‌هایِ یادداشتِ صوتیِ موفق با intent=`note` در IndexedDB می‌ماندند و
+`sweepOrphanedAudioQueue` (هر ۶۰s) آن‌ها را با `purpose=note` می‌فرستاد → رونویسیِ دوباره و یک `session_notes(type='voice')`
+دوم کنارِ همانی که `stopVoiceNoteDirect` از متنِ زنده POST کرده. در production دیده شد (جلسه‌ی `2ad0588e`، صدایِ note
+رونویسی شد) ولی چون هر دو متن خالی بودند یادداشتِ تکراری ساخته نشد. حالا: (۱) مسیرِ موفقِ `mode='note'` هم
+`archiveQueuedAudioOnly` را صدا می‌زند که رکوردها را به `note-archive` برچسب می‌زند؛ (۲) `sweepOrphanedAudioQueue`
+هر sessionی را که `FeeliaRT.isSessionActive(sid)` است رد می‌کند (وگرنه سگمنتِ ۱۵ثانیه‌ایِ اولِ یادداشتِ در حالِ ضبط
+— که `feelia_active_session`ش بعد از پایانِ جلسه پاک شده — با purpose=note رونویسی می‌شد). مسیرِ ناموفق (`batch-pending-note`)
+دست‌نخورده: همان‌جا UI متنی POST نمی‌کند و رونویسیِ batch تنها منبع است. تست: `T36`/`T37`.
+
+**آپلودِ تدریجیِ آرشیو حینِ جلسه (2026-09-26):** قبلاً سگمنت‌هایِ `archive` فقط در `finish()` آپلود می‌شدند — کلِ صدایِ
+یک جلسه‌ی سالم تا پایان فقط در IndexedDB بود (best-effort؛ مرورگر زیرِ فشارِ فضا می‌تواند پاکش کند) و پایانِ یک جلسه‌ی
+۱ساعته ~۲۴۰ آپلودِ پشتِ‌سرِهم داشت (تستِ واقعیِ 2026-09-24: ۳۰ سگمنت در ۲۵ ثانیه بعد از «پایان»). حالا `startAutosave`
+یک تایمرِ `ARCHIVE_DRAIN_MS=60s` هم می‌گذارد که در state=ACTIVE `drainQueuedAudioInBackground` را صدا می‌زند (هر رکورد
+با intentِ خودش؛ همان قفل و گاردِ `_draining`)؛ `clearTimers` (finish/abort) پاکش می‌کند. تست: `T38`.
 
 **رفعِ باگِ 2026-09-22:** قبلاً شرط `self.unreliable ||` هم داشت. چون `unreliable` یک‌طرفه و
 سراسری است (I4، subsystem 01)، این یعنی بعدِ **یک بار** قطعی/reconnectِ موفق، همه‌ی سگمنت‌هایِ
@@ -136,7 +153,14 @@ soniox-invalid-audio`) ثبت می‌شود و `batch_status` طبقِ باقی�
   - متنِ خالی (سکوتِ واقعی) = **موفقیت**، نه شکست — آرشیو و از صف حذف می‌شود (قبلاً برایِ
     همیشه در صف می‌ماند و بعدِ ۲۴h بدونِ آرشیو پاک می‌شد).
   - بدونِ کلید → `batch_status='failed'` (فقط transcript/late-transcript).
-  - پایان: `batch_status = queued` اگر فایلی مانده، وگرنه `done`.
+  - پایان: `batch_status = queued` اگر فایلی مانده؛ **`failed` اگر هیچ سگمنتی اعمال نشد و دست‌کم یکی
+    غیرقابلِ‌رونویسی بود (2026-09-26 — قبلاً در این حالت هم `done`)**؛ وگرنه `done`.
+  - `note-archive` (2026-09-26): مثلِ `archive`، فقط آرشیو بدونِ Soniox، ولی با `kind='note'`؛ مارکرِ فایل `.notearchive.`.
+- **`reconcileStaleBatchStatuses`** (2026-09-26، انتهایِ هر `sweepOldBatchFiles` — startup + هر ساعت): جلسه‌ی
+  غیرِآپلودی (`source <> 'upload'`) که `batch_status ∈ {queued, processing}` است، بیش از ۱ ساعت دست نخورده و هیچ
+  فایلِ transcript/late در صف ندارد → `failed` + رویدادِ `batch.failed` (`reason: stale-no-audio`). ریشه: sweepِ ۲۴ساعته
+  فایلِ صف را پاک می‌کرد ولی `batch_status` را نه — جلسه‌ی `cee2e5d2` (تستِ واقعیِ 2026-09-21) از آن روز `queued` ماند
+  (در production سه جلسه). جلسه‌هایِ آپلودی مالکِ جدا دارند (`jobRunner`).
 - `mergeBatchTranscript(sessionId, baseVersion, text, label?)`: همیشه `current + "\n\n" +
   (label ? label+"\n"+text : text)`، `transcript_version+1`، `realtime_reliable=false`،
   `batch_status='done'` (بدونِ CAS — [subsystem 03](03-transcript-integrity.md)).
@@ -176,7 +200,9 @@ soniox-invalid-audio`) ثبت می‌شود و `batch_status` طبقِ باقی�
   `beforeunload` در `index.html` از این استفاده می‌کند.
 - **`sweepOrphanedAudioQueue`** هر ۶۰s + رویِ رویدادِ `online` (قبلاً فقط یک‌بار سرِ لودِ صفحه)؛
   سگمنت‌هایِ جلسه‌ای که در `localStorage.feelia_active_session` است را رد می‌کند (مالکش
-  RTSessionِ resume‌شونده است — جلوگیری از راهِ برخوردِ sweep/RTSession رویِ یک sessionId).
+  RTSessionِ resume‌شونده است — جلوگیری از راهِ برخوردِ sweep/RTSession رویِ یک sessionId)؛
+  **از 2026-09-26** جلسه‌ای که در همین تب RTSessionِ هنوز‌تمام‌نشده دارد (`FeeliaRT.isSessionActive`) — مثلاً یادداشتِ
+  صوتیِ Wrapup — هم رد می‌شود.
 
 ## ۷. awaitBatchDrain
 poll هر 5s از `batch-status` تا ۱۵ دقیقه؛ terminal: transcript → `!audio_pending &&

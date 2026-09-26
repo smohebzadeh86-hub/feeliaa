@@ -10,7 +10,8 @@
  *  - unreliable یک‌طرفه است و finalize را به batch fallback می‌برد.
  *  - finish event/state-based است (نه sleep کور) با timeout صریح.
  *  - abort از هر state امن است (بدون promise معلق، بدون نشت mic/WS/recorder).
- *  - صوت durable فقط در failure به سرور می‌رود (صف batch) و بعد حذف می‌شود.
+ *  - صوت durable به سرور می‌رود: در failure برایِ رونویسی (صف batch)، و در حالتِ سالم فقط برایِ آرشیوِ
+ *    ۱۴روزه‌ی ادمین (تدریجی حینِ جلسه + باقی‌مانده در پایان). نسخه‌ی محلی بعد از آپلودِ موفق حذف می‌شود.
  */
 'use strict';
 (function () {
@@ -75,6 +76,7 @@
   // state هنوز ACTIVEه، یعنی onclose/onerror دیر یا هیچ‌وقت فایر نشده؛ همون reconnect
   // معمولی را دستی صدا می‌زنیم تا مرزِ سگمنت هرچه زودتر بسته شود.
   var WS_WATCHDOG_MS = 3000;
+  var ARCHIVE_DRAIN_MS = 60 * 1000; // آپلودِ تدریجیِ صفِ durable حینِ جلسه‌ی ACTIVE (startAutosave)
   var BATCH_POLL_MS = 5000;
   var BATCH_TIMEOUT_MS = 15 * 60 * 1000; // explicit: سقف انتظار batch
   var MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg'];
@@ -259,9 +261,16 @@
         return Object.keys(seen);
       }).catch(function () { return []; });
     }
+    // تغییرِ intentِ رکوردِ موجود (همان کلید، همان blob) — فقط برایِ note → note-archive در finish.
+    function retag(rec, intent) {
+      var copy = {};
+      for (var k in rec) { if (Object.prototype.hasOwnProperty.call(rec, k)) copy[k] = rec[k]; }
+      copy.intent = intent;
+      return withStore('readwrite', function (store) { return store.put(copy); }).then(function () { return copy; });
+    }
     return {
       add: add, listForSession: listForSession, remove: remove, clearForSession: clearForSession,
-      totalBytes: totalBytes, listSessionIdsWithPending: listSessionIdsWithPending
+      totalBytes: totalBytes, listSessionIdsWithPending: listSessionIdsWithPending, retag: retag
     };
   })();
 
@@ -276,7 +285,9 @@
   // برمی‌گرداند Promise<boolean> — true یعنی رکورد باید از صف حذف شود.
   function uploadQueuedSegment(sessionId, rec) {
     var intent = rec.intent || 'archive'; // legacy بدونِ intent → رفتارِ قبلی (فقط آرشیو)
-    var purpose = intent === 'note' ? 'note' : (intent === 'transcript' ? 'transcript' : 'archive');
+    // 'note-archive': یادداشتِ صوتی‌ای که متنِ زنده‌اش را UI خودش ثبت کرده — فقط آرشیو، بدونِ رونویسیِ دوباره.
+    var purpose = intent === 'note' ? 'note' : intent === 'note-archive' ? 'note-archive' :
+      (intent === 'transcript' ? 'transcript' : 'archive');
     var run = rec.runId || 'legacy';
     var send = function (p) {
       var fd = new FormData();
@@ -382,10 +393,14 @@
     return (typeof reason === 'string' && RT_REASON_TOKEN_RE.test(reason)) ? reason : 'unknown';
   }
 
-  function obsEvent(name, detail) {
+  // owner: همان RTSessionی که رویداد مالِ اوست. ⭐ باگِ واقعی (تستِ واقعی 2026-09-24): FeeliaObs
+  // session_id/run_id را سراسری نگه می‌داشت (setSession در start()) — WSِ جلسه‌ی قبلی که ۱ تا ۴ دقیقه بعد
+  // از COMPLETED بسته شد، rt.ws_close 1006 را به نامِ جلسه‌ی بعدیِ در حالِ اجرا ثبت کرد و قطعیِ
+  // جعلیِ وسطِ جلسه نشان داد. حالا هر رویداد شناسه‌یِ صاحبِ واقعیِ خودش را صریح با خودش می‌برد.
+  function obsEvent(name, detail, owner) {
     try {
       if (window.FeeliaObs && typeof window.FeeliaObs.event === 'function') {
-        window.FeeliaObs.event(name, detail || {});
+        window.FeeliaObs.event(name, detail || {}, owner ? { session_id: owner.sessionId, run_id: owner.runId } : null);
       }
     } catch (e) {}
   }
@@ -452,6 +467,7 @@
     this.timers = [];
     this.autosaveTimer = null;
     this.wsWatchdogTimer = null;
+    this.archiveDrainTimer = null;
     this.finishResolver = null;
     this.aborted = false;
     this.closingIntentional = false;
@@ -468,7 +484,7 @@
   RTSession.prototype.setState = function (s) {
     var prevState = this.state;
     this.state = s;
-    if (prevState !== s) obsEvent('rt.state_change', { state: s, prev_state: prevState });
+    if (prevState !== s) obsEvent('rt.state_change', { state: s, prev_state: prevState }, this);
     try { this.cb.onState(s, this.snapshot()); } catch (e) {}
     syncWakeLock();
     // ⭐ هر بار که واقعاً به ACTIVE/RECOVERED می‌رسیم (شروع، resume، یا reconnect
@@ -503,6 +519,7 @@
     this._failedRetryTimer = null;
     if (this.autosaveTimer) { clearInterval(this.autosaveTimer); this.autosaveTimer = null; }
     if (this.wsWatchdogTimer) { clearInterval(this.wsWatchdogTimer); this.wsWatchdogTimer = null; }
+    if (this.archiveDrainTimer) { clearInterval(this.archiveDrainTimer); this.archiveDrainTimer = null; }
   };
 
   // ——— audio مشترک ———
@@ -753,7 +770,7 @@
           reject(new Error('superseded'));
           return;
         }
-        obsEvent('rt.ws_open', {});
+        obsEvent('rt.ws_open', {}, self);
         try {
           ws.send(JSON.stringify({
             api_key: cred.api_key,
@@ -774,7 +791,7 @@
       };
       ws.onerror = function () {
         clearTimeout(timer);
-        obsEvent('rt.ws_error', {});
+        obsEvent('rt.ws_error', {}, self);
         if (!settled) { settled = true; try { ws.close(); } catch (e) {} reject(new Error('direct-error')); }
         // بعد از resolve، خطا از onclose/reconnect مدیریت می‌شود
       };
@@ -862,7 +879,7 @@
     obsEvent('rt.ws_close', {
       close_code: ev && typeof ev.code === 'number' ? ev.code : null,
       was_clean: ev && typeof ev.wasClean === 'boolean' ? ev.wasClean : null
-    });
+    }, self);
     if (self.closingIntentional || self.aborted) return;
     if (self.state === STATES.MANUAL_PAUSED || self.state === STATES.FINALIZING ||
         self.state === STATES.COMPLETED || self.state === STATES.CANCELED) return;
@@ -892,8 +909,8 @@
       self.startDurable();
     }
     if (self.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      obsEvent('rt.reconnect_exhausted', { attempt: self.reconnectAttempts, reason: safeReasonToken(reason) });
-      if (!self.unreliable) obsEvent('rt.unreliable_set', { reason: 'reconnect_exhausted' });
+      obsEvent('rt.reconnect_exhausted', { attempt: self.reconnectAttempts, reason: safeReasonToken(reason) }, self);
+      if (!self.unreliable) obsEvent('rt.unreliable_set', { reason: 'reconnect_exhausted' }, self);
       self.unreliable = true;
       self.setState(STATES.FAILED);
       // retryِ دوره‌ای (FAILED_RETRY_MS) همین مسیر را تکرار می‌کند — پیام فقط یک بار در هر دورِ قطعی.
@@ -906,9 +923,9 @@
     }
     var delay = RECONNECT_BACKOFF_MS[Math.min(self.reconnectAttempts, RECONNECT_BACKOFF_MS.length - 1)];
     self.reconnectAttempts++;
-    obsEvent('rt.reconnect_scheduled', { reason: safeReasonToken(reason), attempt: self.reconnectAttempts, delay_ms: delay });
+    obsEvent('rt.reconnect_scheduled', { reason: safeReasonToken(reason), attempt: self.reconnectAttempts, delay_ms: delay }, self);
     self.hadGap = true;
-    if (!self.unreliable) obsEvent('rt.unreliable_set', { reason: 'reconnect' });
+    if (!self.unreliable) obsEvent('rt.unreliable_set', { reason: 'reconnect' }, self);
     self.unreliable = true; // یک‌طرفه: گپ احتمالی یعنی دیگر قابل‌اعتماد کامل نیست
     self.interim = ''; // interim قبلی discard — از نقطه امن ادامه
     try { if (self.ws) self.ws.close(); } catch (e) {}
@@ -947,7 +964,7 @@
   // دهد — خطرناک برای یادداشت درمانی)، این نقطه را صریح در transcript علامت می‌زنیم
   // و شماره‌گذاری را از نو (با اولین لیبل تازه) شروع می‌کنیم.
   RTSession.prototype.noteDiscontinuity = function () {
-    obsEvent('rt.gap_marked', {});
+    obsEvent('rt.gap_marked', {}, this);
     this.curSpeaker = null;
     this.confirmed += (this.confirmed ? '\n\n' : '') +
       '[اتصال دوباره برقرار شد — شماره‌گذاری گوینده‌ها از این نقطه ممکن است با قبل فرق کند]';
@@ -989,7 +1006,7 @@
         self._failedReported = false;
         self.realtimeUp = true;
         if (isReconnect) {
-          obsEvent('rt.reconnect_ok', { attempt: attemptsUsed });
+          obsEvent('rt.reconnect_ok', { attempt: attemptsUsed }, self);
           self.noteDiscontinuity();
         }
         // استریمر زنده روی همان stream با MediaRecorder تازه (هدر تازه)؛ durable دست‌نخورده ادامه می‌دهد
@@ -1024,7 +1041,7 @@
       obsEvent('rt.mint_failed', {
         status: (err && typeof err.status === 'number') ? err.status : null,
         code: (err && typeof err.code === 'string') ? err.code : null
-      });
+      }, self);
       // 401 یعنی نشست Feelia مرده — reconnect بی‌فایده است
       if (err && err.status === 401) {
         self._sessionDead = true;
@@ -1073,7 +1090,7 @@
           if (!ok) {
             // FAIL-OPEN (ISSUE 4): realtime بالا نیامد ولی میکروفون داریم —
             // صادقانه FAILED با ضبط durable؛ legacy proxy صدا زده نمی‌شود.
-            if (!self.unreliable) obsEvent('rt.unreliable_set', { reason: 'start_fail_open' });
+            if (!self.unreliable) obsEvent('rt.unreliable_set', { reason: 'start_fail_open' }, self);
             self.unreliable = true;
             self.realtimeUp = false;
             self.startDurable();
@@ -1153,7 +1170,7 @@
     if (self.wsWatchdogTimer) clearInterval(self.wsWatchdogTimer);
     self.wsWatchdogTimer = setInterval(function () {
       if (self.state === STATES.ACTIVE && (!self.ws || self.ws.readyState !== WebSocket.OPEN)) {
-        obsEvent('rt.watchdog_fired', {});
+        obsEvent('rt.watchdog_fired', {}, self);
         self.scheduleReconnect('watchdog-ws-not-open');
       }
     }, WS_WATCHDOG_MS);
@@ -1162,6 +1179,15 @@
   RTSession.prototype.startAutosave = function () {
     var self = this;
     if (!self.persist) return;
+    // ⭐ (تستِ واقعی 2026-09-24): سگمنت‌هایِ archive فقط در finish آپلود می‌شدند — همه‌ی صدایِ جلسه تا پایان
+    // فقط در IndexedDBِ مرورگر بود (که مرورگر زیرِ فشارِ فضا می‌تواند پاکش کند) و در پایانِ یک جلسه‌ی ۱ساعته
+    // ~۲۴۰ سگمنت پشتِ سرِ هم می‌رفت. حالا هر ARCHIVE_DRAIN_MS هرچه در صف است (به intentِ خودش) آپلود می‌شود.
+    if (self.archiveDrainTimer) clearInterval(self.archiveDrainTimer);
+    self.archiveDrainTimer = setInterval(function () {
+      if (self.state === STATES.ACTIVE) {
+        try { self.drainQueuedAudioInBackground(); } catch (e) {}
+      }
+    }, ARCHIVE_DRAIN_MS);
     if (self.autosaveTimer) clearInterval(self.autosaveTimer);
     self.autosaveFailStreak = 0;
     self.autosaveInFlight = false;
@@ -1442,6 +1468,11 @@
               // ⭐ متن از قبل کامل و درسته (رونویسیِ دوباره لازم نیست، ریسکِ duplicate هم
               // داره) — پس فقط صدا رو برایِ بازبینیِ ادمین آرشیو کن، نه merge.
               self.archiveQueuedAudioOnly();
+            } else if (self.mode === 'note') {
+              // ⭐ (2026-09-26) قبلاً یادداشتِ صوتیِ موفق هیچ‌وقت این‌جا آرشیو نمی‌شد؛ سگمنت‌هایش با intent='note'
+              // در IndexedDB می‌ماندند تا sweepOrphanedAudioQueue (index.html، هر ۶۰ث) آن‌ها را با purpose=note
+              // بفرستد → رونویسیِ دوباره و یادداشتِ صوتیِ تکراری کنارِ همانی که UI از متنِ زنده ثبت کرده.
+              self.archiveQueuedAudioOnly();
             }
             self.cleanupAudio();
             self.unwatchOnline();
@@ -1565,10 +1596,21 @@
   // هر سگمنت طبقِ intentِ خودش می‌رود (uploadQueuedSegment). اگه سگمنتی از یه runِ
   // قبلیِ همین session که هنوز intent='transcript' مونده باشه (مثلاً crashِ قبل از
   // آپلود)، درست رونویسی می‌شه، نه فقط آرشیو — به‌جایِ فرضِ کورکورانه‌ی archive.
+  // ⭐ باگِ واقعی (audit تستِ واقعی 2026-09-26): در mode='note' سگمنت‌ها intent='note' دارند؛ این تابع
+  // (که فقط در مسیرِ «realtime کاملاً موفق» صدا زده می‌شود) آن‌ها را با purpose=note می‌فرستاد — سرور دوباره
+  // رونویسی و یک یادداشتِ صوتیِ دوم (تکراریِ همانی که stopVoiceNoteDirect از متنِ زنده POST کرده) می‌ساخت.
+  // حالا سگمنت‌هایِ *همین run* قبل از آپلود در خودِ IndexedDB به 'note-archive' برچسب می‌خورند — حتی اگر
+  // آپلود الان شکست بخورد، sweepِ بعدی هم دیگر آن‌ها را رونویسی نمی‌کند.
   RTSession.prototype.archiveQueuedAudioOnly = function () {
     var self = this;
     withAudioLock(self.sessionId, function () {
-      return AudioQueueDB.listForSession(self.sessionId).then(function (pending) {
+      return AudioQueueDB.listForSession(self.sessionId).then(function (rows) {
+        if (self.mode !== 'note') return rows;
+        return Promise.all(rows.map(function (rec) {
+          if (rec.runId !== self.runId || rec.intent !== 'note') return rec;
+          return AudioQueueDB.retag(rec, 'note-archive').catch(function () { rec.intent = 'note-archive'; return rec; });
+        }));
+      }).then(function (pending) {
         if (!pending.length) return;
         var chain = Promise.resolve();
         pending.forEach(function (rec) {
@@ -1685,6 +1727,11 @@
       return s.hasOpenWS() || (s.durableRec && s.durableRec.state === 'recording');
     });
   }
+  function isSessionActive(sessionId) {
+    return live.some(function (s) {
+      return s.sessionId === sessionId && !s.aborted && s.state !== STATES.COMPLETED && s.state !== STATES.CANCELED;
+    });
+  }
   function forget(s) {
     live = live.filter(function (x) { return x !== s; });
     syncWakeLock();
@@ -1767,6 +1814,8 @@
     // sweepOrphanedAudioQueueِ index.html هم باید دقیقاً همین رفتار را داشته باشد،
     // نه purpose=archive کورکورانه (audit صدا/۲۰۲۶-۰۹-۱۶، بخشِ C).
     uploadQueuedSegment: uploadQueuedSegment,
+    // جلسه‌ای که در همین تب یک RTSessionِ هنوز‌تمام‌نشده (جلسه یا یادداشتِ صوتی) دارد — مالکِ صفِ آن همان RTSession است.
+    isSessionActive: isSessionActive,
     // ⭐ قفلِ سراسریِ صف/session (audit صدا/۲۰۲۶-۰۹-۱۶) — sweepOrphanedAudioQueueِ index.html
     // باید همین قفل را بگیرد، وگرنه ممکن است با درایني‌کردنِ همزمانِ RTSession رویِ همون
     // sessionId تداخل کند (رجوع به تعریفِ withAudioLock بالای همین فایل).
