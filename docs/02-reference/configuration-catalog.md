@@ -87,20 +87,23 @@
 | `KEEPALIVE_INTERVAL_MS` | 5000 — `{"type":"keepalive"}` حینِ MANUAL_PAUSED (Soniox: حداقل هر ۲۰s) |
 | `CONNECT_TIMEOUT_MS` / `REQUEST_TIMEOUT_MS` / `FINALIZE_TIMEOUT_MS` | 10000 / 12000 / 8000 |
 | `PAUSE_SILENCE_BUFFER_MS` / `PAUSE_FLUSH_MS` | 250 / 2000 |
-| `AUTOSAVE_MS` | 5000 |
+| `AUTOSAVE_MS` / `AUTOSAVE_MAX_GAP_MS` | 5000 / 15000 — تیکِ ۵ثانیه‌ای؛ فاصله‌ی دو ذخیره `min(15s, 5s + ⌊طولِ متن/20000⌋×2.5s)`؛ هرگز دو PUTِ هم‌زمان (2026-09-26) |
+| `TRANSCRIPT_PUT_TIMEOUT_MS` | 30000 — فقط PUTِ متنِ کامل در `persistConfirmed` (بقیه‌ی درخواست‌ها `REQUEST_TIMEOUT_MS`) (2026-09-26) |
+| `FAILED_RETRY_MS` | 30000 — از FAILED (به‌جز 401) هر ۳۰ث یک دورِ کاملِ reconnect، مستقل از رویدادِ `online` (2026-09-26) |
+| Screen Wake Lock | `navigator.wakeLock.request('screen')` تا وقتی یک RTSession زنده است (شامل MANUAL_PAUSED)؛ بدونِ پشتیبانی بی‌صدا هیچ (2026-09-26) |
 | `BATCH_POLL_MS` / `BATCH_TIMEOUT_MS` | 5000 / ۱۵ دقیقه |
 | `MIME_CANDIDATES` | webm;opus، webm، ogg;opus، ogg |
 | `DURABLE_ROTATE_MS` / `DURABLE_BITRATE` | **commitنشده (audit صدا/۲۰۲۶-۰۹-۱۶): 15000** (قبلاً 60000 — تصمیمِ مالک، کاهشِ پنجره‌ی صدایِ در-RAM) / 24000 |
 | `DURABLE_FLUSH_GUARD_MS` | **commitنشده — جدید، 10000** (قبلاً hardcode `1500` در `stopDurableSegment`) — نگهبانی که اگه `onstop` هیچ‌وقت fire نشه، `finish()`/`pause()` را برایِ همیشه قفل نمی‌کند |
 | `AUDIO_DB_NAME` / `AUDIO_DB_VERSION` / `AUDIO_STORE` | `feelia-audio` / 1 / `segments` |
-| `AUDIO_QUEUE_MAX_BYTES` | 300MB |
+| `AUDIO_QUEUE_MAX_BYTES` | 300MB — جمعِ bytes یک بار با `getAll()` خوانده و در همان تب با add/remove نگه داشته می‌شود (2026-09-26) |
 
 ### `public/feelia-upload.js` (2026-09-23)
 | ثابت | مقدار |
 |---|---|
 | IndexedDB | `feelia-uploads` / نسخه 1 / store `tasks` (keyPath `key` = `<fingerprint>:<clientId>`) |
 | اثرِ انگشت | sha256 از نام/حجم/lastModified + ۱MBِ اول و آخر |
-| تکرارِ هر تکه | backoff `min(30s, 2^n s)` تا ۸ بار، سپس هر ۱۵s تا بی‌نهایت؛ timeoutِ XHR 120s |
+| تکرارِ هر تکه | backoff `min(30s, 2^n s)` تا ۸ بار، سپس هر ۱۵s تا بی‌نهایت؛ timeoutِ XHR `max(120s, حجم/4KB·s)` + قطعِ زودهنگام اگر `CHUNK_STALL_MS`=60s هیچ بایتی جلو نرود (2026-09-26؛ قبلاً ثابتِ 120s) |
 | poll ِ سینی (`index.html`) | ۵s وقتی کاری فعال است، وگرنه ۳۰s؛ poll ِ صفحه‌ی جلسه ۴s |
 | live recorder timeslice / durable timeslice | 250ms / 1000ms |
 | getUserMedia | `echoCancellation`، `noiseSuppression`، `autoGainControl` = true |

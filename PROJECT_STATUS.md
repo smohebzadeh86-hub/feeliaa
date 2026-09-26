@@ -2,7 +2,7 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-25 — آخرین رویداد: **تلاشِ دوباره‌ی خودکار برایِ خطایِ گذرایِ LLM در پرونده‌ی آپلود + E2Eِ کامل از UIِ واقعی (۵ سناریو PASS)؛ `test:up` 41/41؛ commitهای جدا.** پیش از آن: **رفعِ `MaxListenersExceededWarning` در `assembleUpload` (الحاقِ تکه‌هایِ آپلودِ ≥۱۰ تکه؛ بی‌ضرر برایِ داده)؛ `test:up` 38/38 با mutation-check؛ deploy شد به production (health ok)؛ commit نشده.** پیش از آن: **deploy به production: آپلود فعلاً برایِ همه فقط متن؛ مسیرِ «مراجعِ غیرفعال ⇒ پرونده» (E2Eِ واقعی PASS) رویِ سرور هست ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است؛ health ok؛ commit نشده.** پیش از آن: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — commit `45b0482` (push نشده) و deploy به production؛ migration 025 applied؛ health ok.** پیش از آن: `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16. قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
+> **آخرین به‌روزرسانی:** 2026-09-26 — آخرین رویداد: **deployِ `a20ccdb` (جلسه‌ی ۱ساعته + تایمرِ جلسه در قطعی) به production؛ health ok.** پیش از آن: **آماده‌سازیِ جلسه‌ی ۱ساعته (Wake Lock، رندرِ افزایشی، autosave، صف، timeoutِ آپلود/ffmpeg، retry از FAILED)؛ `test:rt` 62/62، `test:up` 41/41، `tsc` تمیز؛ commit/deploy نشده.** پیش از آن (2026-09-25): **تلاشِ دوباره‌ی خودکار برایِ خطایِ گذرایِ LLM در پرونده‌ی آپلود + E2Eِ کامل از UIِ واقعی (۵ سناریو PASS)؛ `test:up` 41/41؛ commitهای جدا.** پیش از آن: **رفعِ `MaxListenersExceededWarning` در `assembleUpload` (الحاقِ تکه‌هایِ آپلودِ ≥۱۰ تکه؛ بی‌ضرر برایِ داده)؛ `test:up` 38/38 با mutation-check؛ deploy شد به production (health ok)؛ commit نشده.** پیش از آن: **deploy به production: آپلود فعلاً برایِ همه فقط متن؛ مسیرِ «مراجعِ غیرفعال ⇒ پرونده» (E2Eِ واقعی PASS) رویِ سرور هست ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است؛ health ok؛ commit نشده.** پیش از آن: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — commit `45b0482` (push نشده) و deploy به production؛ migration 025 applied؛ health ok.** پیش از آن: `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16. قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
 > health ok، `SONIOX_ORPHAN_SWEEP=1`، nginxِ زنده کافی بود و تغییری نکرد). پیش از آن: auditِ باگ و رفعِ B2، B3، M1–M4، M6 و L*؛
 > `test:up` 29/29 و E2Eِ DBِ dev 13/13. commit نشده.** قبل‌ترش: **مسیرِ آپلود (فعال و غیرفعال) فقط تا ذخیره‌ی متن؛ پرونده خاموش پشتِ
 > `UPLOAD_CASE_FILE`؛ `test:up` 26/26 + E2Eِ واقعی PASS.** قبل‌ترش: **تستِ کاملِ واقعیِ فیچرِ آپلود (Soniox/LLM/MySQL، فایلِ ۶۰دقیقه‌ای،
@@ -393,6 +393,52 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-26 — CODE + GIT + DEPLOY — تایمرِ جلسه در قطعی + commit و deployِ `a20ccdb` (production = HEAD)
+- **مجوز:** «بله و سعی کن تمامی مشکلات ممکن رو بررسی کنی و رفع کنی» (در پاسخِ «commit و deploy کنم؟»).
+- **بررسیِ تکمیلی:** یک مشکلِ دیگر پیدا و رفع شد — `rtOnState` در `index.html` در RECONNECTING/NETWORK_PAUSED/FAILED تایمرِ جلسه را متوقف می‌کرد درحالی‌که ضبطِ durable ادامه داشت ⇒ `duration_ms` و `offset_ms`ِ علائم/یادداشت‌ها به اندازه‌ی قطعی‌ها عقب می‌افتاد. حالا فقط وقتی میکروفون (`rtSession.stream`) نیست متوقف می‌شود. بقیه‌ی موارد بررسی‌شده بدونِ مشکل: bodyLimit 1MiB برایِ متنِ ~۱۵۰KB، نبودِ سقفِ طولِ transcript در `PUT /api/sessions/:id`، heartbeatِ leaseِ job (`jobRunner.ts`) با timeoutِ ۲۰دقیقه‌ایِ ffmpeg، سقفِ mint ۳۰/دقیقه با retryِ ۳۰ثانیه‌ای.
+- تست پیش از deploy: `test:rt` 62/62، `test:up` 41/41، `test:cf` 108/108، `tsc` تمیز؛ `index.html` بدونِ خطایِ اسکریپت در Browser pane بارگذاری شد.
+- **git:** `a8aa376` = کارِ commitنشده‌ی نشستِ دیگر (2026-09-25، جنسیتِ کودک/درخت/منویِ ویرایش/تاگل — قبلاً deploy شده بود)، جدا از `a20ccdb` = کارِ جلسه‌ی ۱ساعته (LAW-022). push نشد.
+- **deploy (§۵):** build لوکال ← tar (۰ ورودیِ `.env`/`data`) ← پیش‌بررسی: `feelia-mysql` online، جلسه‌ی active در ۲ ساعتِ اخیر ۰ ← backup `/root/feeliaa-mysql-backup-before-a20ccdb-20260926T085202Z.tar.gz` ← extract ← `pnpm install --frozen-lockfile` ← `pm2 restart feelia-mysql --update-env`. migration ندارد.
+- **تأیید:** health ok/connected؛ online، restarts=15؛ stderr فقط deprecationِ Fastify؛ رشته‌هایِ جدید در `public/*` و `dist/.../media.js` حاضر؛ `feelia-rt.js` از nginx با `cache-control: no-cache` و نسخه‌ی جدید سرو می‌شود. **جلسه‌ی واقعیِ ۱ساعته (دسکتاپ + موبایل) هنوز انجام نشده** — قدمِ بعدیِ مالک.
+
+### 2026-09-26 — CODE + TEST — آماده‌سازیِ جلسه‌ی ۱ساعته (رونویسیِ زنده + آپلود)
+- **درخواستِ مالک:** «میخوام جلساتم یک ساعته باشه… حلشون کن» — بر اساسِ auditِ read-onlyِ همین روز (۸ یافته؛ هیچ سقفِ سختی در ۱ ساعت رد نمی‌شد، مشکل‌ها کندی/اطمینان بود).
+- `public/feelia-rt.js`: Screen Wake Lock (`syncWakeLock`)؛ کشِ `cleanConfirmed()`؛ autosave با یک PUTِ هم‌زمان و فاصله‌ی متناسب با طولِ متن (۵→۱۵s) و timeoutِ ۳۰sِ PUTِ متن؛ شاخه‌ی 409 برایِ PUTِ timeoutخورده‌ی اعمال‌شده (قبلاً متن را **تکرار** می‌کرد — باگِ نهفته، کشف‌شده حینِ کار)؛ شمارنده‌ی bytesِ صفِ IndexedDB؛ retryِ ۳۰ثانیه‌ای از FAILED (به‌جز 401)؛ autosave/watchdog در شروعِ fail-open.
+- `public/index.html`: `setLiveTextParts` (رندرِ افزایشی؛ هر پاراگراف یک div، CSSِ `.live-para`) برایِ `#liveText`ِ جلسه‌ی زنده. `public/feelia-upload.js`: timeoutِ تکه `max(120s, حجم/4KB·s)` + stallِ ۶۰s. `server/src/features/audio-upload/media.ts`: timeoutِ ffmpeg `duration/3`.
+- تست: `test:rt` **62/62** (baseline 55/55؛ T30–T34 جدید در `scripts/rt-harness.cjs`)، `test:up` 41/41، `tsc` تمیز. سنجشِ رندر در Browser pane با متنِ ساختگیِ ~۷۵هزار کاراکتر: **۵۸.۸ms ⇒ ۰.۹۵ms** برایِ هر به‌روزرسانی در انتهایِ ساعت، ظاهر یکسان.
+- تست‌نشده: Wake Lock رویِ موبایلِ واقعی، stallِ آپلود با شبکه‌ی واقعی، ffmpeg رویِ فایلِ ۱ساعته، شلیکِ واقعیِ retryِ ۳۰ثانیه‌ای. یافته‌ی ۸ (سقفِ توکنِ ورودیِ LLMِ پرونده) عمداً دست نخورد.
+- اسناد: configuration-catalog §۳، subsystem 01/02/06، [verification](verification/2026-09-26-one-hour-session-hardening.md). commit/deploy نشد. تغییراتِ commitنشده‌ی نشستِ دیگر (`clients.ts`، بخش‌هایی از `index.html`) دست نخورد.
+
+### 2026-09-25 — DOCS — snapshotِ توصیفیِ UIِ فعلی: `CURRENT_UI_STATE.md`
+- فایلِ جدید در root: مستندِ فقط‌توصیفیِ UIِ فعلی (۲۲ بخش؛ ۱۴ screen، ۱۶ modal، breakpointهای 480/520/640، ۲۱ inconsistencyِ ثبت‌شده بدونِ پیشنهاد) با ارجاعِ خط به `public/index.html`.
+- هیچ کد/CSS تغییر نکرد. screenshot در repo وجود ندارد؛ فقط صفحه‌ی Auth از فایلِ استاتیک در Browser pane دیده شد (ذخیره نشد). commit نشد.
+
+### 2026-09-25 — DEPLOY — جنسیتِ کودک + درختِ جنسیت + تاگلِ «نمایش متن زنده»
+- **مجوز:** «دیپلوی کن»؛ مالک صریحاً گفت بازطراحیِ تاگل (کارِ نشستِ دیگر، تست‌نشده) هم برود.
+- پیش‌بررسی: diffِ prod با لوکال = فقط این دو تغییر در `index.html` + ۲ خط در `clients.ts`؛ build لوکال موفق؛ جلسه‌ی active ۰. migration ندارد.
+- deploy: backup `/root/backups/before-child-gender-tree-20260925T171955Z.tar.gz` ← جایگزینیِ `public/index.html`، `server/src/http/clients.ts`، `server/dist/http/clients.js` (mv) ← `pm2 restart feelia-mysql --update-env`.
+- تأیید: health ok/connected؛ online، restarts=14؛ رشته‌هایِ جدید در فایل‌هایِ سرور حاضر؛ stderr فقط deprecationِ Fastify. تستِ مرورگری رویِ production انجام نشد. commit نشد (production = `b73197d` + working tree).
+
+### 2026-09-25 — CODE — شاخه‌ی جنسیت به‌شکلِ درختِ دوشاخه زیرِ chipِ دسته
+- درخواستِ مالک: با انتخابِ دسته، درختِ دوشاخه برایِ جنسیت باز شود. `public/index.html`: `.cat-gender-branch` → `.cat-tree` (تنه + میله‌ی افقی + دو برگ `.cat-tree-leaf`، خطوط `--sage`). در `renderCategoryChips` بعد از render با `requestAnimationFrame` تنه زیرِ وسطِ chipِ فعال تراز می‌شود و اگر chipها چندخطی شده باشند تنه با `--stem-up` تا chip بالا می‌رود (chipها `z-index:1` تا خط از پشتشان رد شود). در Browser pane (بدونِ backend) در عرضِ موبایل و ۷۰۰px دیده شد. commit/deploy نشد.
+
+### 2026-09-25 — CODE — جنسیت برایِ «کودک» + انتخابِ درختیِ جنسیت در فرمِ مراجع
+- درخواستِ مالک (اسکرین‌شات): کودک هم جنسیت داشته باشد؛ با انتخابِ دسته، جنسیت به‌صورتِ شاخه‌ی زیرین باز شود.
+- `public/index.html`: `GENDER_OPTIONS.child` (دختر/پسر). `renderCategoryChips` در containerهایِ `.cat-select` (مراجعِ جدید + ویرایش) chipِ دسته را فعال نگه می‌دارد و ردیفِ `.cat-gender-branch` («جنسیت:» + دو chip، خطِ اتصالِ `--sage`) را زیرش می‌سازد؛ ردیفِ فیلترِ افقی همان segmentِ قبلی را دارد (حالا برایِ کودک هم).
+- `server/src/http/clients.ts:112,273`: `finalGender` برایِ `child` هم نگه داشته می‌شود (قبلاً null می‌شد). schema از قبل `gender IN ('f','m')` بدونِ وابستگی به دسته — migration لازم نیست. `tsc --noEmit` سبز؛ render در Browser pane دیده شد (بدونِ backend). commit/deploy نشد.
+
+### 2026-09-25 — CODE — بازطراحیِ تاگلِ «نمایش متن زنده» در صفحه‌یِ ضبط
+- درخواستِ مالک (اسکرین‌شات): تاگل ریز و کم‌دید بود. `public/index.html`: کلاسِ `.live-toggle` (کارتِ کامل‌عرض با آیکون در `--sage-soft`، عنوانِ پررنگ `--ink`، زیرنویسِ `--muted`، سوییچِ بزرگ‌تر، حالتِ فعال `--sage-mist` + حاشیه‌یِ `--sage`، focus-visible). فقط توکن‌هایِ موجودِ design system؛ `#chkLiveText` و منطقِ JS بدونِ تغییر. تستِ مرورگری انجام نشد؛ commit/deploy نشد.
+
+### 2026-09-25 — DEPLOY — فقط `public/index.html` (منویِ «ویرایش»ِ واحد)
+- **مجوز:** «دیپلوی کن». تغییر فقط فرانت بود؛ به‌جایِ رویه‌یِ کاملِ §۵ فقط همین فایل `scp` شد (بدونِ build/restart؛ `public/` با `no-cache` سرو می‌شود).
+- backup: `/root/index.html.bak-20260925T170407Z`. تأیید: health ok/connected؛ رشته‌یِ «ویرایشِ مراجع» حاضر و «ویرایشِ نامِ مستعار» غایب در فایلِ سرور. commit نشد (production = `b73197d` + این فایل). تستِ مرورگری انجام نشد.
+
+### 2026-09-25 — CODE — منویِ کارتِ مراجع: یک «ویرایش» به‌جایِ دو گزینه
+- درخواستِ مالک (اسکرین‌شات): «ویرایشِ دسته‌بندی» و «ویرایشِ نامِ مستعار» در منو به یک آیتمِ «ویرایش» ادغام شدند.
+- `public/index.html`: مودالِ `editCategoryModal` حالا «ویرایشِ مراجع» است و هم inputِ نامِ مستعار و هم chipهایِ دسته‌بندی را دارد؛ `confirmEditCategory` فقط بخشِ تغییرکرده را می‌فرستد (`PUT /api/clients/:id` برایِ alias، `PATCH …/category` برایِ دسته). مودال و توابعِ `editAliasModal` حذف شدند. APIها بدونِ تغییر.
+- تست: تستِ مرورگری انجام نشد (مرور کد فقط).
 
 ### 2026-09-25 — GIT + DEPLOY — commit و deployِ `b73197d` (نقشه‌راه؛ production = HEAD)
 - **مجوز:** «حله دیپلوی کن». commit `b73197d` (push نشده).

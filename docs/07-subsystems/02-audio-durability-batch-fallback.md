@@ -164,7 +164,7 @@ soniox-invalid-audio`) ثبت می‌شود و `batch_status` طبقِ باقی�
 - **چرخشِ durable هر ۱۵ ثانیه** (قبلاً ۶۰s) — پنجره‌ی صدایِ فقط-در-RAM کاهش یافت.
 - **`DURABLE_FLUSH_GUARD_MS = 10000`** (قبلاً ۱۵۰۰) در `stopDurableSegment` — نگهبانی که اگه
   `onstop` هیچ‌وقت fire نشه، `finish()`/`pause()` را برایِ همیشه قفل نکند؛ چون
-  `AudioQueueDB.totalBytes()` با `getAll()` همه‌ی blobهایِ صف را می‌خواند (کند رویِ صفِ بزرگ).
+  `AudioQueueDB.totalBytes()` با `getAll()` همه‌ی blobهایِ صف را می‌خواند (کند رویِ صفِ بزرگ) — **از 2026-09-26 فقط یک بار در هر تب؛** بعد شمارنده‌ی درون‌حافظه‌ای با add/remove به‌روز می‌شود (removeِ بدونِ bytes، مثلِ sweepِ `index.html`، شمارنده را باطل می‌کند تا دفعه‌ی بعد دوباره خوانده شود).
 - **`watchTrackEnded`/`handleMicLost`:** قطعِ فیزیکیِ میکروفون (هدست/OS/تماسِ تلفن) با
   `track.onended` تشخیص داده می‌شود (قبلاً کاملاً بی‌صدا بود — ضبط فقط متوقف می‌شد)؛ استریمِ
   تازه با backoff گرفته و durable/livePusher از سر گرفته می‌شود، بدونِ دست‌زدن به
@@ -239,8 +239,9 @@ batch_status∈{done,failed}`؛ note → `!note_audio_pending`. سپس خوان�
    و پخشِ واقعی در DOMِ مرورگر تأیید شد — جزئیات در [verification](../../verification/2026-09-16-audio-durability-stage4-partsEF.md).
 4. مارکرهایِ `<end>/<fin>` در async حذف نمی‌شوند (اثر UNVERIFIED — این بخش از قبل بود، این
    audit لمسش نکرد).
-5. `AudioQueueDB.totalBytes()` هنوز با `getAll()` همه‌ی blobها را می‌خواند (کندیِ ریشه‌ای حل
-   نشده — فقط نگهبانِ زمانی افزایش یافت که ریسکِ عملی را کم می‌کند).
+5. ~~`AudioQueueDB.totalBytes()` هنوز با `getAll()` همه‌ی blobها را می‌خواند~~ **حل شد (2026-09-26):** شمارنده‌ی
+   درون‌حافظه‌ای (T30 در `scripts/rt-harness.cjs`). تبِ دیگری که هم‌زمان صف را عوض کند شمارنده را تا invalidateِ بعدی کمی
+   نادقیق می‌کند؛ سقفِ ۳۰۰MB نرم است.
 6. ~~قفلِ cross-context~~ **پیاده و تست شد (2026-09-16):** `window.FeeliaRT.withAudioLock(sessionId, fn)`
    (تعریف‌شده کنارِ `uploadQueuedSegment` در `feelia-rt.js`) از `navigator.locks.request` استفاده
    می‌کند (واقعاً بینِ تب‌ها هم مشترک است؛ اگر مرورگر پشتیبانی نکند، fallback به یک promise-lockِ

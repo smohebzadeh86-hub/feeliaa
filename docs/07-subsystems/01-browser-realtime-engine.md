@@ -22,6 +22,7 @@ stateDiagram-v2
   RECONNECTING --> RECOVERED: reconnect ok
   RECOVERED --> ACTIVE: فوری
   RECONNECTING --> FAILED: 4 تلاش
+  FAILED --> RECONNECTING: هر 30s (FAILED_RETRY_MS، به‌جز 401) یا رویدادِ online
   ACTIVE --> NETWORK_PAUSED: offline
   RECONNECTING --> NETWORK_PAUSED: offline
   NETWORK_PAUSED --> RECONNECTING: online
@@ -65,7 +66,7 @@ stateDiagram-v2
 ## ۴. جریان‌های کلیدی
 
 ### start
-`GET /api/sessions/:id` (prefix اگر طولانی‌تر + `baseVersion`) → `ensureStream` (getUserMedia) → `connectWithFreshMint` → ok: `startDurable` + `startAutosave` + `watchOnline` + ACTIVE؛ not ok: `unreliable` + `startDurable` + `watchOnline` + FAILED (بدونِ autosave — **INFERRED:** متنی هم تولید نمی‌شود).
+`GET /api/sessions/:id` (prefix اگر طولانی‌تر + `baseVersion`) → `ensureStream` (getUserMedia) → `connectWithFreshMint` → ok: `startDurable` + `startAutosave` + `watchOnline` + ACTIVE؛ not ok: `unreliable` + `startDurable` + `watchOnline` + `startAutosave` + `startWsWatchdog` + FAILED + `scheduleFailedRetry` (2026-09-26: autosave/watchdog فقط در ACTIVE کار می‌کنند؛ قبلاً اینجا شروع نمی‌شدند و اگر reconnect بعداً realtime را بالا می‌آورد، متن تا pause/پایان ذخیره نمی‌شد).
 
 ### دو MediaRecorder روی یک stream
 | Recorder | timeslice | bitrate | مقصد |
@@ -92,6 +93,8 @@ state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250
 ## ۵. Glue در `index.html`
 `startNewRTSession` (ساخت + بنرِ durable-only)، `rtOnState` (متنِ وضعیت، تایمر، level meter، دکمه‌ی pause)، `endNewRTSession` (finish → `PUT status=completed` → بنرِ batch → Wrapup)، `rtPauseLive`/`rtResumeLive`، `startVoiceNoteDirect`/`stopVoiceNoteDirect`، `sweepOrphanedAudioQueue` (در `enterApp`).
 
+- **تایمرِ جلسه (2026-09-26):** `rtOnState` در RECONNECTING/NETWORK_PAUSED/FAILED تایمر را فقط وقتی `rtSession.stream` نیست متوقف می‌کند (ضبطِ durable ادامه دارد؛ قبلاً `duration_ms`/`offset_ms` به اندازه‌ی قطعی عقب می‌افتاد).
+
 ## ۶. باگ‌های تاریخیِ ثبت‌شده در کامنت‌ها (برای جلوگیری از بازگشت)
 - `stop()` سرور هرگز resolve نمی‌شد (commit `7f7a80c`).
 - pauseِ قدیمی WSِ resumeِ جدید را می‌بست (→ `pauseToken`).
@@ -113,7 +116,7 @@ state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250
 | `rt.ws_open` | `openDirectWS`، بعدِ handshakeِ موفق | — | اتصالِ WSِ مستقیم به Soniox برقرار شد |
 | `rt.ws_close` | اولین خطِ `handleWSClose(ev)` — همیشه، حتی بستنِ عمدی | `close_code` (کدِ خامِ `CloseEvent`)، `was_clean` | `close_code=1006` تکراری برایِ یک تراپیست یعنی قطعیِ غیرطبیعیِ شبکه — شبکه را بررسی کنید. `ev.reason` عمداً هیچ‌وقت خوانده نمی‌شود (متنِ آزادِ سرور/Soniox، LAW-001) |
 | `rt.ws_error` | `ws.onerror` در `openDirectWS` | — | خطایِ سطحِ WS، معمولاً قبل از `rt.ws_close` |
-| `rt.reconnect_scheduled` | `scheduleReconnect(reason)` | `reason` (کدِ کوتاه: `closed`/`soniox-error`/`temp-key-expired`/`watchdog-ws-not-open`/`retry`/`online`/`online-after-failed`)، `attempt`، `delay_ms` | چرا/کِی reconnect زمان‌بندی شد و با چه backoffی |
+| `rt.reconnect_scheduled` | `scheduleReconnect(reason)` | `reason` (کدِ کوتاه: `closed`/`soniox-error`/`temp-key-expired`/`watchdog-ws-not-open`/`retry`/`online`/`online-after-failed`/`failed-retry`)، `attempt`، `delay_ms` | چرا/کِی reconnect زمان‌بندی شد و با چه backoffی |
 | `rt.reconnect_ok` | `connectWithFreshMint`، فقط وقتی `isReconnect===true` | `attempt` (شماره‌ی تلاشِ موفق) | reconnect جواب داد — چند تلاش طول کشید |
 | `rt.reconnect_exhausted` | `scheduleReconnect` وقتی `reconnectAttempts>=MAX_RECONNECT_ATTEMPTS` | `attempt` | همه‌ی تلاش‌ها تمام شد؛ state=FAILED، ضبطِ durable ادامه دارد |
 | `rt.mint_failed` | catchِ `connectWithFreshMint` | `status`، `code` (نه `message`) | mintِ credential شکست خورد (شبکه/rate-limit/۴۰۱) |
@@ -129,7 +132,8 @@ state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250
 
 ## ۸. ریسک‌ها / سؤال‌های باز
 - پیامِ `onError` هنگامِ نبودنِ IndexedDB می‌گوید «فضا پر شده» (گمراه‌کننده).
-- در FAILED از ابتدا (mint fail) هیچ متنی تا batch وجود ندارد و autosave شروع نمی‌شود — مطابقِ طراحی.
+- در FAILED از ابتدا (mint fail) هیچ متنی تا batch وجود ندارد؛ از 2026-09-26 autosave شروع می‌شود ولی فقط بعد از reconnectِ موفق (ACTIVE) کاری می‌کند.
+- **جلسه‌ی طولانی (۱ساعت، 2026-09-26):** Wake Lock (`syncWakeLock` در `feelia-rt.js`) صفحه را روشن نگه می‌دارد؛ اگر کاربر خودش صفحه/تب را پنهان کند، مرورگر قفل را آزاد می‌کند و تایمرها (keepaliveِ pause) ممکن است throttle شوند — در آن حالت resume از مسیرِ کندِ mint تازه می‌رود (رفتارِ موجود). رندرِ متنِ زنده در `index.html#setLiveTextParts` افزایشی است (هر پاراگراف یک div)؛ یک پاراگرافِ خیلی بلند (یک گوینده برای مدتِ طولانی) هنوز به‌طولِ خودش layout می‌شود. کلیدِ موقت سقفِ ۲ ساعت دارد؛ جلسه‌ی بیش از ۲ ساعت یک reconnect با `temp-key-expired` و علامتِ ناپیوستگی می‌گیرد (تغییر نکرد).
 - `live` registry با `forget` پاک می‌شود؛ فراموش‌کردنِ `forget` = هشدارِ `beforeunload` دائمی.
 - **توقفِ طولانی:** چون WS حینِ pause باز می‌ماند، سقفِ `max_session_duration_seconds=7200` کلیدِ موقت همچنان می‌گذرد. اگر Soniox حینِ MANUAL_PAUSED خطای `temp_api_key_session_expired` بدهد، `scheduleReconnect` در MANUAL_PAUSED کاری نمی‌کند و `handleWSClose` هم برای MANUAL_PAUSED برمی‌گردد؛ پس فقط هنگامِ resume مسیرِ کند فعال می‌شود (**INFERRED** از کد؛ تست نشده).
 - `hasOpenConnection()` حینِ pause اکنون true است → هشدارِ `beforeunload` در حالتِ توقف هم نمایش داده می‌شود (**INFERRED**).

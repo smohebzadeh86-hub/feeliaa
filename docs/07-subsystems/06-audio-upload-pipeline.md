@@ -44,7 +44,7 @@
 | اثرِ انگشت | sha256 از `name|size|lastModified` + ۱MBِ اول + ۱MBِ آخر (بدونِ خواندنِ کلِ فایل) |
 | ماندگاری | (رکورد فقط یک بار، پیش از شروع، نوشته می‌شود — ادامه با fingerprint) خودِ `File` در IndexedDB (`feelia-uploads`/`tasks`) تا پایانِ آپلود؛ بعد از رفرش/بستن‌وبازکردنِ تب، بعد از ورود **بدونِ انتخابِ دوباره** ادامه می‌یابد. هر کار به `therapistId` گره خورده. اگر ذخیره‌ی IndexedDB ممکن نشد: fail-open (فقط ادامه بعد از رفرش از دست می‌رود و UI صادقانه می‌گوید فایل را دوباره انتخاب کنید). |
 | تکه | ۴MB (`CHUNK_SIZE`)، PUTِ جدا با `X-Chunk-Sha256`؛ با XHR تا نوارِ پیشرفتِ واقعی |
-| شبکه‌ی ضعیف | فقط همان تکه تکرار می‌شود (backoffِ نمایی تا ۳۰ث، بعد صبرِ ۱۵ثانیه‌ایِ بی‌پایان)؛ با `offline` منتظرِ `online` می‌ماند؛ انتخابِ فایل در حالتِ آفلاین ⇒ «منتظرِ اینترنت» و شروعِ خودکار |
+| شبکه‌ی ضعیف | فقط همان تکه تکرار می‌شود (backoffِ نمایی تا ۳۰ث، بعد صبرِ ۱۵ثانیه‌ایِ بی‌پایان)؛ timeoutِ هر تکه `max(120s, حجم/4KB·s)` و قطعِ زودهنگام فقط اگر ۶۰ث هیچ بایتی نرود (2026-09-26؛ قبلاً ثابتِ ۱۲۰s ⇒ زیرِ ~۳۵KB/s هیچ تکه‌ای کامل نمی‌شد)؛ با `offline` منتظرِ `online` می‌ماند؛ انتخابِ فایل در حالتِ آفلاین ⇒ «منتظرِ اینترنت» و شروعِ خودکار |
 | ادامه | `POST /api/uploads` همان آپلود را (با fingerprint) برمی‌گرداند + فهرستِ تکه‌هایِ رسیده؛ فقط باقی ارسال می‌شود |
 | تکراری | همان فایل برایِ همان مراجع ⇒ `duplicate:true` و پیامِ «قبلاً آپلود شده (جلسه N)». **(2026-09-24، رفعِ B2)** اگر jobِ آن آپلود `failed` و قابلِ ادامه است ⇒ همان job دوباره در صف (`requeued:true`، جلسه‌ی تکراری ساخته نمی‌شود)؛ اگر غیرقابلِ ادامه است (صدا دیگر نیست یا `unreadable`/`no-audio`/`too-long`/`audio-missing`/`audio-expired`) ⇒ آپلودِ تازه مجاز است |
 | بستنِ تب | تا «دریافت شد» `beforeunload` هشدار می‌دهد؛ بعد از آن لازم نیست صفحه باز بماند |
@@ -85,7 +85,7 @@ queued → normalizing → transcribing → case_file → done
 
 | مرحله | کار | idempotency / بازیابی |
 |---|---|---|
-| normalizing | probe ⇒ تبدیل به Opus/Ogg، mono، 16kHz، 32kbps (fallback: AAC/M4A اگر libopus نبود) ⇒ آرشیو با `archiveAudioFileForAdmin` (sha256، rename، `session_audio.source='upload'`) ⇒ حذفِ فایلِ خامِ آپلود | اگر `normalized_path` از قبل هست ⇒ ffmpeg دوباره اجرا نمی‌شود |
+| normalizing | probe ⇒ تبدیل به Opus/Ogg، mono، 16kHz، 32kbps (fallback: AAC/M4A اگر libopus نبود)؛ timeoutِ ffmpeg `max(5min, duration/3)` (2026-09-26؛ قبلاً `/10`) ⇒ آرشیو با `archiveAudioFileForAdmin` (sha256، rename، `session_audio.source='upload'`) ⇒ حذفِ فایلِ خامِ آپلود | اگر `normalized_path` از قبل هست ⇒ ffmpeg دوباره اجرا نمی‌شود |
 | transcribing | آپلودِ stream به Soniox ⇒ ذخیره‌ی `soniox_file_id` ⇒ ساختِ transcription ⇒ ذخیره‌ی `soniox_transcription_id` ⇒ poll (۳ یا ۱۰ ثانیه) ⇒ متن ⇒ **تراکنش**: قفلِ job، اگر `transcript_applied_at` دارد ⇒ هیچ؛ وگرنه append به `sessions.transcript` (+version، `stt_mode='upload'`) + علامت + اعلان ⇒ حذفِ فایل/transcription از Soniox | بعد از ری‌استارت همان transcription دنبال می‌شود (نه آپلودِ دوباره)؛ ۴۰۴ ⇒ فقط transcription دوباره؛ سه اجرایِ دوباره ⇒ یک متن |
 | case_file | `maybeAutoGenerateCaseFile` با اعلان | `busy` ⇒ هر ۲ دقیقه تا ۱۵ بار، بعد `busy_gave_up` (متن سالم می‌ماند) |
 
