@@ -109,7 +109,7 @@ export async function clientRoutes(app: FastifyInstance) {
     }
 
     // جنسیت فقط برایِ نوجوان/بزرگسال معنا داره
-    const finalGender = (category === 'teen' || category === 'adult') ? (gender || null) : null;
+    const finalGender = (category === 'child' || category === 'teen' || category === 'adult') ? (gender || null) : null;
 
     let code = generateClientCode();
     for (let i = 0; i < 5; i++) {
@@ -270,7 +270,7 @@ export async function clientRoutes(app: FastifyInstance) {
     }
 
     // جنسیت فقط برایِ نوجوان/بزرگسال معنا داره — با تغییرِ دسته به کودک، پاک می‌شه
-    const finalGender = (category === 'teen' || category === 'adult') ? (gender || null) : null;
+    const finalGender = (category === 'child' || category === 'teen' || category === 'adult') ? (gender || null) : null;
 
     await query(
       'UPDATE clients SET category = ?, gender = ? WHERE id = ? AND therapist_id = ?',

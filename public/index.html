@@ -297,6 +297,18 @@ input::-ms-reveal{display:none}
 .toggle-row input::after{content:'';position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.22);transition:transform .25s}
 .toggle-row input:checked{background:var(--sage)}
 .toggle-row input:checked::after{transform:translateX(-18px)}
+.live-toggle{justify-content:flex-start;gap:12px;width:100%;max-width:340px;margin:16px auto 20px;padding:12px 14px;box-sizing:border-box;background:var(--card);border:1.5px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);text-align:right;transition:border-color .25s,background .25s}
+.live-toggle:hover{border-color:var(--sage)}
+.live-toggle:has(input:focus-visible){outline:2px solid var(--sage);outline-offset:2px}
+.live-toggle:has(input:checked){background:var(--sage-mist);border-color:var(--sage)}
+.live-toggle .lt-icon{width:38px;height:38px;flex:none;border-radius:var(--r-md);display:grid;place-items:center;background:var(--sage-soft);color:var(--sage-deep)}
+.live-toggle .lt-icon svg{width:20px;height:20px}
+.live-toggle .lt-text{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.live-toggle .lt-title{font-size:14.5px;font-weight:700;color:var(--ink)}
+.live-toggle .lt-sub{font-size:11.5px;font-weight:400;color:var(--muted)}
+.live-toggle input{width:46px;height:26px}
+.live-toggle input::after{width:20px;height:20px}
+.live-toggle input:checked::after{transform:translateX(-20px)}
 
 .signs-area{border-top:1px dashed var(--line);margin-top:18px;padding-top:16px;text-align:right}
 .signs-label{font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:9px;display:flex;align-items:center;gap:7px}
@@ -370,6 +382,17 @@ input::-ms-reveal{display:none}
 .radio-opt:has(input:checked){border-color:var(--sage);background:var(--sage-mist);color:var(--ink)}
 .radio-opt input{accent-color:var(--sage);width:auto;margin:0;padding:0;background:none;border:none}
 .cat-select{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+/* شاخه‌ی درختیِ جنسیت زیرِ دسته‌ی انتخاب‌شده (فرمِ مراجعِ جدید/ویرایش) */
+.cat-select>button{position:relative;z-index:1}
+.cat-gender-branch{flex-basis:100%;display:flex;margin-top:-8px}
+.cat-tree{display:inline-flex;flex-direction:column;align-items:center;position:relative;padding-top:12px}
+.cat-tree::before{content:'';position:absolute;top:calc(-1 * var(--stem-up,0px));inset-inline-start:50%;width:2px;height:calc(12px + var(--stem-up,0px));background:var(--sage);transform:translateX(50%)}
+.cat-tree-leaves{display:flex;gap:14px}
+.cat-tree-leaf{position:relative;padding-top:12px;display:flex;justify-content:center}
+.cat-tree-leaf::before{content:'';position:absolute;top:0;inset-inline-start:50%;width:2px;height:12px;background:var(--sage);transform:translateX(50%)}
+.cat-tree-leaf::after{content:'';position:absolute;top:0;height:2px;background:var(--sage)}
+.cat-tree-leaf:first-child::after{inset-inline-start:50%;inset-inline-end:-7px}
+.cat-tree-leaf:last-child::after{inset-inline-start:-7px;inset-inline-end:50%}
 .cat-opt{padding:8px 13px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);font-family:inherit;font-size:12px;color:var(--ink-2);cursor:pointer}
 .cat-opt.sel{background:var(--sage);border-color:var(--sage);color:#fff}
 
@@ -1005,7 +1028,7 @@ input::-ms-reveal{display:none}
       <div class="timer" id="recTimer">۰۰:۰۰</div>
       <div class="rec-status" id="recStatus">در حال اتصال…</div>
       <div class="level-meter" id="levelMeter"></div>
-      <label class="toggle-row"><input type="checkbox" id="chkLiveText"> نمایش متن زنده</label>
+      <label class="toggle-row live-toggle"><span class="lt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg></span><span class="lt-text"><span class="lt-title">نمایش متن زنده</span><span class="lt-sub">رونویسی را هم‌زمان ببینید</span></span><input type="checkbox" id="chkLiveText"></label>
       <div class="live-text" id="liveText" data-clarity-mask="true" hidden></div>
       <div class="signs-area">
         <div class="signs-label">
@@ -1300,24 +1323,15 @@ input::-ms-reveal{display:none}
 
 <div class="modal-back" id="editCategoryModal" data-clarity-mask="true">
   <div class="modal">
-    <h3>ویرایشِ دسته‌بندی</h3>
-    <p>دسته‌بندیِ <b id="editCategoryClientCode"></b> را تغییر دهید.</p>
+    <h3>ویرایشِ مراجع</h3>
+    <p>اطلاعاتِ <b id="editCategoryClientCode"></b> را تغییر دهید.</p>
+    <label for="editAliasInput" style="display:block;font-size:13px;margin-bottom:6px">نامِ مستعار</label>
+    <input type="text" id="editAliasInput" placeholder="مثلاً: مراجع-الف" maxlength="80">
+    <div style="font-size:13px;margin:14px 0 6px">دسته‌بندی</div>
     <div class="cat-select" id="editCategoryCatSelect"></div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn btn-ghost" onclick="closeEditCategoryModal()">انصراف</button>
       <button class="btn btn-primary" onclick="confirmEditCategory()">ذخیره</button>
-    </div>
-  </div>
-</div>
-
-<div class="modal-back" id="editAliasModal" data-clarity-mask="true">
-  <div class="modal">
-    <h3>ویرایشِ نامِ مستعار</h3>
-    <p>نامِ مستعارِ <b id="editAliasClientCode"></b> را تغییر دهید.</p>
-    <input type="text" id="editAliasInput" placeholder="مثلاً: مراجع-الف" maxlength="80">
-    <div class="modal-actions" style="margin-top:14px">
-      <button class="btn btn-ghost" onclick="closeEditAliasModal()">انصراف</button>
-      <button class="btn btn-primary" onclick="confirmEditAlias()">ذخیره</button>
     </div>
   </div>
 </div>
@@ -3247,6 +3261,7 @@ const CATEGORY_LABELS={'child':'کودک','teen':'نوجوان','adult':'بزر�
 // ⭐ جنسیت یه فیلدِ مستقل و اختیاریه (نه بخشی از category) — چون قرار شد هم
 // نوجوان هم بزرگسال بتونن جنسیت داشته باشن، بدونِ تکرارِ ترکیب‌های category.
 const GENDER_OPTIONS={
+  'child':[{v:'f',label:'دختر'},{v:'m',label:'پسر'}],
   'teen':[{v:'f',label:'دختر'},{v:'m',label:'پسر'}],
   'adult':[{v:'f',label:'زن'},{v:'m',label:'مرد'}],
 };
@@ -3295,9 +3310,37 @@ function switchClientTab(tab){
 // زیرش باز کنه. برایِ ردیفِ فیلتر و هر دو مودالِ دسته‌بندی استفاده می‌شه.
 function renderCategoryChips(container,options,state,onPick,chipClass,activeClass){
   container.innerHTML='';
+  // در فرم‌ها (cat-select) جنسیت به‌صورتِ شاخه‌ی درختی زیرِ دسته باز می‌شود؛
+  // در ردیفِ فیلترِ افقی همان segmentِ درجا می‌ماند.
+  const tree=container.classList.contains('cat-select');
+  let branch=null;
   options.forEach(function(opt){
     const genderOpts=GENDER_OPTIONS[opt.value];
-    if(state.category===opt.value&&genderOpts){
+    if(tree&&state.category===opt.value&&genderOpts){
+      branch=document.createElement('div');
+      branch.className='cat-gender-branch';
+      const treeEl=document.createElement('div');
+      treeEl.className='cat-tree';
+      const leaves=document.createElement('div');
+      leaves.className='cat-tree-leaves';
+      treeEl.appendChild(leaves);
+      branch.appendChild(treeEl);
+      genderOpts.forEach(function(g){
+        const leaf=document.createElement('div');
+        leaf.className='cat-tree-leaf';
+        const b=document.createElement('button');
+        b.type='button';
+        b.className=chipClass+(state.gender===g.v?(' '+activeClass):'');
+        b.textContent=g.label;
+        b.addEventListener('click',function(e){
+          e.stopPropagation();
+          onPick(opt.value,state.gender===g.v?null:g.v);
+        });
+        leaf.appendChild(b);
+        leaves.appendChild(leaf);
+      });
+    }
+    if(!tree&&state.category===opt.value&&genderOpts){
       const seg=document.createElement('div');
       seg.className='cat-seg';
       genderOpts.forEach(function(g){
@@ -3324,6 +3367,24 @@ function renderCategoryChips(container,options,state,onPick,chipClass,activeClas
       container.appendChild(chip);
     }
   });
+  if(branch){
+    container.appendChild(branch);
+    // تنه‌ی درخت دقیقاً زیرِ وسطِ chipِ دسته‌ی انتخاب‌شده قرار می‌گیرد
+    const b=branch;
+    requestAnimationFrame(function(){
+      const chip=container.querySelector('.'+activeClass);
+      const t=b.firstChild;
+      const cr=container.getBoundingClientRect();
+      if(!chip||!cr.width)return;
+      const kr=chip.getBoundingClientRect();
+      const center=cr.right-(kr.left+kr.width/2);
+      const off=Math.max(0,Math.min(center-t.offsetWidth/2,cr.width-t.offsetWidth));
+      t.style.marginInlineStart=off+'px';
+      // اگر chipها چندخطی شده باشند، تنه تا زیرِ chipِ انتخاب‌شده بالا می‌رود
+      const gap=t.getBoundingClientRect().top-kr.bottom;
+      if(gap>0)t.style.setProperty('--stem-up',gap+'px');
+    });
+  }
 }
 
 const FILTER_CATEGORY_OPTIONS=[{value:'all',label:'همه'},{value:'child',label:'کودک'},{value:'teen',label:'نوجوان'},{value:'adult',label:'بزرگسال'}];
@@ -3551,14 +3612,9 @@ function buildClientCard(c){
     menuDrop.className='client-menu-drop';
     const editCatBtn=document.createElement('button');
     editCatBtn.type='button';
-    editCatBtn.innerHTML=IC_PEN+'ویرایشِ دسته‌بندی';
+    editCatBtn.innerHTML=IC_PEN+'ویرایش';
     editCatBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();openEditCategoryModal(c);});
     menuDrop.appendChild(editCatBtn);
-    const editAliasBtn=document.createElement('button');
-    editAliasBtn.type='button';
-    editAliasBtn.innerHTML=IC_PEN+'ویرایشِ نامِ مستعار';
-    editAliasBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();openEditAliasModal(c);});
-    menuDrop.appendChild(editAliasBtn);
     if(!isInactive){
       const pinned=isPinnedClient(c);
       const pinBtn=document.createElement('button');
@@ -3766,6 +3822,7 @@ function openEditCategoryModal(c){
   editCategorySelectedCategory=c.category||null;
   editCategorySelectedGender=c.gender||null;
   $('editCategoryClientCode').textContent=c.alias?(c.alias+' ('+c.code+')'):c.code;
+  $('editAliasInput').value=c.alias||'';
   renderEditCategoryCatSelect();
   $('editCategoryModal').classList.add('open');
 }
@@ -3775,39 +3832,24 @@ function closeEditCategoryModal(){
 }
 async function confirmEditCategory(){
   if(!editCategoryTargetClient)return;
-  const id=editCategoryTargetClient.id;
-  try{
-    await api('/api/clients/'+id+'/category',{method:'PATCH',body:{category:editCategorySelectedCategory,gender:editCategorySelectedGender}});
-    uxTrack('client_category_edited');
-    closeEditCategoryModal();
-    showBanner('info','دسته‌بندی به‌روزرسانی شد.');
-    loadClients();
-  }catch(e){showBanner('error','خطا: '+e.message);}
-}
-
-// ⭐ فیکسِ باگِ واقعی (UI-38): API ویرایشِ alias (`PUT /api/clients/:id`) از قبل
-// وجود داشت ولی هیچ راهِ UI برایِ آن نبود؛ اشتباهِ تایپی در نامِ مراجع ماندگار می‌شد.
-let editAliasTargetClient=null;
-function openEditAliasModal(c){
-  editAliasTargetClient=c;
-  $('editAliasClientCode').textContent=c.code;
-  $('editAliasInput').value=c.alias||'';
-  $('editAliasModal').classList.add('open');
-}
-function closeEditAliasModal(){
-  $('editAliasModal').classList.remove('open');
-  editAliasTargetClient=null;
-}
-async function confirmEditAlias(){
-  if(!editAliasTargetClient)return;
-  const id=editAliasTargetClient.id;
+  const c=editCategoryTargetClient;
+  const id=c.id;
+  // یک مودالِ واحد (UI-38 + دسته‌بندی): فقط بخش‌هایی که واقعاً تغییر کرده‌اند ارسال می‌شوند.
   const alias=$('editAliasInput').value.trim();
+  const aliasChanged=alias!==(c.alias||'');
+  const catChanged=editCategorySelectedCategory!==(c.category||null)||editCategorySelectedGender!==(c.gender||null);
   try{
-    await api('/api/clients/'+id,{method:'PUT',body:{alias:alias}});
-    closeEditAliasModal();
-    showBanner('info','نامِ مستعار به‌روزرسانی شد.');
-    loadClients();
-  }catch(e){showBanner('error','خطا: '+e.message);}
+    if(aliasChanged)await api('/api/clients/'+id,{method:'PUT',body:{alias:alias}});
+    if(catChanged){
+      await api('/api/clients/'+id+'/category',{method:'PATCH',body:{category:editCategorySelectedCategory,gender:editCategorySelectedGender}});
+      uxTrack('client_category_edited');
+    }
+    closeEditCategoryModal();
+    if(aliasChanged||catChanged){
+      showBanner('info','اطلاعاتِ مراجع به‌روزرسانی شد.');
+      loadClients();
+    }
+  }catch(e){showBanner('error','خطا: '+e.message);if(aliasChanged)loadClients();}
 }
 
 function showDeleteClient(id,code,sc){
@@ -7499,7 +7541,6 @@ const MODAL_CLOSERS={
   resolveSpeakersModal:closeResolveSpeakersModal,
   deactivateClientModal:closeDeactivateModal,
   editCategoryModal:closeEditCategoryModal,
-  editAliasModal:closeEditAliasModal,
   cancelModal:closeCancelModal,
   exitModal:closeExitWarning,
   deleteSessionModal:closeDeleteSession,
