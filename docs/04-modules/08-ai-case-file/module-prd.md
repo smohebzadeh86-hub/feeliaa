@@ -99,3 +99,7 @@ provider/مدل بی‌خبرند. جزئیاتِ env: [configuration-catalog](.
 
 مراجعینِ فعال، صفحه/ناوبریِ مستقل، هر providerِ LLM غیر از OpenAI/OpenRouter، صفِ async با
 coalesce، گسترشِ trigger به یادداشت‌هایِ خارج از جلسه.
+
+## رفعِ A1.9 (2026-09-26) — merge
+- ردیفِ محور/گام/خلاصه‌ی جلسه/دارویی که تراپیست تأیید یا ویرایش کرده (reviewed، غیرِ pending) و مدل در regenerateِ عادی نیاورده، مثلِ ردیفِ `addedByTherapist` حفظ می‌شود (`mergeTherapistEdits.ts`).
+- در بازتولیدِ کامل (`force`) هم `answeredQuestions` حفظ می‌شود و سوالِ پاسخ‌داده‌شده دوباره «باز» نمی‌شود. تست: `test:cf` A1.9a/A1.9b.

@@ -125,6 +125,8 @@ state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250
 | `rt.state_change` | `setState(s)` (چون این فایل از قبل یک state machineِ صریحِ `STATES` دارد) | `state`، `prev_state` | دنباله‌ی کاملِ گذارهایِ یک RTSession — برایِ بازسازیِ timeline |
 | `rt.gap_marked` | `noteDiscontinuity()` | — | مارکرِ ناپیوستگیِ گوینده به transcript اضافه شد (بندِ ۳ همین سند) |
 | `rt.audio_quality_warn` | `showAudioQualityHint` در `index.html` (2026-09-26) | `reason` = `no_signal`\|`too_quiet`\|`noisy`\|`clipping` | هشدارِ کیفیتِ ضبط به تراپیست نشان داده شد؛ یک بار برایِ هر reason در هر جلسه |
+| `rt.transcript_diverged` | `persistConfirmed` (rebaseِ 409) — A1.6، 2026-09-26 | `len` (طولِ متنِ محلی)، `chars` (طولِ متنِ سرور) | متنِ محلی و سرور هیچ‌کدام دیگری را در بر نداشتند؛ دُمِ محلی با برچسب پشتِ متنِ سرور آمد |
+| `rt.final_persist_failed` | `persistFinal` در `finish` — A1.4، 2026-09-26 | `attempts`، `count` (سگمنت‌هایِ برگشته به رونویسی) | ذخیره‌ی نهاییِ متن بعد از همه‌ی تلاش‌ها شکست خورد؛ بازه‌ی ذخیره‌نشده از صدا بازیابی می‌شود |
 
 **هشدارِ کیفیتِ ضبط (2026-09-26):** `FeeliaRT.createAudioQualityMonitor()` (خالص، بدونِ DOM) فریم‌هایِ Float32ِ همان آنالایزرِ
 نوارِ سطحِ صدا را (همان استریمی که به Soniox می‌رود) در پنجره‌هایِ ۳۰ثانیه‌ای به هیستوگرامِ dBFS تبدیل می‌کند و در پایانِ هر پنجره

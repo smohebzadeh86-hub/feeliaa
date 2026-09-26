@@ -18,6 +18,8 @@
 | `ADMIN_PHONE` | `http/auth.ts` | — | خیر | نیمه‌حساس | شماره‌ای که در register/login ادمین می‌شود |
 | `CLARITY_PROJECT_ID` | `http/clientConfig.ts` | — (خاموش) | خیر | خیر | باید `^[a-z0-9]{6,20}$`؛ فقط در production |
 | `FFMPEG_PATH` | `stt/speakerResolve.ts`، `stt/sessionAudioArchive.ts`، `features/audio-upload/media.ts` | `ffmpeg` | برایِ آپلودِ فایلِ صوتی عملاً بله | خیر | باینریِ ffmpeg؛ نبودش ⇒ jobِ آپلود با `no-ffmpeg` در backoff می‌ماند |
+| `AUDIT_LOG_RETENTION_DAYS` | `obs/sweep.ts` | `730` (۲ سال) | تنظیم‌نشده | خیر | **جدید 2026-09-26 (A6، تصمیمِ مالک: «۲ سال»).** ردیف‌هایِ `audit_log` قدیمی‌تر از این در جاروبِ روزانه (startup + هر ۲۴ ساعت) حذف می‌شوند |
+| `SESSION_AUTO_CLOSE_IDLE_SECONDS` | `http/sessionAutoClose.ts` | `7200` (۲ ساعت؛ کف ۹۰۰) | تنظیم‌نشده | خیر | **جدید 2026-09-26 (A3).** جلسه‌ی زنده‌ی `in_progress`/`recovered` (غیرِ upload) که در این مدت نه `updated_at`، نه `session_audio`، نه `obs_events` داشته، هر ۱۵ دقیقه خودکار completed می‌شود (`auto_closed_at`) |
 | `SONIOX_ORPHAN_SWEEP` | `features/audio-upload/jobRunner.ts` | خاموش | **رویِ production: `1`** (در `/root/feeliaa-mysql/.env` ست شد 2026-09-24؛ dry-run پیش از آن: ۱ transcription + ۱ فایلِ یتیمِ 2026-09-16) | خیر | **جدید 2026-09-23.** فقط `1` پاک‌سازیِ فایل/transcriptionِ یتیمِ فیلیا رویِ Soniox را فعال می‌کند. رویِ dev عمداً خاموش — کلیدِ Soniox بینِ dev و production مشترک است و DBِ dev از jobهایِ زنده‌ی production خبر ندارد |
 | `UPLOAD_DAILY_AUDIO_MINUTES` | `features/audio-upload/jobRunner.ts` (`quotaWaitMsForJob`) | `600` | ست نشده (پیش‌فرض ۶۰۰) | خیر | **جدید 2026-09-24 (رفعِ L6).** سقفِ دقیقه‌ی صدایِ رونویسی‌شده‌ی آپلودی برایِ هر تراپیست در ۲۴ ساعتِ غلتان. بیش از آن ⇒ job **صف می‌ماند** (`error_code='quota-wait'`، چکِ دوباره هر ۳۰ دقیقه) — هرگز رد/failed نمی‌شود؛ اولین job همیشه اجرا می‌شود؛ `0` ⇒ بدونِ سقف |
 | `UPLOAD_CASE_FILE` | `features/audio-upload/jobMachine.ts#uploadCaseFileEnabled` | خاموش | خیر | خیر | **جدید 2026-09-24 (تصمیمِ مالک).** مسیرِ آپلودِ فایلِ صوتی برایِ مراجعِ فعال و غیرفعال با «ذخیره‌ی متن» تمام می‌شود (`audio_jobs.case_file_status='disabled'`)؛ فقط `1` مرحله‌ی پرونده را بعد از متن روشن می‌کند (UI هم ثابتِ `UPLOAD_SHOW_CASE_FILE_STEP` در `index.html` را دارد که باید هم‌زمان `true` شود). فقط مراجعِ غیرفعال را می‌خواهید؟ ⇒ `UPLOAD_CASE_FILE_INACTIVE` |
@@ -89,6 +91,8 @@
 | `PAUSE_SILENCE_BUFFER_MS` / `PAUSE_FLUSH_MS` | 250 / 2000 |
 | `AUTOSAVE_MS` / `AUTOSAVE_MAX_GAP_MS` | 5000 / 15000 — تیکِ ۵ثانیه‌ای؛ فاصله‌ی دو ذخیره `min(15s, 5s + ⌊طولِ متن/20000⌋×2.5s)`؛ هرگز دو PUTِ هم‌زمان (2026-09-26) |
 | `TRANSCRIPT_PUT_TIMEOUT_MS` | 30000 — فقط PUTِ متنِ کامل در `persistConfirmed` (بقیه‌ی درخواست‌ها `REQUEST_TIMEOUT_MS`) (2026-09-26) |
+| `SEGMENT_UPLOAD_TIMEOUT_MS` | 60000 — سقفِ هر POSTِ سگمنت در `uploadQueuedSegment` (زیرِ قفلِ صف)؛ در timeout رکورد در صف می‌ماند (A1.2، 2026-09-26) |
+| `FINAL_PERSIST_DELAYS_MS` | `[0, 1500, 4000]` — تلاش‌هایِ ذخیره‌ی نهاییِ متن در `finish` (`persistFinal`)؛ در شکستِ نهایی سگمنت‌هایِ archiveِ همین run که از `lastPersistOkAt − UNSAVED_SEGMENT_SAFETY_MS` (3000) به بعد بسته شده‌اند به `transcript` برمی‌گردند (A1.4، 2026-09-26) |
 | `FAILED_RETRY_MS` | 30000 — از FAILED (به‌جز 401) هر ۳۰ث یک دورِ کاملِ reconnect، مستقل از رویدادِ `online` (2026-09-26) |
 | Screen Wake Lock | `navigator.wakeLock.request('screen')` تا وقتی یک RTSession زنده است (شامل MANUAL_PAUSED)؛ بدونِ پشتیبانی بی‌صدا هیچ (2026-09-26) |
 | `BATCH_POLL_MS` / `BATCH_TIMEOUT_MS` | 5000 / ۱۵ دقیقه |
@@ -130,6 +134,7 @@
 | نوع | کلید | مقدار | نویسنده | پاک‌کننده |
 |---|---|---|---|---|
 | localStorage | `feelia_active_session` | UUID جلسه | `startSession`، `liveResumeSession` | پایان/لغو/خطای «یافت نشد» |
+| localStorage | `feelia_note_outbox` | آرایه‌ی `{qid, sessionId, body, ts}` — علامت/یادداشتِ سریع/متنِ یادداشتِ صوتی‌ای که POSTش گذرا شکست خورد (⚠️ شاملِ متنِ یادداشت تا ارسالِ موفق) | `postNoteReliably` (`index.html`) | ارسالِ موفق، خطایِ دائمی (400/404/413)، حذفِ آیتم توسطِ تراپیست؛ تلاشِ دوباره هر ۲۰ث + `online` + لودِ صفحه (A1.5، 2026-09-26) |
 | localStorage | `feelia_direct` | `'0'` = اجبارِ proxy | دستی (`setDirectMode`) | — |
 | localStorage | `feelia_ux_consent_v1:<therapistId>` | `granted`/`denied` | `FeeliaAnalytics.grant/deny` | — |
 | sessionStorage | `p1c-<sessionId>` | clientId P1 | `startSession` | تب |

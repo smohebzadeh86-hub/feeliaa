@@ -50,3 +50,15 @@
 2. هرگز replace برای نتایجِ batch.
 3. T1، T2، T6، T10، T14 را اجرا کنید؛ سناریوی جدید را به harness اضافه کنید.
 4. ~~CAS اتمیک (پیشنهاد)~~ **پیاده شد (2026-09-22):** `server/src/http/sessions.ts`، `UPDATE … WHERE id=? AND transcript_version=?` (بدونِ `RETURNING` چون MySQL آن را ندارد؛ `affectedRows` جایگزین شد).
+
+## رفعِ A1 (2026-09-26)
+- `persistConfirmed`: `baseVersion` از پاسخِ PUT (`session.transcript_version`) خوانده می‌شود، نه `++`ِ محلی. تست: `T44`.
+- rebaseِ 409 هرگز متنِ هیچ طرف را حذف نمی‌کند: متنِ ما فقط وقتی نوشته می‌شود که با متنِ سرور شروع شود؛ اگر سرور متنِ ما را در بر دارد همان پذیرفته می‌شود؛ در واگرایی دُمِ ذخیره‌نشده با برچسبِ `[متنِ زنده‌ای که هم‌زمان با تغییرِ دیگری ذخیره نشده بود]` پشتِ متنِ سرور می‌آید (+ رویدادِ `rt.transcript_diverged`). قبلاً شاخه‌ی «سرور کوتاه‌تر» کورکورانه overwrite و شاخه‌ی «سرور بلندتر» متنِ محلی را دور می‌ریخت. تست: `T44`.
+- پایانِ جلسه با ذخیره‌ی نهاییِ ناموفق دیگر دُمِ متن را بی‌صدا گم نمی‌کند (بازیابی از صدا، [subsystem 02](02-audio-durability-batch-fallback.md)؛ رویدادِ `rt.final_persist_failed`).
+## A2 (2026-09-26) — متنِ بازیابی‌شده در جایِ زمانیِ درست (تصمیمِ مالک)
+- **کلاینت:** هر سگمنتِ durable که در قطعی بسته می‌شود (intent=`transcript`) همان لحظه placeholderِ `[⏳ بازه‌ی قطعیِ اینترنت — متن در حالِ بازیابی · #<run>:<seq>]` را در `confirmed` می‌گذارد (`insertRecoveryPlaceholder`؛ قبل از نشانگرِ «اتصال دوباره برقرار شد» اگر همان لحظه اضافه شده باشد).
+- **سرور:** `applyBatchSegmentOnce(…, key)` با `mergeRecoveredSegment` همان placeholder را **درجا** با `[بازیابی‌شده از صدایِ بازه‌ی قطعی · #key]
+<متن>` جایگزین می‌کند؛ سکوت ⇒ `[بازه‌ی قطعی — گفتاری تشخیص داده نشد · #key]`. بدونِ placeholder (کلاینتِ قدیمی یا placeholderِ هنوز ذخیره‌نشده) ⇒ append با همان برچسب/کلید (رفتارِ قبلیِ append، حالا برچسب‌دار). LAW-008 («batch همیشه append») به این شکل اصلاح می‌شود: متنِ batch هرگز متنِ موجود را حذف/بازنویسی نمی‌کند؛ فقط placeholderِ خودش را پر می‌کند.
+- **rebaseِ 409:** `serverFilledPlaceholders` (سرور placeholderهایِ متنِ پایه را پر کرده ⇒ متنِ سرور + دُمِ تازه) و `dropResolvedPlaceholders` (placeholderِ دُمِ محلی که کلیدش در متنِ سرور هست حذف می‌شود).
+- **ترتیب:** صفِ سرور (`filesFor`) و صفِ مرورگر (`listForSession`) به ترتیبِ ضبط: (زمانِ شروعِ run، seq) / (createdAt، seq)؛ آرشیو با `client_seq` (migration 027).
+- **تست:** `test:rt` T46–T48؛ E2E رویِ DBِ dev ۱۰ تست ([verification](../../verification/2026-09-26-storage-fixes-full-test-run.md)).

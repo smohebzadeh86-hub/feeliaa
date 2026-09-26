@@ -288,3 +288,9 @@ batch_status∈{done,failed}`؛ note → `!note_audio_pending`. سپس خوان�
    حالا رویِ `state===FAILED` هم با `reconnectAttempts=0` یک دورِ کاملِ تازه‌ی
    `scheduleReconnect` می‌زند. با Soniوxِ واقعی تأیید شد: `FAILED → RECONNECTING → RECOVERED
    → ACTIVE`. جزئیات: [verification](../../verification/2026-09-16-audio-durability-stage6-offline-reconnect.md).
+
+## رفعِ A1 (2026-09-26)
+- **لغو فقط runِ خودش:** `RTSession.abort()` حالا `AudioQueueDB.clearForRun(sessionId, runId)` می‌زند، نه `clearForSession` — لغوِ یادداشتِ صوتی دیگر صدایِ آپلودنشده‌ی جلسه (runهایِ دیگرِ همان sessionId) را پاک نمی‌کند. تست: `T42`.
+- **timeoutِ آپلودِ سگمنت:** `uploadQueuedSegment` با `AbortController` و `SEGMENT_UPLOAD_TIMEOUT_MS` (۶۰ث)؛ قبلاً fetchِ معلق قفلِ سراسریِ صفِ جلسه را برایِ همیشه نگه می‌داشت. در timeout رکورد می‌ماند. تست: `T43`.
+- **ذخیره‌ی نهاییِ ناموفق:** `finish` → `persistFinal` (۳ تلاش)؛ در شکستِ نهایی `requeueUnsavedAudio` سگمنت‌هایِ archiveِ همین run را که بعد از آخرین ذخیره‌ی موفق بسته شده‌اند به `transcript` برمی‌گرداند و نتیجه `reliable:false`/`batch-pending` است. تست: `T45`.
+- **علامت/یادداشت:** شکستِ گذرایِ POST در `feelia_note_outbox` (localStorage) صف و «ذخیره نشده» نمایش داده می‌شود ([configuration-catalog](../02-reference/configuration-catalog.md)).
