@@ -1038,6 +1038,7 @@ input::-ms-reveal{display:none}
       <div class="timer" id="recTimer">۰۰:۰۰</div>
       <div class="rec-status" id="recStatus">در حال اتصال…</div>
       <div class="level-meter" id="levelMeter"></div>
+      <div id="audioQualityHint" hidden></div>
       <label class="toggle-row live-toggle"><span class="lt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg></span><span class="lt-text"><span class="lt-title">نمایش متن زنده</span><span class="lt-sub">رونویسی را هم‌زمان ببینید</span></span><input type="checkbox" id="chkLiveText"></label>
       <div class="live-text" id="liveText" data-clarity-mask="true" hidden></div>
       <div class="signs-area">
@@ -5545,7 +5546,7 @@ async function startNewRTSession(){
     $('recStatus').textContent='در حال ضبط — متن پس از پایان آماده می‌شود';
     $('recStatus').classList.add('warn');
   }
-  startTimer();startSttWatchdog();startDurationAutosave();
+  startTimer();startSttWatchdog();startDurationAutosave();startAudioQualityMonitor();
   return true;
 }
 // ⭐ باگِ واقعی: نوارِ سطحِ صدا (levelMeter) فقط توی مسیرِ قدیمیِ proxy وصل می‌شد.
@@ -5562,11 +5563,15 @@ function attachLevelMeterToStream(stream){
     analyser.fftSize=512;
     src.connect(analyser);
     const data=new Uint8Array(analyser.frequencyBinCount);
+    const fdata=new Float32Array(analyser.fftSize);
     const tick=function(){
       analyser.getByteTimeDomainData(data);
       let sum=0;
       for(let i=0;i<data.length;i++){const v=(data[i]-128)/128;sum+=v*v;}
       updateLevelMeter(Math.min(1,Math.sqrt(sum/data.length)*4));
+      if(audioQualityMon){
+        try{analyser.getFloatTimeDomainData(fdata);const r=audioQualityMon.push(fdata,performance.now());if(r)showAudioQualityHint(r.issue);}catch(e){}
+      }
       levelRAF=requestAnimationFrame(tick);
     };
     tick();
@@ -5577,6 +5582,32 @@ function stopLevelMeter(){
   if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
   analyser=null;
   updateLevelMeter(0);
+  showAudioQualityHint(null);
+}
+// ===== هشدارِ کیفیتِ ضبط (2026-09-26) — منطقِ سنجش: FeeliaRT.createAudioQualityMonitor =====
+// فقط رویِ جلسه‌ی زنده‌ی FeeliaRT؛ هر وضعیتِ بد یک بار در هر جلسه به obs می‌رود (فقط reason، بدونِ صدا/متن).
+let audioQualityMon=null;
+let audioQualityLogged={};
+const AUDIO_QUALITY_MSG={
+  no_signal:'<b>صدایی از میکروفون نمی‌رسد.</b> میکروفون قطع یا بی‌صدا است، یا میکروفونِ اشتباهی انتخاب شده.',
+  too_quiet:'<b>صدا ضعیف ضبط می‌شود.</b> دستگاه را به وسطِ جمع نزدیک‌تر کنید تا صدای همه واضح ضبط شود.',
+  noisy:'<b>نویزِ محیط زیاد است.</b> اگر می‌شود منبعِ صدا (کولر، پنکه، پنجره) را کم کنید یا دستگاه را به گوینده‌ها نزدیک‌تر کنید.',
+  clipping:'<b>صدا بیش از حد بلند است و خش دارد.</b> دستگاه را کمی از گوینده‌ها دورتر بگذارید.'
+};
+function startAudioQualityMonitor(){
+  audioQualityLogged={};
+  audioQualityMon=(window.FeeliaRT&&window.FeeliaRT.createAudioQualityMonitor)?window.FeeliaRT.createAudioQualityMonitor():null;
+}
+function stopAudioQualityMonitor(){audioQualityMon=null;showAudioQualityHint(null);}
+function showAudioQualityHint(issue){
+  const el=$('audioQualityHint');if(!el)return;
+  if(!issue||!AUDIO_QUALITY_MSG[issue]){el.hidden=true;el.innerHTML='';return;}
+  el.innerHTML='<div class="banner warn">'+AUDIO_QUALITY_MSG[issue]+'</div>';
+  el.hidden=false;
+  if(!audioQualityLogged[issue]){
+    audioQualityLogged[issue]=true;
+    try{if(window.FeeliaObs&&rtSession)window.FeeliaObs.event('rt.audio_quality_warn',{reason:issue},{session_id:rtSession.sessionId,run_id:rtSession.runId});}catch(e){}
+  }
 }
 
 function rtOnState(st,snap){
@@ -5625,7 +5656,7 @@ async function endNewRTSession(){
   $('btnEndSession').disabled=true;
   $('recStatus').textContent='در حال نهایی‌سازی…';
   pauseTimer();
-  stopLevelMeter();
+  stopLevelMeter();stopAudioQualityMonitor();
   let out={text:'',reliable:false,mode:'error'};
   try{out=await s.finish();}catch(e){}
   rtSession=null;
@@ -6348,7 +6379,7 @@ function stopAllAudio(){
   clearP1AckTimers();
   try{if(rtSession)rtSession.abort();}catch(e){}
   try{if(rtVoice)rtVoice.abort();}catch(e){}
-  rtSession=null;rtVoice=null;
+  rtSession=null;rtVoice=null;stopAudioQualityMonitor();
   try{if(directRec&&directRec.state!=='inactive')directRec.stop();}catch(e){}
   directRec=null;directActive=false;
   try{if(SonioxDirect.ws)SonioxDirect.close();}catch(e){}
@@ -6368,6 +6399,7 @@ async function confirmCancelSession(){
   closeCancelModal();
   uxTrack('session_canceled');
   if(rtSession){try{rtSession.abort();}catch(e){}try{window.FeeliaRT.forget(rtSession);}catch(ee){}rtSession=null;}
+  stopAudioQualityMonitor();
   // P3: cancel → ترمینال، کلید resume پاک شود
   try{localStorage.removeItem('feelia_active_session');}catch(e){}
   p1Terminal=true;

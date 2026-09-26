@@ -95,6 +95,8 @@ export const OBS_CLIENT_EVENTS = [
   'rt.watchdog_fired',
   'rt.state_change',
   'rt.gap_marked',
+  // هشدارِ کیفیتِ ضبط (2026-09-26) — detail فقط {reason: no_signal|too_quiet|noisy|clipping}، یک بار برایِ هر reason در هر جلسه
+  'rt.audio_quality_warn',
   // فازِ ۱: افتِ رویدادِ سمتِ کلاینت به‌خاطرِ سرریزِ ring buffer (feelia-obs.js)
   'obs.client_dropped',
 ] as const;

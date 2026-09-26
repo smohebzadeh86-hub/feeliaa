@@ -105,6 +105,10 @@
     return '';
   }
 
+  // ⚠️ (2026-09-26) آزموده شد و عمداً دست‌نخورده ماند: خاموش‌کردنِ این سه پردازش (پیش‌فرضِ SDKِ Soniox)
+  // در تستِ کنترل‌شده (Chromeِ واقعی + میکروفونِ جعلی با مکالمه‌ی ۳نفره) هیچ اثری بر تفکیکِ گوینده نداشت
+  // (هر دو حالت ۳/۳)، ولی در تستِ میدانیِ مالک بعد از خاموش‌کردن نتیجه بدتر دیده شد — به حالتِ اثبات‌شده برگشت.
+  // شواهد: verification/2026-09-26-speaker-diarization-3-speakers.md
   function reqStream() {
     return navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
@@ -453,7 +457,9 @@
     // راه‌حل: هر (نسل، شماره‌ی خامِ Soniox) یه برچسبِ سراسریِ تازه می‌گیره — پس گوینده‌ها
     // بعدِ هر reconnect/resume، به‌جایِ قاطی‌شدن با گوینده‌هایِ قبلی، شماره‌ی جدید می‌گیرن.
     this.speakerLabelMap = {};
-    this.nextSpeakerLabel = 0;
+    // ⭐ (2026-09-26) از ۱، هم‌راستا با خودِ Soniox و مسیرِ async/batch/آپلود (buildTextFromAsyncTokens که
+    // شماره‌ی خام را می‌نویسد) — قبلاً از ۰ بود و متنِ زنده «گوینده ۰» می‌داد ولی بازسازی «گوینده ۱».
+    this.nextSpeakerLabel = 1;
     // ⭐ توکنِ pause/resume — برایِ خنثی‌کردنِ پاکسازیِ تاخیریِ pauseِ قدیمی وقتی
     // کاربر توی همون فاصله resume زده (پایینِ همین فایل، تابعِ pause را ببین).
     this.pauseToken = 0;
@@ -772,6 +778,9 @@
         }
         obsEvent('rt.ws_open', {}, self);
         try {
+          // contextِ تفکیکِ گوینده (متنِ ثابت، مالکش سرور: server/src/stt/sessionContext.ts) — برایِ
+          // purpose=note سرور آن را نمی‌فرستد. اگر نبود، فیلد اصلاً ارسال نمی‌شود.
+          var sttContext = cred.stt_defaults && cred.stt_defaults.context;
           ws.send(JSON.stringify({
             api_key: cred.api_key,
             model: (cred.stt_defaults && cred.stt_defaults.model) || cred.model || 'stt-rt-v5',
@@ -783,7 +792,8 @@
             // بالا می‌بره، ولی قیمتش تاخیرِ محسوسِ finalize‌شدنِ متنِ زنده‌ست (کاربر
             // با صدایِ واقعی امتحان کرد: کاملاً کند و غیرقابل‌قبول). سرعتِ کپشنِ زنده
             // اولویتِ بالاتریه — این معاوضه به نفعِ سرعت برگشت.
-            enable_endpoint_detection: true
+            enable_endpoint_detection: true,
+            context: sttContext || undefined
           }));
         } catch (e) { clearTimeout(timer); if (!settled) { settled = true; reject(e); } return; }
         clearTimeout(timer);
@@ -1798,8 +1808,63 @@
     window.addEventListener('pagehide', function () { flushAllDurable(); });
   } catch (e) {}
 
+  // ————————————————— هشدارِ کیفیتِ ضبط (2026-09-26) —————————————————
+  // چرا: تفکیکِ گوینده (و خودِ رونویسی) به کیفیتِ ضبط وابسته است و کد نمی‌تواند صدایی را که درست ضبط نشده
+  // جبران کند (verification/2026-09-26-speaker-diarization-3-speakers.md). این پایشِ خالص و بدونِ DOM، فریم‌هایِ
+  // Float32ِ آنالایزر (همان استریمی که به Soniox می‌رود) را در پنجره‌هایِ QM_WINDOW_MS جمع می‌کند و در پایانِ هر پنجره
+  // وضعیت می‌دهد. سکوت در جلسه‌ی درمانی عادی است، پس هشدارِ «ضعیف/بی‌صدا/نویز» فقط بعد از QM_CONFIRM پنجره‌ی پیاپی
+  // (≈۶۰ث) می‌آید؛ خش (clipping) در یک پنجره. هیچ صدا/متنی نگه‌داشته یا ارسال نمی‌شود — فقط هیستوگرامِ سطح.
+  var QM_WINDOW_MS = 30000;
+  var QM_CONFIRM = 2;
+  var QM_NO_SIGNAL_DB = -85;   // p95 زیرِ این: عملاً هیچ صدایی نمی‌رسد (میکروفونِ قطع/بی‌صدا/اشتباه)
+  var QM_QUIET_DB = -45;       // p95 زیرِ این: گفتار خیلی ضعیف (دور از میکروفون)
+  var QM_NOISY_FLOOR_DB = -40; // p10 بالایِ این و فاصله‌ی p95−p10 کمتر از QM_NOISY_SNR_DB: نویزِ محیط غالب است
+  var QM_NOISY_SNR_DB = 12;
+  var QM_CLIP_PEAK = 0.99;
+  var QM_CLIP_FRAC = 0.02;
+  var QM_MIN_FRAMES = 200;     // پنجره‌ی با فریمِ کم (تبِ پنهان/rAF متوقف) قضاوت نمی‌شود
+
+  function createAudioQualityMonitor() {
+    var hist, frames, clipped, windowStart = null, streak = { no_signal: 0, too_quiet: 0, noisy: 0 };
+    function reset(now) { hist = new Array(101); for (var i = 0; i <= 100; i++) hist[i] = 0; frames = 0; clipped = 0; windowStart = now; }
+    function pct(p) {
+      var target = frames * p, acc = 0;
+      for (var i = 0; i <= 100; i++) { acc += hist[i]; if (acc >= target) return i - 100; }
+      return 0;
+    }
+    function evaluate() {
+      var p10 = pct(0.10), p95 = pct(0.95), clipFrac = clipped / frames;
+      var cand = null;
+      if (p95 < QM_NO_SIGNAL_DB) cand = 'no_signal';
+      else if (p95 < QM_QUIET_DB) cand = 'too_quiet';
+      else if (p10 > QM_NOISY_FLOOR_DB && (p95 - p10) < QM_NOISY_SNR_DB) cand = 'noisy';
+      for (var k in streak) streak[k] = (k === cand) ? streak[k] + 1 : 0;
+      var issue = null;
+      if (clipFrac > QM_CLIP_FRAC) issue = 'clipping';
+      else if (cand && streak[cand] >= QM_CONFIRM) issue = cand;
+      return { issue: issue, p10: p10, p95: p95, clipFrac: clipFrac, frames: frames };
+    }
+    return {
+      // samples: Float32Array (−1..1). now: ms. خروجی: null وسطِ پنجره، یا نتیجه‌ی ارزیابی در پایانِ هر پنجره.
+      push: function (samples, now) {
+        if (windowStart === null) reset(now);
+        var sum = 0, peak = 0;
+        for (var i = 0; i < samples.length; i++) { var v = samples[i]; sum += v * v; var a = v < 0 ? -v : v; if (a > peak) peak = a; }
+        var db = samples.length ? 10 * Math.log10(sum / samples.length + 1e-12) : -100;
+        var bin = Math.max(0, Math.min(100, Math.round(db) + 100));
+        hist[bin]++; frames++;
+        if (peak >= QM_CLIP_PEAK) clipped++;
+        if (now - windowStart < QM_WINDOW_MS) return null;
+        var res = frames >= QM_MIN_FRAMES ? evaluate() : null;
+        reset(now);
+        return res;
+      }
+    };
+  }
+
   window.FeeliaRT = {
     STATES: STATES,
+    createAudioQualityMonitor: createAudioQualityMonitor,
     isAvailable: isAvailable,
     createSession: createSession,
     hasOpenConnection: hasOpenConnection,

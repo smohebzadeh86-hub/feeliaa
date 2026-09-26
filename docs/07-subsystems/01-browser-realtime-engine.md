@@ -124,6 +124,14 @@ state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250
 | `rt.watchdog_fired` | `startWsWatchdog`، قبل از `scheduleReconnect('watchdog-ws-not-open')` | — | قطعیِ «بی‌صدا» (WSای که readyState مرده ولی onclose نیامده) تشخیص داده شد |
 | `rt.state_change` | `setState(s)` (چون این فایل از قبل یک state machineِ صریحِ `STATES` دارد) | `state`، `prev_state` | دنباله‌ی کاملِ گذارهایِ یک RTSession — برایِ بازسازیِ timeline |
 | `rt.gap_marked` | `noteDiscontinuity()` | — | مارکرِ ناپیوستگیِ گوینده به transcript اضافه شد (بندِ ۳ همین سند) |
+| `rt.audio_quality_warn` | `showAudioQualityHint` در `index.html` (2026-09-26) | `reason` = `no_signal`\|`too_quiet`\|`noisy`\|`clipping` | هشدارِ کیفیتِ ضبط به تراپیست نشان داده شد؛ یک بار برایِ هر reason در هر جلسه |
+
+**هشدارِ کیفیتِ ضبط (2026-09-26):** `FeeliaRT.createAudioQualityMonitor()` (خالص، بدونِ DOM) فریم‌هایِ Float32ِ همان آنالایزرِ
+نوارِ سطحِ صدا را (همان استریمی که به Soniox می‌رود) در پنجره‌هایِ ۳۰ثانیه‌ای به هیستوگرامِ dBFS تبدیل می‌کند و در پایانِ هر پنجره
+p10/p95/سهمِ فریم‌هایِ خش‌دار را می‌سنجد. «بی‌صدا/ضعیف/نویز» فقط بعد از ۲ پنجره‌ی پیاپی (≈۶۰ث؛ سکوتِ عادیِ جلسه هشدار نمی‌دهد)،
+«خش» در یک پنجره؛ اولین پنجره‌ی سالم هشدار را برمی‌دارد. فقط در جلسه‌ی زنده‌ی FeeliaRT و فقط وقتی تب دیده می‌شود (rAF).
+آستانه‌ها: [configuration-catalog](../02-reference/configuration-catalog.md). کالیبراسیون رویِ صدایِ واقعی:
+[verification](../../verification/2026-09-26-speaker-diarization-3-speakers.md). تست: T41 در `pnpm test:rt`.
 
 ⚠️ این تله‌متری فقط با خواندنِ دقیقِ کد + عبورِ تمیزِ `pnpm test:rt` تأیید شده؛ رسیدنِ واقعیِ ردیف به `obs_events` با یک WSِ mock در مرورگر هنوز تست نشده (کارِ بازِ ثبت‌شده در `PROJECT_STATUS.md`، رویدادِ 2026-09-23).
 

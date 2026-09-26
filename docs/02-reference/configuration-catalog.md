@@ -106,7 +106,9 @@
 | تکرارِ هر تکه | backoff `min(30s, 2^n s)` تا ۸ بار، سپس هر ۱۵s تا بی‌نهایت؛ timeoutِ XHR `max(120s, حجم/4KB·s)` + قطعِ زودهنگام اگر `CHUNK_STALL_MS`=60s هیچ بایتی جلو نرود (2026-09-26؛ قبلاً ثابتِ 120s) |
 | poll ِ سینی (`index.html`) | ۵s وقتی کاری فعال است، وگرنه ۳۰s؛ poll ِ صفحه‌ی جلسه ۴s |
 | live recorder timeslice / durable timeslice | 250ms / 1000ms |
-| getUserMedia | `echoCancellation`، `noiseSuppression`، `autoGainControl` = true |
+| getUserMedia (`feelia-rt.js`) | `echoCancellation`، `noiseSuppression`، `autoGainControl` = true (2026-09-26: خاموش‌کردنشان آزموده شد — اثری بر تفکیکِ گوینده نداشت؛ برگشت. [verification](../../verification/2026-09-26-speaker-diarization-3-speakers.md)) |
+| هشدارِ کیفیتِ ضبط (`QM_*` در `feelia-rt.js`) | پنجره 30000ms؛ تأیید ۲ پنجره (ضعیف/بی‌صدا/نویز)؛ `no_signal` p95<−85dBFS؛ `too_quiet` p95<−45؛ `noisy` p10>−40 و p95−p10<12dB؛ `clipping` >۲٪ فریم‌ها با peak≥0.99؛ حداقل ۲۰۰ فریم در پنجره |
+| contextِ Soniox | `server/src/stt/sessionContext.ts` → `stt_defaults.context` (realtime، به‌جز `purpose=note`) و `createTranscription` (async، به‌جز یادداشتِ صوتی) — متنِ ثابتِ «جلسه‌ی درمانی، ممکن است ۳+ گوینده» |
 
 ### `public/index.html`
 | ثابت | مقدار |

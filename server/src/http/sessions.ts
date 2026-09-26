@@ -46,7 +46,7 @@ async function processVoiceNoteInBackground(
     const { transcribeFileAsync } = await import('../stt/asyncTranscribe.js');
 
     console.log('[voice-note] transcribing via async API, size:', buffer.length);
-    const text = await transcribeFileAsync(buffer, `${sessionId}-note.webm`, `feelia:${sessionId}:note`);
+    const text = await transcribeFileAsync(buffer, `${sessionId}-note.webm`, `feelia:${sessionId}:note`, { sessionContext: false });
 
     console.log('[voice-note] finished, text length:', (text || '').length);
 

@@ -393,7 +393,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       console.log(`[batch] processing session=${sessionId} purpose=${purpose} bytes=${buffer.length} (async API)`);
       let text = '';
       try {
-        text = await transcribeFileAsync(buffer, `${sessionId}.webm`, `feelia:${sessionId}:${purpose}`);
+        text = await transcribeFileAsync(buffer, `${sessionId}.webm`, `feelia:${sessionId}:${purpose}`, { sessionContext: purpose !== 'note' });
       } catch (e) {
         if (isPermanentTranscribeError(e)) {
           dropUnrecoverable(sessionId, file, purpose, buffer.length, 'soniox-invalid-audio');

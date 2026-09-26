@@ -40,7 +40,7 @@ class FakeRecorder {
 globalThis.MediaRecorder = FakeRecorder;
 FakeRecorder.isTypeSupported = () => true;
 FakeRecorder.durableStarts = 0;
-Object.defineProperty(globalThis, 'navigator', { value: { mediaDevices: { getUserMedia: async () => ({ active: true, getTracks: () => [{ stop() {} }] }) } }, configurable: true, writable: true });
+Object.defineProperty(globalThis, 'navigator', { value: { mediaDevices: { getUserMedia: async (c) => (globalThis.lastGumConstraints = c, { active: true, getTracks: () => [{ stop() {} }] }) } }, configurable: true, writable: true });
 
 class FakeWS {
   constructor(url) { this.url = url; this.readyState = 0; this.sent = []; FakeWS.last = this; wsCreatedCount++; }
@@ -64,7 +64,7 @@ globalThis.fetch = async (url, opts = {}) => {
     mintCount++;
     const body = JSON.parse(opts.body);
     if (!sessions[body.session_id]) return json(404, { error: 'not found' });
-    return json(200, { websocket_url: 'wss://fake-soniox', model: 'stt-rt-v5', api_key: 'TEMP-' + mintCount, expires_in_seconds: 120, single_use: true, stt_defaults: { model: 'stt-rt-v5' } });
+    return json(200, { websocket_url: 'wss://fake-soniox', model: 'stt-rt-v5', api_key: 'TEMP-' + mintCount, expires_in_seconds: 120, single_use: true, stt_defaults: { model: 'stt-rt-v5', context: { general: [{ key: 'speakers', value: 'FAKE-CTX' }] } } });
   }
   let m = url.match(/^\/api\/sessions\/([^/?]+)$/);
   if (m && method === 'GET' && !url.endsWith('batch-status')) {
@@ -188,6 +188,39 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('T1 finish reliable realtime', out1.reliable && out1.mode === 'realtime' && out1.text.includes('سلام'));
   ok('T1 persisted with version bump', sessions.s1.transcript.includes('سلام') && sessions.s1.transcript_version >= 1, 'v=' + sessions.s1.transcript_version);
   ok('T1 temp key used, master never sent', mintCount >= 1 && FakeWS.last.sent[0].includes('TEMP-') && !FakeWS.last.sent[0].includes(MASTER));
+  // تفکیکِ گوینده (2026-09-26): constraintهایِ میکروفون ثابت + contextِ سرور در کانفیگِ Soniox
+  const a39 = (globalThis.lastGumConstraints || {}).audio || {};
+  ok('T39 mic constraints unchanged (EC/NS/AGC on — field-proven baseline)', a39.noiseSuppression === true && a39.autoGainControl === true && a39.echoCancellation === true, JSON.stringify(a39));
+  const cfg39 = JSON.parse(FakeWS.last.sent[0]);
+  // T41 — هشدارِ کیفیتِ ضبط: گفتارِ عادی ok؛ ضعیف/بی‌صدا/نویز فقط بعد از ۲ پنجره‌ی پیاپی؛ خش در یک پنجره؛ برگشت به ok
+  {
+    const QM = RT.createAudioQualityMonitor;
+    const frame = (amp, noise) => { const f = new Float32Array(512); for (let i = 0; i < 512; i++) f[i] = amp * Math.sin(i / 7) + (noise ? (Math.random() * 2 - 1) * noise : 0); return f; };
+    // هر پنجره ۳۰ث؛ ۶۰fps. «گفتار»: ۴۰٪ فریم‌ها بلند، بقیه سکوتِ کم‌نویز
+    const run = (m, secs, gen, t0 = 0) => { const out = []; for (let t = t0; t <= t0 + secs * 1000 + 50; t += 1000 / 60) { const r = m.push(gen(t), t); if (r) out.push(r.issue || 'ok'); } return out; };
+    const speech = (amp) => (t) => (Math.floor(t / 1000) % 5 < 2 ? frame(amp, 0.001) : frame(0, 0.0005));
+    const m1 = QM(); const a = run(m1, 90, speech(0.2));
+    ok('T41 normal speech → ok', a.length === 3 && a.every((x) => x === 'ok'), a.join(','));
+    const m2 = QM(); const b = run(m2, 90, speech(0.002));
+    ok('T41 quiet → too_quiet only after 2 windows', b.join(',') === 'ok,too_quiet,too_quiet', b.join(','));
+    const m3 = QM(); const c = run(m3, 90, () => new Float32Array(512));
+    ok('T41 muted → no_signal after 2 windows', c.join(',') === 'ok,no_signal,no_signal', c.join(','));
+    const m4 = QM(); const d = run(m4, 30, speech(1.5));
+    ok('T41 clipping → immediate', d.join(',') === 'clipping', d.join(','));
+    const m5 = QM(); const e = run(m5, 90, (t) => frame(Math.floor(t / 1000) % 5 < 2 ? 0.05 : 0, 0.08));
+    ok('T41 loud noise floor → noisy', e.join(',') === 'ok,noisy,noisy', e.join(','));
+    const f = run(m2, 30, speech(0.2), 90100);
+    ok('T41 recovers to ok after quiet', f.join(',') === 'ok', f.join(','));
+  }
+  // شماره‌گذاریِ گوینده از ۱ و بدونِ سقف (۳ گوینده‌ی متمایزِ Soniox ⇒ ۳ برچسبِ متمایز)
+  newSession('s40');
+  const s40 = RT.createSession('s40', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+  const p40 = s40.start(); await sleep(5); serverOpen(FakeWS.last); await p40;
+  serverTokens(FakeWS.last, [{ text: 'الف', is_final: true, speaker: '1' }, { text: 'ب', is_final: true, speaker: '2' }, { text: 'پ', is_final: true, speaker: '3' }, { text: 'ت', is_final: true, speaker: '1' }]);
+  await sleep(5);
+  ok('T40 speaker labels 1-based, 3 distinct', /گوینده ۱: الف/.test(s40.confirmed) && /گوینده ۲: ب/.test(s40.confirmed) && /گوینده ۳: پ/.test(s40.confirmed) && !/گوینده ۰/.test(s40.confirmed), JSON.stringify(s40.confirmed));
+  await s40.finish();
+  ok('T39 server context forwarded to Soniox config', cfg39.enable_speaker_diarization === true && JSON.stringify(cfg39.context || {}).includes('FAKE-CTX'));
 
   // Test 3+2: disconnect during interim -> reconnect preserves confirmed, discards interim, unreliable
   newSession('s2');

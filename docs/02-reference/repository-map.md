@@ -41,7 +41,7 @@ feeliaa/
 │       │   └── migrations/ 001–014 T (008–014 با commitِ `54a17fd`، 2026-09-15؛ هنوز رویِ production اجرا نشده)
 │       ├── http/ admin.ts M · auth.ts M · clients.ts T (تا `54a17fd`) · sessions.ts T (تا `54a17fd`) · stt.ts M · clientConfig.ts U · sessionDate.ts T (نرمال‌سازیِ تاریخ/ساعتِ شمسیِ جلسه، `54a17fd`) · obs.ts U (جدید، فازِ ۱: `POST /api/obs/events`)
 │       ├── obs/   U — جدید، فازِ ۱ِ رصد/حسابرسی (2026-09-22): types.ts، redact.ts (نقطه‌ی اجرایِ LAW-001، `sanitizeDetail`/`isSafeToken`)، fileSink.ts (JSONLِ چرخشی، بدونِ dependency)، eventLog.ts (صفِ درون‌حافظه‌ای + drain به DB، `logEvent`/`logUiEvents`)، httpHook.ts (`registerObsHooks`)، sweep.ts (`sweepOldObsEvents`)
-│       ├── stt/  batchqueue.ts M · soniox.ts M · tempkey.ts T · asyncTranscribe.ts U · sessionAudioArchive.ts U (+ `deriveSessionStatus` جدید، فازِ ۱) · speakerResolve.ts U
+│       ├── stt/  batchqueue.ts M · soniox.ts M · tempkey.ts T · asyncTranscribe.ts U · sessionAudioArchive.ts U (+ `deriveSessionStatus` جدید، فازِ ۱) · speakerResolve.ts U · sessionContext.ts (contextِ ثابتِ تفکیکِ گوینده، 2026-09-26)
 │       ├── features/case-file/  U — جدید 2026-09-17: AI Case File (Ports & Adapters)؛ `application/autoTrigger.ts` (2026-09-23، سیاستِ مرکزیِ تولیدِ خودکار)
 │       ├── features/audio-upload/  U — جدید 2026-09-23: آپلودِ فایلِ صوتیِ جلسه + jobِ پس‌زمینه ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))
 │       ├── features/notifications/ U — جدید 2026-09-23: اعلان‌هایِ پایدار (`notify.ts`)

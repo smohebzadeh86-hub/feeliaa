@@ -9,6 +9,7 @@ import https from 'node:https';
 import { randomBytes } from 'node:crypto';
 import { createReadStream, statSync } from 'node:fs';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { SESSION_TRANSCRIPTION_CONTEXT } from './sessionContext.js';
 
 const API_BASE = process.env.SONIOX_API_BASE || 'https://api.soniox.com';
 const POLL_INTERVAL_MS = 2000;
@@ -174,7 +175,9 @@ export function uploadFileFromPath(filePath: string, filename: string): Promise<
 
 export async function createTranscription(
   fileId: string,
-  opts: { languageHints?: string[]; clientReferenceId?: string } = {}
+  // sessionContext (پیش‌فرض true): contextِ «جلسه‌ی چندنفره» برایِ دقتِ تفکیکِ گوینده؛ یادداشتِ صوتیِ
+  // تک‌گوینده‌ی تراپیست آن را false می‌دهد تا مدل به شکستنِ بی‌جایِ یک صدا سوق داده نشود.
+  opts: { languageHints?: string[]; clientReferenceId?: string; sessionContext?: boolean } = {}
 ): Promise<string> {
   const payload = JSON.stringify({
     model: 'stt-async-v5',
@@ -182,6 +185,7 @@ export async function createTranscription(
     language_hints: opts.languageHints || ['fa'],
     enable_speaker_diarization: true,
     enable_language_identification: true,
+    ...(opts.sessionContext === false ? {} : { context: SESSION_TRANSCRIPTION_CONTEXT }),
     client_reference_id: opts.clientReferenceId,
   });
   const res = await request('POST', '/v1/transcriptions', {
@@ -274,13 +278,14 @@ export function buildTextFromAsyncTokens(tokens: AsyncToken[]): string {
 export async function transcribeFileAsync(
   buffer: Buffer,
   filenameHint: string,
-  clientReferenceId?: string
+  clientReferenceId?: string,
+  opts: { sessionContext?: boolean } = {}
 ): Promise<string> {
   // نامِ فایل با پیشوندِ feelia- تا sweepِ یتیم‌ها (sweepSonioxOrphans) فقط فایل‌هایِ خودِ ما را بشناسد.
   const fileId = await uploadFile(buffer, 'feelia-' + filenameHint, clientReferenceId);
   let transcriptionId: string | null = null;
   try {
-    transcriptionId = await createTranscription(fileId, { clientReferenceId });
+    transcriptionId = await createTranscription(fileId, { clientReferenceId, sessionContext: opts.sessionContext });
     const startedAt = Date.now();
     const timeoutMs = pollTimeoutForBytes(buffer.length);
     let status = 'queued';
