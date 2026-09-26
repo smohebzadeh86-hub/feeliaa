@@ -103,12 +103,70 @@ nginx باید WebSocket upgrade را برای `/ws/*` پشتیبانی کند (
 1. لوکال build (`pnpm --filter server run build`) + تست (`pnpm test:rt`, `pnpm test:cf`, `tsc --noEmit`).
 2. تارِ `server/ public/ package.json pnpm-lock.yaml pnpm-workspace.yaml` (بدونِ `.env`/`node_modules`/`data`؛
    قبل از ارسال تأیید کنید `.env` در آرشیو نیست) → `scp` به `/root/`.
-3. رویِ سرور: backup از DB اگر migrationِ داده‌تغییردهنده در راه است (migrationِ فقط-ADD-COLUMN معمولاً
+3. **Preflightِ اجباری — آیا کسی الان از سایت استفاده می‌کند؟** (بلافاصله قبل از گامِ ۴؛ فقط-خواندنی) — [§۵.۱](#۵۱-preflight-کاربرِ-فعال-قبل-از-restart).
+   اگر NO-GO بود، restart نکنید؛ صبر و تکرار.
+4. رویِ سرور: backup از DB اگر migrationِ داده‌تغییردهنده در راه است (migrationِ فقط-ADD-COLUMN معمولاً
    نیاز ندارد — همه‌ی migrationهایِ `mysql/migrations` تا امروز idempotent و برگشت‌پذیر با ستونِ NULL/DEFAULT بوده‌اند).
-4. `tar -xzf` مستقیم داخلِ `/root/feeliaa-mysql` → `pnpm install --frozen-lockfile` → `pm2 restart feelia-mysql --update-env`.
-5. لاگ را با `pm2 logs feelia-mysql --lines 40 --nostream` بررسی کنید — همه‌ی migrationهایِ جدید باید `applied` باشند، بدونِ خطا.
-6. `curl -s http://localhost:3000/api/health` → `{"status":"ok","database":"connected"}`.
-7. smoke: شروعِ یک جلسه‌ی آزمایشی **با داده‌ی غیرواقعی** (اگر تغییرِ لمس‌کننده‌ی مسیرِ رونویسی/صدا بود).
+5. `tar -xzf` مستقیم داخلِ `/root/feeliaa-mysql` → `pnpm install --frozen-lockfile` → `pm2 restart feelia-mysql --update-env`.
+6. لاگ را با `pm2 logs feelia-mysql --lines 40 --nostream` بررسی کنید — همه‌ی migrationهایِ جدید باید `applied` باشند، بدونِ خطا.
+7. `curl -s http://localhost:3000/api/health` → `{"status":"ok","database":"connected"}`.
+8. smoke: شروعِ یک جلسه‌ی آزمایشی **با داده‌ی غیرواقعی** (اگر تغییرِ لمس‌کننده‌ی مسیرِ رونویسی/صدا بود).
+
+### ۵.۱ Preflight: کاربرِ فعال قبل از restart
+
+**چرا:** در رونویسیِ زنده مرورگر مستقیم به Soniox وصل است؛ سرور فقط mintِ کلید و ذخیره‌ی دوره‌ایِ صدا/متن را می‌بیند.
+پس «سرور بیکار به‌نظر می‌رسد» ≠ «کسی جلسه ندارد». restart وسطِ جلسه یا آپلود ریسکِ از دست رفتنِ تکه/وقفه دارد.
+سیگنال‌ها از schemaِ واقعی: `sessions.status/updated_at`، `session_audio.created_at`، `audio_uploads`، `audio_jobs`
+(migration 023)، `sessions.batch_status`، و رویدادِ `stt.mint_ok` در `obs_events` (`server/src/http/stt.ts`).
+
+**اجرا** (همان الگویِ اسکریپتِ یک‌بارِ §۴.۱؛ فقط `COUNT` — هیچ متنِ بالینی/شناسه‌ای چاپ نمی‌شود؛ اسکریپت در پایان حذف می‌شود):
+
+```bash
+cd /root/feeliaa-mysql && cat > server/_preflight.mjs <<'EOF'
+import 'dotenv/config';
+import mysql from 'mysql2/promise';
+const c = await mysql.createConnection({ uri: process.env.DATABASE_URL });
+const [rows] = await c.query(`
+  SELECT 'live_sessions' k, COUNT(*) v FROM sessions WHERE status='in_progress' AND updated_at > NOW() - INTERVAL 15 MINUTE
+  UNION ALL SELECT 'audio_chunks_5m', COUNT(*) FROM session_audio WHERE created_at > NOW() - INTERVAL 5 MINUTE
+  UNION ALL SELECT 'soniox_mint_10m', COUNT(*) FROM obs_events WHERE event='stt.mint_ok' AND ts > NOW() - INTERVAL 10 MINUTE
+  UNION ALL SELECT 'uploads_active', COUNT(*) FROM audio_uploads WHERE status='uploading' AND updated_at > NOW() - INTERVAL 15 MINUTE
+  UNION ALL SELECT 'jobs_running', COUNT(*) FROM audio_jobs WHERE stage NOT IN ('done','failed')
+  UNION ALL SELECT 'batch_running', COUNT(*) FROM sessions WHERE batch_status IN ('queued','processing') AND updated_at > NOW() - INTERVAL 6 HOUR`);
+await c.end();
+const m = Object.fromEntries(rows.map(r => [r.k, Number(r.v)]));
+console.table(m);
+const hard = m.live_sessions + m.audio_chunks_5m + m.soniox_mint_10m + m.uploads_active;
+const soft = m.jobs_running + m.batch_running;
+console.log(hard ? 'NO-GO: کاربرِ فعال (جلسه/ضبط/آپلود) — صبر کنید'
+  : soft ? 'WAIT: فقط jobِ پس‌زمینه در جریان است — ترجیحاً صبر کنید' : 'GO: کسی فعال نیست');
+EOF
+DOTENV_CONFIG_PATH=/root/feeliaa-mysql/.env node server/_preflight.mjs; rm -f server/_preflight.mjs
+```
+
+بلوکِ بالا برایِ اجرا **داخلِ shellِ سرور** است. از ماشینِ dev آن را داخلِ `ssh '...'` نگذارید (کوتیشن‌هایِ تکیِ اسکریپت می‌شکنند)؛
+به‌جایش: `ssh -i ~/.ssh/feelia_migration root@185.110.191.126 'bash -s' <<'REMOTE'` + همان بلوک + `REMOTE` (تأییدشده 2026-09-26).
+
+| خروجی | معنی | اقدام |
+|---|---|---|
+| `live_sessions` / `audio_chunks_5m` > 0 | جلسه‌ی زنده در حالِ ضبط | **NO-GO** |
+| `soniox_mint_10m` > 0 | رونویسیِ زنده/یادداشتِ صوتی تازه شروع شده | **NO-GO** |
+| `uploads_active` > 0 | آپلودِ فایلِ صوتی در جریان | **NO-GO** |
+| `jobs_running` / `batch_running` > 0 | jobِ پس‌زمینه (lease/retry دارد، ولی restart آن را از نو شروع می‌کند) | **WAIT** — ترجیحاً صبر |
+| همه ۰ | — | **GO** |
+
+**چکِ تکمیلی (هر کاربرِ آنلاین، حتی بدونِ جلسه):** زمانِ آخرین خطوطِ لاگ — اگر چند دقیقه‌ی اخیر است، کسی در سایت است:
+`pm2 logs feelia-mysql --lines 50 --nostream` و (مسیرِ **UNVERIFIED**، پیش‌فرضِ nginx) `tail -n 50 /var/log/nginx/access.log`.
+همه‌ی GETهایِ عادی در `obs_events` ثبت نمی‌شوند (`server/src/obs/httpHook.ts` فقط خطا/کند/ادمین/mutationِ حسابرسی‌شده را به DB می‌فرستد)،
+پس برایِ «حضورِ صرف» لاگ مرجع است نه DB.
+مسیرِ لاگِ nginx تأیید شد (2026-09-26). **تفسیر:** یک تبِ باز حتی بیکار هر دقیقه `GET /api/notifications` و `/api/audio-jobs?scope=active`
+می‌زند (~۲ درخواست/دقیقه) — این یعنی «کسی صفحه را باز دارد»، نه جلسه؛ restart برایش بی‌خطر است (polling بعد از بالا آمدن ادامه می‌یابد).
+درخواست‌هایِ دیگر (`/api/sessions/...`، `/api/stt/...`، آپلود) نشانه‌ی کارِ واقعی‌اند.
+
+**پنجره‌ی ۶ ساعته برایِ `batch_running`:** در اولین اجرا (2026-09-26) سه ردیفِ `batch_status='queued'` با عمرِ ۱۰۸ و ۳۳۹ ساعت پیدا شد —
+همان باگِ «batch_statusِ گیرکرده» که رفعش در working tree است ولی deploy نشده؛ jobِ واقعی نیستند و بدونِ این فیلتر preflight همیشه WAIT می‌داد.
+
+**وضعیت:** اولین اجرا رویِ production: 2026-09-26 — اسکریپت درست اجرا و حذف شد (Event Log).
 
 **کشِ مرورگر:** فایل‌هایِ `public/` (بدونِ نسخه در URL) با `Cache-Control: no-cache` سرو می‌شوند (`server/src/index.ts`،
 از ۲۰۲۶-۰۹-۲۳) تا هر بارگذاری revalidate شود (ETag → 304). پیش از آن پیش‌فرضِ `public, max-age=0` باعث شد مرورگرِ مالک

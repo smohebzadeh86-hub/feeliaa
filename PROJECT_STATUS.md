@@ -2,7 +2,7 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-26 — آخرین رویداد: **تستِ کامل + بک‌آپِ production + commitِ رفع‌هایِ تستِ واقعی (بدونِ deploy).** قبل‌ترش: **رفعِ ریشه‌ایِ چالش‌هایِ تستِ واقعی (batch_statusِ گیرکرده، انتسابِ rt.*، آپلودِ تدریجیِ آرشیو، حذفِ جلسه→404، آپلود از Setup، یادداشتِ صوتیِ تکراری) — commitنشده.** قبل‌ترش: **deployِ `a20ccdb` (جلسه‌ی ۱ساعته + تایمرِ جلسه در قطعی) به production؛ health ok.** پیش از آن: **آماده‌سازیِ جلسه‌ی ۱ساعته (Wake Lock، رندرِ افزایشی، autosave، صف، timeoutِ آپلود/ffmpeg، retry از FAILED)؛ `test:rt` 62/62، `test:up` 41/41، `tsc` تمیز؛ commit/deploy نشده.** پیش از آن (2026-09-25): **تلاشِ دوباره‌ی خودکار برایِ خطایِ گذرایِ LLM در پرونده‌ی آپلود + E2Eِ کامل از UIِ واقعی (۵ سناریو PASS)؛ `test:up` 41/41؛ commitهای جدا.** پیش از آن: **رفعِ `MaxListenersExceededWarning` در `assembleUpload` (الحاقِ تکه‌هایِ آپلودِ ≥۱۰ تکه؛ بی‌ضرر برایِ داده)؛ `test:up` 38/38 با mutation-check؛ deploy شد به production (health ok)؛ commit نشده.** پیش از آن: **deploy به production: آپلود فعلاً برایِ همه فقط متن؛ مسیرِ «مراجعِ غیرفعال ⇒ پرونده» (E2Eِ واقعی PASS) رویِ سرور هست ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است؛ health ok؛ commit نشده.** پیش از آن: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — commit `45b0482` (push نشده) و deploy به production؛ migration 025 applied؛ health ok.** پیش از آن: `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16. قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
+> **آخرین به‌روزرسانی:** 2026-09-26 — آخرین رویداد: **deployِ `59ea786` با preflightِ کاربرِ فعال (GO)؛ health ok؛ production = `59ea786`؛ کارِ تفکیکِ گوینده deploy نشد.** قبل‌ترش: **تفکیکِ ۳ گوینده: آزمایشِ کنترل‌شده ثابت کرد کد/کانفیگ/مسیرِ ضبط ۳ نفر را درست جدا می‌کنند؛ صدایِ تستِ مالک حتی با async فقط ۲؛ constraintهایِ میکروفون به حالتِ قبل برگشت؛ شماره‌گذاری از ۱ + contextِ ثابت ماند؛ `test:rt` 72/72؛ commitنشده.** قبل‌ترش: **افزودنِ preflightِ اجباریِ «کاربرِ فعال» به رویه‌ی deploy (فقط سند؛ رویِ production اجرا نشده).** قبل‌ترش: **تستِ کامل + بک‌آپِ production + commitِ رفع‌هایِ تستِ واقعی (بدونِ deploy).** قبل‌ترش: **تفکیکِ بیش از دو گوینده: میکروفونِ خام (بدونِ NS/AGC/EC) + contextِ ثابتِ Soniox؛ `test:rt` 71/71؛ با Sonioxِ واقعی تست نشده؛ commitنشده.** قبل‌ترش: **رفعِ ریشه‌ایِ چالش‌هایِ تستِ واقعی (batch_statusِ گیرکرده، انتسابِ rt.*، آپلودِ تدریجیِ آرشیو، حذفِ جلسه→404، آپلود از Setup، یادداشتِ صوتیِ تکراری) — commitنشده.** قبل‌ترش: **deployِ `a20ccdb` (جلسه‌ی ۱ساعته + تایمرِ جلسه در قطعی) به production؛ health ok.** پیش از آن: **آماده‌سازیِ جلسه‌ی ۱ساعته (Wake Lock، رندرِ افزایشی، autosave، صف، timeoutِ آپلود/ffmpeg، retry از FAILED)؛ `test:rt` 62/62، `test:up` 41/41، `tsc` تمیز؛ commit/deploy نشده.** پیش از آن (2026-09-25): **تلاشِ دوباره‌ی خودکار برایِ خطایِ گذرایِ LLM در پرونده‌ی آپلود + E2Eِ کامل از UIِ واقعی (۵ سناریو PASS)؛ `test:up` 41/41؛ commitهای جدا.** پیش از آن: **رفعِ `MaxListenersExceededWarning` در `assembleUpload` (الحاقِ تکه‌هایِ آپلودِ ≥۱۰ تکه؛ بی‌ضرر برایِ داده)؛ `test:up` 38/38 با mutation-check؛ deploy شد به production (health ok)؛ commit نشده.** پیش از آن: **deploy به production: آپلود فعلاً برایِ همه فقط متن؛ مسیرِ «مراجعِ غیرفعال ⇒ پرونده» (E2Eِ واقعی PASS) رویِ سرور هست ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است؛ health ok؛ commit نشده.** پیش از آن: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — commit `45b0482` (push نشده) و deploy به production؛ migration 025 applied؛ health ok.** پیش از آن: `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16. قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
 > health ok، `SONIOX_ORPHAN_SWEEP=1`، nginxِ زنده کافی بود و تغییری نکرد). پیش از آن: auditِ باگ و رفعِ B2، B3، M1–M4، M6 و L*؛
 > `test:up` 29/29 و E2Eِ DBِ dev 13/13. commit نشده.** قبل‌ترش: **مسیرِ آپلود (فعال و غیرفعال) فقط تا ذخیره‌ی متن؛ پرونده خاموش پشتِ
 > `UPLOAD_CASE_FILE`؛ `test:up` 26/26 + E2Eِ واقعی PASS.** قبل‌ترش: **تستِ کاملِ واقعیِ فیچرِ آپلود (Soniox/LLM/MySQL، فایلِ ۶۰دقیقه‌ای،
@@ -395,6 +395,39 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-26 — DEPLOY + TEST — deployِ `59ea786` (رفع‌هایِ تستِ واقعی) با preflightِ کاربرِ فعال (production = `59ea786`)
+- **مجوز:** «هرکاری باید بکنی بکن فقط حواست باشه قبلش چک کنی کسی از سایت استفاده نکرده باشه».
+- **build/test رویِ exportِ تمیزِ `59ea786`** (`git archive` در scratchpad؛ کارِ commitنشده‌ی تفکیکِ گوینده عمداً بیرون ماند): `tsc` ✅، `test:rt` ۶۹/۰، `test:up` ۴۱/۰، `test:cf` ۱۰۸/۰. تار بدونِ `.env`/`node_modules`/`data` (بررسی شد). بدونِ migration؛ backupِ همان روز (`/root/backups/pre-realtest-fixes-20260926T110447Z/`) معتبر ماند.
+- **preflight در همان اسکریپتِ restart (gate: فقط در صورتِ GO ادامه):** 12:16:22 UTC همه‌ی شمارنده‌ها ۰ → GO؛ آخرین APIِ واقعی در nginx ساعتِ 12:01 (۱۵ دقیقه قبل).
+- **deploy:** extract → `pnpm install --frozen-lockfile` ✅ → `pm2 restart feelia-mysql --update-env`؛ `feelia-mysql` online، `/api/health` ok/connected، لاگِ خطا فقط هشدارِ قدیمیِ FSTDEP023.
+- **تأیید:** `feelia-rt.js`ِ سروشده شاملِ `ARCHIVE_DRAIN_MS`؛ `dist/stt/batchqueue.js` شاملِ `reconcileStaleBatchStatuses`؛ آن ۳ ردیفِ کهنه‌ی `batch_status='queued'` دیگر در صف نیستند (reconcile شدند).
+- **git:** commitِ اسناد (preflight + این ورودی)؛ push نشد.
+- **کارِ باز:** کارِ تفکیکِ گوینده (نشستِ دیگر) هنوز commit/deploy نشده.
+
+### 2026-09-26 — TEST — اجرایِ نسخه‌ی نهاییِ preflight (با فیلترِ ۶ ساعته) رویِ production
+- **چه شد:** با مجوزِ مالک، دقیقاً اسکریپتِ مستندِ §۵.۱ اجرا شد (11:14 UTC): همه‌ی شش شمارنده ۰ → **GO**؛ فایلِ موقت حذف شد (`cleaned`). اولین تلاش به‌خاطرِ کوتیشنِ `ssh '...'` در سمتِ local اجرا نشد (هیچ چیز رویِ سرور اجرا نشد)؛ روشِ `ssh 'bash -s' <<'REMOTE'` جواب داد و در سند ثبت شد.
+- **فایل‌ها:** —
+- **اسنادِ به‌روزشده:** `deployment-operations.md` §۵.۱ (نحوه‌ی اجرا از ماشینِ dev).
+- **تست / تأیید:** خروجیِ واقعیِ بالا؛ هیچ داده‌ای تغییر نکرد، ری‌استارت نشد.
+- **عامل:** این نشست
+- **کارِ باز / پیامد:** ۳ ردیفِ کهنه‌ی `batch_status='queued'` همچنان در DB هستند تا deployِ رفعِ batch_status؛ تغییراتِ سند commit نشده.
+
+### 2026-09-26 — TEST + FINDING — اولین اجرایِ preflightِ «کاربرِ فعال» رویِ production
+- **چه شد:** با مجوزِ مالک، اسکریپتِ فقط-خواندنیِ §۵.۱ رویِ production اجرا شد (11:11 UTC)؛ فایلِ موقت حذف و حذفش تأیید شد. نتیجه: جلسه/صدا/mint/آپلود/job همه ۰؛ `batch_running`=۳ → WAIT. بررسیِ سنِ آن ۳ ردیف (فقط وضعیت + عمر): `queued` با عمرِ ۳۳۹، ۳۳۹ و ۱۰۸ ساعت — همان باگِ batch_statusِ گیرکرده (رفع در working tree، deploy نشده)، نه jobِ واقعی. لاگِ nginx: فقط polling ِ `/api/notifications` + `/api/audio-jobs?scope=active` هر دقیقه (یک تبِ بازِ بیکار). ارزیابیِ واقعی: GO.
+- **فایل‌ها:** —
+- **اسنادِ به‌روزشده:** `deployment-operations.md` §۵.۱ — فیلترِ ۶ ساعته رویِ `batch_running`، تفسیرِ polling، تأییدِ مسیرِ لاگِ nginx.
+- **تست / تأیید:** اجرایِ واقعی رویِ production (بالا). هیچ داده‌ای تغییر نکرد؛ ری‌استارت انجام نشد.
+- **عامل:** این نشست
+- **کارِ باز / پیامد:** با deployِ رفعِ batch_status، آن ۳ ردیفِ کهنه باید reconcile شوند؛ پس از آن دوباره preflight اجرا شود.
+
+### 2026-09-26 — DOCS — preflightِ اجباریِ «کاربرِ فعال» قبل از هر restart/deploy
+- **چه شد:** به درخواستِ مالک، گامِ ۳ِ جدید در رویه‌ی deploy: قبل از `pm2 restart` با یک اسکریپتِ یک‌بارِ فقط-خواندنی (الگویِ §۴.۱) شمارشِ جلسه‌ی `in_progress` تازه، تکه‌هایِ صدایِ ۵ دقیقه‌ی اخیر، `stt.mint_ok` ۱۰ دقیقه‌ی اخیر، آپلودِ `uploading`، `audio_jobs`ِ ناتمام و `batch_status` صف/در حالِ پردازش → خروجیِ GO / WAIT / NO-GO. چکِ تکمیلی: زمانِ آخرین خطوطِ لاگِ pm2/nginx. دلیل: در رونویسیِ زنده مرورگر مستقیم به Soniox وصل است، پس بیکار به‌نظر رسیدنِ سرور نشانه‌ی نبودنِ جلسه نیست.
+- **فایل‌ها:** —
+- **اسنادِ به‌روزشده:** `docs/01-architecture/deployment-operations.md` (§۵ گامِ ۳ + §۵.۱ جدید؛ شماره‌ی گام‌هایِ بعدی +۱).
+- **تست / تأیید:** انجام نشد — اسکریپت هنوز رویِ production اجرا نشده (نیازمندِ مجوز، LAW-006)؛ نام‌هایِ جدول/ستون با `server/src/db/mysql/schema.sql` و migration 023 تطبیق داده شد. مسیرِ لاگِ nginx UNVERIFIED.
+- **عامل:** این نشست
+- **کارِ باز / پیامد:** در اولین deployِ بعدی preflight اجرا و نتیجه (و صحتِ اجرایِ اسکریپت) این‌جا ثبت شود.
+
 ### 2026-09-26 — TEST + BACKUP + GIT — تستِ کامل، بک‌آپِ production و commitِ رفع‌هایِ تستِ واقعی (بدونِ deploy)
 - **مجوز:** «کامل تست‌ها رو انجام بده، بک‌آپ بگیر، بعدش کامیت کن و منتظرِ دستور برای دیپلوی وایسا».
 - **تست رویِ snapshotِ دقیقاً همان چیزی که commit شد** (`git checkout-index` در اسکرچ‌پد، بدونِ کدِ نیمه‌کاره‌ی نشستِ دیگر): `tsc` ✅؛ `test:rt` ۶۹/۰؛ `test:up` ۴۱/۰؛ `test:cf` ۱۰۸/۰. رویِ working treeِ ترکیبی هم همه سبز.
@@ -402,6 +435,45 @@
 - **بک‌آپِ production (فقط رویِ سرور، `umask 077`):** `/root/backups/pre-realtest-fixes-20260926T110447Z/` — `db.sql.gz` (`mysqldump --single-transaction`، «Dump completed»، ۱۳/۱۳ جدول؛ ۵۰ جلسه در لحظه‌ی بک‌آپ) + `app-and-data.tar.gz` (کلِ `/root/feeliaa-mysql` بدونِ node_modules، شاملِ `.env` و ۲۰۶ فایلِ `data/session-audio`) + `SHA256SUMS` (✅). هیچ داده‌ای به ماشینِ dev منتقل نشد.
 - **commit:** فقط hunkهایِ این نشست؛ کارِ هم‌زمانِ نشستِ دیگر (تفکیکِ گوینده: `sessionContext.ts`، `stt.ts`، `asyncTranscribe.ts`، constraintهایِ میکروفون/`context`/شماره‌گذاریِ گوینده در `feelia-rt.js`، T39/T40، یک خط در `sessions.ts`/`batchqueue.ts`، `configuration-catalog`/`repository-map` و ورودیِ Event Logِ خودش) در working tree دست‌نخورده ماند. push نشد.
 - **کارِ باز:** deploy منتظرِ دستورِ مالک.
+
+### 2026-09-26 — TEST + FINDING + REVERT — آزمایشِ کنترل‌شده‌ی کلِ مسیرِ تفکیکِ گوینده (مجوزِ صریحِ مالک برایِ همه‌ی تست‌ها)
+- **تستِ دومِ مالک (ادامه‌ی `ec144271…`، مجموعاً ۹۰ث آرشیو):** باز ۲ گوینده.
+- **آزمایش:** صدایِ مالک با realtime (کانفیگِ اصلی/+context/بدونِ endpoint) و async (±context و حتی «دقیقاً ۳ گوینده») ⇒ همه **۲**.
+  مکالمه‌ی کنترلِ ۳نفره (TTSِ Soniox، دو صدایِ مرد) ⇒ realtime با کانفیگِ دقیقِ کد **۲۰/۲۰ درست، ۳ گوینده**؛ همان صدا از
+  Chromeِ واقعی (میکروفونِ جعلی) با NS/AGC/EC روشن و خاموش ⇒ realtime و async هر دو **۳**.
+- **نتیجه:** کد/کانفیگ/مسیرِ ضبط سه گوینده را درست جدا می‌کنند؛ صدایِ تستِ مالک خودش برایِ Soniox (حتی async) فقط ۲ خوشه دارد.
+- **REVERT:** constraintهایِ میکروفونِ `feelia-rt.js` به `true` برگشت (در آزمایش بی‌اثر؛ در تستِ میدانی بدتر گزارش شد). T39 به‌روز شد.
+  contextِ ثابت و شماره‌گذاریِ ۱-مبنا ماندند. `test:rt` 72/72، `tsc` تمیز.
+- **ریسکِ رخ‌داده:** `taskkill /IM chrome.exe` (برایِ بستنِ Chromeِ headlessِ تست) ممکن است Chromeِ مالک را هم بسته باشد — گزارش شد.
+- شواهد: [verification/2026-09-26-speaker-diarization-3-speakers.md](verification/2026-09-26-speaker-diarization-3-speakers.md). commit/deploy نشده.
+
+### 2026-09-26 — BUG + FIX + FINDING — شماره‌گذاریِ گوینده از ۰؛ تستِ ۳نفره‌ی مالک رویِ dev ناموفق
+- **تستِ مالک (dev، جلسه‌ی `ec144271…`):** ۳ نفر، ولی متنِ زنده فقط «گوینده ۰/۱». شواهدِ DB/obs: کلِ ضبط ~۳۰ ثانیه
+  (10:44:03→10:44:33 UTC، سپس MANUAL_PAUSED)، یک اتصالِ WS، بدونِ reconnect؛ صدا هنوز در IndexedDBِ مرورگر (جلسه تمام نشده).
+- **باگ:** `nextSpeakerLabel = 0` (از commitِ `2763414`، 2026-09-14) ⇒ متنِ زنده از «گوینده ۰» شروع می‌شد، در حالی که Soniox
+  و مسیرِ async/batch/آپلود از ۱ می‌شمارند. **رفع:** شروع از ۱ + تستِ T40 (۳ گوینده‌ی متمایز، ۱-مبنا). `test:rt` 72/72.
+- **FINDING:** کانفیگِ Sonioxِ realtime (مدل `stt-rt-v5`، diarization، endpoint) از 2026-09-10 عوض نشده؛ تنها تغییرِ مسیرِ
+  صدا/کانفیگ همان دو تغییرِ امروز است (میکروفونِ خام + context). علتِ ۳→۲ هنوز اثبات نشده — ابزارِ A/B (scratchpad،
+  `diar-ab.mts`: همان فایل با realtime ±context ±endpoint و async) آماده است؛ smoke رویِ یک فایلِ dev: Soniox فیلدِ
+  `context` را در realtime بی‌خطا پذیرفت و شماره‌ی خام از "1" است. منتظرِ صدایِ جلسه‌ی ۳نفره.
+
+### 2026-09-26 — CODE + TEST + DOCS — تفکیکِ بیش از دو گوینده (زوج‌درمانی)
+- **مشکل (گزارشِ مالک):** در جلسه‌ی ۳نفره با صداهایِ متفاوت فقط ۲ گوینده تشخیص داده می‌شد.
+- **audit:** هیچ سقفِ «۲ گوینده» در کد نیست (Soniox تا ۱۵). ریشه‌ها: (۱) `reqStream()` در `public/feelia-rt.js` با
+  `noiseSuppression/autoGainControl/echoCancellation = true` میکروفون می‌گرفت — پردازشِ مخصوصِ تماسِ تصویری که طیف و بلندیِ
+  صداها را یکدست می‌کند؛ SDKِ رسمیِ Soniox (`MicrophoneSourceOptions`) پیش‌فرض را هر سه `false` + مونو گذاشته. چون آرشیو/batch
+  هم از همین stream است، حتی «بازسازیِ گوینده‌ها» (async) صدایِ پردازش‌شده می‌گرفت. (۲) هیچ `context`ی به Soniox داده نمی‌شد؛
+  docs («Improving speaker diarization») توصیه می‌کند اطلاعاتِ گوینده‌ها در `context.general` بیاید. (۳) endpoint detection
+  (کاهنده‌ی دقتِ diarization) طبقِ تصمیمِ قبلیِ مالک برایِ سرعت روشن ماند — دست نخورد.
+- **تصمیمِ مالک:** تعدادِ حاضرین از تراپیست پرسیده **نشود** (کارِ اضافه نه) — تفکیک باید با تفاوتِ صدا کار کند.
+- **رفع:** `feelia-rt.js` → constraintها `false` + `channelCount:1`؛ فایلِ جدیدِ `server/src/stt/sessionContext.ts` (متنِ ثابت،
+  بدونِ دادهٔ مراجع) → `stt_defaults.context` در mint (به‌جز `purpose=note`) و کلاینت آن را در کانفیگِ WS می‌فرستد؛
+  `createTranscription`/`transcribeFileAsync` (batch، آپلود، resolve-speakers) همان context را می‌فرستند، یادداشتِ صوتی نه
+  (`batchqueue` برایِ `purpose=note` و `/voice-note`ِ legacy با `sessionContext:false` — رفتارِ legacy بدونِ تغییر).
+  `MicModule.LIVE_CONSTRAINTS`ِ legacy در `index.html` دست نخورد (LAW-015).
+- **تست:** `tsc` تمیز؛ `test:rt` 71/71 (T39 جدید: constraintهایِ خام + ارسالِ context)؛ `test:up` 41/41.
+- **تأییدنشده:** با Sonioxِ واقعی و صدایِ ۳نفره تست نشد؛ پذیرشِ فیلدِ `context` از طرفِ API فقط طبقِ docs است (ساختار دقیقاً
+  مطابقِ مثالِ docs). **پیش از deploy یک جلسه‌ی آزمایشیِ واقعی لازم است.** commit/deploy نشده.
 
 ### 2026-09-26 — CODE + TEST + DOCS — رفعِ ریشه‌ایِ چالش‌هایِ تستِ واقعیِ تراپیستِ `3cb546ef…` (ادامه‌ی FINDINGِ زیر)
 - **چه شد (ریشه → رفع):**
