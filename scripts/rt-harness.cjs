@@ -742,5 +742,211 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     RT.forget(s38);
   }
 
+  // T41 (audit ذخیره‌سازی 2026-09-26): بدونِ «پایان»، پنهان‌شدن/بستنِ صفحه متنِ ذخیره‌نشده را فوراً PUT می‌کند
+  // (hidden → PUTِ عادی؛ pagehide → PUTِ keepalive) — بدونِ انتظار برایِ تیکِ autosave.
+  {
+    newSession('s39');
+    const s39 = RT.createSession('s39', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p39 = s39.start(); await sleep(5); serverOpen(FakeWS.last); await p39;
+    serverTokens(FakeWS.last, [{ text: 'اول', is_final: true }]);
+    s39.flushTranscriptNow(false); await sleep(30);
+    const afterHidden = sessions.s39.transcript;
+    serverTokens(FakeWS.last, [{ text: ' دوم', is_final: true }]);
+    const realFetch39 = globalThis.fetch; let keepaliveSeen = false;
+    globalThis.fetch = async (url, opts = {}) => { if (opts.keepalive && url === '/api/sessions/s39') keepaliveSeen = true; return realFetch39(url, opts); };
+    s39.flushTranscriptNow(true); await sleep(30);
+    globalThis.fetch = realFetch39;
+    ok('T41 hidden flush persists confirmed text immediately', afterHidden.includes('اول'), JSON.stringify(afterHidden));
+    ok('T41 pagehide flush sends keepalive PUT with latest text', keepaliveSeen && sessions.s39.transcript.includes('دوم'), JSON.stringify(sessions.s39.transcript));
+    const putsBefore = fetchUrls.filter((u) => u === 'PUT /api/sessions/s39').length;
+    await s39.finish(); await sleep(50);
+    const putsAfterFinish = fetchUrls.filter((u) => u === 'PUT /api/sessions/s39').length;
+    s39.flushTranscriptNow(true); await sleep(10);
+    ok('T41 no flush after COMPLETED', fetchUrls.filter((u) => u === 'PUT /api/sessions/s39').length === putsAfterFinish && putsAfterFinish >= putsBefore);
+    RT.forget(s39);
+  }
+
+  // ——— A1 رفعِ ذخیره‌سازی (2026-09-26) ———
+  // T42 (A1.1): لغوِ یادداشتِ صوتی فقط سگمنت‌هایِ run خودش را پاک می‌کند، نه صدایِ آپلودنشده‌ی دیگرِ همان جلسه.
+  {
+    newSession('s42');
+    await RT.audioQueue.add('s42', 'otherrun', 0, new Blob(['x'.repeat(600)]), 'audio/webm', 'transcript');
+    const n = RT.createSession('s42', { mode: 'note', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const pn = n.start(); await sleep(5); serverOpen(FakeWS.last); await pn;
+    await n.stopDurableSegment(); n.startDurable();
+    const mid = await RT.audioQueue.listForSession('s42');
+    n.abort(); await sleep(40);
+    const left = await RT.audioQueue.listForSession('s42');
+    ok('T42 voice-note abort clears only its own run', mid.some((r) => r.runId === n.runId) && left.length === 1 && left[0].runId === 'otherrun',
+      'mid=' + mid.map((r) => r.runId).join(',') + ' left=' + left.map((r) => r.runId).join(','));
+    RT.forget(n);
+    await RT.audioQueue.clearForSession('s42');
+  }
+
+  // T43 (A1.2): آپلودِ سگمنتِ معلق timeout می‌خورد، رکورد در صف می‌ماند و قفلِ صف آزاد می‌شود.
+  {
+    RT._setTestTimeouts({ segmentUploadMs: 60 });
+    const realFetch43 = globalThis.fetch;
+    globalThis.fetch = (url, opts = {}) => {
+      if (String(url).includes('/sessions/s43/batch-audio')) {
+        return new Promise((res, rej) => { if (opts.signal) opts.signal.addEventListener('abort', () => rej(new Error('aborted'))); });
+      }
+      return realFetch43(url, opts);
+    };
+    newSession('s43');
+    const t0 = Date.now();
+    const done = await RT.withAudioLock('s43', () => RT.uploadQueuedSegment('s43', { runId: 'r', seq: 0, blob: new Blob(['y'.repeat(600)]), intent: 'archive' }));
+    const took = Date.now() - t0;
+    let lockFree = false;
+    await Promise.race([RT.withAudioLock('s43', async () => { lockFree = true; }), sleep(500)]);
+    globalThis.fetch = realFetch43;
+    RT._setTestTimeouts({ segmentUploadMs: 60000 });
+    ok('T43 hung segment upload times out → kept in queue, lock released', done === false && took < 1000 && lockFree, 'done=' + done + ' took=' + took + ' lockFree=' + lockFree);
+  }
+
+  // T44 (A1.6): نسخه از پاسخِ PUT خوانده می‌شود؛ rebaseِ واگرا متنِ هیچ طرف را حذف نمی‌کند.
+  {
+    newSession('s44');
+    const s44 = RT.createSession('s44', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p44 = s44.start(); await sleep(5); serverOpen(FakeWS.last); await p44;
+    serverTokens(FakeWS.last, [{ text: 'محلی اول', is_final: true }]); await sleep(5);
+    // سرور نسخه را جلوتر از +1 می‌برد (مثلاً نویسنده‌ی دیگری هم‌زمان) و در پاسخ برمی‌گرداند
+    const realFetch44 = globalThis.fetch;
+    let bumped = false;
+    globalThis.fetch = async (url, opts = {}) => {
+      const r = await realFetch44(url, opts);
+      if (!bumped && url === '/api/sessions/s44' && opts.method === 'PUT' && r.ok) {
+        bumped = true; sessions.s44.transcript_version += 4;
+        const v = sessions.s44.transcript_version;
+        return { ok: true, status: 200, json: async () => ({ session: { transcript: sessions.s44.transcript, transcript_version: v } }) };
+      }
+      return r;
+    };
+    await s44.persistConfirmed();
+    globalThis.fetch = realFetch44;
+    ok('T44 baseVersion taken from PUT response', s44.baseVersion === sessions.s44.transcript_version, s44.baseVersion + ' vs ' + sessions.s44.transcript_version);
+    // نویسنده‌ی دیگر متنِ سرور را به متنی بلندتر و ناسازگار تغییر می‌دهد؛ ما دُمِ ذخیره‌نشده داریم
+    sessions.s44.transcript = 'متنِ دیگری که از جای دیگری نوشته شده و از متنِ محلی بلندتر است و آن را ندارد';
+    sessions.s44.transcript_version++;
+    serverTokens(FakeWS.last, [{ text: ' دُمِ محلی', is_final: true }]); await sleep(5);
+    await s44.persistConfirmed();
+    const t44 = sessions.s44.transcript;
+    ok('T44 divergent rebase keeps server text and appends local unsaved tail (labeled)',
+      t44.includes('از جای دیگری') && t44.includes('دُمِ محلی') && t44.includes('ذخیره نشده بود'), JSON.stringify(t44));
+    // سرورِ کوتاه‌ترِ ناسازگار دیگر کورکورانه overwrite نمی‌شود
+    sessions.s44.transcript = 'کوتاهِ سرور'; sessions.s44.transcript_version++;
+    serverTokens(FakeWS.last, [{ text: ' باز هم', is_final: true }]); await sleep(5);
+    await s44.persistConfirmed();
+    ok('T44 shorter divergent server text is not overwritten', sessions.s44.transcript.includes('کوتاهِ سرور') && sessions.s44.transcript.includes('باز هم'), JSON.stringify(sessions.s44.transcript));
+    await s44.finish(); RT.forget(s44);
+  }
+
+  // T45 (A1.4): اگر ذخیره‌ی نهاییِ متن در finish بعد از چند تلاش شکست بخورد، سگمنت‌هایِ archiveِ بعد از آخرین
+  // ذخیره‌ی موفق با purpose=transcript می‌روند و نتیجه صادقانه reliable:false/batch-pending است.
+  {
+    RT._setTestTimeouts({ finalPersistDelaysMs: [0, 5, 5] });
+    newSession('s45');
+    const s45 = RT.createSession('s45', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p45 = s45.start(); await sleep(5); serverOpen(FakeWS.last); await p45;
+    serverTokens(FakeWS.last, [{ text: 'ذخیره‌شده', is_final: true }]); await sleep(5);
+    await s45.stopDurableSegment(); s45.startDurable(); // سگمنتِ قدیمی — قبل از ذخیره‌ی موفق
+    (await RT.audioQueue.listForSession('s45')).forEach((r) => { r.createdAt -= 60000; });
+    await s45.persistConfirmed();
+    await s45.stopDurableSegment(); s45.startDurable(); // سگمنتِ بعد از ذخیره
+    serverTokens(FakeWS.last, [{ text: ' دُمِ ذخیره‌نشده', is_final: true }]); await sleep(5);
+    const realFetch45 = globalThis.fetch; let putTries = 0;
+    globalThis.fetch = async (url, opts = {}) => {
+      if (url === '/api/sessions/s45' && opts.method === 'PUT' && opts.body && JSON.parse(opts.body).transcript !== undefined) {
+        putTries++; return { ok: false, status: 503, json: async () => ({ error: 'down' }) };
+      }
+      return realFetch45(url, opts);
+    };
+    const fin = s45.finish(); await sleep(5); serverTokens(FakeWS.last, [], true);
+    const out45 = await fin; await sleep(80);
+    globalThis.fetch = realFetch45;
+    RT._setTestTimeouts({ finalPersistDelaysMs: [0, 1500, 4000] });
+    const up45 = sentBlobs.filter((b) => b.sessionId === 's45');
+    const tr = up45.filter((b) => b.purpose === 'transcript').length;
+    const ar = up45.filter((b) => b.purpose === 'archive').length;
+    ok('T45 failed final persist retried then unsaved segments re-transcribed; honest result',
+      putTries === 3 && out45.reliable === false && out45.mode === 'batch-pending' && tr === 2 && ar === 1,
+      'tries=' + putTries + ' out=' + JSON.stringify(out45) + ' transcript=' + tr + ' archive=' + ar);
+    RT.forget(s45);
+  }
+
+  // ——— A2 (2026-09-26): متنِ بازیابی‌شده در جایِ زمانیِ درست ———
+  // T46: سگمنتِ بسته‌شده در قطعی ⇒ placeholder با کلیدِ run:seq، قبل از نشانگرِ «اتصال دوباره برقرار شد»، و قبل از متنِ بعدی.
+  {
+    newSession('s46');
+    const s46 = RT.createSession('s46', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p46 = s46.start(); await sleep(5); serverOpen(FakeWS.last); await p46;
+    serverTokens(FakeWS.last, [{ text: 'قبل', is_final: true }]); await sleep(5);
+    serverClose(FakeWS.last); await sleep(1200);
+    serverOpen(FakeWS.last); await sleep(30);
+    serverTokens(FakeWS.last, [{ text: 'بعد', is_final: true }]); await sleep(5);
+    const rows = (await RT.audioQueue.listForSession('s46')).filter((r) => r.intent === 'transcript');
+    const key = rows.length ? s46.runId + ':' + rows[0].seq : '?';
+    const c = s46.confirmed;
+    const iPh = c.indexOf('· #' + key + ']'), iMark = c.indexOf('[اتصال دوباره برقرار شد'), iBefore = c.indexOf('قبل'), iAfter = c.indexOf('بعد');
+    ok('T46 outage segment leaves placeholder in chronological place (before reconnect mark and later text)',
+      rows.length === 1 && iBefore >= 0 && iPh > iBefore && iMark > iPh && iAfter > iMark, JSON.stringify(c));
+    // T47: سرور placeholder را درجا پر کرده؛ ما دُمِ تازه داریم ⇒ 409 → متنِ سرور + دُم، بدونِ برچسبِ واگرایی
+    await s46.persistConfirmed();
+    const base = sessions.s46.transcript;
+    sessions.s46.transcript = base.replace(/\[⏳ [^\]]*\]/, '[بازیابی‌شده از صدایِ بازه‌ی قطعی · #' + key + ']\nمتنِ بازیابی‌شده');
+    sessions.s46.transcript_version++;
+    serverTokens(FakeWS.last, [{ text: ' ادامه‌ی تازه', is_final: true }]); await sleep(5);
+    await s46.persistConfirmed();
+    const t47 = sessions.s46.transcript;
+    ok('T47 rebase after in-place fill keeps recovered text + new tail, no divergence label, no placeholder',
+      t47.includes('متنِ بازیابی‌شده') && t47.includes('ادامه‌ی تازه') && !t47.includes('ذخیره نشده بود') && !t47.includes('⏳') &&
+      t47.indexOf('متنِ بازیابی‌شده') < t47.indexOf('بعد'), JSON.stringify(t47));
+    await s46.finish(); RT.forget(s46);
+  }
+  // T48: placeholder هنوز ذخیره نشده بود و سرور متن را با همان کلید append کرد ⇒ placeholderِ محلی حذف می‌شود
+  {
+    newSession('s48');
+    const s48 = RT.createSession('s48', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p48 = s48.start(); await sleep(5); serverOpen(FakeWS.last); await p48;
+    serverTokens(FakeWS.last, [{ text: 'اول', is_final: true }]); await sleep(5);
+    await s48.persistConfirmed();
+    s48.insertRecoveryPlaceholder(s48.runId, 7);
+    serverTokens(FakeWS.last, [{ text: 'دوم', is_final: true }]); await sleep(5);
+    sessions.s48.transcript += '\n\n[بازیابی‌شده از صدایِ بازه‌ی قطعی · #' + s48.runId + ':7]\nمتنِ صف';
+    sessions.s48.transcript_version++;
+    await s48.persistConfirmed();
+    const t48 = sessions.s48.transcript;
+    ok('T48 unsaved placeholder resolved by server append is dropped from local tail', t48.includes('متنِ صف') && t48.includes('دوم') && !t48.includes('⏳'), JSON.stringify(t48));
+    await s48.finish(); RT.forget(s48);
+  }
+
+  // T49 (A5): متنِ > ۶۰KB ⇒ pagehide فقط دُمِ ذخیره‌نشده را با CAS رویِ نسخه (transcript-tail، keepalive) می‌فرستد.
+  {
+    newSession('s49');
+    const s49 = RT.createSession('s49', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p49 = s49.start(); await sleep(5); serverOpen(FakeWS.last); await p49;
+    serverTokens(FakeWS.last, [{ text: 'ب'.repeat(40000), is_final: true }]); await sleep(5);
+    await s49.persistConfirmed();
+    serverTokens(FakeWS.last, [{ text: ' دُمِ آخر', is_final: true }]); await sleep(5);
+    const realFetch49 = globalThis.fetch; let tailReq = null;
+    globalThis.fetch = async (url, opts = {}) => {
+      if (url === '/api/sessions/s49/transcript-tail') {
+        tailReq = { keepalive: !!opts.keepalive, body: JSON.parse(opts.body) };
+        const s = sessions.s49;
+        if (tailReq.body.base_version !== s.transcript_version) return { ok: false, status: 409, json: async () => ({}) };
+        s.transcript += tailReq.body.tail; s.transcript_version++;
+        return { ok: true, status: 200, json: async () => ({ ok: true, transcript_version: s.transcript_version }) };
+      }
+      return realFetch49(url, opts);
+    };
+    s49.flushTranscriptNow(true); await sleep(20);
+    globalThis.fetch = realFetch49;
+    ok('T49 long transcript: pagehide sends only unsaved tail with version CAS (keepalive)',
+      !!tailReq && tailReq.keepalive && tailReq.body.tail.indexOf('دُمِ آخر') >= 0 && tailReq.body.tail.length < 100 &&
+      sessions.s49.transcript.endsWith('دُمِ آخر') && sessions.s49.transcript.length > 40000,
+      JSON.stringify(tailReq && { k: tailReq.keepalive, len: tailReq.body.tail.length, v: tailReq.body.base_version }));
+    await s49.finish(); RT.forget(s49);
+  }
+
   console.log(results.map((r) => r[0]).join('\n'));
 })().catch((e) => { console.error('HARNESS ERROR', e); process.exitCode = 1; });

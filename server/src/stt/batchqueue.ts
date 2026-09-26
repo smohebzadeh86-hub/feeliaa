@@ -190,6 +190,15 @@ function dropUnrecoverable(sessionId: string, file: string, purpose: BatchPurpos
   logEvent({ event: 'batch.segment_unrecoverable', sessionId, source: 'job', severity: 'warn', detail: { purpose, seq: seqFromFilename(file), bytes, reason } });
 }
 
+// ⭐ (A2، 2026-09-26) زمانِ شروعِ run از خودِ runId (genRunId در feelia-rt.js: Date.now() به base36 + ۶ نویسه‌ی
+// تصادفی). runِ legacy/ناشناخته ⇒ 0. برایِ ترتیبِ واقعیِ ضبط بینِ runها (ادامه بعد از رفرش هر run را از seq=0 شروع می‌کند).
+export function runStartMs(runId: string | null | undefined): number {
+  const r = String(runId || '');
+  if (!/^[a-z0-9]{9,}$/i.test(r)) return 0;
+  const t = parseInt(r.slice(0, r.length - 6), 36);
+  return Number.isFinite(t) && t > 1_500_000_000_000 && t < 4_000_000_000_000 ? t : 0;
+}
+
 function filesFor(sessionId: string, purpose: BatchPurpose): string[] {
   ensureDir();
   const safe = String(sessionId).replace(/[^a-zA-Z0-9-]/g, '');
@@ -202,8 +211,38 @@ function filesFor(sessionId: string, purpose: BatchPurpose): string[] {
       if (purpose === 'note-archive') return isNoteArchiveFile(f);
       return !isNoteFile(f) && !isArchiveFile(f) && !isLateFile(f) && !isNoteArchiveFile(f);
     })
-    .sort()
-    .map((f) => path.join(QUEUE_DIR, f));
+    .map((f) => path.join(QUEUE_DIR, f))
+    // (A2) ترتیبِ ضبط: (زمانِ شروعِ run، seq) — قبلاً sortِ متنی بر اساسِ seq بود و seq=0ِ runِ بعدی جلوتر از seq=5ِ runِ قبلی می‌رفت.
+    .sort((a, b) => {
+      const pa = parseQueueFilename(a), pb = parseQueueFilename(b);
+      return (runStartMs(pa?.runId) - runStartMs(pb?.runId)) || ((pa?.seq ?? 0) - (pb?.seq ?? 0)) || (a < b ? -1 : a > b ? 1 : 0);
+    });
+}
+
+// ⭐ (A2) placeholderِ بازه‌ی قطعی که کلاینت در جایِ زمانیِ درست گذاشته (insertRecoveryPlaceholder در feelia-rt.js):
+// «[⏳ … · #<run>:<seq>]». applyBatchSegmentOnce همان را درجا با متنِ بازیابی‌شده جایگزین می‌کند.
+export const RECOVERED_LABEL = 'بازیابی‌شده از صدایِ بازه‌ی قطعی';
+export const RECOVERED_EMPTY_LABEL = 'بازه‌ی قطعی — گفتاری تشخیص داده نشد';
+export function recoveryKey(runId: string, seq: number): string {
+  return `${String(runId).replace(/[^a-zA-Z0-9]/g, '').slice(0, 32)}:${seq}`;
+}
+function escapeRe(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+export function recoveryPlaceholderRe(key: string): RegExp {
+  return new RegExp(`\\[⏳ [^\\]\\n]*· #${escapeRe(key)}\\]`);
+}
+// متنِ فعلی + متنِ بازیابی‌شده‌ی یک سگمنت ⇒ متنِ جدید (یا null اگر تغییری لازم نیست).
+export function mergeRecoveredSegment(currentText: string, text: string, key: string | undefined, label?: string): string | null {
+  const re = key ? recoveryPlaceholderRe(key) : null;
+  if (re && re.test(currentText)) {
+    const repl = text ? `[${RECOVERED_LABEL} · #${key}]\n${text}` : `[${RECOVERED_EMPTY_LABEL} · #${key}]`;
+    return currentText.replace(re, () => repl);
+  }
+  if (!text) return null;
+  // placeholder نیست (کلاینتِ قدیمی، یا placeholder هنوز ذخیره نشده بود) ⇒ رفتارِ قبلی: append، حالا با برچسب/کلید
+  // تا کلاینت placeholderِ ذخیره‌نشده‌ی همان بازه را بعداً حذف کند (dropResolvedPlaceholders).
+  const head = label ? label + (key ? ` [#${key}]` : '') : key ? `[${RECOVERED_LABEL} · #${key}]` : '';
+  const segment = head ? `${head}\n${text}` : text;
+  return currentText ? currentText + '\n\n' + segment : segment;
 }
 
 export function pendingAudioFor(sessionId: string, purpose: BatchPurpose = 'transcript'): string | null {
@@ -215,6 +254,26 @@ export function pendingAudioFor(sessionId: string, purpose: BatchPurpose = 'tran
 // پردازش می‌شوند و merge امنِ نسخه‌ای، ترتیب متن را حفظ می‌کند).
 export function pendingAudiosFor(sessionId: string, purpose: BatchPurpose = 'transcript'): string[] {
   return filesFor(sessionId, purpose);
+}
+
+// (A4، 2026-09-26) همه‌ی فایل‌هایِ صفِ یک جلسه، با هر purpose — برایِ حذفِ جلسه/مراجع (LAW-010).
+export function allQueueFilesFor(sessionId: string): string[] {
+  ensureDir();
+  const safe = String(sessionId).replace(/[^a-zA-Z0-9-]/g, '');
+  if (!safe) return [];
+  return readdirSync(QUEUE_DIR).filter((f) => f.startsWith(safe + '-')).map((f) => path.join(QUEUE_DIR, f));
+}
+
+// (A4) فایل‌هایِ صف همراهِ sessionIdِ نامشان — برایِ پاک‌کردنِ فایلِ جلسه‌ای که دیگر در DB نیست.
+export function queueFilesWithSession(): { path: string; sessionId: string }[] {
+  ensureDir();
+  const out: { path: string; sessionId: string }[] = [];
+  for (const f of readdirSync(QUEUE_DIR)) {
+    const p = path.join(QUEUE_DIR, f);
+    const sid = parseQueueFilename(p)?.sessionId;
+    if (sid) out.push({ path: p, sessionId: sid });
+  }
+  return out;
 }
 
 export function removeAudioFile(p: string) {
@@ -241,7 +300,8 @@ export async function applyBatchSegmentOnce(
   sha256: string,
   batchText: string,
   purpose: BatchPurpose,
-  label?: string
+  label?: string,
+  key?: string // (A2) run:seqِ همین سگمنت — برایِ جایگزینیِ درجایِ placeholder
 ): Promise<boolean> {
   const text = batchText.trim();
   const conn = await pool.getConnection();
@@ -256,19 +316,21 @@ export async function applyBatchSegmentOnce(
       await conn.commit();
       return false;
     }
-    if (text) {
-      if (purpose === 'note') {
+    if (purpose === 'note') {
+      if (text) {
         await conn.query(
           `INSERT INTO session_notes (id, session_id, type, text, wall_clock) VALUES (?, ?, 'voice', ?, ?)`,
           [randomUUID(), sessionId, text, new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })]
         );
-      } else {
-        const [curRows] = await conn.query('SELECT transcript FROM sessions WHERE id = ? FOR UPDATE', [sessionId]);
-        const cur = (curRows as any[])[0];
-        if (cur) {
-          const currentText: string = cur.transcript ?? '';
-          const segment = label ? `${label}\n${text}` : text;
-          const merged = currentText ? currentText + '\n\n' + segment : segment;
+      }
+    } else {
+      // (A2) حتی با متنِ خالی (سکوت) placeholderِ همین بازه باید بسته شود، وگرنه «⏳» برایِ همیشه می‌ماند.
+      const [curRows] = await conn.query('SELECT transcript FROM sessions WHERE id = ? FOR UPDATE', [sessionId]);
+      const cur = (curRows as any[])[0];
+      if (cur) {
+        const currentText: string = cur.transcript ?? '';
+        const merged = mergeRecoveredSegment(currentText, text, key, label);
+        if (merged !== null) {
           await conn.query(
             `UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1,
               realtime_reliable = false, batch_status = 'done', updated_at = NOW() WHERE id = ?`,
@@ -336,6 +398,8 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
         removeAudioFile(file);
         console.log(`[batch] archived (no transcribe) session=${sessionId} seq=${seqFromFilename(file)}`);
       } catch (e) {
+        // (A4) جلسه حذف شده ⇒ صدایش هم نباید بماند (LAW-010)
+        if ((e as { code?: string })?.code === 'session-gone') { removeAudioFile(file); continue; }
         console.log('[batch] archive-only failed:', String(e).slice(0, 160));
       }
     }
@@ -371,6 +435,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       try {
         await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, mimeFromFilename(file), 'durable', runIdFromFilename(file), purpose === 'note' ? 'note' : 'session');
       } catch (e) {
+        if ((e as { code?: string })?.code === 'session-gone') { removeAudioFile(file); continue; } // (A4) LAW-010
         console.log('[batch] archive-for-admin failed, kept queued:', String(e).slice(0, 160));
         logEvent({ event: 'audio.archive_failed', sessionId, source: 'job', severity: 'error', detail: { purpose } });
         continue;
@@ -407,9 +472,11 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       // حالت فقط سگمنت را «اعمال‌شده» علامت می‌زند.
       const applied = await applyBatchSegmentOnce(
         sessionId, sha256, text || '', purpose,
-        purpose === 'late-transcript' ? LATE_TRANSCRIPT_LABEL : undefined
+        purpose === 'late-transcript' ? LATE_TRANSCRIPT_LABEL : undefined,
+        purpose === 'note' ? undefined : recoveryKey(runIdFromFilename(file), seqFromFilename(file))
       );
-      if (applied && text && text.trim() && purpose === 'late-transcript') appliedLate = true;
+      // (A5، 2026-09-26) هر متنِ تازه‌ای که به جلسه‌ی از‌قبل‌completed رسید (نه فقط late-transcript) پرونده را به‌روز کند.
+      if (applied && text && text.trim() && purpose !== 'note') appliedLate = true;
       appliedCount++;
       removeAudioFile(file);
       console.log(`[batch] segment done session=${sessionId} purpose=${purpose}`);
@@ -426,8 +493,9 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
     // ⭐ رفعِ F8: متنِ late-transcript رویِ جلسه‌ی از‌قبل‌completedشده اضافه می‌شد ولی هیچ‌وقت به
     // پرونده نمی‌رسید (هیچ triggerی نبود). همان سیاستِ مرکزیِ auto-generate صدا زده می‌شود.
     if (appliedLate) {
+      // triggerCaseFileForSession خودش فقط جلسه‌ی completed را trigger می‌کند.
       const { triggerCaseFileForSession } = await import('../features/case-file/application/autoTrigger.js');
-      void triggerCaseFileForSession(sessionId, 'late-transcript');
+      void triggerCaseFileForSession(sessionId, purpose === 'late-transcript' ? 'late-transcript' : 'batch-after-complete');
     }
   } catch (err) {
     console.log('[batch] processing failed:', String(err).slice(0, 160));

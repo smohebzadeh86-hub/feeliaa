@@ -23,7 +23,8 @@ import { sweepOldObsEvents } from './obs/sweep.js';
 import { sweepOldBatchFiles, retryQueuedBatches, BATCH_SWEEP_INTERVAL_MS } from './stt/batchqueue.js';
 import { sweepOldSessionAudio } from './stt/sessionAudioArchive.js';
 import { sweepOldResolveJobs } from './stt/speakerResolve.js';
-import { audioUploadRoutes } from './features/audio-upload/uploads.routes.js';
+import { audioUploadRoutes, tryFinalizeGroup } from './features/audio-upload/uploads.routes.js';
+import { autoCloseAbandonedSessions, AUTO_CLOSE_INTERVAL_MS } from './http/sessionAutoClose.js';
 import { startAudioJobWorker, sweepSonioxOrphans } from './features/audio-upload/jobRunner.js';
 import { sweepStaleUploads } from './features/audio-upload/uploadStore.js';
 import { sweepOldNotifications } from './features/notifications/notify.js';
@@ -102,6 +103,10 @@ app.addHook('onClose', async () => {
 process.on('SIGTERM', () => {
   flushObsQueue().finally(() => process.exit(0));
 });
+// (A6، 2026-09-26) Ctrl+C / pm2 stop با SIGINT هم باید صفِ obs را خالی کند — قبلاً رویدادهایِ در صف گم می‌شدند.
+process.on('SIGINT', () => {
+  flushObsQueue().finally(() => process.exit(0));
+});
 
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
@@ -127,9 +132,14 @@ const start = async () => {
     // آپلودِ فایلِ صوتیِ جلسه (migration 023): workerِ DB-محور (بعد از ری‌استارت فوراً ادامه می‌دهد)،
     // جاروبِ آپلودهایِ رهاشده/یتیم، اعلان‌هایِ قدیمی، و فایل/transcriptionِ یتیمِ رویِ Soniox (F3).
     await startAudioJobWorker();
-    try { await sweepStaleUploads(); } catch {}
-    setInterval(() => { sweepStaleUploads().catch(() => {}); }, 60 * 60 * 1000);
+    try { await sweepStaleUploads(tryFinalizeGroup); } catch {}
+    setInterval(() => { sweepStaleUploads(tryFinalizeGroup).catch(() => {}); }, 60 * 60 * 1000);
+    // (A6) در startup هم — سروری که کمتر از ۲۴ ساعت بالا می‌ماند هرگز اعلان‌هایِ قدیمی را پاک نمی‌کرد.
+    try { await sweepOldNotifications(); } catch {}
     setInterval(() => { sweepOldNotifications().catch(() => {}); }, 24 * 60 * 60 * 1000);
+    // A3: بستنِ خودکارِ جلسه‌ی زنده‌ی رهاشده (بی‌فعالیت > SESSION_AUTO_CLOSE_IDLE_SECONDS، پیش‌فرض ۲ ساعت)
+    void autoCloseAbandonedSessions();
+    setInterval(() => { autoCloseAbandonedSessions().catch(() => {}); }, AUTO_CLOSE_INTERVAL_MS);
     void sweepSonioxOrphans();
     setInterval(() => { sweepSonioxOrphans().catch(() => {}); }, 6 * 60 * 60 * 1000);
     console.log('🌿 Feelia server starting...');

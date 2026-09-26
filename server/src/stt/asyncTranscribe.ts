@@ -248,12 +248,16 @@ export async function getTranscriptTokens(id: string): Promise<AsyncToken[]> {
   return res.json.tokens as AsyncToken[];
 }
 
-export async function deleteTranscription(id: string): Promise<void> {
-  await request('DELETE', `/v1/transcriptions/${id}`, { headers: { Authorization: authHeader() } }).catch(() => {});
+// (A4، 2026-09-26) نتیجه برمی‌گردد (true = حذف شد یا از قبل نبود) تا caller شناسه‌ی منبعی را که حذفش
+// شکست خورده دور نریزد — وگرنه منبعِ باقی‌مانده رویِ Soniox دیگر از هیچ‌جا قابلِ‌ردیابی نبود.
+export async function deleteTranscription(id: string): Promise<boolean> {
+  const r = await request('DELETE', `/v1/transcriptions/${id}`, { headers: { Authorization: authHeader() } }).catch(() => null);
+  return !!r && ((r.status >= 200 && r.status < 300) || r.status === 404);
 }
 
-export async function deleteFile(fileId: string): Promise<void> {
-  await request('DELETE', `/v1/files/${fileId}`, { headers: { Authorization: authHeader() } }).catch(() => {});
+export async function deleteFile(fileId: string): Promise<boolean> {
+  const r = await request('DELETE', `/v1/files/${fileId}`, { headers: { Authorization: authHeader() } }).catch(() => null);
+  return !!r && ((r.status >= 200 && r.status < 300) || r.status === 404);
 }
 
 // همون قراردادِ «گوینده N:» که مسیرِ realtime (soniox.ts) هم استفاده می‌کنه — یکدست

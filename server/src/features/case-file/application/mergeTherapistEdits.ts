@@ -33,9 +33,16 @@ function mergeField(existing: CaseFileField | undefined, draft: DraftField): Cas
 }
 
 // ردیف‌هایِ دستیِ تراپیست که مدل نیاورده در regenerate حفظ می‌شوند (وگرنه کارِ دستی گم می‌شد).
-function keepManual<T extends { addedByTherapist?: boolean }>(existing: T[] | undefined, merged: T[], key: (x: T) => string): T[] {
+// ⭐ (A1.9، 2026-09-26) ردیفی که تراپیست تأیید/ویرایش کرده (reviewed، غیرِ pending) هم کارِ تراپیست است —
+// قبلاً اگر مدل در regenerateِ عادی آن را نمی‌آورد (عنوانِ دیگر، حذف) بی‌صدا از پرونده حذف می‌شد.
+function isReviewed(f: { reviewedByTherapist?: boolean; pending?: boolean } | null | undefined): boolean {
+  return !!f && !!f.reviewedByTherapist && !f.pending;
+}
+function keepManual<T extends { addedByTherapist?: boolean }>(
+  existing: T[] | undefined, merged: T[], key: (x: T) => string, reviewed: (x: T) => boolean = () => false
+): T[] {
   const have = new Set(merged.map(key));
-  const extra = (existing || []).filter(x => x.addedByTherapist && !have.has(key(x)));
+  const extra = (existing || []).filter(x => (x.addedByTherapist || reviewed(x)) && !have.has(key(x)));
   return [...merged, ...extra];
 }
 
@@ -58,7 +65,7 @@ function mergeAxes(existing: CaseFileAxis[] | undefined, draft: DraftAxis[]): Ca
       ...(items ? { items } : {}),
       ...(refs ? { refs } : {}),
     };
-  }), a => normKey(a.title));
+  }), a => normKey(a.title), a => isReviewed(a));
 }
 
 function mergeRelationshipGroup(
@@ -107,7 +114,7 @@ function mergeMedication(existing: CaseFileMedicationEntry[] | undefined, draft:
       prescriber: mergeField(prev?.prescriber, { value: d.prescriber, pending: d.pending }),
       ...(prev?.addedByTherapist ? { addedByTherapist: true } : {}),
     };
-  }), m => normKey(m.name));
+  }), m => normKey(m.name), m => [m.dose, m.frequency, m.lastChange, m.prescriber].some(isReviewed));
 }
 
 function mergeRoadmap(existing: CaseFileRoadmapStep[] | undefined, draft: DraftRoadmapStep[]): CaseFileRoadmapStep[] {
@@ -122,7 +129,7 @@ function mergeRoadmap(existing: CaseFileRoadmapStep[] | undefined, draft: DraftR
       detail: mergeField(prev?.detail, { value: d.detail, pending: false }),
       ...(prev?.addedByTherapist ? { addedByTherapist: true } : {}),
     };
-  }), r => normKey(r.question));
+  }), r => normKey(r.question), r => isReviewed(r.detail));
 }
 
 function mergePendingQuestions(answeredExisting: CaseFileAnsweredQuestion[] | undefined, draft: DraftPendingQuestion[]): CaseFilePendingQuestion[] {
@@ -144,7 +151,10 @@ function mergeSessionsSummary(
   // sessionId واقعی از corpus resolve می‌شود، نه از خروجیِ مدل (مدل فقط sessionNum
   // می‌بیند، هرگز UUIDِ واقعی را نمی‌داند تا حدس‌زدنِ شناسه ممکن نباشد).
   const sessionIdByNum = new Map(corpus.sessions.map(s => [s.sessionNum, s.id]));
-  return draft.map(d => {
+  // (A1.9) خلاصه‌ی جلسه‌ای که تراپیست تأیید/ویرایش کرده و مدل این بار نیاورده حفظ می‌شود.
+  const drafted = new Set(draft.map(d => d.sessionNum));
+  const keptReviewed = (existing || []).filter(e => !drafted.has(e.sessionNum) && (isReviewed(e.title) || isReviewed(e.body)));
+  return [...draft.map(d => {
     const prev = byNum.get(d.sessionNum);
     return {
       sessionId: sessionIdByNum.get(d.sessionNum) || prev?.sessionId || '',
@@ -153,7 +163,7 @@ function mergeSessionsSummary(
       body: mergeField(prev?.body, { value: d.body, pending: false }),
       durationIndicator: d.durationIndicator ?? prev?.durationIndicator ?? null,
     };
-  });
+  }), ...keptReviewed].sort((a, b) => a.sessionNum - b.sessionNum);
 }
 
 // جابه‌جاییِ دستیِ تراپیست (movedTo) بعد از regenerate دوباره اعمال می‌شود (شناسه‌ی یافته پایدار است: hash). اگر یافته در
@@ -181,11 +191,15 @@ function reapplyMoves(existing: CaseFileAxis[] | undefined, merged: CaseFileAxis
 
 // existing=null یعنی merge کامل بدونِ حفظِ هیچ‌چیزی — دقیقاً همان چیزی که «بازتولیدِ
 // کامل» (force=true) می‌خواهد.
+// ⭐ (A1.9) استثنا: پاسخ‌هایِ تراپیست به سوالاتِ باز دیتا هستند نه خروجیِ مدل — در force هم (keepAnswered)
+// حفظ می‌شوند؛ قبلاً بازتولیدِ کامل آن‌ها را برایِ همیشه پاک می‌کرد و همان سوال‌ها دوباره «باز» می‌شدند.
 export function mergeCaseFileDraft(
   existing: CaseFileContent | null,
   draft: CaseFileDraft,
-  corpus: ClientCorpus
+  corpus: ClientCorpus,
+  keepAnswered?: CaseFileAnsweredQuestion[]
 ): CaseFileContent {
+  const answered = existing?.answeredQuestions ?? keepAnswered ?? [];
   return {
     identity: mergeField(existing?.identity, draft.identity),
     mainIssue: mergeField(existing?.mainIssue, draft.mainIssue),
@@ -202,9 +216,9 @@ export function mergeCaseFileDraft(
     },
     sessionsSummary: mergeSessionsSummary(existing?.sessionsSummary, draft.sessionsSummary, corpus),
     roadmap: mergeRoadmap(existing?.roadmap, draft.roadmap),
-    pendingQuestions: mergePendingQuestions(existing?.answeredQuestions, draft.pendingQuestions),
+    pendingQuestions: mergePendingQuestions(answered, draft.pendingQuestions),
     // پاسخ‌هایِ ثبت‌شده دستیِ تراپیست‌اند؛ regenerate آن‌ها را دست نمی‌زند (فقط applyFieldPatch اضافه می‌کند)
-    answeredQuestions: existing?.answeredQuestions ?? [],
+    answeredQuestions: answered,
     // نکاتِ کلیدیِ دستیِ تراپیست (ستاره‌گذاری) با regenerate عوض نمی‌شود؛ وگرنه پیشنهادِ تازه‌ی مدل
     keyPoints: existing?.keyPoints?.edited ? existing.keyPoints : { ids: draft.keyPointIds ?? [], edited: false },
     // ردیف‌هایِ قبل/اکنون: اگر تراپیست ردیفِ اصلی (changeOverTime) را تایید/ویرایش کرده، ردیف‌هایِ قبلی با آن هم‌گام می‌مانند

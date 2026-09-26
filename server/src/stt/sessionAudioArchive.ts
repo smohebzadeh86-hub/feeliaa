@@ -7,10 +7,12 @@ import { execFile } from 'node:child_process';
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../db/connection.js';
-import { extForMime, mimeForExt } from './batchqueue.js';
+import { extForMime, mimeForExt, allQueueFilesFor, queueFilesWithSession, removeAudioFile, runStartMs } from './batchqueue.js';
+import { logEvent } from '../obs/eventLog.js';
 
 const ARCHIVE_DIR = path.join(process.cwd(), 'data', 'session-audio');
 const RETENTION_MS = 14 * 24 * 60 * 60 * 1000; // ۱۴ روز — طبقِ تصمیمِ تیم
+export const SESSION_AUDIO_RETENTION_MS = RETENTION_MS; // برایِ «روزهایِ باقی‌مانده» در آرشیوِ ادمین (B2)
 const FFMPEG_BIN = process.env.FFMPEG_PATH || 'ffmpeg';
 
 function ensureArchiveDir() {
@@ -112,6 +114,9 @@ export async function archiveAudioForAdmin(
       // idempotent: همین بایت‌ها قبلاً آرشیو شده (retry بعدِ خطایِ گذرا) — کارِ اضافه نکن
       return;
     }
+    // ⭐ (A4، 2026-09-26) جلسه‌ی حذف‌شده: قبلاً فایل نوشته می‌شد، INSERT با FK شکست می‌خورد و فایل بدونِ ردیف
+    // رویِ دیسک می‌ماند (sweep فقط ردیف‌ها را می‌دید) — نقضِ LAW-010. حالا اصلاً نوشته نمی‌شود.
+    await assertSessionExists(sessionId);
     ensureArchiveDir();
     const dir = sessionDir(sessionId);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -124,15 +129,22 @@ export async function archiveAudioForAdmin(
     const ext = extForMime(mime || '');
     const filePath = path.join(dir, `${String(nextSeq).padStart(6, '0')}.${ext}`);
     writeFileSync(filePath, buffer);
-    const durationMs = await remuxAndGetDuration(filePath);
-    let bytes = buffer.length;
-    try { bytes = statSync(filePath).size; } catch {}
-    await query(
-      `INSERT INTO session_audio (id, session_id, seq, path, bytes, mime, source, run_id, kind, sha256, duration_ms)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [randomUUID(), sessionId, nextSeq, filePath, bytes, mime, source, String(runId).slice(0, 64), kind, sha256, durationMs]
-    );
-    void clientSeq; // فقط برایِ لاگ/دیباگ نگه داشته می‌شه، دیگه seqِ نهایی نیست
+    try {
+      const durationMs = await remuxAndGetDuration(filePath);
+      let bytes = buffer.length;
+      try { bytes = statSync(filePath).size; } catch {}
+      await query(
+        `INSERT INTO session_audio (id, session_id, seq, path, bytes, mime, source, run_id, kind, sha256, duration_ms, client_seq)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [randomUUID(), sessionId, nextSeq, filePath, bytes, mime, source, String(runId).slice(0, 64), kind, sha256, durationMs,
+          Number.isInteger(clientSeq) && clientSeq >= 0 ? clientSeq : null]
+      );
+    } catch (e) {
+      // (A4) همان الگویِ M4ِ نسخه‌ی فایل‌محور: فایلِ بدونِ ردیف نماند (جلسه وسطِ کار حذف شد / خطایِ DB).
+      try { rmSync(filePath, { force: true }); } catch {}
+      try { if (readdirSync(dir).length === 0) rmSync(dir, { recursive: true, force: true }); } catch {}
+      throw e;
+    }
   });
 }
 
@@ -211,6 +223,25 @@ export interface SessionAudioRow {
   sha256: string | null;
   duration_ms: number | null;
   created_at: string;
+  client_seq?: number | null; // migration 027
+}
+
+async function assertSessionExists(sessionId: string): Promise<void> {
+  const r = await query('SELECT id FROM sessions WHERE id = ?', [sessionId]);
+  if (!r.rows.length) {
+    const err = new Error('session-gone') as Error & { code?: string };
+    err.code = 'session-gone';
+    throw err;
+  }
+}
+
+// ⭐ (A2، 2026-09-26) ترتیبِ ضبط، نه ترتیبِ رسیدن: (زمانِ شروعِ run، client_seq) — seqِ سرور MAX+1ِ لحظه‌ی رسیدن
+// است و سگمنتِ دیررسیده (صفِ آفلاین) را بعد از سگمنت‌هایِ تازه‌تر می‌گذاشت. ردیفِ بدونِ client_seq ⇒ seq.
+export function sortByRecordingOrder<T extends { run_id: string; seq: number; client_seq?: number | null }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) =>
+    (runStartMs(a.run_id) - runStartMs(b.run_id)) ||
+    ((a.client_seq ?? a.seq) - (b.client_seq ?? b.seq)) ||
+    (a.seq - b.seq));
 }
 
 export async function listSessionAudio(sessionId: string): Promise<SessionAudioRow[]> {
@@ -218,7 +249,7 @@ export async function listSessionAudio(sessionId: string): Promise<SessionAudioR
     'SELECT * FROM session_audio WHERE session_id = ? ORDER BY seq',
     [sessionId]
   );
-  return r.rows;
+  return sortByRecordingOrder(r.rows as SessionAudioRow[]);
 }
 
 export async function getSessionAudioRow(id: string): Promise<SessionAudioRow | null> {
@@ -289,6 +320,13 @@ export function deleteSessionAudioDirs(sessionIds: string[]): void {
       console.log('[session-audio] failed to delete dir for', id, String((e as Error).message || e).slice(-200));
     }
   }
+  // ⭐ (A4، 2026-09-26) صدایِ همان جلسه‌ها که هنوز در صفِ batch است (data/batch-queue) — قبلاً می‌ماند و
+  // sweepِ ۲۴ساعته حتی سعی می‌کرد آرشیوش کند.
+  for (const id of sessionIds) {
+    try { for (const f of allQueueFilesFor(id)) removeAudioFile(f); } catch {}
+  }
+  // جلسه‌ای که هم‌زمان با حذفِ مراجع ساخته شد (id در فهرستِ caller نبود) — هر پوشه/فایلی که جلسه‌اش دیگر نیست.
+  void sweepAudioWithoutSession().catch(() => {});
   // فایل‌هایِ آپلودِ صدا (data/uploads/<uploadId>، migration 023) — ردیف‌هایِ audio_uploads با
   // cascade حذف شده‌اند؛ هر پوشه‌ای که دیگر ردیفِ متناظر ندارد همین‌جا پاک می‌شود (هر ۴ مسیرِ حذف).
   void import('../features/audio-upload/uploadStore.js')
@@ -303,11 +341,21 @@ export function deleteSessionAudioDirs(sessionIds: string[]): void {
 // فایل می‌چسباند و کش می‌کند — اگر سگمنتِ جدیدی اضافه نشده (جلسه تمام شده، late-transcript
 // هم چیزی اضافه نکرده)، دوباره ساخته نمی‌شود.
 export type FullAudioResult =
-  | { ok: true; path: string; mime: string; complete: boolean; missingSegments: number[] }
+  | { ok: true; path: string; mime: string; complete: boolean; missingSegments: number[]; unreadableSegments: number[] }
   | { ok: false; reason: 'no-ffmpeg' | 'no-audio' | 'build-failed'; message: string };
 
 function fullAudioMetaPath(dir: string): string {
   return path.join(dir, 'full.meta.json');
+}
+
+// ⭐ (audit ذخیره‌سازی 2026-09-26، production): concat demuxer با رسیدن به اولین سگمنتِ غیرقابلِ‌decode
+// (قطعه‌یِ بدونِ هدرِ WebM از raceِ چرخشِ durable پیش از 3e732b1) بی‌صدا متوقف می‌شد و بقیه‌ی سگمنت‌هایِ سالم
+// را کنار می‌گذاشت — جلسه‌ی e78df1a5: ۲۶.۶ث صدایِ سالم، فایلِ کاملِ ادمین فقط ۸.۵ث. حالا هر سگمنت قبل از
+// concat یک بار decode-تست می‌شود؛ سگمنتِ خراب کنار گذاشته و در نتیجه گزارش می‌شود (فایلِ خام دست نمی‌خورد).
+// v3 (A2): ترتیبِ concat = ترتیبِ ضبط (sortByRecordingOrder) — کشِ v2 با ترتیبِ رسیدن ساخته شده بود.
+const FULL_AUDIO_META_VERSION = 3;
+async function segmentDecodes(p: string): Promise<boolean> {
+  try { await runFfmpeg(['-v', 'error', '-i', p, '-t', '1', '-f', 'null', '-']); return true; } catch { return false; }
 }
 
 async function checkFfmpegAvailable(): Promise<boolean> {
@@ -330,9 +378,10 @@ export async function getFullSessionAudio(sessionId: string): Promise<FullAudioR
     const metaPath = fullAudioMetaPath(dir);
     // کش: اگه شمارشِ سگمنت‌ها از آخرین ساختِ فایلِ کامل عوض نشده، همون فایلِ قبلی معتبره.
     try {
-      const meta = JSON.parse(readFileSync(metaPath, 'utf-8')) as { segCount: number; path: string; mime: string };
-      if (meta.segCount === rows.length && existsSync(meta.path)) {
-        return { ok: true, path: meta.path, mime: meta.mime, complete, missingSegments };
+      const meta = JSON.parse(readFileSync(metaPath, 'utf-8')) as { v?: number; segCount: number; path: string; mime: string; unreadable?: number[] };
+      if (meta.v === FULL_AUDIO_META_VERSION && meta.segCount === rows.length && existsSync(meta.path)) {
+        const unreadableSegments = meta.unreadable || [];
+        return { ok: true, path: meta.path, mime: meta.mime, complete: complete && !unreadableSegments.length, missingSegments, unreadableSegments };
       }
     } catch {
       // فایلِ meta نیست یا خراب است — دوباره می‌سازیم
@@ -342,7 +391,16 @@ export async function getFullSessionAudio(sessionId: string): Promise<FullAudioR
       return { ok: false, reason: 'no-ffmpeg', message: 'این قابلیت بدونِ ffmpeg در دسترس نیست' };
     }
 
-    const exts = new Set(rows.map((r) => path.extname(r.path).slice(1) || 'webm'));
+    const unreadableSegments: number[] = [];
+    const allRows = rows;
+    const readable: typeof rows = [];
+    for (const r of allRows) {
+      if (existsSync(r.path) && (await segmentDecodes(r.path))) readable.push(r);
+      else unreadableSegments.push(r.seq);
+    }
+    if (!readable.length) return { ok: false, reason: 'build-failed', message: 'هیچ‌کدام از سگمنت‌هایِ صدایِ این جلسه قابلِ پخش نیست' };
+    const segRows = readable;
+    const exts = new Set(segRows.map((r) => path.extname(r.path).slice(1) || 'webm'));
     const uniform = exts.size === 1;
     const outExt = uniform ? [...exts][0] : 'webm';
     const outPath = path.join(dir, `full.${outExt}`);
@@ -352,7 +410,7 @@ export async function getFullSessionAudio(sessionId: string): Promise<FullAudioR
       if (uniform) {
         // مسیرِ سریع: همه‌ی سگمنت‌ها یک container/codec دارن → concat demuxer بدونِ ری‌اینکود.
         const listPath = path.join(dir, 'full.concat-list.txt');
-        const listContent = rows
+        const listContent = segRows
           .map((r) => `file '${r.path.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`)
           .join('\n');
         writeFileSync(listPath, listContent);
@@ -366,8 +424,8 @@ export async function getFullSessionAudio(sessionId: string): Promise<FullAudioR
         // وسطِ جلسه)؛ concat demuxerِ بدونِ ری‌اینکود اینجا کار نمی‌کنه — با
         // filter_complex هر ورودی جدا decode و به یک استریمِ واحدِ opus می‌چسبد.
         const args = ['-y'];
-        rows.forEach((r) => { args.push('-i', r.path); });
-        const filter = rows.map((_, i) => `[${i}:a]`).join('') + `concat=n=${rows.length}:v=0:a=1[out]`;
+        segRows.forEach((r) => { args.push('-i', r.path); });
+        const filter = segRows.map((_, i) => `[${i}:a]`).join('') + `concat=n=${segRows.length}:v=0:a=1[out]`;
         args.push('-filter_complex', filter, '-map', '[out]', '-c:a', 'libopus', outPath);
         await runFfmpeg(args);
       }
@@ -376,10 +434,50 @@ export async function getFullSessionAudio(sessionId: string): Promise<FullAudioR
     }
 
     try {
-      writeFileSync(metaPath, JSON.stringify({ segCount: rows.length, path: outPath, mime: outMime }));
+      writeFileSync(metaPath, JSON.stringify({ v: FULL_AUDIO_META_VERSION, segCount: allRows.length, path: outPath, mime: outMime, unreadable: unreadableSegments }));
     } catch {}
-    return { ok: true, path: outPath, mime: outMime, complete, missingSegments };
+    if (unreadableSegments.length) {
+      logEvent({ event: 'audio.segment_unreadable', sessionId, source: 'server', severity: 'warn', detail: { count: unreadableSegments.length } });
+    }
+    return { ok: true, path: outPath, mime: outMime, complete: complete && !unreadableSegments.length, missingSegments, unreadableSegments };
   });
+}
+
+// (A4، 2026-09-26) پوشه‌ی آرشیو یا فایلِ صفی که جلسه‌اش دیگر در DB نیست ⇒ حذف (LAW-010). معیار «نبودِ ردیفِ
+// sessions» است نه سن: نوشتنِ تازه فقط برایِ جلسه‌ی موجود انجام می‌شود (assertSessionExists)، پس پوشه‌ی جلسه‌ی
+// زنده هرگز پاک نمی‌شود.
+const SESSION_DIR_RE = /^[0-9a-f-]{36}$/i;
+export async function sweepAudioWithoutSession(): Promise<number> {
+  ensureArchiveDir();
+  const dirs = readdirSync(ARCHIVE_DIR).filter((n) => SESSION_DIR_RE.test(n));
+  const queued = queueFilesWithSession();
+  const ids = [...new Set([...dirs, ...queued.map((q) => q.sessionId)])];
+  const alive = new Set<string>();
+  for (let i = 0; i < ids.length; i += 500) {
+    const part = ids.slice(i, i + 500);
+    const r = await query(`SELECT id FROM sessions WHERE id IN (${part.map(() => '?').join(',')})`, part);
+    for (const row of r.rows) alive.add(String(row.id));
+  }
+  // ترمزِ ایمنی: اگر DB اشتباه/خالی وصل شده باشد، «جلسه‌ای پیدا نشد» نباید کلِ آرشیو را پاک کند.
+  // حذفِ عادی (یک مراجع/جلسه) چند پوشه است؛ بیش از ۲۰٪ (و بیش از ۵) ⇒ هیچ حذفی، فقط لاگ.
+  const doomed = ids.filter((id) => !alive.has(id)).length;
+  if (doomed > 5 && doomed > ids.length * 0.2) {
+    console.log(`[session-audio] orphan sweep aborted: ${doomed}/${ids.length} sessions not found — DB mismatch?`);
+    logEvent({ event: 'audio.archive_failed', source: 'server', severity: 'error', detail: { reason: 'orphan-sweep-aborted', count: doomed } });
+    return 0;
+  }
+  let removed = 0;
+  for (const d of dirs) {
+    if (alive.has(d)) continue;
+    try { rmSync(path.join(ARCHIVE_DIR, d), { recursive: true, force: true }); removed++; } catch {}
+  }
+  for (const q of queued) {
+    if (alive.has(q.sessionId)) continue;
+    removeAudioFile(q.path);
+    removed++;
+  }
+  if (removed) console.log(`[session-audio] removed ${removed} dir(s)/queue file(s) of deleted sessions`);
+  return removed;
 }
 
 // اجرا در startup + هر ۲۴ ساعت — نه فقط سرِ راه‌اندازی، چون سروری که هفته‌ها ری‌استارت
@@ -395,14 +493,21 @@ export async function sweepOldSessionAudio(): Promise<void> {
       await query('DELETE FROM session_audio WHERE created_at < ?', [cutoff]);
       console.log(`[session-audio] swept ${old.rows.length} expired file(s)`);
     }
-    // پوشه‌هایِ خالیِ session (همه‌ی فایل‌هاشون پاک شده) رو هم جارو کن
+    // پوشه‌هایِ session که دیگر هیچ ردیفِ session_audio ندارند (همه منقضی شده‌اند) ⇒ کلِ پوشه، شاملِ فایلِ
+    // کاملِ کش‌شده (full.*). ⭐ (A4) قبلاً فقط پوشه‌ی کاملاً خالی پاک می‌شد، پس full.webmِ ساخته‌شده برایِ ادمین
+    // بعد از ۱۴ روز برایِ همیشه می‌ماند. پوشه‌ی تازه (<۱ ساعت) دست نمی‌خورد (نوشتنِ در جریان).
     ensureArchiveDir();
+    const withRows = new Set((await query('SELECT DISTINCT session_id FROM session_audio')).rows.map((r: { session_id: string }) => String(r.session_id)));
     for (const name of readdirSync(ARCHIVE_DIR)) {
       const dir = path.join(ARCHIVE_DIR, name);
       try {
-        if (readdirSync(dir).length === 0) rmSync(dir, { recursive: true, force: true });
+        if (withRows.has(name)) continue;
+        if (readdirSync(dir).length === 0 || Date.now() - statSync(dir).mtimeMs > 60 * 60 * 1000) {
+          rmSync(dir, { recursive: true, force: true });
+        }
       } catch {}
     }
+    await sweepAudioWithoutSession();
   } catch (e) {
     console.log('[session-audio] sweep failed:', String(e).slice(0, 160));
   }

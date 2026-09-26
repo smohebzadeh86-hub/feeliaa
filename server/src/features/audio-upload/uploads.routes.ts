@@ -260,6 +260,13 @@ async function finalizeGroup(groupId: string, therapistId: string): Promise<Grou
   return { kind: 'created', jobId, sessionId };
 }
 
+// (A1.3) برایِ sweepStaleUploads: گروهی که همه‌ی بخش‌هایش رسیده ولی جلسه ندارد finalize می‌شود، نه حذف.
+// true ⇒ جلسه ساخته شد یا از قبل بود.
+export async function tryFinalizeGroup(groupId: string, therapistId: string): Promise<boolean> {
+  const g = await withLock('group:' + groupId, () => finalizeGroup(groupId, therapistId));
+  return g.kind === 'created' || g.kind === 'already';
+}
+
 export async function audioUploadRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAuth);
 
@@ -320,7 +327,6 @@ export async function audioUploadRoutes(app: FastifyInstance) {
       reply.code(400);
       return { error: 'تأییدِ رضایتِ مراجع برایِ ضبط الزامی است', code: 'consent-required' };
     }
-    if (b.consent === true) await recordClientConsent(b.client_id, therapistId);
     let sessionDate: string | null = null;
     if (typeof b.session_date === 'string' && b.session_date.trim()) {
       sessionDate = normalizeSessionDate(b.session_date);
@@ -342,6 +348,12 @@ export async function audioUploadRoutes(app: FastifyInstance) {
         reply.code(409);
         return { error: 'این مجموعه‌ی فایل لغو یا رد شده است — دوباره انتخاب کنید', code: 'group-closed' };
       }
+    }
+    // ⭐ (A1.8، 2026-09-26) ثبتِ رضایت فقط بعد از گذشتنِ همه‌ی validationها — قبلاً درخواستی که بعداً رد می‌شد
+    // (تاریخِ نامعتبر، گروهِ بسته) هم رضایت را ثبت می‌کرد.
+    if (b.consent === true) await recordClientConsent(b.client_id, therapistId);
+
+    if (grouped) {
       // ادامه‌ی همان بخش (بعد از رفرش/قطعی) — کلید: گروه + شماره‌ی بخش، نه fingerprint (یک فایل ممکن است دو بار انتخاب شود).
       const pp = await query(
         `SELECT * FROM audio_uploads WHERE therapist_id = ? AND group_id = ? AND part_index = ?
@@ -355,7 +367,16 @@ export async function audioUploadRoutes(app: FastifyInstance) {
           return { error: 'این بخش با فایلِ دیگری شروع شده بود', code: 'part-mismatch' };
         }
         if (u.status === 'uploading') return { upload: uploadView(u, receivedChunks(u.id, Number(u.size_bytes), u.chunk_size)), resumed: true };
-        if (!u.session_id) return { upload: uploadView(u), part_done: true };
+        if (!u.session_id) {
+          // ⭐ (A1.3، 2026-09-26) بخشِ رسیده بدونِ جلسه: اگر finalizeِ قبلی (مثلاً خطایِ DB بعد از complete) شکست
+          // خورده بود، گروه برایِ همیشه «منتظرِ بخش‌هایِ دیگر» می‌ماند و بعد از ۷ روز حذف می‌شد. finalize idempotent
+          // است (زیرِ قفلِ گروه + FOR UPDATE)؛ اینجا دوباره امتحان می‌شود.
+          const g = await withLock('group:' + groupId, () => finalizeGroup(groupId!, therapistId));
+          if (g.kind === 'rejected') { reply.code(g.status); return { error: g.error, code: g.code }; }
+          if (g.kind === 'waiting') return { upload: uploadView(u), part_done: true, parts_received: g.received, parts_total: g.total };
+          const gj = await query(`${JOB_SELECT} WHERE j.session_id = ? ORDER BY j.created_at DESC LIMIT 1`, [g.sessionId]);
+          return { upload: { ...uploadView(u), session_id: g.sessionId }, duplicate: true, requeued: false, job: gj.rows[0] ? jobView(gj.rows[0]) : null };
+        }
         const j = await query(`${JOB_SELECT} WHERE j.session_id = ? ORDER BY j.created_at DESC LIMIT 1`, [u.session_id]);
         return { upload: uploadView(u), duplicate: true, requeued: false, job: j.rows[0] ? jobView(j.rows[0]) : null };
       }

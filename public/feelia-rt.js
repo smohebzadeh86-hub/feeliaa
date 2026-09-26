@@ -63,6 +63,10 @@
   }
   // PUTِ متنِ کامل (تا ~۱۵۰KB در یک ساعت) رویِ اینترنتِ کند بیشتر از REQUEST_TIMEOUT_MS طول می‌کشد.
   var TRANSCRIPT_PUT_TIMEOUT_MS = 30000;
+  // سگمنتِ ۱۵ثانیه‌ایِ ۲۴kbps ≈ ۴۵KB؛ ۶۰ث حتی رویِ اینترنتِ خیلی کند کافی است (uploadQueuedSegment).
+  var SEGMENT_UPLOAD_TIMEOUT_MS = 60000;
+  // (A1.4) تلاش‌هایِ ذخیره‌ی نهاییِ متن در finish — فاصله قبل از هر تلاش.
+  var FINAL_PERSIST_DELAYS_MS = [0, 1500, 4000];
   // ⭐ بعد از تمام‌شدنِ MAX_RECONNECT_ATTEMPTS (FAILED)، قبلاً فقط رویدادِ online مرورگر رونویسیِ
   // زنده را برمی‌گرداند — قطعی‌ای که online/offline نمی‌دهد (Wi-Fi وصل ولی بی‌اینترنت، ردِ موقتِ
   // Soniox) تا پایانِ جلسه FAILED می‌ماند. حالا هر ۳۰ثانیه یک دورِ کاملِ reconnect دوباره امتحان می‌شود.
@@ -237,7 +241,9 @@
         var idx = store.index('sessionId');
         return idx.getAll(IDBKeyRange.only(sessionId));
       }).then(function (rows) {
-        return (rows || []).sort(function (a, b) { return a.seq - b.seq; });
+        // ⭐ (A2) ترتیبِ ضبط، نه فقط seq: runهایِ مختلفِ یک جلسه (ادامه بعد از رفرش) هر کدام seq را از ۰ شروع می‌کنند —
+        // قبلاً seq=0ِ runِ دوم پیش از seq=5ِ runِ اول آپلود می‌شد.
+        return (rows || []).sort(function (a, b) { return ((a.createdAt || 0) - (b.createdAt || 0)) || (a.seq - b.seq); });
       }).catch(function () { return []; });
     }
     // با idِ کاملِ رکورد (نه بازسازیِ دستی) — امن‌تره چون رکوردهایِ قدیمی‌ترِ قبلِ این
@@ -254,6 +260,13 @@
     function clearForSession(sessionId) {
       return listForSession(sessionId).then(function (rows) {
         return Promise.all(rows.map(function (r) { return remove(r.id, r.bytes); }));
+      }).catch(function () {});
+    }
+    // ⭐ (A1.1، 2026-09-26) فقط رکوردهایِ یک run — لغوِ یادداشتِ صوتی قبلاً clearForSession می‌زد و صدایِ
+    // آپلودنشده‌ی خودِ جلسه (runهایِ دیگرِ همان sessionId) را هم پاک می‌کرد.
+    function clearForRun(sessionId, runId) {
+      return listForSession(sessionId).then(function (rows) {
+        return Promise.all(rows.filter(function (r) { return r.runId === runId; }).map(function (r) { return remove(r.id, r.bytes); }));
       }).catch(function () {});
     }
     // همه‌ی sessionId هایی که هنوز صدایِ آپلودنشده دارن — برایِ جاروبِ هر بارِ لودِ صفحه
@@ -273,7 +286,7 @@
       return withStore('readwrite', function (store) { return store.put(copy); }).then(function () { return copy; });
     }
     return {
-      add: add, listForSession: listForSession, remove: remove, clearForSession: clearForSession,
+      add: add, listForSession: listForSession, remove: remove, clearForSession: clearForSession, clearForRun: clearForRun,
       totalBytes: totalBytes, listSessionIdsWithPending: listSessionIdsWithPending, retag: retag
     };
   })();
@@ -293,10 +306,17 @@
     var purpose = intent === 'note' ? 'note' : intent === 'note-archive' ? 'note-archive' :
       (intent === 'transcript' ? 'transcript' : 'archive');
     var run = rec.runId || 'legacy';
+    // ⭐ (A1.2، 2026-09-26) این آپلود زیرِ قفلِ سراسریِ صفِ همین جلسه اجرا می‌شود؛ fetchِ بی‌سقف رویِ شبکه‌ی
+    // ناپایدار قفل را برایِ همیشه نگه می‌داشت (هیچ drain/sweep/finishِ بعدی جلو نمی‌رفت). در timeout رکورد
+    // در صف می‌ماند (false) و دورِ بعد دوباره امتحان می‌شود.
     var send = function (p) {
       var fd = new FormData();
       fd.append('file', rec.blob, 'segment-' + rec.seq + '.webm');
-      return fetch('/api/sessions/' + sessionId + '/batch-audio?purpose=' + p + '&seq=' + rec.seq + '&run=' + encodeURIComponent(run), { method: 'POST', body: fd });
+      var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var timer = controller ? setTimeout(function () { try { controller.abort(); } catch (e) {} }, SEGMENT_UPLOAD_TIMEOUT_MS) : null;
+      return fetch('/api/sessions/' + sessionId + '/batch-audio?purpose=' + p + '&seq=' + rec.seq + '&run=' + encodeURIComponent(run), {
+        method: 'POST', body: fd, signal: controller ? controller.signal : undefined
+      }).then(function (res) { if (timer) clearTimeout(timer); return res; }, function (err) { if (timer) clearTimeout(timer); throw err; });
     };
     return send(purpose).then(function (res) {
       if (res.ok) return true;
@@ -358,6 +378,7 @@
       method: opts.method || 'GET',
       headers: opts.body ? { 'Content-Type': 'application/json' } : undefined,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
+      keepalive: !!opts.keepalive,
       signal: controller ? controller.signal : undefined
     }).then(function (res) {
       if (timer) clearTimeout(timer);
@@ -555,6 +576,7 @@
         self.state === STATES.MANUAL_PAUSED || self.state === STATES.FINALIZING) return;
     if (self._micRecovering) return;
     self._micRecovering = true;
+    obsEvent('rt.mic_lost', { state: self.state }, self);
     try { self.cb.onError('میکروفون قطع شد — در حال تلاش برای اتصالِ دوباره'); } catch (e) {}
     self.stopLivePusher();
     var wasDurable = !!(self.durableRec && self.durableRec.state === 'recording');
@@ -564,6 +586,7 @@
       if (self.aborted || self.state === STATES.COMPLETED || self.state === STATES.CANCELED) { self._micRecovering = false; return; }
       self.ensureStream().then(function () {
         self._micRecovering = false;
+        obsEvent('rt.mic_recovered', { attempt: n }, self);
         try { self.cb.onError('میکروفون دوباره وصل شد'); } catch (e) {}
         if (self.hasOpenWS()) self.startLivePusher();
         if (wasDurable) self.startDurable();
@@ -694,6 +717,9 @@
       var intent = self.mode === 'note' ? 'note' :
         (stateAtStop === STATES.RECONNECTING || stateAtStop === STATES.NETWORK_PAUSED || stateAtStop === STATES.FAILED)
           ? 'transcript' : 'archive';
+      // ⭐ (A2، 2026-09-26، تصمیمِ مالک: «متنِ بازیابی‌شده در جایِ زمانیِ درست») جایِ متنِ این بازه همین‌جاست —
+      // placeholder با کلیدِ run:seq؛ سرور بعد از رونویسی همان را درجا جایگزین می‌کند (applyBatchSegmentOnce).
+      if (intent === 'transcript' && self.persist) self.insertRecoveryPlaceholder(self.runId, seq);
       try {
         var blob = new Blob(chunks, { type: recordedMime });
         AudioQueueDB.add(self.sessionId, self.runId, seq, blob, recordedMime, intent).then(function (ok) {
@@ -973,13 +999,56 @@
   // آن ندارد. به‌جای وانمود به تداوم (که می‌تواند حرف اشتباه را به شخص اشتباه نسبت
   // دهد — خطرناک برای یادداشت درمانی)، این نقطه را صریح در transcript علامت می‌زنیم
   // و شماره‌گذاری را از نو (با اولین لیبل تازه) شروع می‌کنیم.
+  var RECONNECT_MARK = '[اتصال دوباره برقرار شد — شماره‌گذاری گوینده‌ها از این نقطه ممکن است با قبل فرق کند]';
   RTSession.prototype.noteDiscontinuity = function () {
     obsEvent('rt.gap_marked', {}, this);
     this.curSpeaker = null;
-    this.confirmed += (this.confirmed ? '\n\n' : '') +
-      '[اتصال دوباره برقرار شد — شماره‌گذاری گوینده‌ها از این نقطه ممکن است با قبل فرق کند]';
+    this.confirmed += (this.confirmed ? '\n\n' : '') + RECONNECT_MARK;
     this.dirty = true;
   };
+
+  // ⭐ (A2) placeholderِ بازه‌ی قطعی. قالب با سرور (batchqueue.ts: recoveryPlaceholderRe) یکی است.
+  function recoveryPlaceholder(runId, seq) {
+    return '[⏳ بازه‌ی قطعیِ اینترنت — متن در حالِ بازیابی · #' + String(runId).replace(/[^a-zA-Z0-9]/g, '').slice(0, 32) + ':' + seq + ']';
+  }
+  var PLACEHOLDER_RE = /\[⏳ [^\]\n]*· #([A-Za-z0-9]+:\d+)\]/g;
+  RTSession.prototype.insertRecoveryPlaceholder = function (runId, seq) {
+    var ph = recoveryPlaceholder(runId, seq);
+    var c = this.confirmed || '';
+    // سگمنتِ قطعی ناهمگام بسته می‌شود — اگر نشانگرِ «اتصال دوباره برقرار شد» همین حالا اضافه شده، جایِ زمانیِ
+    // این بازه قبل از آن است.
+    if (c.length >= RECONNECT_MARK.length && c.slice(-RECONNECT_MARK.length) === RECONNECT_MARK) {
+      var head = c.slice(0, -RECONNECT_MARK.length).replace(/\s+$/, '');
+      this.confirmed = head + (head ? '\n\n' : '') + ph + '\n\n' + RECONNECT_MARK;
+    } else {
+      this.confirmed = c + (c ? '\n\n' : '') + ph;
+    }
+    this.curSpeaker = null;
+    this.dirty = true;
+  };
+
+  // (A2) placeholderهایِ دُمِ محلی که کلیدشان در متنِ سرور هست (سرور قبلاً پرش کرده یا متن را با همان کلید
+  // append کرده) حذف می‌شوند — وگرنه «⏳ در حالِ بازیابی» برایِ همیشه در متن می‌ماند.
+  function dropResolvedPlaceholders(tail, serverText) {
+    return tail.replace(PLACEHOLDER_RE, function (m, key) {
+      return serverText.indexOf('#' + key + ']') >= 0 && serverText.indexOf(m) < 0 ? '' : m;
+    }).replace(/\n{3,}/g, '\n\n');
+  }
+  // (A2) سرور placeholderهایِ متنِ پایه را درجا جایگزین کرده (و چیزِ دیگری عوض نشده): متنِ سرور همه‌ی تکه‌هایِ
+  // بینِ placeholderهایِ base را به همان ترتیب دارد و با آخرین تکه تمام می‌شود.
+  function serverFilledPlaceholders(base, serverText) {
+    if (!base || base.search(PLACEHOLDER_RE) < 0) return false;
+    var parts = base.split(/\[⏳ [^\]\n]*· #[A-Za-z0-9]+:\d+\]/);
+    if (serverText.indexOf(parts[0]) !== 0) return false;
+    var pos = parts[0].length;
+    for (var i = 1; i < parts.length; i++) {
+      if (!parts[i]) continue;
+      var at = serverText.indexOf(parts[i], pos);
+      if (at < 0) return false;
+      pos = at + parts[i].length;
+    }
+    return parts[parts.length - 1] === '' || pos === serverText.length;
+  }
 
   // اتصال با credential تازه (هر reconnect یک mint — single_use).
   // موفق → true؛ ناموفق → false (caller تصمیم reconnect/FAILED می‌گیرد).
@@ -1228,19 +1297,32 @@
   };
 
   // ذخیره امن با CAS؛ هرگز overwrite کور نیست. برمی‌گرداند متن مرجع فعلی.
+  // ⭐ (A1.6، 2026-09-26) نسخه‌ی بعد از PUT از پاسخِ خودِ سرور خوانده می‌شود، نه ++ِ محلی — هر نویسنده‌ی دیگری
+  // (merge batch، legacy) که بینِ دو ذخیره نسخه را بالا برده باشد، دیگر حدسِ ما را به‌هم نمی‌ریزد.
+  function applyPutVersion(self, r) {
+    var v = r && r.session && r.session.transcript_version;
+    self.baseVersion = (typeof v === 'number') ? v : self.baseVersion + 1;
+  }
+  var UNSYNCED_TAIL_LABEL = '[متنِ زنده‌ای که هم‌زمان با تغییرِ دیگری ذخیره نشده بود]';
+
   RTSession.prototype.persistConfirmed = function () {
     var self = this;
     if (!self.persist) return Promise.resolve(self.confirmed);
     var text = cleanText(self.confirmed);
-    return reqJson('/api/sessions/' + self.sessionId, {
-      method: 'PUT',
-      body: { transcript: text, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' },
-      timeoutMs: TRANSCRIPT_PUT_TIMEOUT_MS
-    }).then(function () {
-      self.baseVersion++;
-      self.persistedText = text;
-      return text;
-    }).catch(function (err) {
+    var putAt = Date.now();
+    var put = function (t) {
+      return reqJson('/api/sessions/' + self.sessionId, {
+        method: 'PUT',
+        body: { transcript: t, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' },
+        timeoutMs: TRANSCRIPT_PUT_TIMEOUT_MS
+      }).then(function (r) {
+        applyPutVersion(self, r);
+        self.persistedText = t;
+        self.lastPersistOkAt = putAt;
+        return t;
+      });
+    };
+    return put(text).catch(function (err) {
       if (err && err.status === 409) {
         // نسخه جدیدتر آمده — تازه‌سازی و rebase (متن طولانی‌تر برنده است)
         return reqJson('/api/sessions/' + self.sessionId).then(function (r) {
@@ -1257,38 +1339,86 @@
           // ⭐ (2026-09-26) PUTی که سمتِ مرورگر timeout خورده ولی سرور اعمالش کرده: متنِ سرور پیشوندِ
           // متنِ فعلیِ ماست. شاخه‌ی merge پایین دُمِ «جدید از base» را دوباره پشتِ آن می‌چسباند (تکرارِ متن)؛
           // اینجا متنِ ما همه‌ی متنِ سرور را دارد، پس همان را با نسخه‌ی تازه می‌نویسیم.
-          if (serverText.length > base.length && nowText.indexOf(serverText) === 0) {
-            return reqJson('/api/sessions/' + self.sessionId, {
-              method: 'PUT',
-              body: { transcript: nowText, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' },
-              timeoutMs: TRANSCRIPT_PUT_TIMEOUT_MS
-            }).then(function () { self.baseVersion++; self.persistedText = nowText; return nowText; });
-          }
-          if (serverText.length > base.length && serverText.indexOf(base) === 0 && nowText.indexOf(base) === 0) {
-            var tail = nowText.slice(base.length).replace(/^\s+/, '');
-            self.confirmed = serverText + (tail ? '\n\n' + tail : '');
-            self.curSpeaker = null; // بعد از بلوکِ batch، گفته‌ی بعدی دوباره برچسبِ گوینده بگیرد
-            var merged = cleanText(self.confirmed);
-            return reqJson('/api/sessions/' + self.sessionId, {
-              method: 'PUT',
-              body: { transcript: merged, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' },
-              timeoutMs: TRANSCRIPT_PUT_TIMEOUT_MS
-            }).then(function () { self.baseVersion++; self.persistedText = merged; return merged; });
-          }
-          if (serverText.length >= text.length) {
-            if (serverText.length > self.confirmed.length) self.confirmed = serverText;
+          if (serverText === nowText) {
             self.persistedText = serverText;
             return serverText;
           }
-          // سرور کوتاه‌تر است (مثلاً قدیمی) — یک بار با نسخه تازه تلاش کن
-          return reqJson('/api/sessions/' + self.sessionId, {
-            method: 'PUT',
-            body: { transcript: text, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' },
-            timeoutMs: TRANSCRIPT_PUT_TIMEOUT_MS
-          }).then(function () { self.baseVersion++; self.persistedText = text; return text; });
+          // ⭐ (A1.6) هر شاخه‌ای که متنِ ما را می‌نویسد فقط وقتی مجاز است که متنِ ما کلِ متنِ سرور را در بر
+          // داشته باشد؛ قبلاً «سرور کوتاه‌تر است» کورکورانه overwrite می‌کرد (متنِ batch/legacyِ سرور گم می‌شد).
+          if (nowText.indexOf(serverText) === 0) return put(nowText);
+          var tail;
+          // (A2) سرور placeholderِ بازه‌ی قطعی را درجا با متنِ بازیابی‌شده پر کرده ⇒ متنِ سرور + دُمِ تازه‌ی ما.
+          if (nowText.indexOf(base) === 0 && serverFilledPlaceholders(base, serverText)) {
+            self.confirmed = serverText + dropResolvedPlaceholders(nowText.slice(base.length), serverText);
+            return put(cleanText(self.confirmed));
+          }
+          if (serverText.length > base.length && serverText.indexOf(base) === 0 && nowText.indexOf(base) === 0) {
+            tail = dropResolvedPlaceholders(nowText.slice(base.length), serverText).replace(/^\s+/, '');
+            self.confirmed = serverText + (tail ? '\n\n' + tail : '');
+            self.curSpeaker = null; // بعد از بلوکِ batch، گفته‌ی بعدی دوباره برچسبِ گوینده بگیرد
+            return put(cleanText(self.confirmed));
+          }
+          // متنِ سرور همه‌ی متنِ ما را دارد — چیزی از دست نمی‌رود.
+          if (serverText.indexOf(nowText) >= 0) {
+            self.confirmed = serverText;
+            self.persistedText = serverText;
+            return serverText;
+          }
+          // ⭐ (A1.6) واگرایی: هیچ‌کدام دیگری را در بر ندارد. قبلاً اگر سرور بلندتر بود متنِ محلیِ ذخیره‌نشده
+          // دور ریخته می‌شد. حالا دُمِ ذخیره‌نشده‌ی ما با برچسبِ صریح پشتِ متنِ سرور می‌آید؛ هیچ طرفی حذف نمی‌شود.
+          tail = dropResolvedPlaceholders(base && nowText.indexOf(base) === 0 ? nowText.slice(base.length) : nowText, serverText).replace(/^\s+/, '');
+          if (!tail) {
+            self.confirmed = serverText;
+            self.persistedText = serverText;
+            return serverText;
+          }
+          obsEvent('rt.transcript_diverged', { len: nowText.length, chars: serverText.length }, self);
+          self.confirmed = serverText + '\n\n' + UNSYNCED_TAIL_LABEL + '\n' + tail;
+          self.curSpeaker = null;
+          return put(cleanText(self.confirmed));
         });
       }
       throw err;
+    });
+  };
+
+  // ⭐ (audit ذخیره‌سازی 2026-09-26): اگر تراپیست «پایان» نزند و تب را ببندد/رفرش کند/گوشی قفل شود،
+  // متنِ تأییدشده‌ی بعد از آخرین autosave (تا ۱۵ث) فقط در RAM بود و گم می‌شد — ادمین متنِ ناقص می‌دید.
+  // hidden → PUTِ عادیِ فوری (همان CASِ persistConfirmed)؛ pagehide → PUTِ keepalive (مرورگر بعد از بستنِ
+  // صفحه هم می‌فرستد؛ سقفِ بدنه‌ی keepalive ~۶۴KB است، متنِ بزرگ‌تر به همان flushِ hidden تکیه دارد).
+  // پاسخِ keepalive دیده نمی‌شود؛ اگر صفحه برگردد، 409ِ بعدی با شاخه‌ی «متنِ سرور پیشوندِ ماست» حل می‌شود.
+  var KEEPALIVE_MAX_BYTES = 60000;
+  RTSession.prototype.flushTranscriptNow = function (onUnload) {
+    var self = this;
+    if (!self.persist || self.aborted || self.state === STATES.COMPLETED || self.state === STATES.CANCELED || self.state === STATES.IDLE) return;
+    var text = cleanText(self.confirmed);
+    if (!text || text === self.persistedText) return;
+    if (onUnload) {
+      var body = { transcript: text, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' };
+      var byteSize = function (o) {
+        try { return new Blob([JSON.stringify(o)]).size; } catch (e) { return JSON.stringify(o).length * 3; }
+      };
+      if (byteSize(body) > KEEPALIVE_MAX_BYTES) {
+        // ⭐ (A5، 2026-09-26) متنِ بلند: فقط دُمِ ذخیره‌نشده، با CAS رویِ همان نسخه‌ای که persistedText مالِ آن است.
+        var base = self.persistedText || '';
+        if (!base || text.indexOf(base) !== 0) return;
+        var tailBody = { base_version: self.baseVersion, tail: text.slice(base.length) };
+        if (!tailBody.tail || byteSize(tailBody) > KEEPALIVE_MAX_BYTES) return;
+        try { reqJson('/api/sessions/' + self.sessionId + '/transcript-tail', { method: 'POST', body: tailBody, keepalive: true }).catch(function () {}); } catch (e) {}
+        return;
+      }
+      try { reqJson('/api/sessions/' + self.sessionId, { method: 'PUT', body: body, keepalive: true }).catch(function () {}); } catch (e) {}
+      return;
+    }
+    if (self.autosaveInFlight) return;
+    self.dirty = false;
+    self.autosaveInFlight = true;
+    self.lastAutosaveAt = Date.now();
+    self.persistConfirmed().then(function () {
+      self.autosaveInFlight = false;
+    }).catch(function () {
+      self.autosaveInFlight = false;
+      self.dirty = true;
     });
   };
 
@@ -1416,6 +1546,50 @@
     });
   };
 
+  // ⭐ (A1.4، 2026-09-26) ذخیره‌ی نهاییِ متن در finish قبلاً یک بار امتحان می‌شد و خطایش بلعیده می‌شد —
+  // دُمِ متنِ بعد از آخرین autosave (تا ۱۵ث، یا بیشتر اگر autosaveها هم شکست خورده بودند) بی‌صدا گم می‌شد.
+  // حالا چند بار با فاصله؛ اگر باز ناموفق بود، سگمنت‌هایِ archiveِ همین run که بعد از آخرین ذخیره‌ی موفق
+  // بسته شده‌اند به 'transcript' برمی‌گردند تا همان بازه از رویِ صدا رونویسی شود. برمی‌گرداند {ok, text}.
+  // SAFETY_MS: متنِ زنده چند ثانیه از صدا عقب است؛ سگمنتی که کمی بعد از آخرین ذخیره بسته شده ممکن است
+  // حاویِ گفتارِ ذخیره‌نشده باشد. تکرارِ جزئی (با برچسبِ batch) بر گم‌شدن ترجیح دارد.
+  var UNSAVED_SEGMENT_SAFETY_MS = 3000;
+  RTSession.prototype.persistFinal = function () {
+    var self = this;
+    if (!self.persist) return Promise.resolve({ ok: true, text: cleanText(self.confirmed) });
+    var i = 0;
+    var attempt = function () {
+      return new Promise(function (res) { setTimeout(res, FINAL_PERSIST_DELAYS_MS[i] || 0); }).then(function () {
+        return self.persistConfirmed();
+      }).then(function (t) { return { ok: true, text: t }; }, function () {
+        i++;
+        if (i < FINAL_PERSIST_DELAYS_MS.length && !self.aborted) return attempt();
+        // چیزی ذخیره‌نشده نمانده (مثلاً فقط PUTِ تکراریِ همان متن شکست خورد) — نیازی به رونویسیِ دوباره نیست.
+        if (cleanText(self.confirmed) === self.persistedText) return { ok: true, text: self.persistedText };
+        return self.requeueUnsavedAudio().then(function (n) {
+          obsEvent('rt.final_persist_failed', { attempts: i, count: n }, self);
+          return { ok: false, text: cleanText(self.confirmed) };
+        });
+      });
+    };
+    return attempt();
+  };
+
+  // سگمنت‌هایِ archiveِ همین run که بعد از آخرین ذخیره‌ی موفقِ متن بسته شده‌اند → intent='transcript'.
+  // برمی‌گرداند تعدادِ سگمنت‌هایِ برگشته. سگمنت‌هایی که قبلاً (drainِ ۶۰ثانیه‌ای) آرشیو شده‌اند دیگر در صف نیستند.
+  RTSession.prototype.requeueUnsavedAudio = function () {
+    var self = this;
+    var since = (self.lastPersistOkAt || 0) - UNSAVED_SEGMENT_SAFETY_MS;
+    return withAudioLock(self.sessionId, function () {
+      return AudioQueueDB.listForSession(self.sessionId).then(function (rows) {
+        var hit = rows.filter(function (r) {
+          return r.runId === self.runId && (r.intent || 'archive') === 'archive' && (r.createdAt || 0) >= since;
+        });
+        return Promise.all(hit.map(function (r) { return AudioQueueDB.retag(r, 'transcript').catch(function () {}); }))
+          .then(function () { return hit.length; });
+      });
+    }).catch(function () { return 0; });
+  };
+
   // finish رویدادمحور: توقف ورودی → finalize → انتظار finished/timeout صریح →
   // تعیین reliability → persist → در صورت نیاز آپلود batch (بدون انتظار برای drain) → COMPLETED.
   // ISSUE 1: در ابتدای finalize، epoch باطل می‌شود تا mint/WS دیررسیده نتواند resurrection کند.
@@ -1469,8 +1643,19 @@
         var realtimeText = cleanText(self.confirmed);
         if (!self.unreliable) {
           // مسیر موفق: persist نهایی و تمام
-          var p = self.persist ? self.persistConfirmed().catch(function () { return realtimeText; }) : Promise.resolve(realtimeText);
-          return p.then(function (saved) {
+          return self.persistFinal().then(function (fr) {
+            var saved = fr.text || realtimeText;
+            if (self.persist && !fr.ok) {
+              // (A1.4) متن نهایی ذخیره نشد — بازه‌ی ذخیره‌نشده از رویِ صدا بازیابی می‌شود؛ صادقانه reliable:false.
+              reqJson('/api/sessions/' + self.sessionId, {
+                method: 'PUT', body: { realtime_reliable: false, stt_mode: 'batch-pending' }
+              }).catch(function () {});
+              self.archiveQueuedAudioOnly(); // هر سگمنت به intentِ خودش — برگشته‌ها با purpose=transcript
+              self.cleanupAudio();
+              self.unwatchOnline();
+              self.setState(STATES.COMPLETED);
+              return { text: saved, reliable: false, mode: 'batch-pending' };
+            }
             if (self.persist) {
               reqJson('/api/sessions/' + self.sessionId, {
                 method: 'PUT', body: { realtime_reliable: true, stt_mode: 'realtime' }
@@ -1493,8 +1678,8 @@
         // مسیر unreliable → اول متن realtime به‌عنوان پایه persist شود (CAS)، بعد سگمنت‌ها
         // آپلود شوند؛ COMPLETED بلافاصله برمی‌گردد و drain در پس‌زمینه است (ISSUE 2).
         // merge سمت سرور همیشه به متنِ فعلی append می‌کنه (نه جایگزین) — باگِ قبلی همین‌جا بود.
-        var baseP = self.persist ? self.persistConfirmed().catch(function () { return realtimeText; }) : Promise.resolve(realtimeText);
-        return baseP.then(function () {
+        // (A1.4) همان retry؛ در شکستِ نهایی سگمنت‌هایِ archiveِ بعد از آخرین ذخیره هم رونویسی می‌شوند.
+        return self.persistFinal().then(function () {
           return self.uploadBatchSegments().then(function () {
             if (self.persist) {
               // وضعیت صادقانه: realtime غیرقابل‌اعتماد، batch در صف (تخلیه در پس‌زمینه)
@@ -1708,8 +1893,11 @@
     // سگمنت‌های durable (هم RAM هم IndexedDB) دور ریخته می‌شوند — abort یعنی این
     // جلسه اصلاً ذخیره نمی‌شه، پس نسخه‌ی پشتیبانِ صداش هم دیگه لازم نیست. زیرِ همون
     // قفلِ سراسری تا با sweep/drainِ هم‌زمانِ همین sessionId تداخل نکنه.
+    // ⭐ (A1.1) فقط سگمنت‌هایِ همین run — نه صدایِ آپلودنشده‌ی runهایِ دیگرِ همین جلسه (مثلاً لغوِ یادداشتِ
+    // صوتی وسطِ جلسه‌ای که صفِ قطعی دارد). رکوردهایِ runهایِ دیگر را sweep/drainِ خودشان آپلود می‌کنند.
     var sid = this.sessionId;
-    withAudioLock(sid, function () { return AudioQueueDB.clearForSession(sid); });
+    var rid = this.runId;
+    withAudioLock(sid, function () { return AudioQueueDB.clearForRun(sid, rid); });
     if (this.state !== STATES.COMPLETED) this.setState(STATES.CANCELED);
   };
 
@@ -1796,16 +1984,26 @@
               s.stream && s.stream.active) {
             s.startDurable();
           }
+          // (audit ذخیره‌سازی 2026-09-26) صدایِ صف‌شده را همین حالا به سرور بفرست — اگر تراپیست
+          // دیگر برنگردد، صدا فقط در IndexedDBِ همین مرورگر می‌ماند و به آرشیوِ ادمین نمی‌رسید.
+          if (!s.aborted && s.persist && s.state !== STATES.COMPLETED && s.state !== STATES.CANCELED) {
+            try { s.drainQueuedAudioInBackground(); } catch (e) {}
+          }
         });
       } catch (e) {}
     });
   }
+  function flushAllTranscripts(onUnload) {
+    live.forEach(function (s) {
+      try { s.flushTranscriptNow(onUnload); } catch (e) {}
+    });
+  }
   try {
     document.addEventListener('visibilitychange', function () {
-      if (document.visibilityState === 'hidden') flushAllDurable();
+      if (document.visibilityState === 'hidden') { flushAllTranscripts(false); flushAllDurable(); }
       else if (document.visibilityState === 'visible') syncWakeLock();
     });
-    window.addEventListener('pagehide', function () { flushAllDurable(); });
+    window.addEventListener('pagehide', function () { flushAllTranscripts(true); flushAllDurable(); });
   } catch (e) {}
 
   // ————————————————— هشدارِ کیفیتِ ضبط (2026-09-26) —————————————————
@@ -1884,6 +2082,11 @@
     // ⭐ قفلِ سراسریِ صف/session (audit صدا/۲۰۲۶-۰۹-۱۶) — sweepOrphanedAudioQueueِ index.html
     // باید همین قفل را بگیرد، وگرنه ممکن است با درایني‌کردنِ همزمانِ RTSession رویِ همون
     // sessionId تداخل کند (رجوع به تعریفِ withAudioLock بالای همین فایل).
-    withAudioLock: withAudioLock
+    withAudioLock: withAudioLock,
+    // فقط برایِ scripts/rt-harness.cjs — کوتاه‌کردنِ timeoutهایِ طولانی در تست.
+    _setTestTimeouts: function (o) {
+      if (o && typeof o.segmentUploadMs === 'number') SEGMENT_UPLOAD_TIMEOUT_MS = o.segmentUploadMs;
+      if (o && Array.isArray(o.finalPersistDelaysMs)) FINAL_PERSIST_DELAYS_MS = o.finalPersistDelaysMs;
+    }
   };
 })();

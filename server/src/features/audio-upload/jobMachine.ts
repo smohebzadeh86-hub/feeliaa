@@ -82,8 +82,9 @@ export interface SonioxPort {
   createTranscription(fileId: string, clientReferenceId: string): Promise<string>;
   poll(transcriptionId: string): Promise<{ status: string; error_message?: string; notFound?: boolean }>;
   getText(transcriptionId: string): Promise<string>;
-  deleteTranscription(id: string): Promise<void>;
-  deleteFile(id: string): Promise<void>;
+  // true/undefined = حذف شد؛ false = حذف ناموفق (شناسه نگه داشته می‌شود — A4)
+  deleteTranscription(id: string): Promise<boolean | void>;
+  deleteFile(id: string): Promise<boolean | void>;
 }
 
 export interface MediaPort {
@@ -167,12 +168,15 @@ export async function giveUpJob(job: AudioJob, deps: JobDeps, code: string): Pro
 export async function cleanupRemote(job: AudioJob, deps: JobDeps): Promise<void> {
   const tid = job.sonioxTranscriptionId;
   const fid = job.sonioxFileId;
-  if (tid) await deps.soniox.deleteTranscription(tid).catch(() => {});
-  if (fid) await deps.soniox.deleteFile(fid).catch(() => {});
+  // ⭐ (A4، 2026-09-26) شناسه فقط وقتی پاک می‌شود که حذف واقعاً موفق بود؛ شناسه‌ی حذف‌نشده روی job می‌ماند و
+  // sweepSonioxOrphans (که حالا jobهایِ done/failed را «زنده» حساب نمی‌کند) بعداً آن را پاک می‌کند.
+  const tOk = tid ? (await deps.soniox.deleteTranscription(tid).catch(() => false)) !== false : true;
+  const fOk = fid ? (await deps.soniox.deleteFile(fid).catch(() => false)) !== false : true;
   if (tid || fid) {
-    job.sonioxTranscriptionId = null;
-    job.sonioxFileId = null;
-    await deps.store.update(job, { sonioxTranscriptionId: null, sonioxFileId: null, transcriptionStartedAt: null });
+    const patch: Record<string, null> = { transcriptionStartedAt: null };
+    if (tid && tOk) { job.sonioxTranscriptionId = null; patch.sonioxTranscriptionId = null; }
+    if (fid && fOk) { job.sonioxFileId = null; patch.sonioxFileId = null; }
+    await deps.store.update(job, patch as any);
   }
 }
 

@@ -185,7 +185,7 @@ export function logUiEvents(events: ObsUiEventInput[]): void {
         maybeLogOverflow();
         continue;
       }
-      uiQueue.push({
+      const uiRow = {
         ts: now,
         client_ts: e.clientTs ?? null,
         therapist_id: e.therapistId ?? null,
@@ -198,7 +198,11 @@ export function logUiEvents(events: ObsUiEventInput[]): void {
         target_role: clampStr(e.targetRole ?? null, 32),
         target_tag: clampStr(e.targetTag ?? null, 16),
         value_num: clampNum(e.valueNum ?? null),
-      });
+      };
+      uiQueue.push(uiRow);
+      // ⭐ (A6، 2026-09-26) رویدادهایِ UI قبلاً فقط به DB می‌رفتند — وقتی DB پایین بود (یا صف سرریز) هیچ ردی نمی‌ماند.
+      // حالا مثلِ logEvent در JSONL هم نوشته می‌شوند (فقط همان فیلدهایِ allowlistِ شده، بدونِ متن).
+      writeJsonl({ ...uiRow, ts: now.toISOString(), ui: true });
     }
     if (uiQueue.length >= IMMEDIATE_DRAIN_THRESHOLD) {
       void drainUi();

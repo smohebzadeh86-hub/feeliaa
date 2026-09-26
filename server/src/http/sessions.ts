@@ -25,6 +25,7 @@ import { hasStoredConsent, recordClientConsent } from './clientConsent.js';
 // خودکارسازیِ تولیدِ پرونده بعدِ پایانِ کاملِ جلسه (فازِ ۲ِ Module 08) — سیاستِ مرکزی حالا در
 // features/case-file/application/autoTrigger.ts است (jobِ آپلودِ صدا هم از همان استفاده می‌کند).
 import { maybeAutoGenerateCaseFile } from '../features/case-file/application/autoTrigger.js';
+import { recordAudit } from '../obs/audit.js';
 // ⭐ پردازش صدا در background — با API واقعیِ async (stt-async-v5)، نه وانمودِ
 // زنده‌بودن رویِ موتورِ realtime (که طبقِ docsِ Soniox دقتِ تشخیصِ گوینده‌ی پایین‌تری داره)
 // ⭐ باگِ واقعیِ کشف‌شده (2026-09-18): برایِ جلسه‌ی دستی/آرشیو، auto-generate رویِ لحظه‌ی
@@ -335,9 +336,28 @@ export async function sessionRoutes(app: FastifyInstance) {
       updates.push(`duration_ms = ?`);
       values.push(body.duration_ms);
     }
+    let reopened = false;
     if (body.status !== undefined) {
+      // ⭐ (A5، 2026-09-26) قبلاً هر رشته‌ای پذیرفته و هر انتقالی مجاز بود (مثلاً completed → in_progress با یک
+      // PUTِ دیررسیده از تبِ دیگر). حالا فقط statusهایِ شناخته‌شده؛ completed/canceled نهایی‌اند، جز جلسه‌ای که
+      // worker خودکار بسته (auto_closed_at) و تراپیست ادامه‌اش می‌دهد (A3).
+      const ALLOWED_STATUS = ['in_progress', 'recovered', 'completed', 'canceled'];
+      if (!ALLOWED_STATUS.includes(body.status)) {
+        reply.code(400);
+        return { error: 'وضعیتِ جلسه نامعتبر است', code: 'invalid-status' };
+      }
+      const cur = String(owned.status || '');
+      if (cur !== body.status) {
+        reopened = cur === 'completed' && body.status === 'in_progress' && !!owned.auto_closed_at;
+        const open = cur === 'in_progress' || cur === 'recovered';
+        if (!open && !reopened) {
+          reply.code(409);
+          return { error: 'این جلسه پایان یافته و قابلِ تغییرِ وضعیت نیست', code: 'invalid-transition', status: cur };
+        }
+      }
       updates.push(`status = ?`);
       values.push(body.status);
+      if (reopened) updates.push(`auto_closed_at = NULL`);
     }
     if (body.date !== undefined) {
       const dateIsEmpty = body.date === null || (typeof body.date === 'string' && body.date.trim() === '');
@@ -415,6 +435,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     }
 
     const result = await query('SELECT * FROM sessions WHERE id = ?', [id]);
+    if (reopened) logEvent({ event: 'session.reopened', sessionId: id, therapistId: request.therapistId });
     if (body.status === 'completed') {
       // fire-and-forget — پایانِ کاملِ جلسه (زنده یا دستی) یکی از دو نقطه‌ی تریگرِ
       // auto-generate است؛ نقطه‌ی دیگر ساختِ جلسه‌ی دستی در بالاست.
@@ -450,6 +471,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     deleteSessionAudioDirs([id]);
     releaseSonioxRefs(sonioxRefs);
     logEvent({ event: 'session.deleted', sessionId: id, therapistId: request.therapistId });
+    await recordAudit({ actorId: request.therapistId, action: 'therapist.session_delete', targetType: 'session', targetId: id });
 
     return { deleted: id };
   });
@@ -682,6 +704,38 @@ export async function sessionRoutes(app: FastifyInstance) {
     return { status: 'retrying', purpose };
   });
 
+  // ===== (A5، 2026-09-26) ذخیره‌ی فقط دُمِ متن هنگامِ بستنِ صفحه =====
+  // PUTِ keepaliveِ مرورگر سقفِ ~۶۴KB دارد؛ برایِ جلسه‌ی طولانی (متنِ > ۶۰KB) flushِ pagehide قبلاً هیچ کاری نمی‌کرد و دُمِ
+  // متنِ بعد از آخرین autosave گم می‌شد. اینجا فقط دُم با CAS رویِ transcript_version به انتهایِ متنِ همان نسخه اضافه می‌شود.
+  const MAX_TAIL_CHARS = 60000;
+  app.post('/api/sessions/:id/transcript-tail', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = (request.body || {}) as { base_version?: number; tail?: string };
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+    if (typeof body.base_version !== 'number' || typeof body.tail !== 'string' || !body.tail || body.tail.length > MAX_TAIL_CHARS) {
+      reply.code(400);
+      return { error: 'درخواستِ نامعتبر', code: 'bad-tail' };
+    }
+    const u = await query(
+      `UPDATE sessions SET transcript = CONCAT(COALESCE(transcript, ''), ?), transcript_version = transcript_version + 1, updated_at = NOW()
+        WHERE id = ? AND transcript_version = ?`,
+      [body.tail, id, body.base_version]
+    );
+    if (u.rowCount !== 1) {
+      const cur = await query('SELECT transcript_version FROM sessions WHERE id = ?', [id]);
+      logEvent({ event: 'session.transcript_conflict', sessionId: id, therapistId: request.therapistId, severity: 'warn', detail: { version: body.base_version, prev_version: cur.rows[0]?.transcript_version, source: 'tail' } });
+      reply.code(409);
+      return { error: 'نسخه‌ی transcript قدیمی است', code: 'version-conflict', current_version: cur.rows[0]?.transcript_version };
+    }
+    logEvent({ event: 'session.transcript_put', sessionId: id, therapistId: request.therapistId, detail: { len: body.tail.length, version: body.base_version, source: 'tail' } });
+    const r = await query('SELECT transcript_version FROM sessions WHERE id = ?', [id]);
+    return { ok: true, transcript_version: r.rows[0]?.transcript_version };
+  });
+
   // ===== بازسازیِ اختیاریِ شماره‌گذاریِ گوینده‌ها =====
   // فقط با کلیکِ صریحِ تراپیست (نه خودکار) — چون رونویسیِ دوباره چند دقیقه طول
   // می‌کشه و هزینه‌ی Soniox داره؛ خیلی از جلسات اصلاً نیازش نیست.
@@ -698,7 +752,8 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'فقط برایِ جلساتِ پایان‌یافته ممکن است' };
     }
     const audio = await listSessionAudio(id);
-    if (!audio.length) {
+    // (A1.7) فقط صدایِ خودِ جلسه — یادداشتِ صوتی (kind='note') هرگز واردِ متنِ جلسه نمی‌شود (LAW-008).
+    if (!audio.some((a) => a.kind === 'session')) {
       reply.code(400);
       return { error: 'صدایی برایِ این جلسه آرشیو نشده — این قابلیت در دسترس نیست' };
     }

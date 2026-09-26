@@ -129,7 +129,8 @@ export async function sweepOrphanUploadDirs(): Promise<void> {
 
 // آپلودِ نیمه‌کاره‌ی رهاشده (> ۷ روز) ⇒ canceled + حذفِ تکه‌ها. آپلودِ complete شده‌ای که پوشه‌اش
 // هنوز مانده و jobش تمام شده/شکست خورده و از ۱۴ روز گذشته ⇒ حذفِ فایلِ منبع (سقفِ LAW-010).
-export async function sweepStaleUploads(): Promise<void> {
+// finalizeGroup: از uploads.routes.ts (tryFinalizeGroup) تزریق می‌شود تا import حلقوی نشود.
+export async function sweepStaleUploads(finalizeGroup?: (groupId: string, therapistId: string) => Promise<boolean>): Promise<void> {
   try {
     const stale = await query(
       `SELECT id FROM audio_uploads WHERE status = 'uploading' AND updated_at < (NOW() - INTERVAL ? SECOND)`,
@@ -138,6 +139,23 @@ export async function sweepStaleUploads(): Promise<void> {
     for (const row of stale.rows) {
       await query(`UPDATE audio_uploads SET status = 'canceled', error_code = 'expired' WHERE id = ? AND status = 'uploading'`, [row.id]);
       removeUploadDir(row.id);
+    }
+    // ⭐ (A1.3، 2026-09-26) گروهی که همه‌ی بخش‌هایش رسیده ولی جلسه‌اش ساخته نشد (مثلاً خطایِ DB وسطِ finalize)
+    // قبلاً فقط منتظر می‌ماند و بعد از ۷ روز حذف می‌شد. حالا هر دورِ sweep دوباره finalize می‌شود؛
+    // finalizeGroup خودش گروهِ ناقص را «waiting» برمی‌گرداند و به آن دست نمی‌زند.
+    if (finalizeGroup) {
+      const groups = await query(
+        `SELECT DISTINCT group_id, therapist_id FROM audio_uploads
+          WHERE status = 'complete' AND session_id IS NULL AND group_id IS NOT NULL
+            AND updated_at < (NOW() - INTERVAL 10 MINUTE)`
+      );
+      for (const g of groups.rows) {
+        try {
+          if (await finalizeGroup(g.group_id, g.therapist_id)) console.log(`[upload] finalized stuck group ${g.group_id}`);
+        } catch (e) {
+          console.log('[upload] stuck group finalize failed:', String(e).slice(0, 160));
+        }
+      }
     }
     // چندبخشی (migration 025): بخشِ رسیده‌ای که جلسه‌اش هرگز ساخته نشد (بخشِ دیگرش رها/لغو شد) — همان ۷ روز.
     const waiting = await query(

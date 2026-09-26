@@ -325,6 +325,7 @@ input::-ms-reveal{display:none}
 .signs-log{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;min-height:8px}
 .sign-log-item{display:inline-flex;align-items:center;gap:6px;background:var(--gold-soft);border-radius:99px;padding:4px 6px 4px 12px;font-size:12px;font-weight:600;color:var(--gold-deep)}
 .sign-log-item .sign-log-time{color:var(--muted);font-size:10px;font-weight:400;direction:ltr}
+.unsaved-mark{color:var(--clay-deep);font-size:10.5px;font-weight:600;white-space:nowrap}
 .sign-log-item .sign-rm{background:none;border:none;color:var(--gold-deep);cursor:pointer;padding:0 4px;display:grid;place-items:center;opacity:.55;transition:opacity .15s}
 .sign-log-item .sign-rm:hover{opacity:1}
 .sign-log-item .sign-rm svg{width:11px;height:11px}
@@ -724,6 +725,47 @@ input::-ms-reveal{display:none}
 .session-status.processing{background:var(--gold-soft);color:var(--gold-deep)}
 .session-status.failed{background:var(--clay-soft);color:var(--clay-deep)}
 #uploadJobPanel{margin-bottom:14px}
+
+/* ===== پوسته‌ی پنلِ ادمین (B1، 2026-09-26): sidebarِ راست رویِ دسکتاپ، tab barِ بالا رویِ موبایل؛ فقط توکن‌هایِ موجود ===== */
+body.admin-mode .wrap{max-width:1120px;display:grid;grid-template-columns:224px minmax(0,1fr);column-gap:20px;align-items:start}
+body.admin-mode .wrap>*{grid-column:1/-1}
+body.admin-mode .wrap>.screen{grid-column:2}
+body.admin-mode .wrap>.admin-nav{grid-column:1}
+.admin-nav{display:flex;flex-direction:column;gap:3px;position:sticky;top:16px;background:var(--card);border:1px solid var(--line-soft);border-radius:var(--r-lg);padding:10px;box-shadow:var(--shadow)}
+.admin-nav-title{font-size:11px;font-weight:700;color:var(--muted);padding:2px 10px 8px}
+.admin-nav-item{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;color:var(--ink-2);font:inherit;font-size:13.5px;font-weight:600;padding:9px 10px;border-radius:var(--r-sm);cursor:pointer;text-align:right;line-height:1.5}
+.admin-nav-item svg{width:18px;height:18px;flex:none}
+.admin-nav-item:hover{background:var(--sage-mist);color:var(--sage-deep)}
+.admin-nav-item.active{background:var(--sage-soft);color:var(--sage-deep)}
+.admin-nav-sep{height:1px;background:var(--line-soft);margin:6px 4px}
+@media (max-width:760px){
+  body.admin-mode .wrap{display:block}
+  .admin-nav{flex-direction:row;overflow-x:auto;position:static;margin-bottom:14px;padding:6px;gap:6px;scrollbar-width:none}
+  .admin-nav::-webkit-scrollbar{display:none}
+  .admin-nav-title,.admin-nav-sep{display:none}
+  .admin-nav-item{white-space:nowrap;width:auto;flex:none;font-size:12.5px;padding:8px 12px}
+}
+.admin-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;margin-bottom:18px}
+.stat-tile{padding:14px 10px;text-align:center;margin:0}
+.stat-tile .v{font-size:21px;font-weight:800;color:var(--sage-deep);line-height:1.4}
+.stat-tile .l{font-size:11.5px;color:var(--muted);margin-top:4px}
+.stat-tile.warn .v{color:var(--gold-deep)}
+.adm-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;border-radius:99px;padding:1px 9px;line-height:1.9}
+.adm-badge.ok{background:var(--sage-soft);color:var(--sage-deep)}
+.adm-badge.warn{background:var(--gold-soft);color:var(--gold-deep)}
+.adm-badge.bad{background:var(--clay-soft);color:var(--clay-deep)}
+.admin-row{padding:14px 16px;margin-bottom:10px;border-radius:var(--r-lg)}
+.admin-row-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.admin-row-title{font-weight:700;font-size:14px;color:var(--ink)}
+.admin-row-badges{display:flex;gap:6px;flex-wrap:wrap}
+.admin-row-meta{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.9}
+.admin-row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.admin-row audio{width:100%;margin-top:10px;display:block}
+.admin-filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.admin-filters select{font-family:inherit;font-size:13px;padding:8px 12px;border:1.5px solid var(--line);border-radius:var(--r-md);background:var(--field);color:var(--ink);min-width:150px}
+.admin-sub{font-size:12.5px;font-weight:700;color:var(--ink-2);margin:10px 0 4px}
+.vn-item{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line-soft);font-size:12.5px;color:var(--ink-2)}
+.vn-text{white-space:pre-wrap;background:var(--sage-mist);border-radius:var(--r-md);padding:10px 12px;margin-top:6px;font-size:13px;color:var(--ink);width:100%}
 </style>
 </head>
 <body>
@@ -773,6 +815,32 @@ input::-ms-reveal{display:none}
     <div class="step" id="step3"><span class="step-dot">۳</span><span class="step-label">پایان</span></div>
   </nav>
 
+  <!-- پوسته‌ی پنلِ ادمین (B1، 2026-09-26) — فقط رویِ صفحه‌هایِ Admin* نمایش داده می‌شود (showScreen) -->
+  <nav class="admin-nav" id="adminNav" aria-label="بخش‌هایِ پنلِ ادمین" data-clarity-mask="true" hidden>
+    <div class="admin-nav-title">پنلِ ادمین</div>
+    <button class="admin-nav-item" data-admin-nav="overview" onclick="openAdminPanel()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>
+      <span>نمایِ کلی و تراپیست‌ها</span>
+    </button>
+    <button class="admin-nav-item" data-admin-nav="activity" onclick="openAdminActivity()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      <span>فعالیت‌ها</span>
+    </button>
+    <button class="admin-nav-item" data-admin-nav="audio" onclick="openAdminAudio()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>
+      <span>آرشیوِ صدا</span>
+    </button>
+    <button class="admin-nav-item" data-admin-nav="voice" onclick="openAdminVoiceNotes()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg>
+      <span>یادداشت‌هایِ صوتی</span>
+    </button>
+    <div class="admin-nav-sep"></div>
+    <button class="admin-nav-item" onclick="closeAdminPanel()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+      <span>بازگشت به اپ</span>
+    </button>
+  </nav>
+
   <section id="screenAuth" class="card screen" data-clarity-mask="true">
     <div class="card-head">
       <h2 id="authTitle">ورود تراپیست</h2>
@@ -806,10 +874,7 @@ input::-ms-reveal{display:none}
       <h2>پنل ادمین</h2>
       <p>مدیریت تراپیست‌ها و دیتای سیستم</p>
     </div>
-    <div id="adminStats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px"></div>
-    <button class="btn btn-secondary btn-block" style="margin-bottom:8px" onclick="openAdminActivity()">
-      فعالیت‌ها / لاگ
-    </button>
+    <div id="adminStats" class="admin-stats"></div>
     <button class="btn btn-secondary btn-block" style="margin-bottom:16px" onclick="adminDownloadAll()">
       دانلود کاملِ دیتای سیستم
     </button>
@@ -850,6 +915,8 @@ input::-ms-reveal{display:none}
       <h2 id="adminSessionDetailTitle"></h2>
       <p id="adminSessionDetailMeta"></p>
     </div>
+    <!-- تشخیصِ جلسه (audit ذخیره‌سازی 2026-09-26): «چه اتفاقی افتاد؟» — GET /api/admin/sessions/:id/diagnosis -->
+    <div id="adminSessionDiagnosis" style="margin-bottom:14px"></div>
     <div class="transcript-box" id="adminSessionDetailTranscript"></div>
     <div id="adminSessionDetailNotes" style="margin-top:14px"></div>
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminSessionDetail()">بازگشت</button>
@@ -897,6 +964,46 @@ input::-ms-reveal{display:none}
       <div class="empty" id="adminObsEventsEmpty" hidden><p>رویدادی یافت نشد</p></div>
     </div>
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminActivity()">بازگشت</button>
+  </section>
+
+  <!-- B2 (2026-09-26): آرشیوِ صدا — جلسه‌به‌جلسه، فقط متادیتا؛ پخش/دانلود/حذف ممیزی می‌شوند (audit_log) -->
+  <section id="screenAdminAudio" class="card screen" data-clarity-mask="true" hidden>
+    <div class="card-head">
+      <h2>آرشیوِ صدا</h2>
+      <p id="adminAudioSubtitle">صدایِ جلسات فقط برایِ بازبینیِ فنی نگه داشته می‌شود و بعد از ۱۴ روز خودکار حذف می‌شود.</p>
+    </div>
+    <div id="adminAudioStats" class="admin-stats"></div>
+    <div class="admin-filters">
+      <select id="adminAudioTherapist" onchange="reloadAdminAudio()" aria-label="تراپیست"></select>
+      <select id="adminAudioPeriod" onchange="reloadAdminAudio()" aria-label="بازه‌ی زمانی">
+        <option value="">همه (۱۴ روزِ اخیر)</option>
+        <option value="1">۲۴ ساعتِ اخیر</option>
+        <option value="7">۷ روزِ اخیر</option>
+      </select>
+    </div>
+    <div id="adminAudioList"></div>
+    <div class="empty" id="adminAudioEmpty" hidden><p>صدایی در این بازه آرشیو نشده</p></div>
+    <button class="btn btn-ghost btn-block" id="adminAudioMore" style="margin-top:6px" onclick="loadAdminAudio(true)" hidden>بیشتر</button>
+  </section>
+
+  <!-- B3 (2026-09-26): یادداشت‌هایِ صوتی — متن فقط با کلیکِ صریح (تصمیمِ D2) و ممیزی‌شده -->
+  <section id="screenAdminVoiceNotes" class="card screen" data-clarity-mask="true" hidden>
+    <div class="card-head">
+      <h2>یادداشت‌هایِ صوتی</h2>
+      <p>یادداشت‌هایِ صوتیِ تراپیست‌ها و صدایِ آن‌ها. متن فقط با «نمایشِ متن» باز می‌شود و ثبت می‌شود چه کسی دیده است.</p>
+    </div>
+    <div class="admin-filters">
+      <select id="adminVnTherapist" onchange="reloadAdminVoiceNotes()" aria-label="تراپیست"></select>
+      <select id="adminVnPeriod" onchange="reloadAdminVoiceNotes()" aria-label="بازه‌ی زمانی">
+        <option value="">همه</option>
+        <option value="1">۲۴ ساعتِ اخیر</option>
+        <option value="7">۷ روزِ اخیر</option>
+        <option value="30">۳۰ روزِ اخیر</option>
+      </select>
+    </div>
+    <div id="adminVnList"></div>
+    <div class="empty" id="adminVnEmpty" hidden><p>یادداشتِ صوتی‌ای یافت نشد</p></div>
+    <button class="btn btn-ghost btn-block" id="adminVnMore" style="margin-top:6px" onclick="loadAdminVoiceNotes(true)" hidden>بیشتر</button>
   </section>
 
   <!-- تایم‌لاینِ یک جلسه (از رویِ کلیکِ ردیفِ «جلسات اخیر») -->
@@ -2293,11 +2400,28 @@ function updateSteps(idx){
     if(st){st.classList.toggle('active',(i-1)===idx);st.classList.toggle('done',(i-1)<idx);}
   }
 }
+// (B1) صفحه‌هایِ ادمین ⇒ کدام آیتمِ sidebar فعال است. AdminSessionDetail از چند جا باز می‌شود (adminDetailReturn).
+const ADMIN_SCREEN_NAV={Admin:'overview',AdminTherapist:'overview',AdminSessions:'overview',AdminSessionDetail:null,AdminActivity:'activity',AdminSessionTimeline:'activity',AdminAudio:'audio',AdminVoiceNotes:'voice'};
+let adminDetailReturn='sessions';
 function showScreen(name){
-  ['Auth','Clients','AllClients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions','AdminSessionDetail','AdminActivity','AdminSessionTimeline'].forEach(s=>{
+  ['Auth','Clients','AllClients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions','AdminSessionDetail','AdminActivity','AdminSessionTimeline','AdminAudio','AdminVoiceNotes'].forEach(s=>{
     const el=$('screen'+s);
     if(el)el.hidden=s!==name;
   });
+  const isAdminScreen=Object.prototype.hasOwnProperty.call(ADMIN_SCREEN_NAV,name);
+  document.body.classList.toggle('admin-mode',isAdminScreen);
+  const nav=$('adminNav');
+  if(nav){
+    nav.hidden=!isAdminScreen;
+    const sec=isAdminScreen?(ADMIN_SCREEN_NAV[name]||({audio:'audio',voice:'voice'}[adminDetailReturn])||'overview'):null;
+    nav.querySelectorAll('[data-admin-nav]').forEach(function(b){
+      const on=b.dataset.adminNav===sec;
+      b.classList.toggle('active',on);
+      if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');
+      // رویِ موبایل (tab barِ افقی) تبِ فعال باید دیده شود
+      if(on&&nav.scrollWidth>nav.clientWidth){try{b.scrollIntoView({block:'nearest',inline:'nearest'});}catch(e){}}
+    });
+  }
   // ⭐ صفحه‌ی «امروز» همیشه با وضعیتِ تازه باز می‌شود — بدونِ این، اگر کاربر در
   // صفحه‌ی «همه» تبِ غیرفعال را انتخاب کرده باشد و برگردد، clientTabِ سراسری هنوز
   // 'inactive' می‌ماند و دکمه‌ی «مراجع جدید»ِ همین صفحه (که از newClientTargetStatus
@@ -2350,6 +2474,137 @@ async function api(path,options={}){
   }
   return data;
 }
+
+// ===== صفِ محلیِ ذخیره‌ی علامت/یادداشت (A1.5، 2026-09-26) =====
+// قبلاً POSTِ ناموفقِ علامت/یادداشتِ سریع/متنِ یادداشتِ صوتی بلعیده می‌شد و UI «ثبت شد» نشان می‌داد —
+// داده فقط در RAMِ همین صفحه بود و با رفرش/بستن برایِ همیشه گم می‌شد (R15/UX-001). حالا شکستِ گذرا
+// (شبکه/timeout/5xx/401) در localStorage صف می‌شود، کنارِ آیتم «ذخیره نشده» نشان داده می‌شود و هر ۲۰ث،
+// رویِ online و در لودِ صفحه دوباره فرستاده می‌شود. خطایِ دائمی (400/404/413) صف نمی‌شود.
+// ⚠️ متنِ یادداشت تا ارسالِ موفق در localStorageِ همین مرورگر می‌ماند (مثلِ صدایِ صف‌شده در IndexedDB).
+const NOTE_OUTBOX_KEY='feelia_note_outbox';
+const noteOutboxLive={}; // qid → {local, onChange, item} — آیتم‌هایِ همین صفحه
+let noteOutboxBusy=false;
+function readNoteOutbox(){try{const v=JSON.parse(localStorage.getItem(NOTE_OUTBOX_KEY)||'[]');return Array.isArray(v)?v:[];}catch(e){return[];}}
+function writeNoteOutbox(list){try{localStorage.setItem(NOTE_OUTBOX_KEY,JSON.stringify(list));return true;}catch(e){return false;}}
+function isPermanentNoteError(e){return !!(e&&(e.status===400||e.status===404||e.status===413));}
+function dropNoteOutboxItem(qid){
+  writeNoteOutbox(readNoteOutbox().filter(function(it){return it.qid!==qid;}));
+  delete noteOutboxLive[qid];
+}
+// local: همان شیءِ نمایشی (sessionSigns/sessionNotes/wrapupNotes)؛ dbId/unsaved رویِ آن ست می‌شود.
+async function postNoteReliably(sessionId,body,local,onChange){
+  try{
+    const r=await api('/api/sessions/'+sessionId+'/notes',{method:'POST',body:body,timeoutMs:20000});
+    if(r&&r.note)local.dbId=r.note.id;
+    return true;
+  }catch(e){
+    if(isPermanentNoteError(e)){
+      local.unsaved='failed';if(onChange)onChange();
+      showBanner('error','ذخیره نشد: '+(e.message||'خطا'));
+      return false;
+    }
+    const qid='q'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+    const item={qid:qid,sessionId:sessionId,body:body,ts:Date.now()};
+    local.qid=qid;local.unsaved='pending';
+    noteOutboxLive[qid]={local:local,onChange:onChange,item:item};
+    const list=readNoteOutbox();list.push(item);
+    const stored=writeNoteOutbox(list);
+    if(onChange)onChange();
+    showBanner('warn',stored
+      ?'ذخیره نشد — اتصال را بررسی کنید؛ تا ثبتِ موفق در همین مرورگر نگه داشته و خودکار دوباره فرستاده می‌شود.'
+      :'ذخیره نشد و حافظه‌ی مرورگر هم در دسترس نیست — تا وقتی این صفحه باز است دوباره تلاش می‌شود.');
+    return false;
+  }
+}
+// حذفِ آیتمِ نمایشی: اگر هنوز در صف است، از صف هم برداشته می‌شود؛ اگر همین حالا در حالِ ارسال است،
+// بعد از ثبت حذف می‌شود (flushNoteOutbox).
+function forgetLocalNote(local){
+  if(!local)return;
+  local.removed=true;
+  if(local.dbId){api('/api/notes/'+local.dbId,{method:'DELETE'}).catch(function(){});return;}
+  if(local.qid&&!noteOutboxBusy)dropNoteOutboxItem(local.qid);
+}
+async function flushNoteOutbox(){
+  if(noteOutboxBusy)return;
+  noteOutboxBusy=true;
+  try{
+    const items=readNoteOutbox();
+    Object.keys(noteOutboxLive).forEach(function(q){
+      if(!items.some(function(it){return it.qid===q;}))items.push(noteOutboxLive[q].item);
+    });
+    for(const it of items){
+      const live=noteOutboxLive[it.qid];
+      if(live&&live.local.removed){dropNoteOutboxItem(it.qid);continue;}
+      let ok=false,drop=false,dbId=null;
+      try{
+        const r=await api('/api/sessions/'+it.sessionId+'/notes',{method:'POST',body:it.body,timeoutMs:20000});
+        ok=true;dbId=r&&r.note?r.note.id:null;
+      }catch(e){drop=isPermanentNoteError(e);}
+      if(!ok&&!drop)continue;
+      dropNoteOutboxItem(it.qid);
+      if(!live)continue;
+      if(ok&&live.local.removed){if(dbId)api('/api/notes/'+dbId,{method:'DELETE'}).catch(function(){});continue;}
+      if(ok){live.local.dbId=dbId;live.local.unsaved=null;}else live.local.unsaved='failed';
+      if(live.onChange)live.onChange();
+    }
+  }catch(e){}
+  finally{noteOutboxBusy=false;}
+}
+function unsavedMark(local){
+  if(!local||!local.unsaved)return null;
+  const m=document.createElement('span');
+  m.className='unsaved-mark';
+  m.textContent=local.unsaved==='failed'?'ذخیره نشد':'ذخیره نشده — تلاشِ دوباره…';
+  return m;
+}
+setInterval(flushNoteOutbox,20000);
+window.addEventListener('online',flushNoteOutbox);
+setTimeout(flushNoteOutbox,3000);
+
+// ===== ثبتِ مطمئنِ «پایانِ جلسه» (A3، 2026-09-26) =====
+// قبلاً PUT status=completed فقط یک بار و بدونِ retry فرستاده می‌شد و کلیدِ feelia_active_session پیش از جواب پاک می‌شد —
+// اگر همان لحظه اینترنت قطع بود، جلسه رویِ سرور برایِ همیشه «در جریان» می‌ماند و بنرِ ادامه هم دیگر ظاهر نمی‌شد.
+// حالا شناسه‌ی جلسه تا تأییدِ سرور در feelia_pending_complete می‌ماند، با backoff و بعد هر ۳۰ث/online/لودِ صفحه
+// دوباره فرستاده می‌شود؛ کلیدِ resume فقط بعد از تأیید پاک می‌شود. 409 (قبلاً پایان‌یافته) و 404 (حذف‌شده) = پایان.
+const PENDING_COMPLETE_KEY='feelia_pending_complete';
+function readPendingCompletes(){try{const v=JSON.parse(localStorage.getItem(PENDING_COMPLETE_KEY)||'[]');return Array.isArray(v)?v:[];}catch(e){return[];}}
+function writePendingCompletes(list){try{localStorage.setItem(PENDING_COMPLETE_KEY,JSON.stringify(list));}catch(e){}}
+function isPendingComplete(sid){return readPendingCompletes().indexOf(sid)>=0;}
+function markPendingComplete(sid){const l=readPendingCompletes();if(l.indexOf(sid)<0){l.push(sid);writePendingCompletes(l);}}
+function clearPendingComplete(sid){
+  writePendingCompletes(readPendingCompletes().filter(function(x){return x!==sid;}));
+  try{if(localStorage.getItem('feelia_active_session')===sid)localStorage.removeItem('feelia_active_session');}catch(e){}
+}
+async function sendSessionComplete(sid){
+  try{
+    await api('/api/sessions/'+sid,{method:'PUT',body:{status:'completed'},timeoutMs:15000});
+    clearPendingComplete(sid);
+    return true;
+  }catch(e){
+    if(e&&(e.status===404||e.status===409)){clearPendingComplete(sid);return true;}
+    return false;
+  }
+}
+const COMPLETE_RETRY_DELAYS_MS=[0,1500,4000];
+async function completeSessionReliably(sid){
+  if(!sid)return false;
+  markPendingComplete(sid);
+  for(let i=0;i<COMPLETE_RETRY_DELAYS_MS.length;i++){
+    if(COMPLETE_RETRY_DELAYS_MS[i])await new Promise(function(r){setTimeout(r,COMPLETE_RETRY_DELAYS_MS[i]);});
+    if(await sendSessionComplete(sid))return true;
+  }
+  return false; // در feelia_pending_complete می‌ماند؛ flushPendingCompletes بعداً می‌فرستد
+}
+let pendingCompleteBusy=false;
+async function flushPendingCompletes(){
+  if(pendingCompleteBusy)return;
+  pendingCompleteBusy=true;
+  try{for(const sid of readPendingCompletes())await sendSessionComplete(sid);}catch(e){}
+  finally{pendingCompleteBusy=false;}
+}
+setInterval(flushPendingCompletes,30000);
+window.addEventListener('online',flushPendingCompletes);
+setTimeout(flushPendingCompletes,3500);
 
 // ⭐ مودالِ تاییدِ عمومی — جایگزینِ سراسریِ `confirm()`ِ خامِ مرورگر (هم‌راستا با سیستمِ
 // طراحیِ اپ، همان الگویِ `.modal-back`/`.modal`/`.modal-actions`). موردهایِ تک‌منظوره
@@ -2608,6 +2863,7 @@ async function enterApp(){
 setInterval(sweepOrphanedAudioQueue,60000);
 window.addEventListener('online',sweepOrphanedAudioQueue);
 
+const LOCAL_AUDIO_MAX_AGE_MS=7*86400000; // (A3) سقفِ ماندنِ صدایِ آپلودنشده در IndexedDBِ مرورگر
 async function sweepOrphanedAudioQueue(){
   try{
     if(!window.FeeliaRT||!window.FeeliaRT.audioQueue||!window.FeeliaRT.uploadQueuedSegment||!window.FeeliaRT.withAudioLock)return;
@@ -2616,20 +2872,36 @@ async function sweepOrphanedAudioQueue(){
     try{activeSid=localStorage.getItem('feelia_active_session');}catch(e){}
     const sessionIds=await q.listSessionIdsWithPending();
     for(const sid of sessionIds){
-      if(sid&&sid===activeSid)continue;
       // ⭐ (2026-09-26) feelia_active_session بعد از پایانِ جلسه پاک می‌شود، ولی یادداشتِ صوتیِ Wrapup هنوز
       // RTSessionِ زنده‌ی همین session است — بدونِ این چک، سگمنتِ ۱۵ثانیه‌ایِ اولِ یادداشتِ در حالِ ضبط با
       // purpose=note رونویسی و یک یادداشتِ صوتیِ تکراری ساخته می‌شد.
       if(window.FeeliaRT.isSessionActive&&window.FeeliaRT.isSessionActive(sid))continue;
+      if(sid&&sid===activeSid){
+        // ⭐ (A3، 2026-09-26) قبلاً صفِ «جلسه‌ی فعال» هرگز جارو نمی‌شد (مالکش RTSessionِ ادامه‌دهنده فرض می‌شد) — اگر جلسه
+        // رویِ سرور بسته شده بود (پایان، بستنِ خودکار، یا در حالِ ثبتِ پایان) و تراپیست ادامه نمی‌داد، صدایش هیچ‌وقت نمی‌رسید.
+        // فقط اگر سرور می‌گوید جلسه هنوز باز است، صف برایِ «ادامه» نگه داشته می‌شود.
+        let open=!isPendingComplete(sid);
+        if(open){
+          try{const r=await api('/api/sessions/'+sid,{timeoutMs:15000});open=!!(r&&r.session&&(r.session.status==='in_progress'||r.session.status==='recovered'));}
+          catch(e){open=!(e&&e.status===404);} // خطایِ شبکه ⇒ فعلاً نگه‌دار؛ 404 ⇒ جلسه نیست، uploadQueuedSegment پاکش می‌کند
+        }
+        if(open)continue;
+      }
       await window.FeeliaRT.withAudioLock(sid,async function(){
         const pending=await q.listForSession(sid);
+        let expired=0;
         for(const rec of pending){
           if(!rec.blob||rec.blob.size<=100){await q.remove(rec.id);continue;}
+          let done=false;
           try{
-            const done=await window.FeeliaRT.uploadQueuedSegment(sid,rec);
+            done=await window.FeeliaRT.uploadQueuedSegment(sid,rec);
             if(done)await q.remove(rec.id);
           }catch(e){/* شکستِ شبکه — توی صف می‌مونه، بارِ بعدِ بازکردنِ اپ امتحان می‌شه */}
+          // ⭐ (A3) صدایِ بالینی نباید بی‌پایان در مرورگر بماند: بعد از ۷ روز تلاشِ ناموفق (سرور خودش صدا را فقط ۱۴ روز
+          // نگه می‌دارد) رکورد پاک و رویدادش (فقط تعداد) ثبت می‌شود.
+          if(!done&&rec.createdAt&&Date.now()-rec.createdAt>LOCAL_AUDIO_MAX_AGE_MS){await q.remove(rec.id,rec.bytes);expired++;}
         }
+        if(expired){try{if(window.FeeliaObs)window.FeeliaObs.event('rt.local_audio_expired',{count:expired},{session_id:sid});}catch(e){}}
       });
     }
   }catch(e){}
@@ -2647,6 +2919,7 @@ async function openAdminPanel(){
     return;
   }
   clearBanner();
+  adminDetailReturn='sessions';
   showScreen('Admin');
   await Promise.all([loadAdminStats(),loadAdminTherapists()]);
 }
@@ -2665,6 +2938,7 @@ async function openAdminActivity(){
     return;
   }
   clearBanner();
+  adminDetailReturn='sessions';
   showScreen('AdminActivity');
   adminActivityTab('sessions');
 }
@@ -2703,7 +2977,7 @@ function renderAdminRecentSessions(sessions){
     row.className='card';
     row.style.cssText='padding:12px;margin-bottom:8px;cursor:pointer';
     const stale=s.status==='in_progress'&&(Date.now()-new Date(s.updated_at).getTime())>2*3600*1000&&(s.transcript_len||0)>0;
-    if(stale)row.style.borderColor='var(--warn, #d97706)';
+    if(stale)row.style.borderColor='var(--gold)';
     const title=document.createElement('div');
     title.style.cssText='font-weight:700;font-size:13.5px';
     title.textContent=(s.therapist_name||'—')+' · '+(s.client_code||'—')+' · جلسه‌ی '+toFa(s.session_num);
@@ -2739,10 +3013,10 @@ function renderAdminObsEvents(events){
   $('adminObsEventsEmpty').hidden=events.length>0;
   events.forEach(function(ev){
     const row=document.createElement('div');
-    row.style.cssText='padding:8px 10px;border-bottom:1px solid var(--border,#eee);font-size:12px;display:flex;gap:10px;align-items:baseline';
+    row.style.cssText='padding:8px 10px;border-bottom:1px solid var(--line-soft);font-size:12px;display:flex;gap:10px;align-items:baseline';
     const badge=document.createElement('span');
     badge.textContent=ev.severity;
-    badge.style.cssText='font-weight:700;min-width:40px;color:'+(ev.severity==='error'?'#c0392b':ev.severity==='warn'?'#d97706':'var(--muted)');
+    badge.style.cssText='font-weight:700;min-width:40px;color:'+(ev.severity==='error'?'var(--clay-deep)':ev.severity==='warn'?'var(--gold-deep)':'var(--muted)');
     const name=document.createElement('span');
     name.style.cssText='font-weight:600;min-width:180px';
     name.textContent=ev.event;
@@ -2767,13 +3041,13 @@ function closeAdminSessionTimeline(){
   showScreen('AdminActivity');
   adminActivityTab('sessions');
 }
-const ADMIN_TIMELINE_LANE_COLORS={server:'#2563eb',client:'#7c3aed',ui:'#0891b2',audio:'#16a34a',note:'#ca8a04',db:'#64748b'};
+const ADMIN_TIMELINE_LANE_COLORS={server:'var(--sage)',client:'var(--clay)',ui:'var(--gold)',audio:'var(--sage-deep)',note:'var(--gold-deep)',db:'var(--muted)'};
 function renderAdminTimeline(items){
   const list=$('adminTimelineList');
   list.innerHTML='';
   items.forEach(function(it){
     const row=document.createElement('div');
-    row.style.cssText='padding:8px 10px;border-inline-start:3px solid '+(ADMIN_TIMELINE_LANE_COLORS[it.lane]||'#999')+';margin-bottom:6px;background:var(--card-alt,#fafafa);border-radius:4px';
+    row.style.cssText='padding:8px 10px;border-inline-start:3px solid '+(ADMIN_TIMELINE_LANE_COLORS[it.lane]||'var(--line)')+';margin-bottom:6px;background:var(--sage-mist);border-radius:4px';
     const head=document.createElement('div');
     head.style.cssText='display:flex;justify-content:space-between;font-size:12.5px;font-weight:600';
     const label=document.createElement('span');
@@ -2808,11 +3082,265 @@ function renderAdminStats(s){
     ['جلساتِ امروز',s.sessions_today],
     ['جلساتِ این هفته',s.sessions_this_week],
   ];
-  $('adminStats').innerHTML=items.map(function(it){
-    return '<div class="card" style="padding:14px;text-align:center">'+
-      '<div style="font-size:22px;font-weight:800;color:var(--sage-deep)">'+toFa(it[1])+'</div>'+
-      '<div style="font-size:11.5px;color:var(--muted);margin-top:4px">'+it[0]+'</div></div>';
+  $('adminStats').innerHTML=items.map(function(it){return adminStatTile(it[0],toFa(it[1]));}).join('');
+}
+
+// ===== (B1–B3، 2026-09-26) ابزارهایِ مشترک + آرشیوِ صدا + یادداشت‌هایِ صوتی =====
+// منبعِ جلسه در پنلِ ادمین — قبلاً هر جلسه‌ی غیرِدستی (از جمله آپلودِ فایل) «جلسه‌ی زنده» نوشته می‌شد.
+function adminSourceLabel(src){
+  return src==='manual'?' · ثبتِ دستی':src==='upload'?' · آپلودِ فایل':' · جلسه‌ی زنده';
+}
+// ===== (2026-09-26، «از این جنس مشکلاتِ نمایش همه را حل کن») نمایشِ یکسانِ وضعیتِ واقعیِ جلسه — ادمین و تراپیست =====
+// قبلاً: recovered «قطع‌شده» نوشته می‌شد (در حالی که قابلِ ادامه است)، جلسه‌ی خودکاربسته هیچ نشانی نداشت، و جلسه‌ی
+// زنده‌ای که بخشی از متنش هنوز از صدایِ قطعی بازیابی می‌شد (یا نشد) «کامل» دیده می‌شد.
+function sessionStatusFa(s){
+  if(s.status==='completed'&&s.auto_closed_at)return 'بسته‌شده (بی‌فعالیت)';
+  return {completed:'کامل',in_progress:'در جریان',recovered:'ناتمام (قطع شده)',canceled:'لغوشده'}[s.status]||s.status||'—';
+}
+function transcriptProgressNote(s){
+  if(!s||s.source==='upload'||s.source==='manual')return '';
+  if(s.batch_status==='queued'||s.batch_status==='processing')return 'بخشی از متن در حالِ بازیابی از صداست';
+  if(s.batch_status==='failed')return 'بخشی از متن از صدا بازیابی نشد';
+  return '';
+}
+// متنِ بلند در جعبه‌ی ۴۰۰پیکسلی فقط چند خطِ اول را نشان می‌داد و ناقص به نظر می‌رسید (جلسه‌ی ۱ساعته ~۵۵هزار نویسه).
+// بالایِ جعبه: طولِ متن + مدت؛ برایِ متنِ بلند دکمه‌ی «نمایشِ کامل» که سقفِ ارتفاع را برمی‌دارد.
+function attachTranscriptExpander(box,text,durationMs,note){
+  const infoId=box.id+'Info';
+  let info=document.getElementById(infoId);
+  if(!info){
+    info=document.createElement('div');info.id=infoId;info.className='admin-row-meta';
+    info.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px';
+    box.parentNode.insertBefore(info,box);
+  }
+  info.innerHTML='';
+  box.style.maxHeight='';
+  info.hidden=box.hidden||!text;
+  if(!text)return;
+  const label=document.createElement('span');
+  label.textContent='متنِ جلسه: '+toFa(text.length.toLocaleString('en-US'))+' نویسه'+(durationMs?' · '+fmtDur(durationMs):'')+(note?' · '+note:'');
+  if(note)label.style.color='var(--gold-deep)';
+  info.appendChild(label);
+  if(text.length>1500){
+    info.appendChild(adminBtn('نمایشِ کامل','btn-ghost',function(){
+      const open=box.style.maxHeight==='none';
+      box.style.maxHeight=open?'':'none';
+      this.textContent=open?'نمایشِ کامل':'جمع کردن';
+    }));
+  }
+}
+function adminStatTile(label,value,warn){
+  return '<div class="card stat-tile'+(warn?' warn':'')+'"><div class="v">'+escapeHtml(value)+'</div><div class="l">'+escapeHtml(label)+'</div></div>';
+}
+function fmtBytes(b){
+  b=Number(b)||0;
+  if(b>=1024*1024*1024)return toFa((b/1073741824).toFixed(1))+' گیگابایت';
+  if(b>=1024*1024)return toFa((b/1048576).toFixed(1))+' مگابایت';
+  return toFa(Math.max(1,Math.round(b/1024)))+' کیلوبایت';
+}
+function fmtDur(ms){
+  const s=Math.round((Number(ms)||0)/1000);
+  const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),r=s%60;
+  if(h)return toFa(h)+' ساعت'+(m?' و '+toFa(m)+' دقیقه':'');
+  if(m)return toFa(m)+' دقیقه'+(r?' و '+toFa(r)+' ثانیه':'');
+  return toFa(r)+' ثانیه';
+}
+function adminPeriodFrom(days){
+  if(!days)return '';
+  return new Date(Date.now()-Number(days)*86400000).toISOString().slice(0,10);
+}
+async function fillAdminTherapistFilter(id){
+  if(!adminTherapists.length){try{const d=await api('/api/admin/therapists');adminTherapists=d.therapists||[];}catch(e){}}
+  const sel=$(id);
+  const cur=sel.value;
+  sel.innerHTML='<option value="">همه‌ی تراپیست‌ها</option>'+adminTherapists.map(function(t){
+    return '<option value="'+escapeHtml(t.id)+'">'+escapeHtml(t.name||t.phone||'—')+'</option>';
   }).join('');
+  sel.value=cur;
+}
+function adminFilterQuery(therapistSel,periodSel){
+  const parts=[];
+  const t=$(therapistSel).value;if(t)parts.push('therapist_id='+encodeURIComponent(t));
+  const from=adminPeriodFrom($(periodSel).value);if(from)parts.push('from='+from);
+  return parts.join('&');
+}
+function adminBadge(cls,text){
+  const b=document.createElement('span');
+  b.className='adm-badge '+cls;
+  b.textContent=text;
+  return b;
+}
+function adminBtn(label,cls,fn){
+  const b=document.createElement('button');
+  b.className='btn btn-sm '+cls;
+  b.textContent=label;
+  b.addEventListener('click',fn);
+  return b;
+}
+function adminDownload(url){
+  const a=document.createElement('a');
+  a.href=url;a.download='';document.body.appendChild(a);a.click();a.remove();
+}
+
+// ——— آرشیوِ صدا (B2) ———
+let adminAudioOffset=0;
+async function openAdminAudio(){
+  if(hasActiveRecording()){showBanner('warn','ابتدا جلسه‌ی زنده را پایان دهید یا لغو کنید.');return;}
+  clearBanner();
+  adminDetailReturn='audio';
+  showScreen('AdminAudio');
+  await fillAdminTherapistFilter('adminAudioTherapist');
+  reloadAdminAudio();
+}
+function reloadAdminAudio(){adminAudioOffset=0;loadAdminAudio(false);}
+async function loadAdminAudio(append){
+  try{
+    const q=adminFilterQuery('adminAudioTherapist','adminAudioPeriod');
+    const data=await api('/api/admin/audio-archive?limit=30&offset='+adminAudioOffset+(q?'&'+q:''));
+    const t=data.totals||{};
+    $('adminAudioStats').innerHTML=
+      adminStatTile('جلسه‌ی دارایِ صدا',toFa(t.sessions||0))+
+      adminStatTile('مدتِ کل',fmtDur(t.audio_ms))+
+      adminStatTile('حجمِ کل',fmtBytes(t.bytes))+
+      adminStatTile('حذف تا ۲ روزِ دیگر',toFa(t.expiring_2d||0),(t.expiring_2d||0)>0);
+    if(data.retention_days)$('adminAudioSubtitle').textContent='صدایِ جلسات فقط برایِ بازبینیِ فنی نگه داشته می‌شود و بعد از '+toFa(data.retention_days)+' روز خودکار حذف می‌شود. پخش، دانلود و حذف ثبت می‌شوند.';
+    const list=$('adminAudioList');
+    if(!append)list.innerHTML='';
+    (data.items||[]).forEach(function(it){list.appendChild(renderAdminAudioRow(it));});
+    adminAudioOffset+=(data.items||[]).length;
+    $('adminAudioEmpty').hidden=list.children.length>0;
+    $('adminAudioMore').hidden=!data.has_more;
+  }catch(e){showBanner('error',e.message);}
+}
+function renderAdminAudioRow(it){
+  const row=document.createElement('div');
+  row.className='card admin-row';
+  const head=document.createElement('div');head.className='admin-row-head';
+  const title=document.createElement('div');title.className='admin-row-title';
+  const titleText=(it.therapist_name||'—')+' · '+(it.client_code||'—')+' · جلسه‌ی '+toFa(it.session_num)+(it.date?' · '+toFa(it.date):'');
+  title.textContent=titleText;
+  const badges=document.createElement('div');badges.className='admin-row-badges';
+  if(it.silent)badges.appendChild(adminBadge('bad','سکوت — میکروفون صدا نگرفته'));
+  if(!it.complete)badges.appendChild(adminBadge('bad','ناقص — '+toFa((it.missing_segments||[]).length)+' بخش گمشده'));
+  if(it.pending_count>0)badges.appendChild(adminBadge('warn','در صفِ پردازش'));
+  if(!it.silent&&it.complete&&!it.pending_count)badges.appendChild(adminBadge('ok','کامل'));
+  if(it.days_left<=2)badges.appendChild(adminBadge('warn',it.days_left?'حذف تا '+toFa(it.days_left)+' روزِ دیگر':'امروز حذف می‌شود'));
+  head.appendChild(title);head.appendChild(badges);
+  const meta=document.createElement('div');meta.className='admin-row-meta';
+  meta.textContent=fmtDur(it.audio_ms)+' صدا · '+fmtBytes(it.bytes)+
+    (it.audio_kbps!==null&&it.audio_kbps!==undefined?' · '+toFa(it.audio_kbps)+' kbps':'')+
+    ' · '+toFa(it.segments)+' بخش · آخرین ضبط '+fmtDateTime(it.last_at)+' · '+toFa(it.days_left)+' روز تا حذف';
+  const actions=document.createElement('div');actions.className='admin-row-actions';
+  const url='/api/admin/sessions/'+encodeURIComponent(it.session_id)+'/audio/full';
+  let player=null;
+  actions.appendChild(adminBtn('پخش','btn-secondary',function(){
+    if(player){player.remove();player=null;return;}
+    player=document.createElement('audio');
+    player.controls=true;player.preload='metadata';player.src=url;
+    player.addEventListener('error',function(){showBanner('error','پخشِ صدا ممکن نشد — ممکن است فایل حذف شده یا روی سرور ffmpeg در دسترس نباشد.');});
+    row.appendChild(player);
+    player.play().catch(function(){});
+  }));
+  actions.appendChild(adminBtn('دانلود','btn-ghost',function(){adminDownload(url+'?download=1');}));
+  actions.appendChild(adminBtn('جزئیاتِ جلسه','btn-ghost',function(){adminDetailReturn='audio';openAdminSessionDetail(it.session_id,(it.therapist_name||'—')+' · '+(it.client_code||'—'));}));
+  actions.appendChild(adminBtn('حذفِ صدا','btn-ghost',function(){
+    showGenericConfirm({
+      title:'حذفِ صدایِ این جلسه؟',
+      text:titleText+' — '+fmtDur(it.audio_ms)+' صدا برایِ همیشه حذف می‌شود. متن و یادداشت‌هایِ جلسه دست نمی‌خورند. این کار ثبت می‌شود.',
+      okLabel:'حذفِ صدا',
+      onConfirm:async function(){
+        try{
+          await api('/api/admin/sessions/'+encodeURIComponent(it.session_id)+'/audio',{method:'DELETE'});
+          showBanner('info','صدایِ جلسه حذف شد.');
+          reloadAdminAudio();
+        }catch(e){showBanner('error',e.message);}
+      }
+    });
+  }));
+  row.appendChild(head);row.appendChild(meta);row.appendChild(actions);
+  return row;
+}
+
+// ——— یادداشت‌هایِ صوتی (B3) ———
+let adminVnOffset=0;
+async function openAdminVoiceNotes(){
+  if(hasActiveRecording()){showBanner('warn','ابتدا جلسه‌ی زنده را پایان دهید یا لغو کنید.');return;}
+  clearBanner();
+  adminDetailReturn='voice';
+  showScreen('AdminVoiceNotes');
+  await fillAdminTherapistFilter('adminVnTherapist');
+  reloadAdminVoiceNotes();
+}
+function reloadAdminVoiceNotes(){adminVnOffset=0;loadAdminVoiceNotes(false);}
+async function loadAdminVoiceNotes(append){
+  try{
+    const q=adminFilterQuery('adminVnTherapist','adminVnPeriod');
+    const data=await api('/api/admin/voice-notes?limit=20&offset='+adminVnOffset+(q?'&'+q:''));
+    const list=$('adminVnList');
+    if(!append)list.innerHTML='';
+    (data.items||[]).forEach(function(it){list.appendChild(renderAdminVoiceNoteGroup(it));});
+    adminVnOffset+=(data.items||[]).length;
+    $('adminVnEmpty').hidden=list.children.length>0;
+    $('adminVnMore').hidden=!data.has_more;
+  }catch(e){showBanner('error',e.message);}
+}
+function renderAdminVoiceNoteGroup(it){
+  const row=document.createElement('div');
+  row.className='card admin-row';
+  const head=document.createElement('div');head.className='admin-row-head';
+  const title=document.createElement('div');title.className='admin-row-title';
+  title.textContent=(it.therapist_name||'—')+' · '+(it.client_code||'—')+' · جلسه‌ی '+toFa(it.session_num)+(it.date?' · '+toFa(it.date):'');
+  const badges=document.createElement('div');badges.className='admin-row-badges';
+  badges.appendChild(adminBadge('ok',toFa((it.notes||[]).length)+' یادداشت'));
+  if((it.audio||[]).length&&!(it.notes||[]).length)badges.appendChild(adminBadge('warn','صدا بدونِ متن'));
+  head.appendChild(title);head.appendChild(badges);
+  row.appendChild(head);
+  const meta=document.createElement('div');meta.className='admin-row-meta';
+  meta.textContent='آخرین یادداشت '+fmtDateTime(it.last_at);
+  row.appendChild(meta);
+  if((it.notes||[]).length){
+    const sub=document.createElement('div');sub.className='admin-sub';sub.textContent='متن‌ها';row.appendChild(sub);
+    it.notes.forEach(function(n){
+      const item=document.createElement('div');item.className='vn-item';
+      const info=document.createElement('span');
+      info.textContent=(n.wall_clock?toFa(n.wall_clock)+' · ':'')+toFa(n.text_len)+' نویسه';
+      item.appendChild(info);
+      let shown=null;
+      item.appendChild(adminBtn('نمایشِ متن','btn-ghost',async function(){
+        if(shown){shown.remove();shown=null;return;}
+        try{
+          const d=await api('/api/admin/voice-notes/'+encodeURIComponent(n.id)+'/text');
+          shown=document.createElement('div');shown.className='vn-text';shown.textContent=d.text||'(خالی)';
+          item.appendChild(shown);
+        }catch(e){showBanner('error',e.message);}
+      }));
+      row.appendChild(item);
+    });
+  }
+  if((it.audio||[]).length){
+    const sub=document.createElement('div');sub.className='admin-sub';sub.textContent='صدا';row.appendChild(sub);
+    it.audio.forEach(function(a){
+      const item=document.createElement('div');item.className='vn-item';
+      const info=document.createElement('span');
+      info.textContent=fmtDateTime(a.created_at)+(a.duration_ms?' · '+fmtDur(a.duration_ms):'')+' · '+fmtBytes(a.bytes);
+      item.appendChild(info);
+      let player=null;
+      item.appendChild(adminBtn('پخش','btn-secondary',function(){
+        if(player){player.remove();player=null;return;}
+        player=document.createElement('audio');
+        player.controls=true;player.preload='metadata';
+        player.src='/api/admin/session-audio/'+encodeURIComponent(a.id)+'/stream';
+        player.style.cssText='width:100%;margin-top:6px';
+        item.appendChild(player);
+        player.play().catch(function(){});
+      }));
+      row.appendChild(item);
+    });
+  }
+  const actions=document.createElement('div');actions.className='admin-row-actions';
+  actions.appendChild(adminBtn('جزئیاتِ جلسه','btn-ghost',function(){adminDetailReturn='voice';openAdminSessionDetail(it.session_id,(it.therapist_name||'—')+' · '+(it.client_code||'—'));}));
+  row.appendChild(actions);
+  return row;
 }
 
 async function loadAdminTherapists(q){
@@ -3024,17 +3552,31 @@ async function openAdminClientSessions(clientId,title){
       num.className='session-num';
       num.textContent='جلسه '+toFa(s.session_num);
       head.appendChild(num);
-      const st=s.status==='completed'?'کامل':s.status==='in_progress'?'در جریان':'قطع‌شده';
       const status=document.createElement('span');
-      status.className='session-status '+s.status;
-      status.textContent=st;
+      const upBusy=s.source==='upload'&&(s.batch_status==='queued'||s.batch_status==='processing');
+      const upFailed=s.source==='upload'&&s.batch_status==='failed';
+      // مثلِ صفحه‌ی تراپیست: جلسه‌ی آپلودی وضعیتِ پردازشِ فایل را نشان می‌دهد، نه «کامل»
+      status.className='session-status '+(upBusy?'processing':upFailed?'failed':s.status);
+      status.textContent=s.source==='manual'?'ثبتِ دستی':s.source==='upload'?(upBusy?'در حالِ پردازش':upFailed?'پردازش ناموفق':'فایلِ صوتی'):sessionStatusFa(s);
       head.appendChild(status);
       div.appendChild(head);
       const date=document.createElement('div');
       date.className='session-date';
-      date.textContent=toFa(s.date)+' · شروع '+toFa(s.start_time)+(s.duration_ms?' · '+toFa(Math.round(s.duration_ms/60000))+' دقیقه':'')
-        +(s.source==='manual'?' · ثبتِ دستی':' · جلسه‌ی زنده')+(s.consent?' · رضایت ✓':' · بدونِ رضایت');
+      const isLiveRow=s.source!=='manual'&&s.source!=='upload';
+      // (2026-09-26) مدت با fmtDur (نه گرد به دقیقه: جلسه‌ی ۲۰ثانیه‌ای «۰ دقیقه» می‌شد) + طولِ متن + وضعیتِ بازیابیِ متن
+      date.textContent=(s.date?toFa(s.date):'بدونِ تاریخ')+(isLiveRow?' · شروع '+toFa(s.start_time):'')+(s.duration_ms?' · '+fmtDur(s.duration_ms):'')
+        +adminSourceLabel(s.source)+(s.consent?' · رضایت ✓':' · بدونِ رضایت')
+        +' · متن '+toFa(Number(s.transcript_len||0).toLocaleString('en-US'))+' نویسه';
       div.appendChild(date);
+      const progress=s.source==='upload'
+        ?(s.batch_status==='queued'||s.batch_status==='processing'?'فایل در حالِ پردازش':s.batch_status==='failed'?'پردازشِ فایل ناموفق':'')
+        :transcriptProgressNote(s);
+      if(progress){
+        const pn=document.createElement('div');
+        pn.style.cssText='font-size:11.5px;color:var(--gold-deep);margin-top:2px';
+        pn.textContent=progress;
+        div.appendChild(pn);
+      }
       const viewBtn=document.createElement('button');
       viewBtn.className='btn btn-ghost btn-sm';
       viewBtn.style.marginTop='8px';
@@ -3052,7 +3594,7 @@ async function openAdminClientSessions(clientId,title){
           if(row.querySelector('.audio-err-note'))return;
           const note=document.createElement('span');
           note.className='audio-err-note';
-          note.style.cssText='font-size:11px;color:var(--danger,#c0392b)';
+          note.style.cssText='font-size:11px;color:var(--clay-deep)';
           note.textContent='فایلِ صدا بارگذاری نشد';
           row.appendChild(note);
         }
@@ -3072,28 +3614,31 @@ async function openAdminClientSessions(clientId,title){
           if(aSt!=='none'||tSt!=='none'){
             const statusLine=document.createElement('div');
             statusLine.style.cssText='font-size:11px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap';
-            var aColor=aSt==='incomplete'?'var(--danger,#c0392b)':(aSt==='syncing'?'var(--warning,#b58105)':'inherit');
-            var tColor=tSt==='failed'?'var(--danger,#c0392b)':(tSt==='pending'?'var(--warning,#b58105)':'inherit');
+            var aColor=aSt==='incomplete'?'var(--clay-deep)':(aSt==='syncing'?'var(--gold-deep)':'inherit');
+            var tColor=tSt==='failed'?'var(--clay-deep)':(tSt==='pending'?'var(--gold-deep)':'inherit');
             statusLine.innerHTML='<span>صدا: <b style="color:'+aColor+'">'+audioStatusLabel[aSt]+'</b></span>'+
               '<span>رونویسی: <b style="color:'+tColor+'">'+transcriptStatusLabel[tSt]+'</b></span>';
             audioBox.appendChild(statusLine);
           }
           if(aSt==='incomplete'&&(audioData.audio_missing_segments||[]).length){
             const missBanner=document.createElement('div');
-            missBanner.style.cssText='font-size:11px;color:var(--danger,#c0392b)';
+            missBanner.style.cssText='font-size:11px;color:var(--clay-deep)';
             missBanner.textContent='سگمنت(هایِ) شماره‌ی '+audioData.audio_missing_segments.map(toFa).join('، ')+' هیچ‌وقت به سرور نرسیده‌اند — صدایِ این جلسه ناقص است.';
             audioBox.appendChild(missBanner);
           }
           if(pending>0){
             const banner=document.createElement('div');
-            banner.style.cssText='font-size:11px;color:var(--warning,#b58105)';
+            banner.style.cssText='font-size:11px;color:var(--gold-deep)';
             banner.textContent=toFa(pending)+' فایل هنوز در صفِ پردازشِ سرور است — بعداً دوباره بررسی کنید.';
             audioBox.appendChild(banner);
           }
           if(sessionRows.length){
             const label=document.createElement('div');
             label.style.cssText='font-size:11.5px;color:var(--muted)';
-            label.textContent='صدایِ کاملِ جلسه:';
+            // (2026-09-26، گزارشِ مالک «صدا کامل نیست») پلیر با preload='none' تا قبل از پخش هیچ مدتی نشان نمی‌دهد و
+            // کامل‌بودنِ صدا دیده نمی‌شد؛ مدتِ صدایِ ذخیره‌شده از خودِ متادیتا (بدونِ بارِ اضافه رویِ سرور) کنارش نوشته می‌شود.
+            const storedMs=sessionRows.reduce(function(t,a){return t+(Number(a.duration_ms)||0);},0);
+            label.textContent='صدایِ کاملِ جلسه'+(storedMs?' — '+fmtDur(storedMs)+' ذخیره شده ('+toFa(sessionRows.length)+' بخش)':'')+':';
             audioBox.appendChild(label);
             const row=document.createElement('div');
             row.style.cssText='display:flex;align-items:center;gap:8px';
@@ -3153,9 +3698,24 @@ async function openAdminSessionDetail(sessionId,clientTitle){
     const data=await api('/api/admin/sessions/'+sessionId);
     const s=data.session;
     $('adminSessionDetailTitle').textContent=clientTitle+' · جلسه '+toFa(s.session_num);
-    $('adminSessionDetailMeta').textContent=toFa(s.date)+' · شروع '+toFa(s.start_time)
-      +(s.source==='manual'?' · ثبتِ دستی':' · جلسه‌ی زنده')+(s.consent?' · رضایت ✓':' · بدونِ رضایت');
-    $('adminSessionDetailTranscript').textContent=s.transcript||'(متنی ثبت نشده)';
+    const isLiveS=s.source!=='manual'&&s.source!=='upload';
+    // (2026-09-26) برایِ جلسه‌ی دستی/آپلودی «شروع HH:MM» ساعتِ ثبت/آپلود است نه جلسه — مثلِ صفحه‌ی تراپیست نشان داده نمی‌شود.
+    $('adminSessionDetailMeta').textContent=(s.date?toFa(s.date):'بدونِ تاریخ')+(isLiveS?' · شروع '+toFa(s.start_time):'')
+      +(s.duration_ms?' · '+fmtDur(s.duration_ms):'')
+      +adminSourceLabel(s.source)+(s.consent?' · رضایت ✓':' · بدونِ رضایت')
+      // (audit ذخیره‌سازی 2026-09-26) ادمین باید ببیند جلسه پایان خورده یا نیمه‌کاره رها شده و آخرین ذخیره کِی بوده.
+      +' · '+sessionStatusFa(s)
+      +(s.updated_at?' · آخرین ذخیره '+new Date(s.updated_at).toLocaleString('fa-IR'):'')
+      +(s.source==='upload'
+        ?(s.batch_status==='queued'||s.batch_status==='processing'?' · فایل در حالِ پردازش':s.batch_status==='failed'?' · پردازشِ فایل ناموفق':'')
+        :(transcriptProgressNote(s)?' · '+transcriptProgressNote(s):'')
+          +(isLiveS&&(s.realtime_reliable===0||s.realtime_reliable===false)?' · بخشی از متن از صدایِ قطعی بازیابی شده':''));
+    // (2026-09-26، گزارشِ مالک) متنِ یک جلسه‌ی ۱ساعته (~۵۵هزار نویسه) در جعبه‌ی ۴۰۰پیکسلی فقط چند خطِ اول دیده می‌شد
+    // و ناقص به نظر می‌رسید. حالا طولِ متن بالایش نوشته می‌شود و «نمایشِ کامل» سقفِ ارتفاع را برمی‌دارد.
+    const tBox=$('adminSessionDetailTranscript');
+    tBox.textContent=s.transcript||'(متنی ثبت نشده)';
+    attachTranscriptExpander(tBox,s.transcript||'',s.duration_ms,transcriptProgressNote(s));
+    renderAdminSessionDiagnosis(sessionId);
     const nb=$('adminSessionDetailNotes');
     nb.innerHTML='';
     (data.notes||[]).forEach(function(n){
@@ -3182,7 +3742,34 @@ async function openAdminSessionDetail(sessionId,clientTitle){
     showScreen('AdminSessionDetail');
   }catch(e){showBanner('error',e.message);}
 }
+// تشخیصِ جلسه برایِ ادمین — فقط یافته‌هایِ محاسبه‌شده‌ی سرور (بدونِ متنِ بالینی). خطا این کارت را بی‌صدا خالی می‌گذارد.
+async function renderAdminSessionDiagnosis(sessionId){
+  const box=$('adminSessionDiagnosis');
+  box.innerHTML='';
+  try{
+    const data=await api('/api/admin/sessions/'+sessionId+'/diagnosis');
+    const f=data.findings||[];
+    if(!f.length)return;
+    const worst=f.some(function(x){return x.level==='error';})?'error':f.some(function(x){return x.level==='warn';})?'warn':'info';
+    const div=document.createElement('div');
+    div.className='banner '+worst;
+    const h=document.createElement('strong');
+    h.textContent='تشخیصِ جلسه — چه اتفاقی افتاد؟';
+    div.appendChild(h);
+    const ul=document.createElement('ul');
+    ul.style.cssText='margin:6px 0 0;padding-inline-start:18px';
+    f.forEach(function(x){
+      const li=document.createElement('li');
+      li.textContent=(x.level==='error'?'⛔ ':x.level==='warn'?'⚠️ ':'✓ ')+toFa(x.text);
+      ul.appendChild(li);
+    });
+    div.appendChild(ul);
+    box.appendChild(div);
+  }catch(e){}
+}
 function closeAdminSessionDetail(){
+  if(adminDetailReturn==='audio'){adminDetailReturn='sessions';showScreen('AdminAudio');return;}
+  if(adminDetailReturn==='voice'){adminDetailReturn='sessions';showScreen('AdminVoiceNotes');return;}
   showScreen('AdminSessions');
 }
 async function adminDeleteClient(clientId){
@@ -3208,6 +3795,8 @@ async function checkActiveSessionBanner(){
   let sid=null;
   try{sid=localStorage.getItem('feelia_active_session');}catch(e){}
   if(!sid)return false;
+  // (A3) جلسه‌ای که تراپیست «پایان» زده ولی ثبتش رویِ سرور هنوز تأیید نشده — «ادامه» پیشنهاد نمی‌شود؛ فقط دوباره فرستاده می‌شود
+  if(isPendingComplete(sid)){flushPendingCompletes();return false;}
   let s=null;
   try{
     const r=await api('/api/sessions/'+sid);
@@ -3216,11 +3805,13 @@ async function checkActiveSessionBanner(){
     try{localStorage.removeItem('feelia_active_session');}catch(ee){}
     return false;
   }
-  if(!s||(s.status!=='in_progress'&&s.status!=='recovered')){
+  // (A3، 2026-09-26) جلسه‌ای که سرور به‌خاطرِ بی‌فعالیتی خودکار بسته (auto_closed_at) هم قابلِ ادامه است.
+  const autoClosed=!!(s&&s.status==='completed'&&s.auto_closed_at);
+  if(!s||(s.status!=='in_progress'&&s.status!=='recovered'&&!autoClosed)){
     try{localStorage.removeItem('feelia_active_session');}catch(e){}
     return false;
   }
-  const stateLabel=s.status==='recovered'?'ناتمام مانده (اینترنت/صفحه قطع شده بود)':'در حال انجام است';
+  const stateLabel=autoClosed?'به‌خاطرِ بی‌فعالیتیِ طولانی خودکار بسته شده بود':s.status==='recovered'?'ناتمام مانده (اینترنت/صفحه قطع شده بود)':'در حال انجام است';
   // BUG-FIX: قبلاً یک دکمه‌ی معمولی در ردیف بنرهای دیگر بود و به‌راحتی از دید جا می‌ماند.
   // حالا برجسته‌تر و صریح‌تر است — همان یک دکمه، ولی تنها و اول چیزی که کاربر می‌بیند.
   bannerBox.innerHTML='<div class="banner warn" style="display:block"><b>جلسه‌ی زنده‌ی نیمه‌تمام پیدا شد</b><br>این جلسه '+stateLabel+'؛ متن رونویسی‌شده تا همین الان حفظ است.<br><div class="btn-row" style="margin-top:10px"><button class="btn btn-primary" onclick="liveResumeSession(\''+s.id+'\')" style="flex:2;font-weight:700">↻ ادامه‌ی رونویسی زنده</button><button class="btn btn-ghost" onclick="clearBanner()" style="flex:1">بعداً</button></div></div>';
@@ -3233,13 +3824,14 @@ async function liveResumeSession(sessionId){
   try{
     const sessionRes=await api('/api/sessions/'+sessionId);
     const sess=sessionRes.session;
-    if(!sess||(sess.status!=='in_progress'&&sess.status!=='recovered')){
+    const autoClosed=!!(sess&&sess.status==='completed'&&sess.auto_closed_at);
+    if(!sess||(sess.status!=='in_progress'&&sess.status!=='recovered'&&!autoClosed)){
       try{localStorage.removeItem('feelia_active_session');}catch(e){}
       showBanner('error','جلسه قابل ادامه نیست.');
       return;
     }
-    // P3 (spec): برای recovered حتماً قبل از اتصال WS جدید به in_progress برگردد
-    if(sess.status==='recovered'){
+    // P3 (spec): برای recovered حتماً قبل از اتصال WS جدید به in_progress برگردد؛ (A3) خودکاربسته هم باز می‌شود
+    if(sess.status==='recovered'||autoClosed){
       await api('/api/sessions/'+sessionId,{method:'PUT',body:{status:'in_progress'}});
       sess.status='in_progress';
     }
@@ -3991,7 +4583,7 @@ async function openClientDetail(clientId,opts){
       const isUploadRow=s.source==='upload';
       const uploadBusy=isUploadRow&&(s.batch_status==='queued'||s.batch_status==='processing');
       const uploadFailed=isUploadRow&&s.batch_status==='failed';
-      const st=isManualRow?'ثبتِ دستی':isUploadRow?(uploadBusy?'در حالِ پردازش':uploadFailed?'پردازش ناموفق':'فایلِ صوتی'):s.status==='completed'?'کامل':s.status==='in_progress'?'در جریان':'قطع‌شده';
+      const st=isManualRow?'ثبتِ دستی':isUploadRow?(uploadBusy?'در حالِ پردازش':uploadFailed?'پردازش ناموفق':'فایلِ صوتی'):sessionStatusFa(s);
       const status=document.createElement('span');
       // ⭐ فیکسِ باگِ واقعیِ UX: «ثبتِ دستی» کلاسِ سبزِ completed می‌گرفت — انگار جلسه‌ای
       // «کامل شده» است، نه صرفاً آرشیوِ دستی. کلاسِ خنثیِ از‌پیش‌موجود (canceled) گرفت.
@@ -4007,8 +4599,16 @@ async function openClientDetail(clientId,opts){
       // ساعتِ واقعیِ جلسه‌ی گذشته — نمایشش گمراه‌کننده است؛ اینجا هم مثلِ صفحه‌ی جلسه حذف شد.
       date.textContent=(isManualRow||isUploadRow)
         ?((s.date?toFa(s.date):'بدونِ تاریخ')+(isUploadRow&&s.duration_ms?' · '+fmtDurationFa(s.duration_ms):''))
-        :(toFa(s.date)+' · شروع '+toFa(s.start_time)+(s.duration_ms?' · '+toFa(Math.round(s.duration_ms/60000))+' دقیقه':''));
+        :(toFa(s.date)+' · شروع '+toFa(s.start_time)+(s.duration_ms?' · '+fmtDurationFa(s.duration_ms):''));
       div.appendChild(date);
+      // (2026-09-26) جلسه‌ی زنده‌ای که بخشی از متنش هنوز از صدایِ قطعی بازیابی می‌شود (یا نشد) دیگر فقط «کامل» دیده نمی‌شود.
+      const progressNote=transcriptProgressNote(s);
+      if(progressNote){
+        const pn=document.createElement('div');
+        pn.style.cssText='font-size:11.5px;color:var(--gold-deep);margin-top:2px';
+        pn.textContent=progressNote;
+        div.appendChild(pn);
+      }
 
       // ⭐ فیکسِ باگِ واقعی (UI-12): جلسه‌ی «در جریان»/«قطع‌شده» در پرونده هیچ راهِ
       // ادامه نداشت — فقط اگر بنرِ خودکارِ همان مرورگر رد نمی‌شد قابلِ‌ادامه بود؛
@@ -5052,9 +5652,11 @@ async function doViewTranscript(sessionId){
       ?('ثبتِ دستی · '+(data.session.date?toFa(data.session.date):'بدونِ تاریخ'))
       :isUploadSession
         ?('فایلِ صوتیِ آپلودشده · '+(data.session.date?toFa(data.session.date):'بدونِ تاریخ')+(data.session.duration_ms?' · '+fmtDurationFa(data.session.duration_ms):''))
-        :((data.session.status==='completed'?'کامل':data.session.status==='in_progress'?'در جریان':'قطع‌شده')+' · '+toFa(data.session.date)+' · '+toFa(data.session.start_time));
+        :(sessionStatusFa(data.session)+' · '+toFa(data.session.date)+' · '+toFa(data.session.start_time)+(data.session.duration_ms?' · '+fmtDurationFa(data.session.duration_ms):''));
     $('transcriptBox').textContent=data.session.transcript||(isManualSession?'جلسه‌ی ثبت‌شده‌ی دستی — بدونِ رونویسی.':'(متنی ثبت نشده)');
     $('transcriptBox').hidden=isManualSession||(isUploadSession&&!hasTranscript);
+    // (2026-09-26) طولِ متن + «نمایشِ کامل» (متنِ بلند در جعبه‌ی ۴۰۰پیکسلی ناقص به نظر می‌رسید) + وضعیتِ بازیابیِ متن
+    attachTranscriptExpander($('transcriptBox'),hasTranscript?data.session.transcript:'',data.session.duration_ms,transcriptProgressNote(data.session));
     $('resolveSpeakersBtn').hidden=(data.session.status!=='completed'||isManualSession||isUploadSession);
     // ⭐ فیکسِ باگِ واقعیِ UX: برایِ جلسه‌ی دستی «ویرایش» بی‌معنی بود (چیزی از قبل
     // تعیین نشده) — این‌جا تاریخ مستقیم و همیشه‌قابل‌مشاهده‌ست، نه پشتِ دکمه/مودال.
@@ -5177,13 +5779,16 @@ async function applyResolvedSpeakers(){
   const applyBtn=$('resolveSpeakersApplyBtn');
   applyBtn.disabled=true;
   try{
-    await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{
+    const put=await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{
       transcript:resolveSpeakersLatestText,
       transcript_version:currentViewSession.transcript_version
     }});
     currentViewSession.transcript=resolveSpeakersLatestText;
-    currentViewSession.transcript_version=(currentViewSession.transcript_version||0)+1;
+    // نسخه از پاسخِ سرور (مثلِ A1.6) — نه +1ِ محلی
+    currentViewSession.transcript_version=(put&&put.session&&typeof put.session.transcript_version==='number')
+      ?put.session.transcript_version:(currentViewSession.transcript_version||0)+1;
     $('transcriptBox').textContent=resolveSpeakersLatestText;
+    attachTranscriptExpander($('transcriptBox'),resolveSpeakersLatestText,currentViewSession.duration_ms,'');
     closeResolveSpeakersModal();
     showBanner('info','متنِ جلسه با شماره‌گذاریِ یکدستِ گوینده‌ها جایگزین شد.');
   }catch(e){
@@ -5227,7 +5832,7 @@ async function saveManualDate(date){
     setTimeout(function(){if(hint.textContent==='ذخیره شد ✓')hint.textContent='';},2000);
   }catch(e){
     hint.textContent='خطا: '+e.message;
-    hint.style.color='var(--danger, #c62828)';
+    hint.style.color='var(--clay-deep)';
   }
 }
 let editSessionDateValue=null;
@@ -5651,7 +6256,8 @@ function rtOnState(st,snap){
 async function endNewRTSession(){
   const s=rtSession;
   if(!s||!currentSession)return;
-  try{localStorage.removeItem('feelia_active_session');}catch(e){}
+  // (A3) کلیدِ resume تا تأییدِ سرور می‌ماند؛ علامتِ «در حالِ پایان» جلویِ بنرِ «ادامه» را می‌گیرد (checkActiveSessionBanner)
+  markPendingComplete(currentSession.id);
   p1Terminal=true;manualPaused=false;updatePauseUI();clearP1AckTimers();
   $('btnEndSession').disabled=true;
   $('recStatus').textContent='در حال نهایی‌سازی…';
@@ -5666,7 +6272,10 @@ async function endNewRTSession(){
   // که رونویسی‌اش کاملاً تموم شده بود، هنوز «در جریان» ثبت مونده بود. الان همین‌جا
   // completed می‌شه؛ finishSession() روی Wrapup فقط idempotent دوباره همین رو می‌فرسته.
   if(currentSession){
-    api('/api/sessions/'+currentSession.id,{method:'PUT',body:{status:'completed'}}).catch(function(){});
+    // (A3) با retry و صفِ ماندگار — قبلاً یک بارِ بی‌retry و خطایش بلعیده می‌شد
+    completeSessionReliably(currentSession.id).then(function(ok){
+      if(!ok)showBanner('warn','ثبتِ «پایانِ جلسه» روی سرور هنوز انجام نشده — اتصال را بررسی کنید؛ خودکار دوباره تلاش می‌شود.');
+    });
   }
   if(out&&(out.mode==='batch-pending')){
     showBanner('warn','متنِ نهایی هنوز آماده نیست؛ به‌محضِ آماده‌شدن به پرونده اضافه می‌شود.');
@@ -5761,14 +6370,13 @@ async function stopVoiceNoteDirect(){
     // دقیقاً مثلِ addTextNote().
     const voiceText=out.text.trim();
     const voiceWallClock=nowClock();
-    let voiceDbId=null;
-    try{
-      const d=await api('/api/sessions/'+currentSession.id+'/notes',{method:'POST',body:{type:'voice',text:voiceText,wall_clock:voiceWallClock}});
-      if(d&&d.note)voiceDbId=d.note.id;
-    }catch(e){}
-    wrapupNotes.push({dbId:voiceDbId,type:'voice',text:voiceText,wall_clock:voiceWallClock});
+    // (A1.5) شکستِ POST دیگر بلعیده نمی‌شود — صفِ محلی + «ذخیره نشده» به‌جایِ «ثبت شد».
+    const vn={dbId:null,type:'voice',text:voiceText,wall_clock:voiceWallClock};
+    wrapupNotes.push(vn);
     renderWrapupNotes();
-    $('voiceStatus').textContent='ثبت شد'+(out.reliable?'':' (با تاخیر)');
+    const saved=await postNoteReliably(currentSession.id,{type:'voice',text:voiceText,wall_clock:voiceWallClock},vn,renderWrapupNotes);
+    renderWrapupNotes();
+    $('voiceStatus').textContent=saved?('ثبت شد'+(out.reliable?'':' (با تاخیر)')):'ذخیره نشد — دوباره تلاش می‌شود';
     setTimeout(function(){$('voiceNoteBox').hidden=true;$('voiceNoteBtn').disabled=false;$('textNoteBtn').disabled=false;},1500);
     return;
   }
@@ -6037,16 +6645,14 @@ document.querySelectorAll('.sign-chip').forEach(function(chip){
     const sd={type:'sign',sign_type:chip.dataset.sign,offset_ms:elapsedMs,wall_clock:nowClock()};
     sessionSigns.push(sd);
     renderSignsLog();
-    try{
-      const r=await api('/api/sessions/'+currentSession.id+'/notes',{method:'POST',body:sd});
-      if(r.note)sd.dbId=r.note.id;
-    }catch(e){}
+    const body={type:sd.type,sign_type:sd.sign_type,offset_ms:sd.offset_ms,wall_clock:sd.wall_clock};
+    await postNoteReliably(currentSession.id,body,sd,function(){renderSignsLog();renderWrapupSigns();});
   });
 });
 
 function removeSign(idx){
   const s=sessionSigns[idx];
-  if(s&&s.dbId)api('/api/notes/'+s.dbId,{method:'DELETE'}).catch(function(){});
+  forgetLocalNote(s);
   sessionSigns.splice(idx,1);
   renderSignsLog();
   renderWrapupSigns();
@@ -6066,6 +6672,7 @@ function renderSignsLog(){
     tm.className='sign-log-time';
     tm.textContent=formatTimer(s.offset_ms||0);
     el.appendChild(tm);
+    const um=unsavedMark(s);if(um)el.appendChild(um);
     const btn=document.createElement('button');
     btn.className='sign-rm';
     btn.title='حذف';
@@ -6089,10 +6696,8 @@ async function addQuickNote(){
   sessionNotes.push(nd);
   renderNotesLog();
   input.value='';
-  try{
-    const r=await api('/api/sessions/'+currentSession.id+'/notes',{method:'POST',body:nd});
-    if(r.note)nd.dbId=r.note.id;
-  }catch(e){}
+  const body={type:nd.type,text:nd.text,offset_ms:nd.offset_ms,wall_clock:nd.wall_clock};
+  await postNoteReliably(currentSession.id,body,nd,function(){renderNotesLog();renderWrapupNotesLog();});
 }
  $('quickNoteInput').addEventListener('keydown',function(e){
   if(e.key==='Enter'){
@@ -6105,7 +6710,7 @@ async function addQuickNote(){
 // دکمه‌ی حذف نداشت — یادداشتِ اشتباه/تکراری برای همیشه در پرونده می‌ماند.
 function removeQuickNote(idx){
   const n=sessionNotes[idx];
-  if(n&&n.dbId)api('/api/notes/'+n.dbId,{method:'DELETE'}).catch(function(){});
+  forgetLocalNote(n);
   sessionNotes.splice(idx,1);
   renderNotesLog();
 }
@@ -6123,6 +6728,7 @@ function renderNotesLog(){
     txt.style.cssText='flex:1;min-width:0;line-height:1.7';
     txt.textContent=n.text;
     el.appendChild(txt);
+    const um=unsavedMark(n);if(um)el.appendChild(um);
     const btn=document.createElement('button');
     btn.className='sign-rm';
     btn.title='حذف';
@@ -6348,6 +6954,7 @@ function renderWrapupSigns(){
     tm.className='sign-log-time';
     tm.textContent=formatTimer(s.offset_ms||0);
     el.appendChild(tm);
+    const um=unsavedMark(s);if(um)el.appendChild(um);
     const btn=document.createElement('button');
     btn.className='sign-rm';
     btn.innerHTML=IC_X;
@@ -6371,6 +6978,7 @@ function renderWrapupNotesLog(){
     txt.style.cssText='flex:1;min-width:0;line-height:1.7';
     txt.textContent=n.text;
     el.appendChild(txt);
+    const um=unsavedMark(n);if(um)el.appendChild(um);
     log.appendChild(el);
   });
 }
@@ -6446,13 +7054,14 @@ function renderWrapupNotes(){
     const cls=n.type==='voice'?'note-tag tag-voice':'note-tag tag-text';
     div.innerHTML='<div class="note-head"><span class="'+cls+'">'+ic+tag+'</span><span class="note-time">'+(n.wall_clock?toFa(n.wall_clock):'')+'</span><button class="note-remove" data-i="'+i+'">'+IC_TRSH+'حذف</button></div><p></p>';
     div.querySelector('p').textContent=n.text||'';
+    const um=unsavedMark(n);if(um)div.querySelector('.note-head').insertBefore(um,div.querySelector('.note-remove'));
     list.appendChild(div);
   });
   list.querySelectorAll('.note-remove').forEach(function(btn){
     btn.addEventListener('click',function(){
       const i=parseInt(btn.dataset.i,10);
       const note=wrapupNotes[i];
-      if(note&&note.dbId)api('/api/notes/'+note.dbId,{method:'DELETE'}).catch(function(){});
+      forgetLocalNote(note);
       wrapupNotes.splice(i,1);
       renderWrapupNotes();
     });
@@ -7006,11 +7615,10 @@ function renderArchiveVoiceTimer(){$('archiveVoiceTimer').textContent=formatTime
 
 async function finishSession(){
   if(!currentSession)return;
-  // P3: completed → کلید resume پاک شود
-  try{localStorage.removeItem('feelia_active_session');}catch(e){}
+  // P3: completed → کلید resume پاک شود — (A3) فقط بعد از تأییدِ سرور (completeSessionReliably)
   showBanner('info','در حال ذخیره…');
   try{
-    await api('/api/sessions/'+currentSession.id,{method:'PUT',body:{status:'completed'}});
+    if(!(await completeSessionReliably(currentSession.id)))throw new Error('اتصال برقرار نشد — «پایانِ جلسه» خودکار دوباره فرستاده می‌شود؛ می‌توانید دوباره هم بزنید');
     uxTrack('session_saved');
     clearBanner();
     wrapupNotes=[];
@@ -7145,7 +7753,8 @@ function fmtBytesFa(n){
 }
 function fmtDurationFa(ms){
   if(!ms)return '';
-  const m=Math.round(ms/60000);
+  // floor (نه round) — هم‌راستا با fmtDurِ پنلِ ادمین؛ قبلاً یک جلسه‌ی ۶۸.۶ دقیقه‌ای اینجا «۱ ساعت و ۹» و در ادمین «۱ ساعت و ۸» بود.
+  const m=Math.floor(ms/60000);
   if(m<1)return 'کمتر از یک دقیقه';
   if(m<60)return toFa(m)+' دقیقه';
   return toFa(Math.floor(m/60))+' ساعت'+(m%60?' و '+toFa(m%60)+' دقیقه':'');
@@ -7628,6 +8237,7 @@ async function renderSessionUploadJob(sessionId){
         currentViewSession=d.session;
         $('transcriptBox').textContent=d.session.transcript||'';
         $('transcriptBox').hidden=!d.session.transcript;
+        attachTranscriptExpander($('transcriptBox'),d.session.transcript||'',d.session.duration_ms,'');
       }
     }catch(e){}
   }

@@ -6,6 +6,7 @@
 import { FastifyInstance } from 'fastify';
 import { requireAuth } from '../auth/guard.js';
 import { getOwnedSession } from '../db/ownership.js';
+import { query } from '../db/connection.js';
 import { logEvent } from '../obs/eventLog.js';
 import {
   SONIOX_WS_URL,
@@ -133,6 +134,18 @@ export async function sttRoutes(app: FastifyInstance) {
     // صددرصدِ مواقع fail-open به durable-only می‌رفت. purpose=transcript (پیش‌فرض،
     // جلسه‌ی زنده‌ی اصلی) همچنان درست مسدود می‌ماند — نباید رویِ جلسه‌ی تمام‌شده
     // realtimeِ transcript دوباره باز بشه.
+    // ⭐ (A3، 2026-09-26) جلسه‌ای که worker به‌خاطرِ بی‌فعالیتی خودکار بسته (مثلاً توقفِ طولانی و بعد «ادامه» در
+    // همان صفحه) با اولین mintِ رونویسی دوباره باز می‌شود — بسته‌شدنِ خودکار نباید ادامه‌ی جلسه را قفل کند.
+    if (purpose === 'transcript' && owned.status === 'completed' && owned.auto_closed_at) {
+      const re = await query(
+        `UPDATE sessions SET status = 'in_progress', auto_closed_at = NULL, updated_at = NOW() WHERE id = ? AND status = 'completed' AND auto_closed_at IS NOT NULL`,
+        [session_id]
+      );
+      if (re.rowCount === 1) {
+        owned.status = 'in_progress';
+        logEvent({ event: 'session.reopened', sessionId: session_id, therapistId, detail: { source: 'mint' } });
+      }
+    }
     if (purpose === 'transcript' && (owned.status === 'completed' || owned.status === 'canceled')) {
       reply.code(400);
       return { error: 'جلسه پایان یافته است' };

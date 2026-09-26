@@ -6,6 +6,7 @@ import { requireAuth } from '../auth/guard.js';
 import { getOwnedClient } from '../db/ownership.js';
 import { deleteSessionAudioDirs } from '../stt/sessionAudioArchive.js';
 import { logEvent } from '../obs/eventLog.js';
+import { recordAudit } from '../obs/audit.js';
 import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
 
 const VALID_CATEGORIES = ['child', 'teen', 'adult'];
@@ -61,6 +62,7 @@ export async function clientRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
     logEvent({ event: 'client.consent_revoked', therapistId: request.therapistId, clientId: id });
+    await recordAudit({ actorId: request.therapistId, action: 'consent.revoked', targetType: 'client', targetId: id });
     return { recording_consent_at: null };
   });
 
@@ -140,7 +142,7 @@ export async function clientRoutes(app: FastifyInstance) {
     }
 
     const sessionsResult = await query(`
-      SELECT id, session_num, date, start_time, duration_ms, status, source, batch_status, created_at
+      SELECT id, session_num, date, start_time, duration_ms, status, source, batch_status, auto_closed_at, created_at
       FROM sessions
       WHERE client_id = ?
       ORDER BY session_num DESC
@@ -316,6 +318,7 @@ export async function clientRoutes(app: FastifyInstance) {
 
     deleteSessionAudioDirs(sessionIds);
     releaseSonioxRefs(sonioxRefs);
+    await recordAudit({ actorId: request.therapistId, action: 'therapist.client_delete', targetType: 'client', targetId: id, detail: { count: sessionIds.length } });
 
     return {
       deleted: owned.code,

@@ -30,7 +30,10 @@
   var CLIENT_DETAIL_KEYS = {
     attempt: 1, attempts: 1, duration_ms: 1, delay_ms: 1, elapsed_ms: 1,
     status: 1, code: 1, reason: 1, state: 1, prev_state: 1,
-    close_code: 1, was_clean: 1, retries: 1, ok: 1
+    close_code: 1, was_clean: 1, retries: 1, ok: 1,
+    // (2026-09-26) rt.transcript_diverged {len, chars}، rt.final_persist_failed {count}، rt.local_audio_expired {count} —
+    // هر سه در ALLOWED_DETAIL_KEYSِ سرور هستند (فقط شمارش/طول، بدونِ محتوا).
+    len: 1, chars: 1, count: 1
   };
   var MAX_DETAIL_KEYS = 12;
 

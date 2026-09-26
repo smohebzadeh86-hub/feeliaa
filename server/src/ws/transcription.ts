@@ -279,7 +279,9 @@ export async function transcriptionRoutes(app: FastifyInstance) {
             const lastLen = (rec as any).lastConfirmedLen ?? 0;
             if (finalText.length < lastLen) return;
             (rec as any).lastConfirmedLen = finalText.length;
-            query('UPDATE sessions SET transcript = ?, updated_at = NOW() WHERE id = ?',
+            // (A5، 2026-09-26، LAW-015 bugfix) همه‌ی نوشتن‌هایِ متنِ این مسیرِ legacy نسخه را بالا می‌برند تا CASِ
+            // موتورِ جدید (PUT با transcript_version) تغییرِ هم‌زمان را ببیند، نه اینکه بی‌صدا رویش بنویسد.
+            query('UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1, updated_at = NOW() WHERE id = ?',
               [finalText, sessionId]).catch(() => {});
           }
         },
@@ -302,7 +304,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
           // کلاینت reconnect کند (نسل جدید با prefix=DB). recovered فقط با grace timeout.
           if (!manuallyFinalized) {
             if (rec.terminal) return;
-            query(`UPDATE sessions SET transcript = ?, updated_at = NOW() WHERE id = ?`,
+            query(`UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1, updated_at = NOW() WHERE id = ?`,
               [finalText, sessionId]).catch(() => {});
             if (rec.engineGeneration === gen) rec.engine = null;
             clearReorderTimer(rec);
@@ -330,7 +332,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
           rec.terminal = 'completed';
           console.log(`[ws] session ${sessionId} gen ${gen} → status: ${newStatus}`);
           query(
-            `UPDATE sessions SET transcript = ?, status = ?, updated_at = NOW() WHERE id = ?`,
+            `UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1, status = ?, updated_at = NOW() WHERE id = ?`,
             [finalText, newStatus, sessionId]
           ).then(() => {
             releaseEngineIfCurrent();
@@ -458,7 +460,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
                       const lastLen = (rec as any).lastConfirmedLen ?? 0;
                       if (finalText.length < lastLen) return;
                       (rec as any).lastConfirmedLen = finalText.length;
-                      query('UPDATE sessions SET transcript = ?, updated_at = NOW() WHERE id = ?', [finalText, sessionId]).catch(() => {});
+                      query('UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1, updated_at = NOW() WHERE id = ?', [finalText, sessionId]).catch(() => {});
                     }
                   },
                   onStatus: (status, message) => {
@@ -475,7 +477,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
                     safeSend({ type: 'finished', finalText });
                     if (!manuallyFinalized) {
                       if (rec.terminal) return;
-                      query(`UPDATE sessions SET transcript = ?, updated_at = NOW() WHERE id = ?`,
+                      query(`UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1, updated_at = NOW() WHERE id = ?`,
                         [finalText, sessionId]).catch(() => {});
                       if (rec.engineGeneration === gen) rec.engine = null;
                       try { socket.close(); } catch {}
@@ -484,7 +486,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
                     const ns = 'completed';
                     if (rec.terminal === 'canceled' || rec.terminal === 'completed') return;
                     rec.terminal = 'completed';
-                    query(`UPDATE sessions SET transcript = ?, status = ?, updated_at = NOW() WHERE id = ?`,
+                    query(`UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1, status = ?, updated_at = NOW() WHERE id = ?`,
                       [finalText, ns, sessionId]).then(() => {
                         if (rec.engineGeneration === gen) rec.engine = null;
                         rec.connectionState = 'CLOSED';
@@ -529,7 +531,7 @@ export async function transcriptionRoutes(app: FastifyInstance) {
                 try {
                   const t = await query('SELECT transcript FROM sessions WHERE id = ?', [sessionId]);
                   const cur = t.rows[0]?.transcript ?? '';
-                  await query(`UPDATE sessions SET transcript = ?, status = 'completed', updated_at = NOW() WHERE id = ?`, [cur, sessionId]);
+                  await query(`UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1, status = 'completed', updated_at = NOW() WHERE id = ?`, [cur, sessionId]);
                 } catch {}
                 rec.terminal = 'completed';
                 rec.connectionState = 'CLOSED';

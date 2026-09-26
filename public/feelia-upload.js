@@ -323,10 +323,15 @@
       try {
         var body = {
           client_id: task.clientId, file_name: task.fileName, size: task.size, mime: task.mime,
-          fingerprint: task.fingerprint, session_date: task.sessionDate || undefined, consent: true,
+          fingerprint: task.fingerprint, session_date: task.sessionDate || undefined,
         };
+        // ⭐ (A1.8، 2026-09-26) رضایت فقط با شروعِ دستیِ همین آپلود (تیکِ مودال) فرستاده می‌شود و فقط تا اولین پاسخِ
+        // موفق؛ قبلاً هر resume/retry (حتی بعد از رفرش یا لغوِ رضایت) consent:true می‌فرستاد و رضایتِ لغوشده را
+        // بی‌صدا دوباره ثبت می‌کرد. بعد از آن سرور به رضایتِ ثبت‌شده‌ی مراجع تکیه می‌کند.
+        if (task.consent) body.consent = true;
         if (task.groupId) { body.group_id = task.groupId; body.part_index = task.partIndex; body.parts_total = task.partsTotal; }
         init = await jsonReq('POST', '/api/uploads', body);
+        task.consent = false;
         break;
       } catch (e) {
         if (task.canceled) return;
@@ -471,6 +476,7 @@
         key: null, therapistId: therapistId, clientId: opts.clientId, clientLabel: opts.clientLabel || '',
         sessionDate: opts.sessionDate || '', fileName: file.name, size: file.size, mime: file.type || '',
         file: file, state: 'hashing', createdAt: Date.now(), persistable: true, doneBytes: 0, inflightBytes: 0,
+        consent: true, // فقط در حافظه (persist نمی‌شود) — شروعِ دستی بعد از تیکِ رضایت
       };
       var tmpKey = 'tmp-' + task.createdAt;
       task.key = tmpKey;
@@ -506,6 +512,7 @@
           sessionDate: opts.sessionDate || '', fileName: file.name, size: file.size, mime: file.type || '',
           file: file, state: 'hashing', createdAt: createdAt, persistable: true, doneBytes: 0, inflightBytes: 0,
           groupId: groupId, partIndex: i, partsTotal: files.length,
+          consent: true, // فقط در حافظه — شروعِ دستی بعد از تیکِ رضایت
         };
         tasks[task.key] = task;
         return task;

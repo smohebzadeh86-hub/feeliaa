@@ -144,7 +144,11 @@ export const sqlJobStore: JobStore = {
         `UPDATE audio_jobs SET stage = 'failed', error_code = ?, finished_at = NOW(), locked_until = NULL WHERE id = ?`, [errorCode, job.id]);
       if ((r as any).affectedRows) {
         await createNotification({ therapistId: job.therapistId, kind: 'processing_failed', clientId: job.clientId, sessionId: job.sessionId, jobId: job.id, errorCode }, conn);
-        await conn.query(`UPDATE sessions SET batch_status = 'failed', updated_at = NOW() WHERE id = ?`, [job.sessionId]);
+        // ⭐ (A5، 2026-09-26) شکست بعد از اعمالِ متن (مرحله‌ی پرونده) رونویسی را «ناموفق» نمی‌کند — متن ذخیره شده است.
+        await conn.query(
+          `UPDATE sessions SET batch_status = 'failed', updated_at = NOW()
+            WHERE id = ? AND NOT EXISTS (SELECT 1 FROM audio_jobs j WHERE j.id = ? AND j.transcript_applied_at IS NOT NULL)`,
+          [job.sessionId, job.id]);
       }
       await conn.commit();
     } catch (e) {
@@ -162,6 +166,12 @@ export const sqlJobStore: JobStore = {
     await query(
       `UPDATE audio_jobs SET stage = 'done', case_file_status = ?, finished_at = NOW(), error_code = NULL WHERE id = ?`,
       [caseFileStatus, job.id]
+    );
+    // ⭐ (A5، 2026-09-26) retryِ jobِ شکست‌خورده batch_status را 'queued' می‌کند (requeueFailedJob)؛ قبلاً finish آن را
+    // برنمی‌گرداند و جلسه با متنِ کامل برایِ همیشه «در صف» دیده می‌شد.
+    await query(
+      `UPDATE sessions SET batch_status = 'done', updated_at = NOW() WHERE id = ? AND batch_status IN ('queued','processing','failed')`,
+      [job.sessionId]
     );
     job.stage = 'done';
     job.caseFileStatus = caseFileStatus;
@@ -410,8 +420,10 @@ const LEGACY_NAME_RE = /^[0-9a-f-]{36}(-note|-resolve)?\.webm$/i;
 export async function sweepSonioxOrphans(): Promise<void> {
   if (!process.env.SONIOX_API_KEY || process.env.SONIOX_ORPHAN_SWEEP !== '1') return;
   try {
+    // ⭐ (A4، 2026-09-26) فقط jobهایِ هنوز در جریان منابعشان را «زنده» نگه می‌دارند؛ قبلاً jobِ done/failed که
+    // حذفِ منبعش شکست خورده بود شناسه را نگه می‌داشت و همان شناسه منبع را برایِ همیشه از sweep مصون می‌کرد.
     const refs = await query(`SELECT soniox_file_id, soniox_transcription_id FROM audio_jobs
-      WHERE soniox_file_id IS NOT NULL OR soniox_transcription_id IS NOT NULL`);
+      WHERE stage NOT IN ('done','failed') AND (soniox_file_id IS NOT NULL OR soniox_transcription_id IS NOT NULL)`);
     const liveFiles = new Set(refs.rows.map((r: any) => r.soniox_file_id).filter(Boolean));
     const liveTr = new Set(refs.rows.map((r: any) => r.soniox_transcription_id).filter(Boolean));
     const cutoff = Date.now() - ORPHAN_AGE_MS;

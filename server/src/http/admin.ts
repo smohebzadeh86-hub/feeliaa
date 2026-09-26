@@ -4,10 +4,11 @@ import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../db/connection.js';
 import { requireAdmin } from '../auth/guard.js';
-import { listSessionAudio, getSessionAudioRow, getFullSessionAudio, deleteSessionAudioDirs, deriveSessionStatus } from '../stt/sessionAudioArchive.js';
+import { listSessionAudio, getSessionAudioRow, getFullSessionAudio, deleteSessionAudioDirs, deriveSessionStatus, checkSeqContiguous, SESSION_AUDIO_RETENTION_MS } from '../stt/sessionAudioArchive.js';
 import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
 import { pendingAudiosFor } from '../stt/batchqueue.js';
 import { logEvent, obsQueueStats } from '../obs/eventLog.js';
+import { recordAudit } from '../obs/audit.js';
 
 // پارسِ امنِ Range: bytes=start-end با clamp به اندازه‌ی واقعیِ فایل.
 // خروجی null یعنی range غیرقابلِ‌ارضا (باید 416 برگردد) — قبلاً start فراتر از
@@ -26,6 +27,26 @@ function parseRange(rangeHeader: string, size: number): { start: number; end: nu
   if (start > end || start < 0 || start >= size) return null;
   if (end >= size) end = size - 1;
   return { start, end };
+}
+
+// ————— فیلترهایِ مشترکِ آرشیوِ صدا / یادداشت‌هایِ صوتی (B2/B3، 2026-09-26) —————
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+// سکوت: همان آستانه‌ی diagnosis — جلساتِ سالم ۱۱–۲۵ kbps؛ زیرِ ۶ با بیش از ۲۰ث صدا یعنی میکروفون چیزی نگرفته.
+const SILENT_KBPS = 6;
+function audioFilters(q: Record<string, string | undefined>, alias: { therapist: string; client: string; ts: string }) {
+  const where: string[] = [];
+  const params: unknown[] = [];
+  if (q.therapist_id && UUID_RE.test(q.therapist_id)) { where.push(`${alias.therapist} = ?`); params.push(q.therapist_id); }
+  if (q.client_id && UUID_RE.test(q.client_id)) { where.push(`${alias.client} = ?`); params.push(q.client_id); }
+  if (q.from && DATE_RE.test(q.from)) { where.push(`${alias.ts} >= ?`); params.push(q.from + ' 00:00:00'); }
+  if (q.to && DATE_RE.test(q.to)) { where.push(`${alias.ts} < DATE_ADD(?, INTERVAL 1 DAY)`); params.push(q.to + ' 00:00:00'); }
+  return { sql: where.length ? ' AND ' + where.join(' AND ') : '', params };
+}
+function pageParams(q: Record<string, string | undefined>) {
+  const limit = Math.min(100, Math.max(1, Number(q.limit) || 30));
+  const offset = Math.max(0, Number(q.offset) || 0);
+  return { limit, offset };
 }
 
 // دیتای کاملِ یک تراپیست: مراجعین + جلسات (با متنِ رونویسی) + یادداشت‌ها/علائم.
@@ -149,6 +170,7 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     const sessions = await query(`
       SELECT s.id, s.session_num, s.date, s.start_time, s.duration_ms, s.status, s.source, s.consent,
+        s.updated_at, s.batch_status, s.auto_closed_at, s.realtime_reliable, CHAR_LENGTH(COALESCE(s.transcript, '')) as transcript_len,
         COUNT(a.id) as audio_count
       FROM sessions s
       LEFT JOIN session_audio a ON a.session_id = s.id
@@ -165,7 +187,8 @@ export async function adminRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const session = await query(`
       SELECT s.id, s.client_id, s.session_num, s.date, s.start_time, s.duration_ms,
-        s.status, s.source, s.consent, s.transcript, s.created_at
+        s.status, s.source, s.consent, s.transcript, s.created_at,
+        s.updated_at, s.transcript_version, s.realtime_reliable, s.stt_mode, s.batch_status, s.auto_closed_at
       FROM sessions s WHERE s.id = ?
     `, [id]);
     if (session.rows.length === 0) {
@@ -178,6 +201,8 @@ export async function adminRoutes(app: FastifyInstance) {
       WHERE session_id = ?
       ORDER BY (offset_ms IS NULL), offset_ms, created_at
     `, [id]);
+    // (A6) مشاهده‌ی متنِ بالینیِ یک جلسه توسطِ ادمین ممیزی می‌شود.
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.session_view', targetType: 'session', targetId: id });
     return { session: session.rows[0], notes: notes.rows };
   });
 
@@ -253,6 +278,10 @@ export async function adminRoutes(app: FastifyInstance) {
     // بخشِ ۵ی audit «zero-loss recording» (2026-09-22): این فایل قبلاً بدونِ هیچ سیگنالی
     // دربارهٔ کاملیت سرو می‌شد — caller ای که مستقیم این endpoint را می‌زند (نه از مسیرِ
     // UIِ فعلی که جدا از `/audio` چک می‌کند) هیچ راهی برایِ فهمیدنِ gapِ احتمالی نداشت.
+    // (A6) پخش/دانلودِ صدا — فقط شروعِ پخش (بدونِ Range یا Rangeِ از بایتِ ۰)، نه هر درخواستِ Rangeِ scrub.
+    if (download || !request.headers.range || /^bytes=0-/.test(String(request.headers.range))) {
+      await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: download ? 'admin.audio_download' : 'admin.audio_play', targetType: 'session', targetId: id, detail: { kind: 'full' } });
+    }
     reply.header('X-Audio-Complete', String(result.complete));
     if (!result.complete) {
       reply.header('X-Audio-Missing-Segments', result.missingSegments.join(','));
@@ -297,6 +326,9 @@ export async function adminRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'فایل رویِ دیسک پیدا نشد' };
     }
+    if (download || !request.headers.range || /^bytes=0-/.test(String(request.headers.range))) {
+      await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: download ? 'admin.audio_download' : 'admin.audio_play', targetType: 'session_audio', targetId: audioId, detail: { kind: row.kind } });
+    }
     if (download) {
       const ext = (row.mime && row.mime.includes('ogg')) ? 'ogg' : 'webm';
       reply.header('Content-Disposition', `attachment; filename="segment-${String(row.seq).padStart(6, '0')}.${ext}"`);
@@ -336,6 +368,7 @@ export async function adminRoutes(app: FastifyInstance) {
       return { error: 'تراپیست یافت نشد' };
     }
     logEvent({ event: 'admin.export', therapistId: request.therapistId, detail: { kind: 'therapist' } });
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.export', targetType: 'therapist', targetId: id, detail: { kind: 'therapist' } });
     reply.header('Content-Disposition', `attachment; filename="feelia-${data.therapist.phone}.json"`);
     reply.type('application/json');
     return data;
@@ -350,6 +383,7 @@ export async function adminRoutes(app: FastifyInstance) {
       if (data) all.push(data);
     }
     logEvent({ event: 'admin.export', therapistId: request.therapistId, detail: { kind: 'full', count: all.length } });
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.export', targetType: 'system', detail: { kind: 'full', count: all.length } });
     reply.header('Content-Disposition', `attachment; filename="feelia-export-${new Date().toISOString().slice(0, 10)}.json"`);
     reply.type('application/json');
     return { exported_at: new Date().toISOString(), therapists: all };
@@ -393,6 +427,8 @@ export async function adminRoutes(app: FastifyInstance) {
       return { error: 'تراپیست یافت نشد' };
     }
 
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.therapist_update', targetType: 'therapist', targetId: id,
+      detail: { ...(typeof active === 'boolean' ? { state: active ? 'active' : 'inactive' } : {}), ...(typeof is_admin === 'boolean' ? { mode: is_admin ? 'admin' : 'not_admin' } : {}) } });
     const result = await query(
       'SELECT id, phone, email, name, is_admin, active, created_at FROM therapists WHERE id = ?',
       [id]
@@ -426,6 +462,7 @@ export async function adminRoutes(app: FastifyInstance) {
     deleteSessionAudioDirs(sessionIds);
     releaseSonioxRefs(sonioxRefs);
     logEvent({ event: 'admin.delete', therapistId: request.therapistId, detail: { kind: 'therapist' } });
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.therapist_delete', targetType: 'therapist', targetId: id, detail: { count: sessionIds.length } });
 
     return { deleted: existing.rows[0].phone };
   });
@@ -447,8 +484,153 @@ export async function adminRoutes(app: FastifyInstance) {
     deleteSessionAudioDirs(sessionIds);
     releaseSonioxRefs(sonioxRefs);
     logEvent({ event: 'admin.delete', therapistId: request.therapistId, detail: { kind: 'client' } });
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.client_delete', targetType: 'client', targetId: id, detail: { count: sessionIds.length } });
 
     return { deleted: existing.rows[0].code };
+  });
+
+  // ————————————————— B2 (2026-09-26): آرشیوِ صدا —————————————————
+  // GET /api/admin/audio-archive?therapist_id&client_id&from&to&limit&offset — فهرستِ جلسه‌به‌جلسه‌ی صدایِ آرشیوشده (فقط
+  // kind='session')، فقط متادیتا (هیچ متنی). روزهایِ باقی‌مانده تا حذفِ قدیمی‌ترین سگمنت در خودِ SQL (هم‌زمان با sweep).
+  app.get('/api/admin/audio-archive', async (request) => {
+    const q = request.query as Record<string, string | undefined>;
+    const f = audioFilters(q, { therapist: 'c.therapist_id', client: 's.client_id', ts: 'a.created_at' });
+    const { limit, offset } = pageParams(q);
+    const retentionSec = Math.floor(SESSION_AUDIO_RETENTION_MS / 1000);
+    const base = `FROM session_audio a JOIN sessions s ON s.id = a.session_id JOIN clients c ON c.id = s.client_id
+      JOIN therapists t ON t.id = c.therapist_id WHERE a.kind = 'session'${f.sql}`;
+    const r = await query(
+      `SELECT s.id AS session_id, s.session_num, s.date, s.status, s.source, s.client_id, c.code AS client_code,
+              c.therapist_id, t.name AS therapist_name,
+              COUNT(*) AS segments, COALESCE(SUM(a.bytes), 0) AS bytes, COALESCE(SUM(a.duration_ms), 0) AS audio_ms,
+              MIN(a.created_at) AS first_at, MAX(a.created_at) AS last_at,
+              TIMESTAMPDIFF(SECOND, NOW(), MIN(a.created_at) + INTERVAL ? SECOND) AS expires_in_sec
+         ${base}
+        GROUP BY s.id, s.session_num, s.date, s.status, s.source, s.client_id, c.code, c.therapist_id, t.name
+        ORDER BY last_at DESC LIMIT ? OFFSET ?`,
+      [retentionSec, ...f.params, limit + 1, offset]
+    );
+    const rows = r.rows.slice(0, limit) as any[];
+    const ids = rows.map((x) => x.session_id);
+    const seqs = new Map<string, any[]>();
+    if (ids.length) {
+      const sr = await query(`SELECT session_id, seq FROM session_audio WHERE kind = 'session' AND session_id IN (${ids.map(() => '?').join(',')})`, ids);
+      for (const x of sr.rows) { if (!seqs.has(x.session_id)) seqs.set(x.session_id, []); seqs.get(x.session_id)!.push(x); }
+    }
+    const items = rows.map((x) => {
+      const audioMs = Number(x.audio_ms) || 0;
+      const bytes = Number(x.bytes) || 0;
+      const kbps = audioMs > 0 ? Math.round((bytes * 8) / audioMs * 10) / 10 : null;
+      const { complete, missing } = checkSeqContiguous(seqs.get(x.session_id) || []);
+      const pending = pendingAudiosFor(x.session_id, 'transcript').length + pendingAudiosFor(x.session_id, 'late-transcript').length + pendingAudiosFor(x.session_id, 'archive').length;
+      return {
+        session_id: x.session_id, session_num: x.session_num, date: x.date, status: x.status, source: x.source,
+        client_id: x.client_id, client_code: x.client_code, therapist_id: x.therapist_id, therapist_name: x.therapist_name,
+        segments: Number(x.segments), bytes, audio_ms: audioMs, audio_kbps: kbps,
+        silent: kbps !== null && audioMs > 20000 && kbps < SILENT_KBPS,
+        complete, missing_segments: missing, pending_count: pending,
+        first_at: x.first_at, last_at: x.last_at,
+        days_left: Math.max(0, Math.ceil(Number(x.expires_in_sec) / 86400)),
+      };
+    });
+    const tot = await query(
+      `SELECT COUNT(DISTINCT a.session_id) AS sessions, COALESCE(SUM(a.bytes), 0) AS bytes, COALESCE(SUM(a.duration_ms), 0) AS audio_ms ${base}`,
+      f.params
+    );
+    const exp = await query(
+      `SELECT COUNT(*) AS n FROM (SELECT a.session_id, MIN(a.created_at) AS m ${base} GROUP BY a.session_id) x
+        WHERE TIMESTAMPDIFF(SECOND, NOW(), x.m + INTERVAL ? SECOND) <= 2 * 86400`,
+      [...f.params, retentionSec]
+    );
+    return {
+      items,
+      has_more: r.rows.length > limit,
+      totals: {
+        sessions: Number(tot.rows[0]?.sessions || 0),
+        bytes: Number(tot.rows[0]?.bytes || 0),
+        audio_ms: Number(tot.rows[0]?.audio_ms || 0),
+        expiring_2d: Number(exp.rows[0]?.n || 0),
+      },
+      retention_days: Math.round(SESSION_AUDIO_RETENTION_MS / 86400000),
+    };
+  });
+
+  // DELETE /api/admin/sessions/:id/audio — فقط صدایِ یک جلسه (نه خودِ جلسه/متن). صدایی که هنوز در صفِ رونویسی است
+  // حذف نمی‌شود (409) تا متنی که فقط از همان صدا بازیابی‌پذیر است گم نشود. LAW-010 + ممیزی.
+  app.delete('/api/admin/sessions/:id/audio', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const s = await query('SELECT id FROM sessions WHERE id = ?', [id]);
+    if (!s.rows.length) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+    const pending = pendingAudiosFor(id, 'transcript').length + pendingAudiosFor(id, 'late-transcript').length + pendingAudiosFor(id, 'note').length;
+    if (pending > 0) {
+      reply.code(409);
+      return { error: 'بخشی از صدایِ این جلسه هنوز در صفِ رونویسی است — بعد از پایانِ پردازش دوباره امتحان کنید', code: 'audio-pending', pending_count: pending };
+    }
+    const cnt = await query('SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b FROM session_audio WHERE session_id = ?', [id]);
+    const n = Number(cnt.rows[0]?.n || 0);
+    const b = Number(cnt.rows[0]?.b || 0);
+    await query('DELETE FROM session_audio WHERE session_id = ?', [id]);
+    deleteSessionAudioDirs([id]);
+    logEvent({ event: 'admin.delete', therapistId: request.therapistId, sessionId: id, detail: { kind: 'session_audio', count: n } });
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.session_audio_delete', targetType: 'session', targetId: id, detail: { count: n, bytes: b } });
+    return { deleted: n, bytes: b };
+  });
+
+  // ————————————————— B3 (2026-09-26): یادداشت‌هایِ صوتی —————————————————
+  // GET /api/admin/voice-notes?therapist_id&client_id&from&to&limit&offset — جلسه‌به‌جلسه: یادداشت‌هایِ صوتی (فقط طول، نه
+  // متن — تصمیمِ D2: متن فقط با کلیکِ صریح) + صدایِ یادداشت‌ها (kind='note'). جلسه‌ای که فقط صدا دارد (رونویسی ناموفق) هم می‌آید.
+  app.get('/api/admin/voice-notes', async (request) => {
+    const q = request.query as Record<string, string | undefined>;
+    const f = audioFilters(q, { therapist: 'c.therapist_id', client: 's.client_id', ts: 'x.ts' });
+    const { limit, offset } = pageParams(q);
+    const r = await query(
+      `SELECT x.session_id, MAX(x.ts) AS last_at FROM (
+          SELECT n.session_id, n.created_at AS ts FROM session_notes n WHERE n.type = 'voice'
+          UNION ALL SELECT a.session_id, a.created_at AS ts FROM session_audio a WHERE a.kind = 'note'
+        ) x JOIN sessions s ON s.id = x.session_id JOIN clients c ON c.id = s.client_id
+        WHERE 1 = 1${f.sql}
+        GROUP BY x.session_id ORDER BY last_at DESC LIMIT ? OFFSET ?`,
+      [...f.params, limit + 1, offset]
+    );
+    const page = r.rows.slice(0, limit) as any[];
+    const ids = page.map((x) => x.session_id);
+    if (!ids.length) return { items: [], has_more: false };
+    const ph = ids.map(() => '?').join(',');
+    const info = await query(
+      `SELECT s.id, s.session_num, s.date, s.status, s.client_id, c.code AS client_code, c.therapist_id, t.name AS therapist_name
+         FROM sessions s JOIN clients c ON c.id = s.client_id JOIN therapists t ON t.id = c.therapist_id WHERE s.id IN (${ph})`, ids);
+    const notes = await query(
+      `SELECT id, session_id, wall_clock, created_at, CHAR_LENGTH(COALESCE(text, '')) AS text_len FROM session_notes
+        WHERE type = 'voice' AND session_id IN (${ph}) ORDER BY created_at`, ids);
+    const audio = await query(
+      `SELECT id, session_id, bytes, duration_ms, created_at FROM session_audio WHERE kind = 'note' AND session_id IN (${ph}) ORDER BY created_at`, ids);
+    const byId = new Map(info.rows.map((x: any) => [x.id, x]));
+    const items = page.map((p) => {
+      const s: any = byId.get(p.session_id) || {};
+      return {
+        session_id: p.session_id, session_num: s.session_num, date: s.date, status: s.status,
+        client_id: s.client_id, client_code: s.client_code, therapist_id: s.therapist_id, therapist_name: s.therapist_name,
+        last_at: p.last_at,
+        notes: notes.rows.filter((n: any) => n.session_id === p.session_id).map((n: any) => ({ id: n.id, wall_clock: n.wall_clock, created_at: n.created_at, text_len: Number(n.text_len) })),
+        audio: audio.rows.filter((a: any) => a.session_id === p.session_id).map((a: any) => ({ id: a.id, bytes: Number(a.bytes), duration_ms: a.duration_ms, created_at: a.created_at })),
+      };
+    });
+    return { items, has_more: r.rows.length > limit };
+  });
+
+  // GET /api/admin/voice-notes/:noteId/text — متنِ یک یادداشتِ صوتی، فقط با کلیکِ صریحِ ادمین؛ ممیزی می‌شود.
+  app.get('/api/admin/voice-notes/:noteId/text', async (request, reply) => {
+    const { noteId } = request.params as { noteId: string };
+    const r = await query(`SELECT id, session_id, text FROM session_notes WHERE id = ? AND type = 'voice'`, [noteId]);
+    if (!r.rows.length) {
+      reply.code(404);
+      return { error: 'یادداشت یافت نشد' };
+    }
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.voice_note_text_view', targetType: 'note', targetId: noteId });
+    return { id: noteId, session_id: r.rows[0].session_id, text: r.rows[0].text || '' };
   });
 
   // ————————————————— لایه‌ی رصد/حسابرسی — فازِ ۱ (پنلِ ادمین) —————————————————
@@ -495,6 +677,96 @@ export async function adminRoutes(app: FastifyInstance) {
       [...params, limit, offset]
     );
     return { sessions: rows.rows };
+  });
+
+  // GET /api/admin/sessions/:id/diagnosis — «چه اتفاقی افتاد؟» به زبانِ ساده (audit ذخیره‌سازی 2026-09-26).
+  // ادمین قبلاً فقط رویدادهایِ خام (timeline) داشت و نمی‌توانست بفهمد صدا سکوت بوده، میکروفون قطع شده،
+  // صفحه پنهان شده یا پایان کِی زده شده. همه از داده‌یِ موجود محاسبه می‌شود؛ متنِ بالینی برگردانده نمی‌شود
+  // (فقط شمارش/طول — LAW-001).
+  app.get('/api/admin/sessions/:id/diagnosis', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const sres = await query(
+      `SELECT id, status, source, duration_ms, created_at, updated_at, batch_status, realtime_reliable, transcript
+       FROM sessions WHERE id = ?`, [id]
+    );
+    if (sres.rows.length === 0) { reply.code(404); return { error: 'جلسه یافت نشد' }; }
+    const s = sres.rows[0] as any;
+    const audioRows = (await listSessionAudio(id)).filter((r) => r.kind === 'session');
+    const audioMs = audioRows.reduce((a, r) => a + (Number(r.duration_ms) || 0), 0);
+    const audioBytes = audioRows.reduce((a, r) => a + (Number(r.bytes) || 0), 0);
+    const kbps = audioMs > 0 ? Math.round((audioBytes * 8) / audioMs * 10) / 10 : null;
+    const seqs = audioRows.map((r) => r.seq);
+    const missing: number[] = [];
+    if (seqs.length) for (let i = 0; i <= Math.max(...seqs); i++) if (!seqs.includes(i)) missing.push(i);
+    const pendingCount = pendingAudiosFor(id, 'transcript').length + pendingAudiosFor(id, 'late-transcript').length + pendingAudiosFor(id, 'archive').length;
+
+    const ev = (await query('SELECT ts, event, detail FROM obs_events WHERE session_id = ? ORDER BY ts', [id])).rows as any[];
+    const countEv = (name: string, pred?: (d: any) => boolean) => ev.filter((e) => e.event === name && (!pred || pred(e.detail || {}))).length;
+    const wsDrops = countEv('rt.ws_close', (d) => d.close_code !== 1000 && d.close_code !== 1005);
+    const reconnectOk = countEv('rt.reconnect_ok');
+    const exhausted = countEv('rt.reconnect_exhausted');
+    const mintFailed = countEv('rt.mint_failed');
+    const micLost = countEv('rt.mic_lost');
+    const batchFailed = countEv('batch.failed') + countEv('batch.segment_unrecoverable');
+    const unreadable = countEv('audio.segment_unreadable');
+    const quality = [...new Set(ev.filter((e) => e.event === 'rt.audio_quality_warn').map((e) => (e.detail || {}).reason).filter(Boolean))];
+
+    const ui = (await query('SELECT ts, kind, target_id FROM obs_ui_events WHERE session_id = ? ORDER BY ts', [id])).rows as any[];
+    const endClick = ui.find((u) => u.kind === 'click' && u.target_id === 'btnEndSession');
+    const completedAt = ev.find((e) => e.event === 'rt.state_change' && (e.detail || {}).state === 'COMPLETED')?.ts || null;
+    let hiddenCount = 0, hiddenMs = 0, hiddenAt: number | null = null;
+    const stopAt = endClick ? new Date(endClick.ts).getTime() : Infinity;
+    for (const u of ui) {
+      if (u.kind !== 'visibility') continue;
+      const t = new Date(u.ts).getTime();
+      if (t > stopAt) break;
+      if (u.target_id === 'hidden' && hiddenAt === null) { hiddenAt = t; hiddenCount++; }
+      else if (u.target_id === 'visible' && hiddenAt !== null) { hiddenMs += t - hiddenAt; hiddenAt = null; }
+    }
+
+    const text: string = s.transcript || '';
+    const paras = text.split(/\n\n+/).filter(Boolean);
+    const shortParas = paras.filter((p) => p.replace(/^گوینده [۰-۹0-9]+:\s*/, '').trim().split(/\s+/).filter(Boolean).length <= 3).length;
+    const durMs = Number(s.duration_ms) || 0;
+
+    type F = { level: 'ok' | 'warn' | 'error'; text: string };
+    const findings: F[] = [];
+    const sec = (ms: number) => Math.round(ms / 1000);
+    if (s.source === 'live') {
+      if (s.status === 'in_progress' || s.status === 'recovered') findings.push({ level: 'warn', text: 'جلسه «پایان» نخورده است؛ داده تا آخرین ذخیره موجود است.' });
+      if (endClick) findings.push({ level: 'ok', text: `دکمه‌ی «پایان جلسه» زده شد (ساعتِ ${new Date(endClick.ts).toLocaleTimeString('fa-IR', { timeZone: 'Asia/Tehran' })}).` });
+      if (!audioRows.length) findings.push({ level: 'error', text: 'هیچ صدایی برایِ این جلسه به سرور نرسیده است.' });
+      else {
+        if (durMs > 0 && audioMs < durMs * 0.9) findings.push({ level: 'error', text: `صدایِ رسیده (${sec(audioMs)}ث) کمتر از مدتِ جلسه (${sec(durMs)}ث) است — ${sec(durMs - audioMs)} ثانیه صدا نرسیده.` });
+        else findings.push({ level: 'ok', text: `صدایِ کاملِ جلسه رسیده است (${sec(audioMs)}ث در ${audioRows.length} تکه).` });
+        if (kbps !== null && audioMs > 20000 && kbps < 6) findings.push({ level: 'error', text: `صدا عملاً سکوت است (${kbps} kbps؛ جلساتِ سالم ۱۱–۲۵). میکروفون صدایی نگرفته — میکروفونِ اشتباه/بی‌صدا یا اشغال توسطِ برنامه‌ی دیگر.` });
+        if (missing.length) findings.push({ level: 'error', text: `${missing.length} تکه از صدا هرگز به سرور نرسید (شماره‌ها: ${missing.join('، ')}).` });
+      }
+      if (unreadable) findings.push({ level: 'warn', text: 'بعضی تکه‌هایِ صدا خراب‌اند و از فایلِ کامل کنار گذاشته شدند.' });
+      if (pendingCount) findings.push({ level: 'warn', text: `${pendingCount} فایلِ صدا هنوز در صفِ پردازشِ سرور است.` });
+      if (micLost) findings.push({ level: 'error', text: `میکروفون ${micLost} بار حینِ ضبط قطع شد.` });
+      for (const q of quality) {
+        const m: Record<string, string> = { no_signal: 'میکروفون صدایی نمی‌گرفت', too_quiet: 'صدا خیلی ضعیف بود (دور از میکروفون)', noisy: 'نویزِ محیط غالب بود', clipping: 'صدا خش داشت (خیلی بلند)' };
+        findings.push({ level: 'warn', text: 'هشدارِ کیفیتِ ضبط: ' + (m[q] || q) });
+      }
+      if (hiddenCount) findings.push({ level: 'warn', text: `صفحه ${hiddenCount} بار حینِ جلسه پنهان شد (جمعاً ${sec(hiddenMs)}ث) — رویِ موبایل می‌تواند رونویسی را قطع کند.` });
+      if (wsDrops) findings.push({ level: 'warn', text: `اتصالِ رونویسیِ زنده ${wsDrops} بار قطع شد؛ ${reconnectOk} بار دوباره وصل شد.` });
+      if (exhausted || mintFailed) findings.push({ level: 'error', text: `رونویسیِ زنده مدتی کاملاً در دسترس نبود (${exhausted + mintFailed} رویداد)؛ متنِ آن بازه از صدا بازیابی می‌شود.` });
+      if (batchFailed || s.batch_status === 'failed') findings.push({ level: 'error', text: 'رونویسیِ صدایِ دوره‌ی قطعی ناموفق بود.' });
+      if (audioMs > 60000 && text.length / (audioMs / 1000) < 2) findings.push({ level: 'error', text: `متن نسبت به طولِ صدا خیلی کم است (${text.length} نویسه برایِ ${sec(audioMs)}ث).` });
+      if (paras.length >= 10 && shortParas / paras.length > 0.4) findings.push({ level: 'warn', text: `متن ${paras.length} بندِ گوینده دارد که ${shortParas} تایش ≤۳ کلمه است — تفکیکِ گوینده متن را تکه‌تکه نشان می‌دهد (داده گم نشده).` });
+    }
+    return {
+      diagnosis: {
+        status: s.status, duration_ms: durMs, audio_ms: audioMs, audio_segments: audioRows.length, audio_kbps: kbps,
+        missing_segments: missing, pending_count: pendingCount, ws_drops: wsDrops, reconnect_ok: reconnectOk,
+        reconnect_exhausted: exhausted, mint_failed: mintFailed, mic_lost: micLost, quality_warnings: quality,
+        hidden_count: hiddenCount, hidden_ms: hiddenMs, end_clicked_at: endClick ? endClick.ts : null, completed_at: completedAt,
+        transcript_chars: text.length, speaker_paragraphs: paras.length, short_paragraphs: shortParas,
+        updated_at: s.updated_at,
+      },
+      findings,
+    };
   });
 
   // GET /api/admin/sessions/:id/timeline — همه‌ی رویدادهایِ مرتبط با یک جلسه، مرتب بر ts.

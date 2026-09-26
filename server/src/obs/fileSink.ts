@@ -17,6 +17,15 @@ let stream: WriteStream | null = null;
 let bytesWritten = 0;
 let sinkBroken = false;
 let ensured = false;
+// ⭐ (A6، 2026-09-26) قبلاً یک خطایِ موقت (دیسکِ پر برایِ چند دقیقه، EACCESِ گذرا) sink را تا ری‌استارتِ بعدیِ سرور
+// برایِ همیشه خاموش می‌کرد. حالا بعد از خطا با backoff (۱ دقیقه، دوبرابر، سقفِ ۳۰ دقیقه) دوباره امتحان می‌شود.
+let retryAt = 0;
+let retryDelayMs = 60_000;
+function markBroken() {
+  sinkBroken = true;
+  retryAt = Date.now() + retryDelayMs;
+  retryDelayMs = Math.min(retryDelayMs * 2, 30 * 60_000);
+}
 
 function ensureDir() {
   if (ensured) return;
@@ -41,15 +50,15 @@ function openStream(): WriteStream | null {
     ensureDir();
     const s = createWriteStream(LOG_FILE, { flags: 'a' });
     s.on('error', () => {
-      // خطایِ استریم (مثلاً دیسک پر/EACCES) → فقط خاموش شو، هرگز throw/crash نکن.
-      sinkBroken = true;
+      // خطایِ استریم (مثلاً دیسک پر/EACCES) → فقط خاموش شو (تا retryِ بعدی)، هرگز throw/crash نکن.
+      markBroken();
       try { s.close(); } catch {}
       if (stream === s) stream = null;
     });
     bytesWritten = currentSize();
     return s;
   } catch {
-    sinkBroken = true;
+    markBroken();
     return null;
   }
 }
@@ -80,11 +89,16 @@ function rotate() {
 // همگام است (هیچ caller نباید منتظرِ نوشتنِ دیسک بماند) — هرگز throw نمی‌کند.
 export function writeJsonl(obj: unknown): void {
   try {
-    if (sinkBroken) return;
+    if (sinkBroken) {
+      if (Date.now() < retryAt) return;
+      sinkBroken = false; // تلاشِ دوباره
+      ensured = false;
+    }
     ensureDir();
     if (!stream) {
       stream = openStream();
       if (!stream) return;
+      retryDelayMs = 60_000; // باز شد ⇒ backoff از اول
     }
     if (bytesWritten >= MAX_BYTES) {
       rotate();

@@ -1049,6 +1049,36 @@ const field = (r: ReturnType<typeof finalizeCouple>, key: string) => r.draft.cou
     assert.ok(seenComposeText.includes('سوال: آیا دارویی مصرف می‌شود؟'), 'مرحله‌ی ۲ باید پاسخ را ببیند');
   });
 
+  // ——— A1.9 رفعِ ذخیره‌سازی (2026-09-26): regenerate کارِ تأییدشده‌ی تراپیست و پاسخ‌ها را حذف نمی‌کند ———
+  const LFR = (v: string, reviewed: boolean) => ({ value: v, source: reviewed ? 'therapist' : 'ai', reviewedByTherapist: reviewed, suggestedUpdate: null, pending: false });
+  await t('A1.9a merge: محور/گام/خلاصه‌ی تأییدشده که مدل نیاورد حفظ می‌شود؛ ردیفِ AIِ تأییدنشده نه', () => {
+    const base: any = mvBase();
+    base.axes.push({ id: 'ax-rev', title: 'محورِ تأییدشده‌ی آزمایشی', statusTone: 'good', sensitiveDoNotDiscussInFrontOfClient: false, ...LFR('متنِ تأییدشده', true) });
+    base.axes.push({ id: 'ax-ai', title: 'محورِ AIِ آزمایشی', statusTone: 'good', sensitiveDoNotDiscussInFrontOfClient: false, ...LFR('متنِ مدل', false) });
+    base.roadmap = [
+      { id: 'rm-rev', priority: 1, question: 'گامِ تأییدشده‌ی آزمایشی', why: '', detail: LFR('جزئیاتِ تأییدشده', true) },
+      { id: 'rm-ai', priority: 2, question: 'گامِ AIِ آزمایشی', why: '', detail: LFR('جزئیاتِ مدل', false) },
+    ];
+    base.sessionsSummary = [{ sessionId: 's-old', sessionNum: 99, title: LFR('عنوانِ تأییدشده', true), body: LFR('بدنه', true), durationIndicator: null }];
+    const out = mergeCaseFileDraft(base, finalizeCouple(mkRaw(null), null).draft, corpus);
+    const rev = out.axes.find(a => a.title === 'محورِ تأییدشده‌ی آزمایشی');
+    assert.ok(rev && rev.value === 'متنِ تأییدشده' && rev.reviewedByTherapist, 'محورِ تأییدشده حفظ شود');
+    assert.ok(!out.axes.some(a => a.title === 'محورِ AIِ آزمایشی'), 'محورِ AIِ تأییدنشده جایگزین شود');
+    assert.ok(out.roadmap.some(r => r.question === 'گامِ تأییدشده‌ی آزمایشی'), 'گامِ تأییدشده حفظ شود');
+    assert.ok(!out.roadmap.some(r => r.question === 'گامِ AIِ آزمایشی'), 'گامِ AIِ تأییدنشده حذف شود');
+    assert.ok(out.sessionsSummary.some(s => s.sessionNum === 99 && s.title.value === 'عنوانِ تأییدشده'), 'خلاصه‌ی تأییدشده حفظ شود');
+  });
+  await t('A1.9b force: answeredQuestions حفظ و سوالِ پاسخ‌داده‌شده دوباره باز نمی‌شود', () => {
+    const answered = [{ id: 'q1', question: 'آیا دارویی مصرف می‌شود؟', relatedAxis: null, answer: 'خیر', answeredAt: '2026-01-01T00:00:00.000Z' }];
+    const draft = mkRaw(null, { pendingQuestions: [
+      { question: 'آیا دارویی مصرف می‌شود؟', relatedAxis: null },
+      { question: 'سوالِ تازه', relatedAxis: null },
+    ] });
+    const out = mergeCaseFileDraft(null, finalizeCouple(draft, null).draft, corpus, answered);
+    assert.deepEqual(out.answeredQuestions, answered);
+    assert.deepEqual(out.pendingQuestions.map(q => q.question), ['سوالِ تازه']);
+  });
+
   console.log(`\n${pass} PASS / ${fail} FAIL`);
   process.exit(fail ? 1 : 0);
 })();

@@ -6,6 +6,7 @@ import { hashPassword, verifyPassword } from '../auth/password.js';
 import { createSession, destroySession } from '../auth/session.js';
 import { SESSION_COOKIE, SESSION_COOKIE_MAX_AGE } from '../auth/guard.js';
 import { logEvent } from '../obs/eventLog.js';
+import { recordAudit } from '../obs/audit.js';
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -46,7 +47,9 @@ async function ensureAdminFlag(therapistId: string, normalizedPhone: string): Pr
   if (!adminPhoneRaw) return;
   const adminPhone = normalizePhone(adminPhoneRaw);
   if (!adminPhone || adminPhone !== normalizedPhone) return;
-  await query('UPDATE therapists SET is_admin = true WHERE id = ? AND is_admin = false', [therapistId]);
+  const r = await query('UPDATE therapists SET is_admin = true WHERE id = ? AND is_admin = false', [therapistId]);
+  // (A6) ادمین‌شدنِ خودکار (ADMIN_PHONE) — تنها مسیری که نقشِ ادمین بدونِ کلیکِ ادمینِ دیگری داده می‌شود.
+  if (r.rowCount === 1) await recordAudit({ actorId: therapistId, action: 'admin.flag_granted', targetType: 'therapist', targetId: therapistId });
 }
 
 export async function authRoutes(app: FastifyInstance) {

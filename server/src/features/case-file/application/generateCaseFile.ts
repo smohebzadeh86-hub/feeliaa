@@ -95,7 +95,7 @@ export async function generateCaseFile(
     for (let attempt = 0; attempt < 5 && !record; attempt++) {
       if (attempt > 0) base = await caseFileRepo.get(clientId);
       const baseContent = base && base.content && Object.keys(base.content).length ? base.content : null;
-      const content = mergeCaseFileDraft(opts.force ? null : baseContent, draft, corpus);
+      const content = mergeCaseFileDraft(opts.force ? null : baseContent, draft, corpus, baseContent?.answeredQuestions);
       record = await caseFileRepo.upsert(clientId, {
         content,
         status: 'ready',
