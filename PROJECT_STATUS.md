@@ -394,6 +394,11 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-26 — CODE — شاخه‌ی درختیِ جنسیت در ردیفِ فیلترِ «همه‌ی مراجعین»
+- درخواستِ کاربر: فیلترِ دسته‌بندیِ لیستِ مراجعین هنوز segmentِ درجا بود، ولی فرم‌ها درختی.
+- `renderCategoryChips` (`public/index.html`) حالا برایِ `.cat-filter-row` هم شاخه‌ی درختی می‌سازد؛ کلاسِ `has-tree` ردیف را wrap می‌کند. segmentِ قدیمی دیگر استفاده نمی‌شود (CSSش ماند).
+- تست (Browser pane + mock backendِ scratchpad با دادهٔ CANARY): درخت زیرِ کودک/نوجوان/بزرگسال رسم می‌شود و با «همه» بسته می‌شود؛ فیلترِ جنسیت درست کار می‌کند (کودک+پسر → ۱ کارت)؛ با کلیکِ دوباره جنسیت برداشته می‌شود؛ در عرضِ ۳۷۵px اسکرولِ افقی ندارد؛ خطای console ندارد. commit/deploy نشده.
+
 ### 2026-09-26 — CODE + GIT + DEPLOY — تایمرِ جلسه در قطعی + commit و deployِ `a20ccdb` (production = HEAD)
 - **مجوز:** «بله و سعی کن تمامی مشکلات ممکن رو بررسی کنی و رفع کنی» (در پاسخِ «commit و deploy کنم؟»).
 - **بررسیِ تکمیلی:** یک مشکلِ دیگر پیدا و رفع شد — `rtOnState` در `index.html` در RECONNECTING/NETWORK_PAUSED/FAILED تایمرِ جلسه را متوقف می‌کرد درحالی‌که ضبطِ durable ادامه داشت ⇒ `duration_ms` و `offset_ms`ِ علائم/یادداشت‌ها به اندازه‌ی قطعی‌ها عقب می‌افتاد. حالا فقط وقتی میکروفون (`rtSession.stream`) نیست متوقف می‌شود. بقیه‌ی موارد بررسی‌شده بدونِ مشکل: bodyLimit 1MiB برایِ متنِ ~۱۵۰KB، نبودِ سقفِ طولِ transcript در `PUT /api/sessions/:id`، heartbeatِ leaseِ job (`jobRunner.ts`) با timeoutِ ۲۰دقیقه‌ایِ ffmpeg، سقفِ mint ۳۰/دقیقه با retryِ ۳۰ثانیه‌ای.

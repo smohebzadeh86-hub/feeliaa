@@ -181,6 +181,9 @@ input::-ms-reveal{display:none}
 .filter-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
 .cat-filter-row{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;flex:1;-ms-overflow-style:none;scrollbar-width:none}
 .cat-filter-row::-webkit-scrollbar{display:none}
+/* وقتی دسته‌ی جنسیت‌دار انتخاب شده، شاخه‌ی درختی زیرِ ردیف باز می‌شود (مثلِ فرم‌ها) */
+.cat-filter-row.has-tree{flex-wrap:wrap;overflow:visible}
+.cat-filter-row>button{position:relative;z-index:1}
 .cat-filter-chip{flex:none;height:36px;box-sizing:border-box;padding:0 14px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);font-family:inherit;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center}
 .cat-filter-chip.active{background:var(--sage);border-color:var(--sage);color:#fff}
 /* ⭐ چیپِ دسته‌ای که جنسیت داره، به‌جایِ بازکردنِ ردیفِ دوم، خودش این‌جا
@@ -3352,7 +3355,8 @@ function renderCategoryChips(container,options,state,onPick,chipClass,activeClas
   container.innerHTML='';
   // در فرم‌ها (cat-select) جنسیت به‌صورتِ شاخه‌ی درختی زیرِ دسته باز می‌شود؛
   // در ردیفِ فیلترِ افقی همان segmentِ درجا می‌ماند.
-  const tree=container.classList.contains('cat-select');
+  const tree=container.classList.contains('cat-select')||container.classList.contains('cat-filter-row');
+  container.classList.remove('has-tree');
   let branch=null;
   options.forEach(function(opt){
     const genderOpts=GENDER_OPTIONS[opt.value];
@@ -3408,6 +3412,7 @@ function renderCategoryChips(container,options,state,onPick,chipClass,activeClas
     }
   });
   if(branch){
+    container.classList.add('has-tree');
     container.appendChild(branch);
     // تنه‌ی درخت دقیقاً زیرِ وسطِ chipِ دسته‌ی انتخاب‌شده قرار می‌گیرد
     const b=branch;
