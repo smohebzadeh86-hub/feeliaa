@@ -53,6 +53,19 @@
   // می‌رفت — بدونِ هیچ زمینه‌ی صوتیِ اضافه برایِ بستنِ درستِ آخرین گفته.
   var PAUSE_SILENCE_BUFFER_MS = 250;
   var AUTOSAVE_MS = 5000;
+  // ⭐ جلسه‌ی ۱ساعته (2026-09-26): هر autosave کلِ متن را می‌فرستد؛ با رشدِ متن فاصله‌ی دو ذخیره
+  // بیشتر می‌شود (۵ث تا ~۲۰هزار کاراکتر، هر ۲۰هزار کاراکتر +۲.۵ث، سقف ۱۵ث) و هیچ‌وقت دو PUT هم‌زمان
+  // نمی‌رود (قبلاً رویِ اینترنتِ کند PUTِ بعدی با همان نسخه قبل از پایانِ قبلی می‌رفت → 409 و GETِ اضافه).
+  var AUTOSAVE_MAX_GAP_MS = 15000;
+  function autosaveGapMs(len) {
+    return Math.min(AUTOSAVE_MAX_GAP_MS, AUTOSAVE_MS + Math.floor((len || 0) / 20000) * 2500);
+  }
+  // PUTِ متنِ کامل (تا ~۱۵۰KB در یک ساعت) رویِ اینترنتِ کند بیشتر از REQUEST_TIMEOUT_MS طول می‌کشد.
+  var TRANSCRIPT_PUT_TIMEOUT_MS = 30000;
+  // ⭐ بعد از تمام‌شدنِ MAX_RECONNECT_ATTEMPTS (FAILED)، قبلاً فقط رویدادِ online مرورگر رونویسیِ
+  // زنده را برمی‌گرداند — قطعی‌ای که online/offline نمی‌دهد (Wi-Fi وصل ولی بی‌اینترنت، ردِ موقتِ
+  // Soniox) تا پایانِ جلسه FAILED می‌ماند. حالا هر ۳۰ثانیه یک دورِ کاملِ reconnect دوباره امتحان می‌شود.
+  var FAILED_RETRY_MS = 30000;
   // ⭐ برخلافِ handleWSClose (که به رویدادِ onclose/onerrorِ خودِ WebSocket وابسته است)،
   // یک قطعیِ «بی‌صدا» (کابل/WiFی که بدونِ FIN/RST محو می‌شه) می‌تونه تا مدتی هیچ رویدادی
   // فایر نکنه — در همون فاصله، durable segment هنوز state=ACTIVE می‌بینه و intent=archive
@@ -172,9 +185,17 @@
         });
       });
     }
+    // ⭐ جلسه‌ی ۱ساعته (2026-09-26): قبلاً هر add (هر چرخشِ ۱۵ثانیه‌ای) با getAll() همه‌ی رکوردهایِ
+    // صف (~۲۴۰ سگمنت در یک ساعت، با blob) را می‌خواند تا جمعِ bytes را حساب کند. حالا جمع یک بار
+    // خوانده و در همین تب نگه داشته می‌شود (add اضافه، remove با bytesِ معلوم کم، وگرنه باطل →
+    // خواندنِ دوباره در addِ بعدی). تبِ دیگر ممکن است صف را عوض کند؛ سقف نرم است و خطایِ این شمارنده
+    // فقط تا invalidateِ بعدی می‌ماند.
+    var cachedTotal = null;
     function totalBytes() {
+      if (cachedTotal !== null) return Promise.resolve(cachedTotal);
       return withStore('readonly', function (store) { return store.getAll(); }).then(function (all) {
-        return (all || []).reduce(function (sum, r) { return sum + (r.bytes || 0); }, 0);
+        cachedTotal = (all || []).reduce(function (sum, r) { return sum + (r.bytes || 0); }, 0);
+        return cachedTotal;
       }).catch(function () { return 0; });
     }
     // اضافه‌کردنِ یه سگمنت. اگه از سقف رد بشه، false برمی‌گردونه (ذخیره نمی‌شه).
@@ -199,8 +220,11 @@
           intent: intent || 'archive',
           createdAt: Date.now(),
         };
-        return withStore('readwrite', function (store) { return store.put(rec); }).then(function () { return true; });
-      }).catch(function () { return false; });
+        return withStore('readwrite', function (store) { return store.put(rec); }).then(function () {
+          if (cachedTotal !== null) cachedTotal += blob.size;
+          return true;
+        });
+      }).catch(function () { cachedTotal = null; return false; });
     }
     function listForSession(sessionId) {
       return withStore('readonly', function (store) {
@@ -212,15 +236,18 @@
     }
     // با idِ کاملِ رکورد (نه بازسازیِ دستی) — امن‌تره چون رکوردهایِ قدیمی‌ترِ قبلِ این
     // نسخه (فرمتِ sessionId_seq بدونِ runId) هم درست حذف می‌شن.
-    function remove(id) {
-      return withStore('readwrite', function (store) { return store.delete(id); }).catch(function () {});
+    function remove(id, bytes) {
+      return withStore('readwrite', function (store) { return store.delete(id); }).then(function () {
+        if (cachedTotal !== null && typeof bytes === 'number') cachedTotal = Math.max(0, cachedTotal - bytes);
+        else cachedTotal = null;
+      }).catch(function () { cachedTotal = null; });
     }
     // ⭐ وقتی مسیرِ realtime قابلِ‌اعتماد بود (unreliable=false)، صدایِ durable هیچ‌وقت
     // آپلود نمی‌شه (طبقِ همون قاعده‌ی حریمِ خصوصیِ همیشگی: صدایِ خام فقط توی مسیرِ
     // شکست به سرور می‌ره) — پس نسخه‌هایِ محلی‌اش دیگه لازم نیستن، همین‌جا پاک می‌شن.
     function clearForSession(sessionId) {
       return listForSession(sessionId).then(function (rows) {
-        return Promise.all(rows.map(function (r) { return remove(r.id); }));
+        return Promise.all(rows.map(function (r) { return remove(r.id, r.bytes); }));
       }).catch(function () {});
     }
     // همه‌ی sessionId هایی که هنوز صدایِ آپلودنشده دارن — برایِ جاروبِ هر بارِ لودِ صفحه
@@ -311,7 +338,7 @@
     var timer = controller ? setTimeout(function () {
       timedOut = true;
       try { controller.abort(); } catch (e) {}
-    }, REQUEST_TIMEOUT_MS) : null;
+    }, opts.timeoutMs || REQUEST_TIMEOUT_MS) : null;
     return fetch(path, {
       method: opts.method || 'GET',
       headers: opts.body ? { 'Content-Type': 'application/json' } : undefined,
@@ -443,6 +470,7 @@
     this.state = s;
     if (prevState !== s) obsEvent('rt.state_change', { state: s, prev_state: prevState });
     try { this.cb.onState(s, this.snapshot()); } catch (e) {}
+    syncWakeLock();
     // ⭐ هر بار که واقعاً به ACTIVE/RECOVERED می‌رسیم (شروع، resume، یا reconnect
     // موفق)، اگه صدایی از یه outage قبلی توی صفِ آفلاین مونده، همون‌جا آپلودش کن —
     // نه اینکه کاربر مجبور باشه صبر کنه تا «پایان جلسه» رو بزنه.
@@ -472,6 +500,7 @@
   RTSession.prototype.clearTimers = function () {
     this.timers.forEach(function (t) { clearTimeout(t); });
     this.timers = [];
+    this._failedRetryTimer = null;
     if (this.autosaveTimer) { clearInterval(this.autosaveTimer); this.autosaveTimer = null; }
     if (this.wsWatchdogTimer) { clearInterval(this.wsWatchdogTimer); this.wsWatchdogTimer = null; }
   };
@@ -806,11 +835,22 @@
     });
     self.interim = nonFinal;
     if (grew) self.dirty = true;
-    try { self.cb.onResult({ final: cleanText(self.confirmed), interim: cleanText(self.interim) }); } catch (e) {}
+    try { self.cb.onResult({ final: self.cleanConfirmed(), interim: cleanText(self.interim) }); } catch (e) {}
     if (msg.finished && self.state === STATES.FINALIZING && self.finishResolver) {
       var r = self.finishResolver; self.finishResolver = null;
       r({ finishedEvent: true });
     }
+  };
+
+  // ⭐ جلسه‌ی ۱ساعته (2026-09-26): Soniox چند پیام در ثانیه می‌فرستد و بیشترشان فقط interim دارند؛
+  // قبلاً هر پیام cleanTextِ کلِ متنِ confirmed (تا ~۱۵۰KB) را از نو حساب می‌کرد. حالا فقط وقتی
+  // confirmed واقعاً عوض شده دوباره حساب می‌شود.
+  RTSession.prototype.cleanConfirmed = function () {
+    if (this._cleanSrc !== this.confirmed) {
+      this._cleanSrc = this.confirmed;
+      this._cleanOut = cleanText(this.confirmed);
+    }
+    return this._cleanOut;
   };
 
   RTSession.prototype.handleWSClose = function (ev) {
@@ -856,7 +896,12 @@
       if (!self.unreliable) obsEvent('rt.unreliable_set', { reason: 'reconnect_exhausted' });
       self.unreliable = true;
       self.setState(STATES.FAILED);
-      try { self.cb.onError('اتصالِ زنده قطع شد؛ ضبط ادامه دارد و متن پس از پایان آماده می‌شود'); } catch (e) {}
+      // retryِ دوره‌ای (FAILED_RETRY_MS) همین مسیر را تکرار می‌کند — پیام فقط یک بار در هر دورِ قطعی.
+      if (!self._failedReported) {
+        self._failedReported = true;
+        try { self.cb.onError('اتصالِ زنده قطع شد؛ ضبط ادامه دارد و متن پس از پایان آماده می‌شود'); } catch (e) {}
+      }
+      self.scheduleFailedRetry();
       return;
     }
     var delay = RECONNECT_BACKOFF_MS[Math.min(self.reconnectAttempts, RECONNECT_BACKOFF_MS.length - 1)];
@@ -880,6 +925,19 @@
         if (!ok && !self.noNewConnections && self.state === STATES.RECONNECTING) self.scheduleReconnect('retry');
       });
     }, delay);
+  };
+
+  // از FAILED (به‌جز نشستِ منقضی/401) هر FAILED_RETRY_MS یک دورِ تازه‌ی reconnect — مستقل از رویدادِ online.
+  RTSession.prototype.scheduleFailedRetry = function () {
+    var self = this;
+    if (self._failedRetryTimer || self._sessionDead) return;
+    self._failedRetryTimer = self.later(function () {
+      self._failedRetryTimer = null;
+      if (self.aborted || self.noNewConnections || self._sessionDead || self.state !== STATES.FAILED) return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) { self.scheduleFailedRetry(); return; }
+      self.reconnectAttempts = 0;
+      self.scheduleReconnect('failed-retry');
+    }, FAILED_RETRY_MS);
   };
 
   // BUG-FIX (speaker continuity): Soniox شماره‌گذاری speaker را در هر اتصال WS تازه
@@ -928,6 +986,7 @@
         var attemptsUsed = self.reconnectAttempts;
         self.generation++;
         self.reconnectAttempts = 0;
+        self._failedReported = false;
         self.realtimeUp = true;
         if (isReconnect) {
           obsEvent('rt.reconnect_ok', { attempt: attemptsUsed });
@@ -968,6 +1027,7 @@
       });
       // 401 یعنی نشست Feelia مرده — reconnect بی‌فایده است
       if (err && err.status === 401) {
+        self._sessionDead = true;
         self.setState(STATES.FAILED);
         try { self.cb.onError('نشست منقضی شده — دوباره وارد شوید'); } catch (e) {}
         return false;
@@ -1018,8 +1078,14 @@
             self.realtimeUp = false;
             self.startDurable();
             self.watchOnline(); // اگر اینترنت برگشت، reconnect می‌تواند realtime را بالا بیاورد
+            // autosave/watchdog فقط در ACTIVE کاری می‌کنند؛ قبلاً اینجا شروع نمی‌شدند، پس اگر
+            // reconnect بعداً realtime را بالا می‌آورد، متنِ زنده تا pause/پایان ذخیره نمی‌شد.
+            self.startAutosave();
+            self.startWsWatchdog();
             self.setState(STATES.FAILED);
+            self._failedReported = true;
             try { self.cb.onError('رونویسیِ زنده در دسترس نیست؛ صدا در حال ضبط است و متن پس از پایان آماده می‌شود'); } catch (e) {}
+            self.scheduleFailedRetry();
             return true;
           }
           self.startDurable();
@@ -1098,12 +1164,20 @@
     if (!self.persist) return;
     if (self.autosaveTimer) clearInterval(self.autosaveTimer);
     self.autosaveFailStreak = 0;
+    self.autosaveInFlight = false;
+    self.lastAutosaveAt = 0;
     self.autosaveTimer = setInterval(function () {
+      if (self.autosaveInFlight) return;
+      if (Date.now() - self.lastAutosaveAt < autosaveGapMs(self.confirmed.length) - 500) return;
       if (self.dirty && (self.state === STATES.ACTIVE || self.state === STATES.RECOVERED)) {
         self.dirty = false;
+        self.autosaveInFlight = true;
+        self.lastAutosaveAt = Date.now();
         self.persistConfirmed().then(function () {
+          self.autosaveInFlight = false;
           self.autosaveFailStreak = 0;
         }).catch(function () {
+          self.autosaveInFlight = false;
           self.dirty = true;
           self.autosaveFailStreak++;
           // BUG-FIX: قبلاً شکست‌های پیاپی ذخیره‌سازی کاملاً بی‌صدا بودند — کاربر تا پایان
@@ -1124,7 +1198,8 @@
     var text = cleanText(self.confirmed);
     return reqJson('/api/sessions/' + self.sessionId, {
       method: 'PUT',
-      body: { transcript: text, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' }
+      body: { transcript: text, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' },
+      timeoutMs: TRANSCRIPT_PUT_TIMEOUT_MS
     }).then(function () {
       self.baseVersion++;
       self.persistedText = text;
@@ -1143,6 +1218,16 @@
           // اگر هر دو طرف فقط به همان آخرین متنِ ذخیره‌شده اضافه کرده‌اند، هر دو افزوده حفظ می‌شوند.
           var base = self.persistedText || '';
           var nowText = cleanText(self.confirmed);
+          // ⭐ (2026-09-26) PUTی که سمتِ مرورگر timeout خورده ولی سرور اعمالش کرده: متنِ سرور پیشوندِ
+          // متنِ فعلیِ ماست. شاخه‌ی merge پایین دُمِ «جدید از base» را دوباره پشتِ آن می‌چسباند (تکرارِ متن)؛
+          // اینجا متنِ ما همه‌ی متنِ سرور را دارد، پس همان را با نسخه‌ی تازه می‌نویسیم.
+          if (serverText.length > base.length && nowText.indexOf(serverText) === 0) {
+            return reqJson('/api/sessions/' + self.sessionId, {
+              method: 'PUT',
+              body: { transcript: nowText, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' },
+              timeoutMs: TRANSCRIPT_PUT_TIMEOUT_MS
+            }).then(function () { self.baseVersion++; self.persistedText = nowText; return nowText; });
+          }
           if (serverText.length > base.length && serverText.indexOf(base) === 0 && nowText.indexOf(base) === 0) {
             var tail = nowText.slice(base.length).replace(/^\s+/, '');
             self.confirmed = serverText + (tail ? '\n\n' + tail : '');
@@ -1150,7 +1235,8 @@
             var merged = cleanText(self.confirmed);
             return reqJson('/api/sessions/' + self.sessionId, {
               method: 'PUT',
-              body: { transcript: merged, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' }
+              body: { transcript: merged, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' },
+              timeoutMs: TRANSCRIPT_PUT_TIMEOUT_MS
             }).then(function () { self.baseVersion++; self.persistedText = merged; return merged; });
           }
           if (serverText.length >= text.length) {
@@ -1161,7 +1247,8 @@
           // سرور کوتاه‌تر است (مثلاً قدیمی) — یک بار با نسخه تازه تلاش کن
           return reqJson('/api/sessions/' + self.sessionId, {
             method: 'PUT',
-            body: { transcript: text, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' }
+            body: { transcript: text, transcript_version: self.baseVersion, realtime_reliable: !self.unreliable, stt_mode: 'realtime' },
+            timeoutMs: TRANSCRIPT_PUT_TIMEOUT_MS
           }).then(function () { self.baseVersion++; self.persistedText = text; return text; });
         });
       }
@@ -1425,7 +1512,7 @@
         segs.forEach(function (rec) {
           chain = chain.then(function () {
             return uploadQueuedSegment(self.sessionId, rec).then(function (done) {
-              if (done) { anyOk = true; return AudioQueueDB.remove(rec.id); }
+              if (done) { anyOk = true; return AudioQueueDB.remove(rec.id, rec.bytes); }
             }).catch(function () {});
           });
         });
@@ -1461,10 +1548,10 @@
         // uploadQueuedSegment دنبال می‌کنه؛ رفعِ همون ریسکِ duplicate از ریشه.
         var chain = Promise.resolve();
         pending.forEach(function (rec) {
-          if (!rec.blob || rec.blob.size <= 100) { chain = chain.then(function () { return AudioQueueDB.remove(rec.id); }); return; }
+          if (!rec.blob || rec.blob.size <= 100) { chain = chain.then(function () { return AudioQueueDB.remove(rec.id, rec.bytes); }); return; }
           chain = chain.then(function () {
             return uploadQueuedSegment(self.sessionId, rec).then(function (done) {
-              if (done) return AudioQueueDB.remove(rec.id);
+              if (done) return AudioQueueDB.remove(rec.id, rec.bytes);
             }).catch(function () {});
           });
         });
@@ -1485,10 +1572,10 @@
         if (!pending.length) return;
         var chain = Promise.resolve();
         pending.forEach(function (rec) {
-          if (!rec.blob || rec.blob.size <= 100) { chain = chain.then(function () { return AudioQueueDB.remove(rec.id); }); return; }
+          if (!rec.blob || rec.blob.size <= 100) { chain = chain.then(function () { return AudioQueueDB.remove(rec.id, rec.bytes); }); return; }
           chain = chain.then(function () {
             return uploadQueuedSegment(self.sessionId, rec).then(function (done) {
-              if (done) return AudioQueueDB.remove(rec.id);
+              if (done) return AudioQueueDB.remove(rec.id, rec.bytes);
             }).catch(function () {}); // شکستِ شبکه: توی صف می‌مونه، sweepِ سراسریِ بعدی امتحان می‌کنه
           });
         });
@@ -1547,6 +1634,7 @@
     this.stopDurableSegment();
     stopStream(this.stream);
     this.stream = null;
+    syncWakeLock();
   };
 
   // abort امن از هر state: بدون hang، بدون نشت — و ابطال epoch (ISSUE 1).
@@ -1599,6 +1687,42 @@
   }
   function forget(s) {
     live = live.filter(function (x) { return x !== s; });
+    syncWakeLock();
+  }
+
+  // ————————————————— Screen Wake Lock (جلسه‌ی ۱ساعته، 2026-09-26) —————————————————
+  // بدونِ این، رویِ موبایل صفحه بعد از چند دقیقه خاموش می‌شد: میکروفون/WS قطع و تایمرهایِ تبِ
+  // پنهان (keepaliveِ ۵ثانیه‌ایِ pause، چرخشِ durable) کند می‌شدند. تا وقتی یک RTSession زنده
+  // است (شامل MANUAL_PAUSED که keepalive لازم دارد) قفل گرفته می‌شود. مرورگرِ بدونِ پشتیبانی یا
+  // رد شدنِ درخواست → بی‌صدا هیچ. مرورگر با پنهان‌شدنِ صفحه قفل را خودش آزاد می‌کند؛ با
+  // visibilitychangeِ visible دوباره گرفته می‌شود.
+  var wakeLock = null;
+  var wakeLockPending = false;
+  function wantsWakeLock() {
+    return live.some(function (s) {
+      if (s.aborted || s.state === STATES.IDLE || s.state === STATES.COMPLETED || s.state === STATES.CANCELED) return false;
+      return s.state !== STATES.FAILED || !!s.stream; // FAILEDِ بدونِ میکروفون = چیزی در حالِ ضبط نیست
+    });
+  }
+  function syncWakeLock() {
+    try {
+      if (wantsWakeLock()) {
+        if (wakeLock || wakeLockPending) return;
+        if (typeof navigator === 'undefined' || !navigator.wakeLock || typeof navigator.wakeLock.request !== 'function') return;
+        if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return;
+        wakeLockPending = true;
+        navigator.wakeLock.request('screen').then(function (lock) {
+          wakeLockPending = false;
+          wakeLock = lock;
+          try { lock.addEventListener('release', function () { if (wakeLock === lock) wakeLock = null; }); } catch (e) {}
+          if (!wantsWakeLock()) syncWakeLock(); // جلسه در همین فاصله تمام شده
+        }).catch(function () { wakeLockPending = false; });
+      } else if (wakeLock) {
+        var l = wakeLock;
+        wakeLock = null;
+        try { Promise.resolve(l.release()).catch(function () {}); } catch (e) {}
+      }
+    } catch (e) {}
   }
 
   // ⭐ فلاشِ فوریِ سگمنتِ durableِ جاری وقتی صفحه پنهان/بسته می‌شود (audit صدا/۲۰۲۶-۰۹-۱۶):
@@ -1622,6 +1746,7 @@
   try {
     document.addEventListener('visibilitychange', function () {
       if (document.visibilityState === 'hidden') flushAllDurable();
+      else if (document.visibilityState === 'visible') syncWakeLock();
     });
     window.addEventListener('pagehide', function () { flushAllDurable(); });
   } catch (e) {}

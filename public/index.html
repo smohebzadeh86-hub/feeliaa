@@ -291,6 +291,7 @@ input::-ms-reveal{display:none}
 .rec-status.warn::before{background:var(--clay)}
 .level-meter{display:flex;gap:4px;align-items:center;justify-content:center;height:56px;margin:18px 0 6px}
 .level-meter span{display:block;width:5px;border-radius:99px;background:var(--sage);opacity:.9;height:5px;transition:height .09s linear}
+.live-para+.live-para{margin-top:2em}
 .live-text{max-height:200px;overflow-y:auto;background:var(--sage-mist);border:1px solid var(--sage-soft);border-radius:var(--r-lg);padding:14px 16px;font-size:14px;color:var(--ink-2);text-align:right;white-space:pre-wrap;line-height:2;margin-bottom:18px}
 .toggle-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:14px 0 20px;font-size:13px;font-weight:500;color:var(--ink-2);cursor:pointer;user-select:none}
 .toggle-row input{appearance:none;width:42px;height:24px;border-radius:99px;background:var(--toggle-off);margin:0;flex:none;position:relative;cursor:pointer;transition:background .25s}
@@ -1594,6 +1595,45 @@ function setLiveTextFollow(el,text){
   if(!el)return;
   const wasNearBottom=(el.scrollHeight-el.scrollTop-el.clientHeight)<40;
   el.textContent=text;
+  followLiveText(el,wasNearBottom);
+}
+// ⭐ رندرِ افزایشیِ متنِ زنده‌ی جلسه (جلسه‌ی ۱ساعته، 2026-09-26): setLiveTextFollow با هر پیامِ Soniox
+// کلِ متن (تا ~۱۵۰KB) را جایگزین می‌کرد و مرورگر کلِ آن را دوباره layout می‌کرد — هزینه با طولِ جلسه
+// رشد می‌کرد. اینجا هر پاراگراف (مرزِ «\n\n»، یعنی هر نوبتِ گوینده) یک div است؛ وقتی متنِ جدید
+// ادامه‌ی قبلی است فقط پاراگرافِ آخر عوض و پاراگراف‌هایِ تازه اضافه می‌شوند، و interim یک span
+// جدا در انتهایِ پاراگرافِ آخر است. اگر متن ادامه‌ی قبلی نباشد (مثلاً merge با متنِ batch)، کامل
+// از نو ساخته می‌شود. فاصله‌ی بینِ divها (2em = یک خطِ خالی با line-height:2) همان «\n\n» است.
+function setLiveTextParts(el,finalText,interimText){
+  if(!el)return;
+  const wasNearBottom=(el.scrollHeight-el.scrollTop-el.clientHeight)<40;
+  let st=el.__liveParts;
+  if(!st||st.root.parentNode!==el||finalText.indexOf(st.final)!==0){
+    const root=document.createElement('div');
+    st={root:root,im:document.createElement('span'),final:'',lastStart:0};
+    el.textContent='';
+    el.appendChild(root);
+    el.__liveParts=st;
+  }
+  const newPara=function(){const d=document.createElement('div');d.className='live-para';d.appendChild(document.createTextNode(''));st.root.appendChild(d);return d;};
+  let last=st.root.lastElementChild||newPara();
+  if(finalText!==st.final){
+    const parts=finalText.slice(st.lastStart).split('\n\n');
+    let start=st.lastStart;
+    if(last.firstChild.data!==parts[0])last.firstChild.data=parts[0];
+    for(let i=1;i<parts.length;i++){
+      start+=parts[i-1].length+2;
+      last=newPara();
+      last.firstChild.data=parts[i];
+    }
+    st.lastStart=start;
+    st.final=finalText;
+  }
+  const im=interimText?((finalText?' ':'')+interimText):'';
+  if(st.im.textContent!==im)st.im.textContent=im;
+  if(st.im.parentNode!==last)last.appendChild(st.im);
+  followLiveText(el,wasNearBottom);
+}
+function followLiveText(el,wasNearBottom){
   if(__followRAF)cancelAnimationFrame(__followRAF);
   __followRAF=requestAnimationFrame(function(){
     if(wasNearBottom)el.scrollTop=el.scrollHeight;
@@ -5466,7 +5506,7 @@ async function startNewRTSession(){
     onState:rtOnState,
     onResult:function(r){
       lastPreviewAt=Date.now();
-      if(!$('liveText').hidden)setLiveTextFollow($('liveText'),r.final+(r.interim?' '+r.interim:''));
+      if(!$('liveText').hidden)setLiveTextParts($('liveText'),r.final,r.interim);
       $('recStatus').classList.remove('warn');
     },
     onError:function(m){
@@ -5549,11 +5589,13 @@ function rtOnState(st,snap){
     manualPaused=true;updatePauseUI();
     stopLevelMeter();
   }else if(st==='RECONNECTING'||st==='NETWORK_PAUSED'){
-    wsConnected=false;$('recDot').classList.add('paused');pauseTimer();
+    // ⭐ (2026-09-26، جلسه‌ی ۱ساعته) ضبطِ durable در قطعیِ اتصال ادامه دارد — قبلاً تایمرِ جلسه اینجا می‌ایستاد،
+    // پس duration_ms و offset_msِ علائم/یادداشت‌هایِ بعدی به‌اندازه‌ی کلِ قطعی‌ها عقب می‌افتاد.
+    wsConnected=false;$('recDot').classList.add('paused');if(!(rtSession&&rtSession.stream))pauseTimer();
     setLiveConnBanner('warn','<b>اتصال قطع شد</b> — در حال تلاش برای وصل‌شدنِ دوباره…<br>متنِ تا اینجا حفظ شده؛ صدا همچنان ضبط و به‌صورتِ محلی ذخیره می‌شود.');
     stopLevelMeter();
   }else if(st==='FAILED'){
-    wsConnected=false;pauseTimer();
+    wsConnected=false;if(!(rtSession&&rtSession.stream))pauseTimer();
     setLiveConnBanner('warn','<b>رونویسیِ زنده ناموفق شد.</b><br>صدا به‌صورتِ محلی ذخیره می‌شود؛ متن پس از پایان آماده می‌شود.');
     stopLevelMeter();
   }
@@ -5907,7 +5949,7 @@ function handleMsg(msg){
   const show=$('chkLiveText').checked;
   $('liveText').hidden=!show;
   if(show&&typeof rtSession!=='undefined'&&rtSession){
-    setLiveTextFollow($('liveText'),rtSession.confirmed+(rtSession.interim?' '+rtSession.interim:''));
+    setLiveTextParts($('liveText'),rtSession.cleanConfirmed(),window.FeeliaRT.cleanText(rtSession.interim));
   }
   uxTrack('live_text_toggled');
 });

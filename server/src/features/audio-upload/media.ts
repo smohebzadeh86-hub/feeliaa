@@ -117,7 +117,9 @@ function sourceArgs(src: string | string[]): string[] {
 // خروجی: Opus/Ogg. اگر ffmpegِ نصب‌شده libopus نداشت، AAC/M4A (Soniox هر دو را می‌پذیرد).
 export async function normalizeAudio(srcPath: string | string[], outBase: string, sourceDurationMs: number | null): Promise<NormalizeResult> {
   // زمانِ مجاز متناسب با طولِ صدا (تبدیل معمولاً ۵۰–۲۰۰ برابر سریع‌تر از real-time است).
-  const timeoutMs = Math.max(5 * 60 * 1000, Math.ceil((sourceDurationMs || 0) / 10));
+  // (2026-09-26) از duration/10 به duration/3: برایِ جلسه‌ی ۱ساعته ۶ دقیقه رویِ CPUِ شلوغ/چندبخشی حاشیه‌ی
+  // کمی داشت؛ حالا ۲۰ دقیقه. heartbeatِ lease در jobRunner جلویِ برداشتنِ دوباره‌ی job را می‌گیرد.
+  const timeoutMs = Math.max(5 * 60 * 1000, Math.ceil((sourceDurationMs || 0) / 3));
   const common = [...sourceArgs(srcPath), '-vn', '-sn', '-dn', '-ac', '1', '-ar', '16000'];
   const opusOut = outBase + '.ogg';
   let r = await run(['-y', ...common, '-c:a', 'libopus', '-b:a', '32k', '-application', 'voip', opusOut], timeoutMs);

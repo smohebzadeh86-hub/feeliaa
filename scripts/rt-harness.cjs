@@ -540,5 +540,99 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('T17 pause from FINALIZING rejected', (await s17d.pause()) === false && s17d.state === 'FINALIZING', s17d.state);
   await pf17d;
 
+  // ——— جلسه‌ی ۱ساعته (2026-09-26) ———
+  // T30: شمارنده‌ی bytesِ صف — addهایِ پیاپی دیگر هر بار getAll() نمی‌زنند، و جمع با محتوایِ واقعیِ صف یکی است.
+  {
+    await sleep(300); // آپلود/حذفِ پس‌زمینه‌ی تست‌هایِ قبلی تمام شود
+    const idbStore = indexedDB.open().result.transaction().objectStore();
+    const origGetAll = idbStore.getAll;
+    const truth = () => new Promise((res) => { const r = origGetAll(); r.onsuccess = () => res(r.result.reduce((a, x) => a + (x.bytes || 0), 0)); });
+    const q = RT.audioQueue;
+    await q.totalBytes(); // مقداردهیِ اولیه (حداکثر یک getAll)
+    let getAllCalls = 0;
+    idbStore.getAll = function () { getAllCalls++; return origGetAll.apply(this, arguments); };
+    for (let i = 0; i < 5; i++) await q.add('s30', 'r30', i, new Blob(['y'.repeat(1000)]), 'audio/webm', 'archive');
+    const mid = await q.totalBytes(); const midTruth = await truth();
+    const rows = await q.listForSession('s30');
+    for (const r of rows) await q.remove(r.id, r.bytes);
+    const after = await q.totalBytes(); const afterTruth = await truth();
+    idbStore.getAll = origGetAll;
+    ok('T30 queue byte counter: no getAll per add, totals match queue',
+      getAllCalls === 0 && mid === midTruth && after === afterTruth && rows.length === 5 && mid - after === 5000,
+      'getAll=' + getAllCalls + ' mid=' + mid + '/' + midTruth + ' after=' + after + '/' + afterTruth);
+  }
+
+  // T31: PUTی که سمتِ مرورگر timeout خورده ولی سرور اعمالش کرده → 409 بعدی نباید متن را تکرار کند.
+  {
+    newSession('s23');
+    const s23 = RT.createSession('s23', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p23 = s23.start(); await sleep(5); serverOpen(FakeWS.last); await p23;
+    serverTokens(FakeWS.last, [{ text: 'جمله‌یک', is_final: true }]);
+    await s23.persistConfirmed();
+    serverTokens(FakeWS.last, [{ text: ' جمله‌دو', is_final: true }]);
+    // سرور این نسخه را گرفته، ولی مرورگر پاسخ را ندیده (baseVersion/persistedText قدیمی مانده‌اند)
+    sessions.s23.transcript = RT.cleanText(s23.confirmed); sessions.s23.transcript_version++;
+    serverTokens(FakeWS.last, [{ text: ' جمله‌سه', is_final: true }]);
+    await s23.persistConfirmed();
+    const t = sessions.s23.transcript;
+    ok('T31 409 after applied-but-timed-out PUT: no duplicated text',
+      (t.match(/جمله‌دو/g) || []).length === 1 && (t.match(/جمله‌یک/g) || []).length === 1 && t.includes('جمله‌سه'), JSON.stringify(t));
+    await s23.finish();
+  }
+
+  // T32: از FAILED (reconnectِ تمام‌شده) retryِ دوره‌ای زمان‌بندی می‌شود، پیامِ خطا یک بار؛ 401 نه.
+  {
+    newSession('s24');
+    let errs24 = 0;
+    const s24 = RT.createSession('s24', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => { errs24++; } });
+    const p24 = s24.start(); await sleep(5); serverOpen(FakeWS.last); await p24;
+    s24.reconnectAttempts = RT.MAX_RECONNECT_ATTEMPTS;
+    serverClose(FakeWS.last); await sleep(5);
+    ok('T32 FAILED schedules periodic realtime retry', s24.state === 'FAILED' && !!s24._failedRetryTimer && errs24 === 1, 'state=' + s24.state + ' errs=' + errs24);
+    await s24.finish();
+    ok('T32 finish clears retry timer', !s24._failedRetryTimer && s24.state === 'COMPLETED', s24.state);
+  }
+
+  // T33: autosave هیچ‌وقت دو PUTِ متن را هم‌زمان نمی‌فرستد (PUTِ کند رویِ اینترنتِ ضعیف).
+  {
+    newSession('s25');
+    let putCount25 = 0; let release25 = null;
+    const hold = new Promise((r) => { release25 = r; });
+    const baseFetch = globalThis.fetch;
+    globalThis.fetch = async (url, opts = {}) => {
+      if (url === '/api/sessions/s25' && opts.method === 'PUT' && opts.body && JSON.parse(opts.body).transcript !== undefined) {
+        putCount25++; await hold;
+      }
+      return baseFetch(url, opts);
+    };
+    const s25 = RT.createSession('s25', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p25 = s25.start(); await sleep(5); serverOpen(FakeWS.last); await p25;
+    serverTokens(FakeWS.last, [{ text: 'یک', is_final: true }]);
+    await sleep(5300);
+    serverTokens(FakeWS.last, [{ text: ' دو', is_final: true }]);
+    await sleep(5300);
+    ok('T33 autosave: single in-flight PUT while previous hangs', putCount25 === 1, 'puts=' + putCount25);
+    release25(); globalThis.fetch = baseFetch;
+    await sleep(20);
+    await s25.finish();
+    ok('T33 final text persisted after slow PUT', sessions.s25.transcript.includes('دو'), JSON.stringify(sessions.s25.transcript));
+  }
+
+  // T34: Screen Wake Lock در طولِ جلسه گرفته و با پایان آزاد می‌شود؛ بدونِ پشتیبانی بی‌اثر است (بقیه‌ی تست‌ها).
+  {
+    let acq = 0; let rel = 0;
+    navigator.wakeLock = { request: async () => { acq++; return { release: async () => { rel++; }, addEventListener() {} }; } };
+    newSession('s26');
+    const s26 = RT.createSession('s26', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p26 = s26.start(); await sleep(5); serverOpen(FakeWS.last); await p26; await sleep(5);
+    const acqDuring = acq;
+    await s26.pause(); await sleep(5);
+    const relDuringPause = rel;
+    await s26.finish(); await sleep(5);
+    RT.forget(s26);
+    delete navigator.wakeLock;
+    ok('T34 wake lock held through pause, released on finish', acqDuring === 1 && relDuringPause === 0 && rel === 1 && acq === 1, 'acq=' + acq + ' rel=' + rel);
+  }
+
   console.log(results.map((r) => r[0]).join('\n'));
 })().catch((e) => { console.error('HARNESS ERROR', e); process.exitCode = 1; });

@@ -25,6 +25,7 @@
   var STORE = 'tasks';
   var EDGE = 1024 * 1024;
   var MAX_CHUNK_RETRIES = 8;
+  var CHUNK_STALL_MS = 60000; // بدونِ هیچ پیشرفتِ بایت در این مدت → قطع و retry (putChunk)
   var PERMANENT_CODES = ['consent-required', 'file-too-small', 'file-too-large', 'unsupported-format', 'bad-fingerprint',
     'not-audio', 'no-audio', 'unreadable', 'too-long', 'upload-closed', 'read-failed', 'group-closed', 'part-mismatch', 'bad-part'];
 
@@ -144,10 +145,24 @@
       xhr.open('PUT', '/api/uploads/' + task.uploadId + '/chunks/' + n);
       xhr.setRequestHeader('Content-Type', 'application/octet-stream');
       xhr.setRequestHeader('X-Chunk-Sha256', digest);
-      xhr.timeout = 120000;
+      // ⭐ (2026-09-26) قبلاً سقفِ ثابتِ ۱۲۰ثانیه برایِ کلِ chunkِ ۴MB بود — زیرِ ~۳۵KB/s هیچ chunkی
+      // هیچ‌وقت کامل نمی‌شد و آپلود بی‌پایان retry می‌کرد. حالا: سقفِ کل متناسب با حجم (حداقل ۴KB/s)،
+      // و قطعِ زودهنگام فقط وقتی ۶۰ثانیه هیچ بایتی جلو نرفته (stall)، نه وقتی شبکه فقط کند است.
+      xhr.timeout = Math.max(120000, Math.ceil(blob.size / 4096) * 1000);
+      var stalled = false;
+      var stallTimer = null;
+      var armStall = function () {
+        if (stallTimer) clearTimeout(stallTimer);
+        stallTimer = setTimeout(function () { stalled = true; try { xhr.abort(); } catch (e) {} }, CHUNK_STALL_MS);
+      };
+      var clearStall = function () { if (stallTimer) { clearTimeout(stallTimer); stallTimer = null; } };
+      armStall();
       xhr.upload.onprogress = function (e) {
+        armStall();
         if (e.lengthComputable) { task.inflightBytes = e.loaded; throttleEmit(); }
       };
+      xhr.upload.onload = clearStall; // بدنه رسید؛ از اینجا فقط xhr.timeout (پاسخِ سرور)
+      xhr.onloadend = clearStall;
       xhr.onload = function () {
         task._xhr = null;
         if (xhr.status >= 200 && xhr.status < 300) return resolve();
@@ -159,7 +174,11 @@
       };
       xhr.onerror = function () { task._xhr = null; var e = new Error('network'); e.network = true; reject(e); };
       xhr.ontimeout = function () { task._xhr = null; var e = new Error('timeout'); e.network = true; reject(e); };
-      xhr.onabort = function () { task._xhr = null; var e = new Error('aborted'); e.aborted = true; reject(e); };
+      xhr.onabort = function () {
+        task._xhr = null;
+        if (stalled) { var s = new Error('timeout'); s.network = true; reject(s); return; }
+        var e = new Error('aborted'); e.aborted = true; reject(e);
+      };
       xhr.send(blob);
     });
   }
