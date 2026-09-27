@@ -5951,11 +5951,22 @@ async function startManualSessionFlow(){
 }
 
 // ===== Setup =====
+// تاریخ/ساعتِ صفحه‌ی «جلسه‌ی جدید» باید زنده بماند (نه ساعتِ لحظه‌ی بازشدنِ صفحه)؛ وقتی صفحه پنهان شد تایمر متوقف می‌شود.
+let setupChipsTimer=null;
+function renderSetupChips(){
+  // فراخوانیِ اول قبل از showScreen است، پس فقط تیک‌هایِ تایمر روی صفحه‌ی پنهان متوقف می‌شوند.
+  if(setupChipsTimer&&$('screenSetup').hidden){clearInterval(setupChipsTimer);setupChipsTimer=null;return;}
+  const d=new Date();
+  $('setupChips').innerHTML='<span class="sum-chip">'+IC_CAL+toFa(toJalali(d))+'</span><span class="sum-chip">'+IC_CLK+nowClock()+'</span>';
+}
 function setupNewSession(client){
   currentClient=client;
   clearBanner();
   $('setupClientInfo').textContent=client.code+(client.alias?' — '+client.alias:'');
-  $('setupChips').innerHTML='<span class="sum-chip">'+IC_CAL+toFa(toJalali(new Date()))+'</span><span class="sum-chip">'+IC_CLK+nowClock()+'</span>';
+  if(setupChipsTimer)clearInterval(setupChipsTimer);
+  setupChipsTimer=null;
+  renderSetupChips();
+  setupChipsTimer=setInterval(renderSetupChips,15000);
   resetConsent();
   applyStoredConsent(client);
   showScreen('Setup');
