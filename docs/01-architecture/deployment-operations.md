@@ -112,6 +112,12 @@ nginx باید WebSocket upgrade را برای `/ws/*` پشتیبانی کند (
 7. `curl -s http://localhost:3000/api/health` → `{"status":"ok","database":"connected"}`.
 8. smoke: شروعِ یک جلسه‌ی آزمایشی **با داده‌ی غیرواقعی** (اگر تغییرِ لمس‌کننده‌ی مسیرِ رونویسی/صدا بود).
 
+**وقتی نشستِ دیگری هم‌زمان در همان working tree کار می‌کند (2026-09-27):** تار را از working tree نسازید — کارِ نیمه‌تمام (و migrationِ
+آن) به production می‌رود. به‌جایش `git worktree add --detach <scratch> <commit>` → فقط تغییراتِ همین کار → `pnpm install` + تست‌ها + build
+در همان worktree → commit → تار از همان worktree. پیش از deploy، checksumِ کدِ production (`server/src`، `public`، lockfile، با حذفِ `\r`)
+را با commitِ پایه مقایسه کنید تا معلوم شود deploy دقیقاً چه چیزی را عوض می‌کند. پشتیبانِ کدِ فعلی پیش از استخراج:
+`/root/backups/code-pre-<name>-<ts>.tar.gz` (برگشت = استخراجِ همان تار + restart). نمونه: Event Logِ `PROJECT_STATUS.md`، 2026-09-27 (علائم در متن).
+
 ### ۵.۱ Preflight: کاربرِ فعال قبل از restart
 
 **چرا:** در رونویسیِ زنده مرورگر مستقیم به Soniox وصل است؛ سرور فقط mintِ کلید و ذخیره‌ی دوره‌ایِ صدا/متن را می‌بیند.
