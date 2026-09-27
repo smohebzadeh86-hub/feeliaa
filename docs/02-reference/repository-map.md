@@ -43,6 +43,7 @@ feeliaa/
 │       ├── obs/   U — جدید، فازِ ۱ِ رصد/حسابرسی (2026-09-22): types.ts، redact.ts (نقطه‌ی اجرایِ LAW-001، `sanitizeDetail`/`isSafeToken`)، fileSink.ts (JSONLِ چرخشی، بدونِ dependency)، eventLog.ts (صفِ درون‌حافظه‌ای + drain به DB، `logEvent`/`logUiEvents`)، httpHook.ts (`registerObsHooks`)، sweep.ts (`sweepOldObsEvents`)
 │       ├── stt/  batchqueue.ts M · soniox.ts M · tempkey.ts T · asyncTranscribe.ts U · sessionAudioArchive.ts U (+ `deriveSessionStatus` جدید، فازِ ۱) · speakerResolve.ts U · sessionContext.ts (contextِ ثابتِ تفکیکِ گوینده، 2026-09-26) · signMarkers.ts (قالبِ نشانگرِ علامت در متن، 2026-09-27)
 │       ├── features/case-file/  U — جدید 2026-09-17: AI Case File (Ports & Adapters)؛ `application/autoTrigger.ts` (2026-09-23، سیاستِ مرکزیِ تولیدِ خودکار)
+│       ├── features/treatment-unit/  U — جدید 2026-09-27: واحدِ درمان (فردی/زوج/خانواده) + contextِ پویای Soniox (Ports & Adapters)؛ کاتالوگ در DB (migration 029)؛ harness: `scripts/treatment-unit-harness.ts` (`pnpm test:tu`)
 │       ├── features/audio-upload/  U — جدید 2026-09-23: آپلودِ فایلِ صوتیِ جلسه + jobِ پس‌زمینه ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))
 │       ├── features/notifications/ U — جدید 2026-09-23: اعلان‌هایِ پایدار (`notify.ts`)
 │       │   ├── domain/     types.ts، errors.ts، validate.ts، normalizeText.ts (جدید 2026-09-19)، findings.ts (جدید 2026-09-20: واحدِ «یافته»، شناسه‌ی فکت، finalizeCouple)

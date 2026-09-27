@@ -8,6 +8,7 @@ import { deleteSessionAudioDirs } from '../stt/sessionAudioArchive.js';
 import { logEvent } from '../obs/eventLog.js';
 import { recordAudit } from '../obs/audit.js';
 import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
+import { treatmentUnits, TreatmentUnitValidationError } from '../features/treatment-unit/index.js';
 
 const VALID_CATEGORIES = ['child', 'teen', 'adult'];
 const VALID_GENDERS = ['f', 'm'];
@@ -37,7 +38,8 @@ export async function clientRoutes(app: FastifyInstance) {
     const result = await query(`
       SELECT
         c.id, c.code, c.alias, c.created_at,
-        c.status, c.status_reason, c.category, c.gender, c.pinned_at, c.recording_consent_at,
+        c.status, c.status_reason, c.category, c.gender, c.pinned_at, c.recording_consent_at, c.unit_type,
+        (SELECT COUNT(*) FROM client_members m WHERE m.client_id = c.id) as member_count,
         COUNT(s.id) as session_count,
         MAX(s.date) as last_session_date
       FROM clients c
@@ -85,9 +87,20 @@ export async function clientRoutes(app: FastifyInstance) {
 
   // POST /api/clients — ساخت مراجع جدید برای همین تراپیست
   app.post('/api/clients', async (request, reply) => {
-    const { alias, category, gender, status, reason } = request.body as {
+    const { alias, category, gender, status, reason, unit_type, members } = request.body as {
       alias?: string; category?: string; gender?: string; status?: string; reason?: string;
+      unit_type?: string; members?: unknown;
     };
+    // واحدِ درمان (migration 029): اختیاری و سازگار با عقب — بدونِ آن همان مراجعِ فردیِ قبلی.
+    // اعتبارسنجی پیش از INSERT تا مراجعِ نیمه‌کاره ساخته نشود.
+    const hasUnit = typeof unit_type === 'string' && unit_type !== '';
+    if (hasUnit) {
+      try { await treatmentUnits.validate(unit_type!, members as any); }
+      catch (e) {
+        if (e instanceof TreatmentUnitValidationError) { reply.code(400); return { error: e.message, code: e.code }; }
+        throw e;
+      }
+    }
 
     if (category && !VALID_CATEGORIES.includes(category)) {
       reply.code(400);
@@ -125,10 +138,11 @@ export async function clientRoutes(app: FastifyInstance) {
       'INSERT INTO clients (id, code, alias, therapist_id, category, gender, status, status_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [newId, code, alias || null, request.therapistId, category || null, finalGender, finalStatus, statusReason]
     );
+    if (hasUnit) await treatmentUnits.saveUnit(newId, unit_type!, members as any);
     const result = await query('SELECT * FROM clients WHERE id = ?', [newId]);
 
     reply.code(201);
-    return { client: result.rows[0] };
+    return { client: result.rows[0], unit: await treatmentUnits.describeUnit(newId) };
   });
 
   // GET /api/clients/:id — جزئیات یک مراجع + جلساتش (فقط اگر مالِ همین تراپیست باشه)
@@ -150,6 +164,7 @@ export async function clientRoutes(app: FastifyInstance) {
 
     return {
       client,
+      unit: await treatmentUnits.describeUnit(id),
       sessions: sessionsResult.rows,
     };
   });

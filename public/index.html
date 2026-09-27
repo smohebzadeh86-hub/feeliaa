@@ -400,6 +400,21 @@ input::-ms-reveal{display:none}
 .cat-tree-leaf:last-child::after{inset-inline-start:-7px;inset-inline-end:50%}
 .cat-opt{padding:8px 13px;border-radius:99px;border:1.5px solid var(--line);background:var(--card);font-family:inherit;font-size:12px;color:var(--ink-2);cursor:pointer}
 .cat-opt.sel{background:var(--sage);border-color:var(--sage);color:#fff}
+/* واحدِ درمان (migration 029): فرمِ درختیِ نوعِ پرونده + اعضا — همه از کاتالوگِ سرور رندر می‌شود */
+.tu-sub{font-size:12px;color:var(--muted);margin:-6px 0 10px}
+.tu-members{display:flex;flex-direction:column;gap:10px;margin-bottom:12px}
+.tu-member{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:10px 12px;background:var(--card)}
+.tu-member-head{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.tu-member-head b{font-size:13px;color:var(--ink);white-space:nowrap}
+.tu-member-head input{flex:1;min-width:0;margin:0;padding:6px 10px;font-size:12.5px}
+.tu-member-head .tu-x{border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px}
+.tu-member .cat-select{margin-bottom:0}
+.tu-add{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tu-link{border:none;background:none;color:var(--sage-deep);font:inherit;font-size:12px;cursor:pointer;padding:0;text-decoration:underline}
+.presence-box{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:14px;background:var(--card)}
+.presence-line{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--ink-2)}
+.presence-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.presence-box textarea{width:100%;margin-top:10px;min-height:64px;font-size:13px}
 
 .transcript-box{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:400px;overflow-y:auto;font-size:13.5px;line-height:2.1;white-space:pre-wrap;color:var(--ink-2)}
 .transcript-notes{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:200px;overflow-y:auto;margin-top:12px}
@@ -1099,6 +1114,16 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <p id="setupClientInfo" data-clarity-mask="true"></p>
     </div>
     <div class="session-summary" id="setupChips" data-clarity-mask="true"></div>
+    <!-- زمینه‌ی جلسه (واحدِ درمان): حاضرینِ امروز (پیش‌فرض = همه‌ی اعضا) + یادداشتِ اختیاریِ پیش از جلسه -->
+    <div class="presence-box" id="presenceBox" data-clarity-mask="true" hidden>
+      <div class="presence-line" id="presenceLine"><span id="presenceSummary"></span><button class="tu-link" id="presenceEditBtn" onclick="togglePresenceEdit()">تغییر</button></div>
+      <div id="presenceEdit" hidden>
+        <div class="presence-chips" id="presenceChips"></div>
+        <button class="tu-link" style="margin-top:8px" onclick="openEditUnitModal('setup')">تغییرِ نوعِ جلسه / اعضا…</button>
+      </div>
+      <div style="margin-top:8px"><button class="tu-link" id="preNoteToggle" onclick="togglePreNote()">+ یادداشتِ پیش از جلسه (اختیاری)</button></div>
+      <textarea id="preNoteInput" hidden maxlength="2000" placeholder="مثلاً: امروز فقط یکی از زوجین می‌آید و بخشی از جلسه فردی است…"></textarea>
+    </div>
     <div class="consent-box" id="consentBox">
       <div class="consent-title">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -1128,7 +1153,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
          تراپیستی که فایلِ ضبط‌شده داشت یک جلسه‌ی زنده‌ی خالیِ چندثانیه‌ای می‌ساخت تا به پرونده برسد. -->
     <button class="btn btn-secondary btn-block" id="setupUploadBtn" style="margin-top:10px" onclick="openAudioUploadFromSetup()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-      به‌جایش فایلِ صوتیِ ضبط‌شده را آپلود می‌کنم
+      آپلود فایل صوتی
     </button>
     <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="goBackToClients()">بازگشت</button>
   </section>
@@ -1246,6 +1271,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <!-- ⭐ پرونده‌ی روندِ درمان (AI Case File) — فازِ ۱: فقط برایِ مراجعینِ غیرفعال
          نمایش داده می‌شود (تصمیمِ مالک)؛ بک‌اند/schema برایِ همه‌ی مراجعین generic است. -->
     <div id="caseFileSection" class="case-file-doc" data-clarity-mask="true" hidden style="margin-bottom:16px"></div>
+    <div class="presence-line" style="margin-bottom:14px" data-clarity-mask="true"><span id="detailUnitText"></span><button class="tu-link" onclick="openEditUnitModal()">تغییرِ نوعِ پرونده / افزودنِ عضو</button></div>
     <h3 class="detail-section-title">جلساتِ ثبت‌شده</h3>
     <div id="sessionsList" data-clarity-mask="true"></div>
     <button class="btn btn-primary btn-block" id="detailStartBtn" style="margin-top:14px" onclick="startFromDetail()">شروع جلسه‌ی جدید</button>
@@ -1346,8 +1372,8 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <p id="newClientDesc">کد یکتا خودکار ساخته می‌شود.</p>
     <label>نام مستعار (اختیاری)</label>
     <input type="text" id="newClientAlias" placeholder="مثلاً: مراجع-الف" style="margin-bottom:14px">
-    <label>دسته‌بندی (اختیاری)</label>
-    <div class="cat-select" id="newClientCatSelect"></div>
+    <label>نوعِ پرونده</label>
+    <div id="newClientUnitEditor"></div>
     <!-- فقط وقتی از تبِ «غیرفعال» (آرشیوِ پرونده‌های قبلی) باز شود -->
     <div id="newClientReasonBox" hidden style="margin-top:14px">
       <label>دلیلِ غیرفعال‌بودن</label>
@@ -1450,6 +1476,30 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn btn-ghost" onclick="closeEditCategoryModal()">انصراف</button>
       <button class="btn btn-primary" onclick="confirmEditCategory()">ذخیره</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="editUnitModal" data-clarity-mask="true">
+  <div class="modal">
+    <h3>نوعِ پرونده و اعضا</h3>
+    <p class="tu-sub">مثلاً اگر همسرِ مراجع هم به جلسه‌ها می‌آید، پرونده را «زوج» کنید. همین پرونده و همه‌ی جلسه‌هایش حفظ می‌شود.</p>
+    <div id="editUnitEditor"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeEditUnitModal()">انصراف</button>
+      <button class="btn btn-primary" id="editUnitSaveBtn" onclick="confirmEditUnit()">ذخیره</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-back" id="modalitiesModal">
+  <div class="modal">
+    <h3>رویکردهای درمانیِ من</h3>
+    <p class="tu-sub">یک بار انتخاب کنید. نوعِ پیش‌فرضِ پرونده‌ی جدید و واژه‌هایِ تخصصیِ رونویسی از همین تعیین می‌شود.</p>
+    <div class="cat-select" id="modalitiesChips"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-ghost" onclick="closeModalitiesModal()">انصراف</button>
+      <button class="btn btn-primary" onclick="confirmModalities()">ذخیره</button>
     </div>
   </div>
 </div>
@@ -1617,8 +1667,6 @@ let clientCategoryFilter='all';
 let clientGenderFilter=null;
 let clientSortMode='default';
 let deactivateTargetClient=null;
-let newClientSelectedCategory=null;
-let newClientSelectedGender=null;
 let editCategoryTargetClient=null;
 let editCategorySelectedCategory=null;
 let editCategorySelectedGender=null;
@@ -2808,6 +2856,7 @@ async function init(){
 
 async function enterApp(){
   $('logoutBtn').hidden=false;
+  loadTuCatalog();
   $('adminBtn').hidden=!(currentTherapist&&currentTherapist.is_admin);
   // آپلودهایِ نیمه‌کاره‌ی همین حساب ادامه می‌یابند + پایشِ jobها/اعلان‌هایِ سرور.
   $('trayBtn').hidden=false;
@@ -3516,7 +3565,7 @@ async function openAdminTherapistDetail(id){
       div.appendChild(head);
       const date=document.createElement('div');
       date.className='session-date';
-      const catLabel=categoryBadgeLabel(c.category,c.gender);
+      const catLabel=clientBadgeLabel(c);
       date.textContent=toFa(c.session_count||0)+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'')
         +(catLabel?' · '+catLabel:'')
         +(c.status==='inactive'?' · غیرفعال'+(c.status_reason?' ('+c.status_reason+')':''):'');
@@ -3922,6 +3971,305 @@ function categoryBadgeLabel(cat,gender){
   if(!cat||!CATEGORY_LABELS[cat])return null;
   const g=genderLabel(cat,gender);
   return g?CATEGORY_LABELS[cat]+' ('+g+')':CATEGORY_LABELS[cat];
+}
+
+// ===== واحدِ درمان (فردی/زوج/خانواده/…، migration 029) =====
+// ⭐ هیچ نوع/نقش/رویکردی اینجا hard-code نیست: همه از GET /api/catalog/treatment-units می‌آید و
+// فرم از روی آن ساخته می‌شود. افزودنِ نوعِ جدید در DB = بدونِ تغییرِ این کد.
+let tuCatalog=null;            // {unit_types, roles, modalities}
+let tuTherapistModalities=[];  // کدهایِ رویکردِ درمانگر
+let tuCatalogPromise=null;
+let currentClientUnit=null;    // {unit_type, members:[{id,role,alias,category,gender,label}]}
+function loadTuCatalog(){
+  if(tuCatalogPromise)return tuCatalogPromise;
+  tuCatalogPromise=Promise.all([api('/api/catalog/treatment-units'),api('/api/therapist/modalities')]).then(function(r){
+    tuCatalog=r[0];tuTherapistModalities=r[1].modalities||[];
+    try{if(typeof applyClientFilters==='function'&&allClients.length)applyClientFilters();}catch(e){}
+    return tuCatalog;
+  }).catch(function(){tuCatalogPromise=null;return null;});
+  return tuCatalogPromise;
+}
+function tuUnit(code){return tuCatalog?tuCatalog.unit_types.find(function(u){return u.code===code;}):null;}
+function tuRole(code){return tuCatalog?tuCatalog.roles.find(function(r){return r.code===code;}):null;}
+function tuDefaultPreset(u){return (u.presets||[]).find(function(p){return p.default;})||(u.presets||[])[0]||null;}
+// نوعِ پیش‌فرضِ پرونده‌ی جدید: اولین رویکردِ درمانگر که default_unit دارد، وگرنه اولین نوعِ کاتالوگ.
+function tuDefaultUnitCode(){
+  if(!tuCatalog||!tuCatalog.unit_types.length)return null;
+  for(const code of tuTherapistModalities){
+    const m=tuCatalog.modalities.find(function(x){return x.code===code;});
+    if(m&&m.default_unit&&tuUnit(m.default_unit))return m.default_unit;
+  }
+  return tuCatalog.unit_types[0].code;
+}
+function tuNewState(code){
+  const u=code&&tuUnit(code);
+  if(!u)return null;
+  const preset=tuDefaultPreset(u);
+  const roles=preset?preset.roles:u.allowed_roles.slice(0,u.min_members);
+  return {unitType:u.code,presetKey:preset?preset.key:null,members:roles.map(function(r){return {role:r,alias:'',category:null,gender:null};})};
+}
+function tuStateFromUnit(unit){
+  if(!unit)return null;
+  return {unitType:unit.unit_type,presetKey:null,members:unit.members.map(function(m){return {id:m.id,role:m.role,alias:m.alias||'',category:m.category,gender:m.gender};})};
+}
+function tuStateToBody(state){
+  // کاتالوگ در دسترس نیست → بدنه‌ی قدیمی (مراجعِ فردیِ بدونِ دسته) — سرور سازگار با عقب است.
+  if(!tuCatalog||!state)return {};
+  const body={unit_type:state.unitType,members:state.members.map(function(m){
+    const o={role:m.role,alias:(m.alias||'').trim()||null,category:m.category||null,gender:m.gender||null};
+    if(m.id)o.id=m.id;
+    return o;
+  })};
+  if(state.members.length===1){body.category=state.members[0].category||null;body.gender=state.members[0].gender||null;}
+  return body;
+}
+// برچسبِ خودکار — همان قاعده‌ی سرور (memberLabels): مستعار، وگرنه نقش + شماره اگر تکراری.
+function tuAutoLabels(members){
+  const count={},seen={};
+  members.forEach(function(m){const l=(tuRole(m.role)||{label:m.role}).label;count[l]=(count[l]||0)+1;});
+  return members.map(function(m){
+    const l=(tuRole(m.role)||{label:m.role}).label;
+    seen[l]=(seen[l]||0)+1;
+    return count[l]>1?l+' '+toFa(seen[l]):l;
+  });
+}
+function tuUnitSummary(unit){
+  if(!unit||!tuCatalog)return '';
+  const u=tuUnit(unit.unit_type);
+  if(!u)return '';
+  if(unit.members.length<=1){
+    const m=unit.members[0];
+    const c=m?categoryBadgeLabel(m.category,m.gender):null;
+    return 'پرونده‌ی '+u.label+(c?' · '+c:'');
+  }
+  return 'پرونده‌ی '+u.label+' · '+unit.members.map(function(m){return m.alias||tuLabelFa(m.label);}).join('، ');
+}
+function tuLabelFa(l){return toFa(l||'');}
+// برچسبِ کارتِ مراجع: غیرفردی ⇒ نوعِ پرونده + تعداد، فردی ⇒ همان دسته‌بندیِ قبلی
+function clientBadgeLabel(c){
+  if(c.unit_type&&c.unit_type!=='individual'){
+    const u=tuUnit(c.unit_type);
+    const n=Number(c.member_count)||0;
+    return (u?u.label:'')+(n?' · '+toFa(n)+' نفر':'');
+  }
+  return categoryBadgeLabel(c.category,c.gender);
+}
+
+// ویرایشگرِ مشترکِ واحد (فرمِ مراجعِ جدید + مودالِ تغییرِ نوع). state درجا تغییر می‌کند و rerender صدا زده می‌شود.
+function tuChip(label,selected,onClick){
+  const b=document.createElement('button');
+  b.type='button';
+  b.className='cat-opt'+(selected?' sel':'');
+  b.textContent=label;
+  b.addEventListener('click',function(e){e.stopPropagation();onClick();});
+  return b;
+}
+function renderUnitEditor(container,state,opts,rerender){
+  container.innerHTML='';
+  if(!tuCatalog||!state){
+    const p=document.createElement('p');p.className='tu-sub';p.textContent='در حال بارگذاری…';
+    container.appendChild(p);return;
+  }
+  // سطحِ ۱: نوعِ پرونده
+  const types=document.createElement('div');types.className='cat-select';
+  tuCatalog.unit_types.forEach(function(u){
+    types.appendChild(tuChip(u.label,state.unitType===u.code,function(){
+      if(state.unitType===u.code)return;
+      const next=tuNewState(u.code);
+      // ارتقا: عضوِ موجود (با id) اگر نقشش در نوعِ جدید مجاز باشد یا تک‌عضوِ فردی است، حفظ می‌شود.
+      const keep=state.members.filter(function(m){return m.id;});
+      if(keep.length&&next.members.length){next.members[0].id=keep[0].id;next.members[0].alias=keep[0].alias||'';}
+      Object.assign(state,next);rerender();
+    }));
+  });
+  container.appendChild(types);
+  if(opts&&opts.showModalitiesLink){
+    const l=document.createElement('button');l.type='button';l.className='tu-link';l.style.marginBottom='10px';
+    l.textContent=tuTherapistModalities.length?'پیش‌فرض بر اساسِ رویکردِ شما · تغییرِ رویکرد':'رویکردِ درمانیِ خود را تعیین کنید (یک بار)';
+    l.addEventListener('click',openModalitiesModal);
+    container.appendChild(l);
+  }
+  const u=tuUnit(state.unitType);
+  if(!u)return;
+  // تک‌عضوی (فردی): همان درختِ آشنایِ سن → جنسیت
+  if(u.max_members===1){
+    const m=state.members[0]||(state.members[0]={role:u.allowed_roles[0],alias:'',category:null,gender:null});
+    const box=document.createElement('div');box.className='cat-select';
+    container.appendChild(box);
+    renderCategoryChips(box,[{value:null,label:'نامشخص'}].concat(Object.keys(CATEGORY_LABELS).map(function(k){return {value:k,label:CATEGORY_LABELS[k]};})),
+      {category:m.category,gender:m.gender},function(cat,g){m.category=cat;m.gender=g;rerender();},'cat-opt','sel');
+    return;
+  }
+  // سطحِ ۲: ترکیب (preset) — فقط اگر بیش از یکی باشد
+  if((u.presets||[]).length>1){
+    const pr=document.createElement('div');pr.className='cat-select';
+    const curRoles=state.members.map(function(m){return m.role;}).join(',');
+    u.presets.forEach(function(p){
+      pr.appendChild(tuChip(p.label,p.roles.join(',')===curRoles,function(){
+        state.members=p.roles.map(function(r,i){const old=state.members[i]||{};return {id:old.id,role:r,alias:old.alias||'',category:null,gender:null};});
+        state.presetKey=p.key;rerender();
+      }));
+    });
+    container.appendChild(pr);
+  }
+  // سطحِ ۳: اعضا — مستعار همیشه اختیاری؛ سن/جنسیت فقط اگر نقش آن را ضمنی ندارد
+  const list=document.createElement('div');list.className='tu-members';
+  const labels=tuAutoLabels(state.members);
+  state.members.forEach(function(m,i){
+    const role=tuRole(m.role)||{label:m.role};
+    const row=document.createElement('div');row.className='tu-member';
+    const head=document.createElement('div');head.className='tu-member-head';
+    const b=document.createElement('b');b.textContent=labels[i];head.appendChild(b);
+    const inp=document.createElement('input');inp.type='text';inp.maxLength=80;inp.value=m.alias||'';
+    inp.placeholder='نامِ مستعار (اختیاری)';
+    inp.addEventListener('input',function(){m.alias=inp.value;});
+    head.appendChild(inp);
+    if(state.members.length>u.min_members){
+      const x=document.createElement('button');x.type='button';x.className='tu-x';x.textContent='×';x.title='حذفِ عضو';
+      x.addEventListener('click',function(){state.members.splice(i,1);rerender();});
+      head.appendChild(x);
+    }
+    row.appendChild(head);
+    if(role.ask_age||role.ask_gender){
+      const box=document.createElement('div');box.className='cat-select';
+      if(role.ask_age){
+        renderCategoryChips(box,Object.keys(CATEGORY_LABELS).map(function(k){return {value:k,label:CATEGORY_LABELS[k]};}),
+          {category:m.category,gender:role.ask_gender?m.gender:null},function(cat,g){m.category=cat;m.gender=role.ask_gender?g:null;rerender();},'cat-opt','sel');
+      }else{
+        const ag=role.age_group||'adult';
+        (GENDER_OPTIONS[ag]||[]).forEach(function(g){
+          box.appendChild(tuChip(g.label,m.gender===g.v,function(){m.gender=m.gender===g.v?null:g.v;rerender();}));
+        });
+      }
+      row.appendChild(box);
+    }
+    list.appendChild(row);
+  });
+  container.appendChild(list);
+  // افزودنِ عضو (مثلاً خانواده) تا سقفِ نوع
+  if(state.members.length<u.max_members&&u.max_members>u.min_members){
+    const add=document.createElement('div');add.className='tu-add';
+    u.allowed_roles.forEach(function(rc){
+      const r=tuRole(rc);if(!r)return;
+      add.appendChild(tuChip('+ '+r.label,false,function(){state.members.push({role:rc,alias:'',category:null,gender:null});rerender();}));
+    });
+    container.appendChild(add);
+  }
+}
+
+// ----- مودالِ تغییرِ نوعِ پرونده / ارتقا (همان client_id، تاریخچه حفظ می‌شود) -----
+let editUnitState=null;
+function renderEditUnit(){renderUnitEditor($('editUnitEditor'),editUnitState,{},renderEditUnit);}
+let editUnitFrom=null;   // 'setup' ⇒ بعد از ذخیره در صفحه‌ی شروعِ جلسه می‌مانیم
+async function openEditUnitModal(from){
+  if(!currentClient)return;
+  editUnitFrom=from==='setup'?'setup':null;
+  await loadTuCatalog();
+  if(!tuCatalog){showBanner('error','بارگذاریِ فهرستِ انواعِ پرونده ناموفق بود.');return;}
+  editUnitState=tuStateFromUnit(currentClientUnit)||tuNewState(tuDefaultUnitCode());
+  renderEditUnit();
+  $('editUnitModal').classList.add('open');
+}
+function closeEditUnitModal(){$('editUnitModal').classList.remove('open');editUnitState=null;}
+async function confirmEditUnit(){
+  if(!currentClient||!editUnitState)return;
+  const btn=$('editUnitSaveBtn');if(btn.disabled)return;btn.disabled=true;
+  const id=currentClient.id;
+  try{
+    await api('/api/clients/'+id+'/unit',{method:'PUT',body:tuStateToBody(editUnitState)});
+    uxTrack('client_unit_edited');
+    closeEditUnitModal();
+    showBanner('info','نوعِ پرونده به‌روزرسانی شد.');
+    loadClients();
+    if(editUnitFrom==='setup'){
+      const note=$('preNoteInput').value;
+      await loadPresenceForSetup(currentClient);
+      if(note){$('preNoteInput').value=note;$('preNoteInput').hidden=false;$('preNoteToggle').hidden=true;}
+    }else openClientDetail(id);
+  }catch(e){showBanner('error',e.message);}
+  finally{btn.disabled=false;}
+}
+
+// ----- مودالِ رویکردهایِ درمانگر (یک بار) -----
+let modalitiesDraft=[];
+function renderModalitiesChips(){
+  const box=$('modalitiesChips');box.innerHTML='';
+  (tuCatalog?tuCatalog.modalities:[]).forEach(function(m){
+    box.appendChild(tuChip(m.label,modalitiesDraft.indexOf(m.code)>=0,function(){
+      const i=modalitiesDraft.indexOf(m.code);
+      if(i>=0)modalitiesDraft.splice(i,1);else modalitiesDraft.push(m.code);
+      renderModalitiesChips();
+    }));
+  });
+}
+async function openModalitiesModal(){
+  await loadTuCatalog();
+  modalitiesDraft=tuTherapistModalities.slice();
+  renderModalitiesChips();
+  $('modalitiesModal').classList.add('open');
+}
+function closeModalitiesModal(){$('modalitiesModal').classList.remove('open');}
+async function confirmModalities(){
+  try{
+    const r=await api('/api/therapist/modalities',{method:'PUT',body:{modalities:modalitiesDraft}});
+    tuTherapistModalities=r.modalities||[];
+    closeModalitiesModal();
+    // فرمِ مراجعِ جدیدِ باز با پیش‌فرضِ تازه دوباره ساخته می‌شود (فقط اگر هنوز چیزی تغییر نکرده)
+    if($('newClientModal').classList.contains('open')){newClientUnitState=tuNewState(tuDefaultUnitCode());renderNewClientCatSelect();}
+  }catch(e){showBanner('error',e.message);}
+}
+
+// ----- کارتِ «پیش از جلسه» در صفحه‌ی شروع: حاضرینِ امروز + یادداشتِ اختیاری -----
+let presenceUnit=null;       // واحدِ مراجعِ همین Setup
+let presenceSelected=null;   // Set از idها؛ همه = پیش‌فرض
+function resetPresence(){
+  presenceUnit=null;presenceSelected=null;
+  $('presenceBox').hidden=true;$('presenceEdit').hidden=true;
+  $('preNoteInput').hidden=true;$('preNoteInput').value='';
+  $('preNoteToggle').hidden=false;
+}
+async function loadPresenceForSetup(client){
+  resetPresence();
+  $('presenceBox').hidden=false;           // یادداشتِ پیش از جلسه برایِ همه‌ی مراجعین
+  $('presenceLine').hidden=true;
+  try{
+    await loadTuCatalog();
+    const r=await api('/api/clients/'+client.id+'/unit');
+    if(!currentClient||currentClient.id!==client.id)return;
+    presenceUnit=r.unit;
+    currentClientUnit=r.unit;
+    if(presenceUnit&&tuCatalog){
+      presenceSelected=new Set(presenceUnit.members.map(function(m){return m.id;}));
+      $('presenceLine').hidden=false;
+      renderPresence();
+    }
+  }catch(e){/* fail-open: بدونِ کارتِ حاضرین هم جلسه شروع می‌شود */}
+}
+function renderPresence(){
+  if(!presenceUnit)return;
+  const u=tuUnit(presenceUnit.unit_type);
+  const typeLabel=u?'جلسه‌ی '+u.label:'';
+  const box=$('presenceChips');box.innerHTML='';box.hidden=presenceUnit.members.length<=1;
+  // تک‌عضوی: انتخابِ حاضرین معنا ندارد؛ فقط نوعِ جلسه نمایش داده می‌شود و «تغییر» به تغییرِ نوع می‌رسد.
+  if(presenceUnit.members.length<=1){$('presenceSummary').textContent=typeLabel;return;}
+  const names=presenceUnit.members.filter(function(m){return presenceSelected.has(m.id);}).map(function(m){return m.alias||tuLabelFa(m.label);});
+  $('presenceSummary').textContent=(typeLabel?typeLabel+' · ':'')+'حاضرین: '+names.join('، ')+' + شما';
+  presenceUnit.members.forEach(function(m){
+    box.appendChild(tuChip(m.alias||tuLabelFa(m.label),presenceSelected.has(m.id),function(){
+      if(presenceSelected.has(m.id)){if(presenceSelected.size>1)presenceSelected.delete(m.id);}
+      else presenceSelected.add(m.id);
+      renderPresence();
+    }));
+  });
+}
+function togglePresenceEdit(){$('presenceEdit').hidden=!$('presenceEdit').hidden;}
+function togglePreNote(){$('preNoteInput').hidden=false;$('preNoteToggle').hidden=true;$('preNoteInput').focus();}
+function presenceBody(){
+  const body={};
+  if(presenceUnit&&presenceSelected&&presenceSelected.size<presenceUnit.members.length)body.attendees=Array.from(presenceSelected);
+  const note=$('preNoteInput').value.trim();
+  if(note)body.pre_note=note;
+  return body;
 }
 
 async function loadClients(){
@@ -4330,7 +4678,7 @@ function buildClientCard(c){
     const metaText=document.createElement('span');
     metaText.textContent=toFa(c.session_count||'0')+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'');
     meta.appendChild(metaText);
-    const badgeLabel=categoryBadgeLabel(c.category,c.gender);
+    const badgeLabel=clientBadgeLabel(c);
     if(badgeLabel){
       const catBadge=document.createElement('span');
       catBadge.className='cat-badge';
@@ -4545,6 +4893,8 @@ async function openClientDetail(clientId,opts){
   try{
     const data=await api('/api/clients/'+clientId);
     currentClient=data.client;
+    currentClientUnit=data.unit||null;
+    $('detailUnitText').textContent=tuUnitSummary(currentClientUnit)||'';
     $('detailTitle').textContent=data.client.code+(data.client.alias?' — '+data.client.alias:'');
     $('detailMeta').textContent=toFa(data.sessions.length)+' جلسه';
     // ⭐ پرونده باید با کارت یکدست باشد: مراجعِ غیرفعال جلسه‌ی زنده‌ی جدید نمی‌گیرد
@@ -5858,13 +6208,10 @@ async function saveSessionMeta(){
 // ⭐ عمداً هیچ دانلود/اشتراک‌گذاریِ دیتا از سمتِ تراپیست وجود نداره — فقط ادمین
 // (توی پنلِ ادمین، با احرازِ سمتِ سرور) می‌تونه دیتا رو از پلتفرم خارج کنه.
 
-const NEW_CLIENT_CATEGORY_OPTIONS=[{value:null,label:'نامشخص'},{value:'child',label:'کودک'},{value:'teen',label:'نوجوان'},{value:'adult',label:'بزرگسال'}];
+// فرمِ مراجعِ جدید: ویرایشگرِ واحدِ درمان (TU) جایگزینِ چیپ‌هایِ دسته‌بندی شد (2026-09-27).
+let newClientUnitState=null;
 function renderNewClientCatSelect(){
-  renderCategoryChips($('newClientCatSelect'),NEW_CLIENT_CATEGORY_OPTIONS,{category:newClientSelectedCategory,gender:newClientSelectedGender},function(cat,gender){
-    newClientSelectedCategory=cat;
-    newClientSelectedGender=gender;
-    renderNewClientCatSelect();
-  },'cat-opt','sel');
+  renderUnitEditor($('newClientUnitEditor'),newClientUnitState,{showModalitiesLink:true},renderNewClientCatSelect);
 }
 // ⭐ وضعیتِ مراجعِ جدید = تبی که مودال از آن باز شده. قبلاً تب نادیده گرفته می‌شد و
 // مراجعِ ساخته‌شده در تبِ «غیرفعال» (آرشیوِ پرونده‌های قبلی) به «فعال» می‌رفت.
@@ -5882,10 +6229,11 @@ function showNewClientModal(){
   if(firstReason)firstReason.checked=true;
   $('newClientReasonOther').value='';
   $('newClientAlias').value='';
-  newClientSelectedCategory=null;
-  newClientSelectedGender=null;
+  newClientUnitState=tuNewState(tuDefaultUnitCode());
   renderNewClientCatSelect();
   $('newClientModal').classList.add('open');
+  // کاتالوگ هنوز نرسیده (اولین بار) → بعد از رسیدن فرم دوباره ساخته می‌شود
+  if(!tuCatalog)loadTuCatalog().then(function(){if($('newClientModal').classList.contains('open')){newClientUnitState=tuNewState(tuDefaultUnitCode());renderNewClientCatSelect();}});
 }
 function closeNewClientModal(){$('newClientModal').classList.remove('open');}
 async function createNewClient(){
@@ -5897,7 +6245,7 @@ async function createNewClient(){
   btn.disabled=true;
   const alias=$('newClientAlias').value.trim();
   const status=newClientTargetStatus;
-  const body={alias:alias,category:newClientSelectedCategory,gender:newClientSelectedGender,status:status};
+  const body=Object.assign({alias:alias,status:status},tuStateToBody(newClientUnitState));
   if(status==='inactive')body.reason=readReasonFrom($('newClientReasonGroup'),$('newClientReasonOther'),'newClientReason');
   try{
     const data=await api('/api/clients',{method:'POST',body:body});
@@ -5969,6 +6317,7 @@ function setupNewSession(client){
   setupChipsTimer=setInterval(renderSetupChips,15000);
   resetConsent();
   applyStoredConsent(client);
+  loadPresenceForSetup(client);
   showScreen('Setup');
   runPreflight();
 }
@@ -6042,7 +6391,7 @@ async function startSession(){
     // ⭐ تاریخ/ساعت از همان ساعتِ دستگاه که صفحه‌ی Setup نشان داده (شمسی، ارقامِ لاتین) —
     // قبلاً سرور تاریخِ میلادیِ خودش را می‌گذاشت و با نمایش و ثبتِ دستی ناهمگون بود.
     const startedAt=new Date();
-    const data=await api('/api/sessions',{method:'POST',body:{client_id:currentClient.id,consent:true,date:toJalali(startedAt),start_time:pad2(startedAt.getHours())+':'+pad2(startedAt.getMinutes())}});
+    const data=await api('/api/sessions',{method:'POST',body:Object.assign({client_id:currentClient.id,consent:true,date:toJalali(startedAt),start_time:pad2(startedAt.getHours())+':'+pad2(startedAt.getMinutes())},presenceBody())});
     currentSession=data.session;
     if(data.client&&data.client.recording_consent_at)markClientConsent(currentClient.id,data.client.recording_consent_at);
     uxTrack('session_started');
@@ -8288,6 +8637,8 @@ const MODAL_CLOSERS={
   resolveSpeakersModal:closeResolveSpeakersModal,
   deactivateClientModal:closeDeactivateModal,
   editCategoryModal:closeEditCategoryModal,
+  editUnitModal:closeEditUnitModal,
+  modalitiesModal:closeModalitiesModal,
   cancelModal:closeCancelModal,
   exitModal:closeExitWarning,
   deleteSessionModal:closeDeleteSession,

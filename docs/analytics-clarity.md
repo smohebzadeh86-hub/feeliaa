@@ -93,7 +93,7 @@ FeeliaAnalytics.boot(therapist)
 | `signup_completed` / `login_completed` | موفقیتِ `submitAuth` |
 | `logout_clicked` | `logout` |
 | `client_create_opened` / `client_created` / `client_create_failed` | مودالِ مراجعِ جدید |
-| `client_deactivated` / `client_reactivated` / `client_category_edited` / `client_deleted` | منوی کارتِ مراجع (دلیل/دسته ارسال نمی‌شود) |
+| `client_deactivated` / `client_reactivated` / `client_category_edited` / `client_unit_edited` / `client_deleted` | منوی کارتِ مراجع (دلیل/دسته ارسال نمی‌شود) |
 | `clients_tab_switched` | تبِ فعال/غیرفعال (صفحه‌ی «همه‌ی مراجعین») |
 | `client_pinned` / `client_unpinned` | منویِ کارتِ مراجع — سنجاق به صفحه‌ی اول (2026-09-16) |
 | `all_clients_opened` | دکمه‌ی «همه‌ی مراجعین» در صفحه‌ی اول (2026-09-16) |

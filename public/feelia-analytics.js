@@ -23,7 +23,7 @@
   var EVENTS = toSet([
     'signup_completed', 'login_completed', 'logout_clicked',
     'client_create_opened', 'client_created', 'client_create_failed',
-    'client_deactivated', 'client_reactivated', 'client_category_edited', 'client_deleted',
+    'client_deactivated', 'client_reactivated', 'client_category_edited', 'client_unit_edited', 'client_deleted',
     'clients_tab_switched', 'client_pinned', 'client_unpinned', 'all_clients_opened',
     'transcript_opened', 'session_meta_edited', 'session_deleted',
     'client_consent_given', 'client_consent_declined', 'preflight_mic_failed',

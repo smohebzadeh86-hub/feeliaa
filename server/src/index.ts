@@ -16,6 +16,7 @@ import { sttRoutes } from './http/stt.js';
 import { clientConfigRoutes } from './http/clientConfig.js';
 import { transcriptionRoutes } from './ws/transcription.js';
 import { caseFileRoutes } from './features/case-file/api/caseFile.routes.js';
+import { treatmentUnitRoutes } from './features/treatment-unit/index.js';
 import { obsRoutes } from './http/obs.js';
 import { registerObsHooks } from './obs/httpHook.js';
 import { startObsDrainLoop, flushObsQueue } from './obs/eventLog.js';
@@ -76,6 +77,7 @@ await app.register(sttRoutes);
 await app.register(clientConfigRoutes);
 await app.register(transcriptionRoutes);
 await app.register(caseFileRoutes);
+await app.register(treatmentUnitRoutes);
 await app.register(obsRoutes);
 await app.register(audioUploadRoutes);
 

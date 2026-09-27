@@ -26,6 +26,10 @@ import { hasStoredConsent, recordClientConsent } from './clientConsent.js';
 // features/case-file/application/autoTrigger.ts است (jobِ آپلودِ صدا هم از همان استفاده می‌کند).
 import { maybeAutoGenerateCaseFile } from '../features/case-file/application/autoTrigger.js';
 import { recordAudit } from '../obs/audit.js';
+import { treatmentUnits, TreatmentUnitValidationError } from '../features/treatment-unit/index.js';
+
+// سقفِ یادداشتِ «پیش از جلسه» (configuration-catalog)
+const PRE_NOTE_MAX_CHARS = Number(process.env.PRE_NOTE_MAX_CHARS) > 0 ? Number(process.env.PRE_NOTE_MAX_CHARS) : 2000;
 // ⭐ پردازش صدا در background — با API واقعیِ async (stt-async-v5)، نه وانمودِ
 // زنده‌بودن رویِ موتورِ realtime (که طبقِ docsِ Soniox دقتِ تشخیصِ گوینده‌ی پایین‌تری داره)
 // ⭐ باگِ واقعیِ کشف‌شده (2026-09-18): برایِ جلسه‌ی دستی/آرشیو، auto-generate رویِ لحظه‌ی
@@ -88,13 +92,15 @@ export async function sessionRoutes(app: FastifyInstance) {
   // mode='manual': ثبتِ دستیِ جلسه‌ی گذشته (آرشیوِ پرونده‌های قبلی) — هیچ ضبط/صدایی
   // در کار نیست، پس رضایتِ ضبط موضوعیت ندارد (LAW-009)؛ جلسه مستقیماً completed ساخته می‌شود.
   app.post('/api/sessions', async (request, reply) => {
-    const { client_id, consent, date, start_time, mode, note } = request.body as {
+    const { client_id, consent, date, start_time, mode, note, attendees, pre_note } = request.body as {
       client_id: string;
       consent: boolean;
       date?: string;
       start_time?: string;
       mode?: string;
       note?: string;
+      attendees?: unknown;   // شناسه‌یِ اعضایِ حاضر (migration 029)؛ نبود = همه
+      pre_note?: string;     // یادداشتِ کوتاهِ پیش از جلسه (اختیاری)
     };
 
     if (mode !== undefined && mode !== 'live' && mode !== 'manual') {
@@ -208,14 +214,27 @@ export async function sessionRoutes(app: FastifyInstance) {
       };
     }
 
+    // زمینه‌ی جلسه (واحدِ درمان): حاضرین + یادداشتِ پیش از جلسه — هر دو اختیاری.
+    let attendeeIds: string[] | null = null;
+    try { attendeeIds = await treatmentUnits.attendeesForNewSession(client_id, attendees); }
+    catch (e) {
+      if (e instanceof TreatmentUnitValidationError) { reply.code(400); return { error: e.message, code: e.code }; }
+      throw e;
+    }
+    const preNote = typeof pre_note === 'string' && pre_note.trim() ? pre_note.trim() : null;
+    if (preNote && preNote.length > PRE_NOTE_MAX_CHARS) {
+      reply.code(400);
+      return { error: 'یادداشتِ پیش از جلسه بیش از حد طولانی است', code: 'pre-note-too-long' };
+    }
+
     const newId = randomUUID();
     for (let attempt = 0; ; attempt++) {
       const sessionNum = await nextSessionNum();
       try {
         await query(
-          `INSERT INTO sessions (id, client_id, session_num, date, start_time, consent, status)
-           VALUES (?, ?, ?, ?, ?, ?, 'in_progress')`,
-          [newId, client_id, sessionNum, sessionDate, sessionTime, true]
+          `INSERT INTO sessions (id, client_id, session_num, date, start_time, consent, status, attendees, pre_note)
+           VALUES (?, ?, ?, ?, ?, ?, 'in_progress', ?, ?)`,
+          [newId, client_id, sessionNum, sessionDate, sessionTime, true, attendeeIds ? JSON.stringify(attendeeIds) : null, preNote]
         );
         break;
       } catch (err) {

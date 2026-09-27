@@ -458,7 +458,9 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       console.log(`[batch] processing session=${sessionId} purpose=${purpose} bytes=${buffer.length} (async API)`);
       let text = '';
       try {
-        text = await transcribeFileAsync(buffer, `${sessionId}.webm`, `feelia:${sessionId}:${purpose}`, { sessionContext: purpose !== 'note' });
+        const { treatmentUnits } = await import('../features/treatment-unit/index.js');
+        const context = purpose === 'note' ? undefined : await treatmentUnits.sessionSttContext(sessionId);
+        text = await transcribeFileAsync(buffer, `${sessionId}.webm`, `feelia:${sessionId}:${purpose}`, { sessionContext: purpose !== 'note', context });
       } catch (e) {
         if (isPermanentTranscribeError(e)) {
           dropUnrecoverable(sessionId, file, purpose, buffer.length, 'soniox-invalid-audio');

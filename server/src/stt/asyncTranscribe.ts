@@ -178,7 +178,8 @@ export async function createTranscription(
   fileId: string,
   // sessionContext (پیش‌فرض true): contextِ «جلسه‌ی چندنفره» برایِ دقتِ تفکیکِ گوینده؛ یادداشتِ صوتیِ
   // تک‌گوینده‌ی تراپیست آن را false می‌دهد تا مدل به شکستنِ بی‌جایِ یک صدا سوق داده نشود.
-  opts: { languageHints?: string[]; clientReferenceId?: string; sessionContext?: boolean } = {}
+  // context: contextِ مخصوصِ جلسه (واحدِ درمان، 2026-09-27) — اگر داده شود جایگزینِ contextِ ثابت می‌شود.
+  opts: { languageHints?: string[]; clientReferenceId?: string; sessionContext?: boolean; context?: object } = {}
 ): Promise<string> {
   const payload = JSON.stringify({
     model: 'stt-async-v5',
@@ -186,7 +187,7 @@ export async function createTranscription(
     language_hints: opts.languageHints || ['fa'],
     enable_speaker_diarization: true,
     enable_language_identification: true,
-    ...(opts.sessionContext === false ? {} : { context: SESSION_TRANSCRIPTION_CONTEXT }),
+    ...(opts.sessionContext === false ? {} : { context: opts.context ?? SESSION_TRANSCRIPTION_CONTEXT }),
     client_reference_id: opts.clientReferenceId,
   });
   const res = await request('POST', '/v1/transcriptions', {
@@ -304,13 +305,13 @@ export async function transcribeFileAsync(
   buffer: Buffer,
   filenameHint: string,
   clientReferenceId?: string,
-  opts: { sessionContext?: boolean; signs?: SignMark[] } = {}
+  opts: { sessionContext?: boolean; context?: object; signs?: SignMark[] } = {}
 ): Promise<string> {
   // نامِ فایل با پیشوندِ feelia- تا sweepِ یتیم‌ها (sweepSonioxOrphans) فقط فایل‌هایِ خودِ ما را بشناسد.
   const fileId = await uploadFile(buffer, 'feelia-' + filenameHint, clientReferenceId);
   let transcriptionId: string | null = null;
   try {
-    transcriptionId = await createTranscription(fileId, { clientReferenceId, sessionContext: opts.sessionContext });
+    transcriptionId = await createTranscription(fileId, { clientReferenceId, sessionContext: opts.sessionContext, context: opts.context });
     const startedAt = Date.now();
     const timeoutMs = pollTimeoutForBytes(buffer.length);
     let status = 'queued';

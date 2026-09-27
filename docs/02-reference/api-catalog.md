@@ -165,6 +165,17 @@ UIِ فعلی فقط برایِ `status='inactive'` رندر می‌شود. جز
 
 **تغییرِ مرتبط:** `GET /api/clients/:id` حالا `sessions[].batch_status` هم برمی‌گرداند؛ `PUT /api/sessions/:id` پاک‌کردنِ تاریخ را برایِ `source='upload'` هم می‌پذیرد (مثلِ `manual`).
 
+## ۸.۲ واحدِ درمان — `server/src/features/treatment-unit/api/treatmentUnit.routes.ts` (همه `auth`) — جدید 2026-09-27
+
+| متد | مسیر | بدنه / خروجی |
+|---|---|---|
+| GET | `/api/catalog/treatment-units` | `{unit_types[], roles[], modalities[]}` — کاتالوگِ داده‌محور؛ فرانت فرم را از آن می‌سازد |
+| GET | `/api/clients/:id/unit` | owned (404). `{unit:{unit_type, members:[{id,role,alias,category,gender,label}]}}` — مراجعِ بدونِ عضو ⇒ عضوِ ضمنیِ `id:"self"` |
+| PUT | `/api/clients/:id/unit` | `{unit_type, members[]}` — تغییر/ارتقا؛ عضوِ با `id` موجود حفظ می‌شود. 400 با `code`: `unit-type-invalid`، `members-count`، `member-role-invalid`، `member-category-invalid`، `member-gender-invalid`، `alias-too-long` |
+| GET/PUT | `/api/therapist/modalities` | `{modalities:[code]}` — 400 `modalities-invalid`/`modality-unknown` |
+
+**تغییرِ مسیرهای موجود:** `POST /api/clients` — اختیاری `unit_type` + `members` (همان خطاهایِ 400 بالا، پیش از INSERT)؛ پاسخ `unit` هم دارد. `GET /api/clients` — `unit_type`، `member_count`. `GET /api/clients/:id` — `unit`. `POST /api/sessions` (زنده) — اختیاری `attendees:[memberId]` (نبود/همه ⇒ NULL؛ 400 `attendees-invalid`/`attendees-empty`/`attendees-unknown`) و `pre_note` (400 `pre-note-too-long`). `POST /api/stt/realtime-session` — `stt_defaults.context` حالا مخصوصِ جلسه است (fail-open به contextِ ثابت).
+
 ## ۹. WebSocket (LEGACY — LAW-015) — `server/src/ws/transcription.ts`
 
 هر دو مسیر پشتِ `requireAuth` (کوکی در upgrade) و مالکیتِ جلسه.

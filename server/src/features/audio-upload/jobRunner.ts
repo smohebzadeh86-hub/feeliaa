@@ -9,6 +9,7 @@ import { query, pool } from '../../db/connection.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { createNotification } from '../notifications/notify.js';
 import { archiveAudioFileForAdmin } from '../../stt/sessionAudioArchive.js';
+import { treatmentUnits } from '../treatment-unit/index.js';
 import {
   uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens,
   buildTextFromAsyncTokens, deleteTranscription, deleteFile, listSonioxFiles, listSonioxTranscriptions,
@@ -205,7 +206,13 @@ export function productionDeps(): JobDeps {
     store: sqlJobStore,
     soniox: {
       uploadFile: uploadFileFromPath,
-      createTranscription: (fileId, ref) => createTranscription(fileId, { clientReferenceId: ref }),
+      // (2026-09-27) contextِ مخصوصِ جلسه از واحدِ درمان. ref = feelia:<sessionId>:upload:<jobId> (jobMachine) —
+      // پورتِ jobMachine دست نخورد. fail-open داخلِ sessionSttContext.
+      createTranscription: async (fileId, ref) => {
+        const sessionId = String(ref).split(':')[1] || '';
+        const context = sessionId ? await treatmentUnits.sessionSttContext(sessionId) : undefined;
+        return createTranscription(fileId, { clientReferenceId: ref, context });
+      },
       poll: pollTranscriptionStatus,
       getText: async (id) => buildTextFromAsyncTokens(await getTranscriptTokens(id)),
       deleteTranscription,

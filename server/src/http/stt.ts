@@ -16,6 +16,7 @@ import {
   mintTemporaryKey,
 } from '../stt/tempkey.js';
 import { SESSION_TRANSCRIPTION_CONTEXT } from '../stt/sessionContext.js';
+import { treatmentUnits } from '../features/treatment-unit/index.js';
 
 // rate-limit ساده درون‌حافظه‌ای: هر تراپیست حداکثر ۳۰ mint در دقیقه
 const mintHits = new Map<string, number[]>();
@@ -170,8 +171,11 @@ export async function sttRoutes(app: FastifyInstance) {
         single_use: true,
         credential_scope: 'transcribe_websocket',
         expires_at: minted.expires_at,
-        // یادداشتِ صوتی تک‌گوینده است — contextِ «جلسه‌ی چندنفره» فقط برایِ transcript
-        stt_defaults: purpose === 'note' ? { ...STT_DEFAULTS, context: undefined } : STT_DEFAULTS,
+        // یادداشتِ صوتی تک‌گوینده است — contextِ «جلسه‌ی چندنفره» فقط برایِ transcript.
+        // (2026-09-27) contextِ جلسه از واحدِ درمان + حاضرین مشتق می‌شود. fail-open: در خطا contextِ ثابتِ قبلی.
+        stt_defaults: purpose === 'note'
+          ? { ...STT_DEFAULTS, context: undefined }
+          : { ...STT_DEFAULTS, context: await treatmentUnits.sessionSttContext(session_id) },
       };
     } catch (err) {
       const code = err instanceof TempKeyError ? err.code : 'mint-transport';
