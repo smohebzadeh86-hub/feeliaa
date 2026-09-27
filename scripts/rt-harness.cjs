@@ -948,5 +948,64 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     await s49.finish(); RT.forget(s49);
   }
 
+  // T50–T53 (2026-09-27): علامتِ بدنی در جایِ زمانیِ خودش داخلِ متنِ ذخیره‌شده؛ حذفش نشانگر را برمی‌دارد.
+  {
+    newSession('s50');
+    const s50 = RT.createSession('s50', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p50 = s50.start(); await sleep(5); serverOpen(FakeWS.last); await p50;
+    serverTokens(FakeWS.last, [{ text: 'قبل از گریه', is_final: true, speaker: 1 }]); await sleep(5);
+    const m50 = s50.insertSignMarker('۰۳:۱۲', 'گریان');
+    serverTokens(FakeWS.last, [{ text: 'بعد از گریه', is_final: true, speaker: 1 }]); await sleep(5);
+    await s50.persistConfirmed();
+    const t50 = sessions.s50.transcript;
+    ok('T50 sign marker saved inside transcript between the utterances around it (speaker relabelled after it)',
+      m50 === '[علامت · ۰۳:۱۲ — گریان]' && t50.indexOf('قبل از گریه') < t50.indexOf(m50) && t50.indexOf(m50) < t50.indexOf('بعد از گریه') &&
+      /\]\n\nگوینده ۱: بعد از گریه$/.test(t50), JSON.stringify(t50));
+    // T51: حذفِ علامتِ ذخیره‌شده ⇒ PUTِ بعدی نشانگر را از سرور برمی‌دارد؛ متنِ دیگری عوض نمی‌شود
+    ok('T51a removeSignMarker returns true for a present marker', s50.removeSignMarker(m50) === true, '');
+    await s50.persistConfirmed();
+    const t51 = sessions.s50.transcript;
+    ok('T51 removed sign marker disappears from saved transcript, rest intact, same-speaker halves re-joined (no duplicate label)',
+      t51 === 'گوینده ۱: قبل از گریه بعد از گریه', JSON.stringify(t51));
+    // T52: حذفِ نشانگرِ ذخیره‌شده + batch هم‌زمان نسخه را بالا برده (409) ⇒ هیچ متنی تکرار یا گم نمی‌شود
+    const m52 = s50.insertSignMarker('۰۵:۰۰', 'سکوت طولانی');
+    serverTokens(FakeWS.last, [{ text: ' ادامه', is_final: true, speaker: 1 }]); await sleep(5);
+    await s50.persistConfirmed();
+    s50.removeSignMarker(m52);
+    sessions.s50.transcript += '\n\nBATCH X'; sessions.s50.transcript_version++;
+    serverTokens(FakeWS.last, [{ text: ' تازه', is_final: true, speaker: 1 }]); await sleep(5);
+    await s50.persistConfirmed();
+    const t52 = sessions.s50.transcript;
+    const count = (s, w) => s.split(w).length - 1;
+    ok('T52 marker removal racing a batch append: no duplicated or lost text',
+      count(t52, 'قبل از گریه') === 1 && count(t52, 'بعد از گریه') === 1 && count(t52, 'BATCH X') === 1 && count(t52, 'تازه') === 1 && count(t52, 'ادامه') === 1,
+      JSON.stringify(t52));
+    // T53: موتور بعد از پایان نشانگر نمی‌پذیرد (متنش دیگر ذخیره نمی‌شود) و حالتِ note هرگز
+    await s50.finish();
+    ok('T53a no sign marker after finish', s50.insertSignMarker('۰۹:۰۰', 'خشم') === null, '');
+    RT.forget(s50);
+    newSession('s53');
+    const n53 = RT.createSession('s53', { mode: 'note', onState: () => {}, onResult: () => {}, onError: () => {} });
+    ok('T53b note-mode session never takes sign markers', n53.insertSignMarker('۰۰:۰۱', 'خشم') === null, '');
+    // T54: نشانگرِ وسطِ گفته، بلافاصله حذف (هنوز متنی بعدش نیامده) ⇒ ادامه‌ی همان گوینده بدونِ برچسبِ تکراری
+    newSession('s54');
+    const s54 = RT.createSession('s54', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p54 = s54.start(); await sleep(5); serverOpen(FakeWS.last); await p54;
+    serverTokens(FakeWS.last, [{ text: 'این جمله خیلی مهم', is_final: true, speaker: 1 }]); await sleep(5);
+    const m54 = s54.insertSignMarker('۰۰:۴۵', 'لرزش');
+    s54.removeSignMarker(m54);
+    serverTokens(FakeWS.last, [{ text: ' بود.', is_final: true, speaker: 1 }, { text: 'سلام', is_final: true, speaker: 2 }]); await sleep(5);
+    const c54 = RT.cleanText(s54.confirmed);
+    ok('T54 immediate removal: same speaker continues in one paragraph; next speaker still labelled',
+      c54 === 'گوینده ۱: این جمله خیلی مهم بود.\n\nگوینده ۲: سلام', JSON.stringify(c54));
+    await s54.finish(); RT.forget(s54);
+    // T55: تابعِ مشترکِ Wrapup — گوینده‌هایِ متفاوتِ دو طرف پاراگرافِ جدا می‌مانند؛ نشانگرِ ناموجود ⇒ null
+    const r55 = RT.removeMarkerFromText('گوینده ۱: الف\n\n[علامت · ۰۱:۰۰ — خشم]\n\nگوینده ۲: ب', '[علامت · ۰۱:۰۰ — خشم]');
+    ok('T55 removeMarkerFromText keeps different speakers apart; absent marker → null',
+      r55 === 'گوینده ۱: الف\n\nگوینده ۲: ب' && RT.removeMarkerFromText('متن', '[علامت · ۰۱:۰۰ — خشم]') === null &&
+      RT.removeMarkerFromText('[علامت · ۰۰:۰۰ — خشم]\n\nگوینده ۱: الف', '[علامت · ۰۰:۰۰ — خشم]') === 'گوینده ۱: الف', JSON.stringify(r55));
+    ok('T53c marker text is sanitised (no brackets/newlines from input)', RT.signMarker('۰۱:۰۰', 'a]\nb[') === '[علامت · ۰۱:۰۰ — a b]', RT.signMarker('۰۱:۰۰', 'a]\nb['));
+  }
+
   console.log(results.map((r) => r[0]).join('\n'));
 })().catch((e) => { console.error('HARNESS ERROR', e); process.exitCode = 1; });

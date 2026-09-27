@@ -1027,6 +1027,64 @@
     this.dirty = true;
   };
 
+  // ⭐ (2026-09-27، درخواستِ مالک: «علائمِ بدنی به ترتیبِ زمانی داخلِ خودِ متن») علامتی که تراپیست حینِ جلسه
+  // می‌زند همان لحظه یک پاراگرافِ جدا در confirmed می‌شود (همان سازوکارِ RECONNECT_MARK) — پس در متنِ ذخیره‌شده
+  // بینِ گفته‌هایِ قبل و بعدش است. قالب با سرور (server/src/stt/signMarkers.ts) یکی است.
+  function signMarker(timeLabel, signType) {
+    var clean = function (s) { return String(s == null ? '' : s).replace(/[\[\]\r\n]/g, ' ').replace(/\s+/g, ' ').trim(); };
+    return '[علامت · ' + clean(timeLabel) + ' — ' + clean(signType) + ']';
+  }
+  // STARTING عمداً نیست: start() متنِ سرور را ناهمگام رویِ confirmed می‌گذارد.
+  var SIGN_MARK_STATES = {};
+  [STATES.ACTIVE, STATES.RECONNECTING, STATES.RECOVERED, STATES.FAILED, STATES.MANUAL_PAUSED, STATES.NETWORK_PAUSED]
+    .forEach(function (s) { SIGN_MARK_STATES[s] = true; });
+  // برمی‌گرداند متنِ نشانگر، یا null اگر موتور در حالی نیست که متنش هنوز ذخیره می‌شود.
+  RTSession.prototype.insertSignMarker = function (timeLabel, signType) {
+    if (!this.persist || this.aborted || !SIGN_MARK_STATES[this.state]) return null;
+    var m = signMarker(timeLabel, signType);
+    this.confirmed += (this.confirmed ? '\n\n' : '') + m;
+    this.curSpeaker = null; // گفته‌ی بعدی دوباره برچسبِ گوینده بگیرد
+    this.dirty = true;
+    try { this.cb.onResult({ final: this.cleanConfirmed(), interim: cleanText(this.interim) }); } catch (e) {}
+    return m;
+  };
+  // حذفِ علامت حینِ جلسه: آخرین رخدادِ نشانگر از confirmed برداشته می‌شود. اگر همان نشانگر در persistedText
+  // (پایه‌ی rebaseِ 409) هم هست، همان برش آنجا هم زده می‌شود تا پایه پیشوندِ متنِ ما بماند؛ PUTِ بعدی
+  // (CAS رویِ همان نسخه) آن را از سرور هم برمی‌دارد. اگر بینِ دو ذخیره نویسنده‌ی دیگری (batch) نسخه را بالا
+  // برده باشد، شاخه‌ی واگراییِ persistConfirmed نشانگر را در متنِ سرور نگه می‌دارد — متنی گم یا تکرار نمی‌شود.
+  // (E2E با Chromeِ واقعی 2026-09-27) نشانگر وسطِ گفته‌ی یک گوینده زده شده بود؛ بعد از حذف، «گوینده ۱: …مهم» و
+  // «گوینده ۱: بود.» دو پاراگرافِ جدا با برچسبِ تکراری می‌ماندند. اگر پاراگرافِ بعد با همان برچسبی شروع شود که
+  // پاراگرافِ قبل داشت، دوباره یکی می‌شوند. همین تابع در Wrapup (index.html) هم استفاده می‌شود. null = نشانگر نیست.
+  var LAST_SPEAKER_RE = /(?:^|\n\n)(گوینده [۰-۹0-9]+): (?:(?!\n\n)[\s\S])*$/;
+  function removeMarkerFromText(s, marker) {
+    s = String(s || '');
+    var i = marker ? s.lastIndexOf(marker) : -1;
+    if (i < 0) return null;
+    var head = s.slice(0, i).replace(/\s+$/, ''), tail = s.slice(i + marker.length).replace(/^\s+/, '');
+    var m = head.match(LAST_SPEAKER_RE);
+    if (m && tail.indexOf(m[1] + ': ') === 0) return head + ' ' + tail.slice(m[1].length + 2).replace(/^\s+/, '');
+    return head + (head && tail ? '\n\n' : '') + tail;
+  }
+  var FA_TO_INT = function (s) { return parseInt(String(s).replace(/[۰-۹]/g, function (d) { return '۰۱۲۳۴۵۶۷۸۹'.indexOf(d); }), 10); };
+  RTSession.prototype.removeSignMarker = function (marker) {
+    if (!this.persist || this.aborted || !marker || !SIGN_MARK_STATES[this.state]) return false;
+    var src = this.confirmed || '';
+    var c = removeMarkerFromText(src, marker);
+    if (c === null) return false;
+    var p = removeMarkerFromText(this.persistedText || '', marker);
+    // اگر بعد از نشانگر هنوز متنی نیامده، گوینده‌ی جاری همان گوینده‌ی پاراگرافِ قبل است (تا ادامه‌ی گفته‌اش برچسبِ
+    // تکراری نگیرد)؛ وگرنه curSpeaker همان است که توکن‌هایِ بعد از نشانگر گذاشته‌اند.
+    if (!src.slice(src.lastIndexOf(marker) + marker.length).replace(/\s+/g, '')) {
+      var m = src.slice(0, src.lastIndexOf(marker)).replace(/\s+$/, '').match(LAST_SPEAKER_RE);
+      this.curSpeaker = m ? FA_TO_INT(m[1].slice('گوینده '.length)) : null;
+    }
+    this.confirmed = c;
+    if (p !== null) this.persistedText = p;
+    this.dirty = true;
+    try { this.cb.onResult({ final: this.cleanConfirmed(), interim: cleanText(this.interim) }); } catch (e) {}
+    return true;
+  };
+
   // (A2) placeholderهایِ دُمِ محلی که کلیدشان در متنِ سرور هست (سرور قبلاً پرش کرده یا متن را با همان کلید
   // append کرده) حذف می‌شوند — وگرنه «⏳ در حالِ بازیابی» برایِ همیشه در متن می‌ماند.
   function dropResolvedPlaceholders(tail, serverText) {
@@ -2069,6 +2127,8 @@
     hasActiveRecording: hasActiveRecording,
     forget: forget,
     cleanText: cleanText,
+    signMarker: signMarker,
+    removeMarkerFromText: removeMarkerFromText,
     MAX_RECONNECT_ATTEMPTS: MAX_RECONNECT_ATTEMPTS,
     // ⭐ برایِ جاروبِ سراسری (index.html) — آپلودِ صداهایِ باقی‌مانده از جلساتِ قبلی
     // که هیچ‌وقت resume نشدن (مثلاً تب برای همیشه بسته شده بود).

@@ -3722,7 +3722,9 @@ async function openAdminSessionDetail(sessionId,clientTitle){
       const div=document.createElement('div');
       div.className='note-item';
       if(n.type==='sign'){
-        div.innerHTML='<div class="note-head"><span class="note-tag">علامت</span></div><p></p>';
+        // (2026-09-27) زمانِ علامت هم نشان داده می‌شود — بدونِ زمان کاربردِ بالینی نداشت.
+        div.innerHTML='<div class="note-head"><span class="note-tag">علامت</span><span class="note-time"></span></div><p></p>';
+        div.querySelector('.note-time').textContent=' — '+formatTimer(n.offset_ms||0);
         div.querySelector('p').textContent=n.sign_type||'';
       }else{
         const tag=n.type==='voice'?'صوتی':'متنی';
@@ -6643,6 +6645,9 @@ document.querySelectorAll('.sign-chip').forEach(function(chip){
     chip.classList.add('logged');
     setTimeout(function(){chip.classList.remove('logged');},2000);
     const sd={type:'sign',sign_type:chip.dataset.sign,offset_ms:elapsedMs,wall_clock:nowClock()};
+    // (2026-09-27، درخواستِ مالک) علامت با زمانش همان لحظه داخلِ متنِ جلسه هم نوشته می‌شود (فقط مسیرِ FeeliaRT؛
+    // مسیرِ legacyِ SonioxDirect طبقِ LAW-015 فیچرِ جدید نمی‌گیرد).
+    try{if(rtSession)rtSession.insertSignMarker(formatTimer(sd.offset_ms||0),sd.sign_type);}catch(e){}
     sessionSigns.push(sd);
     renderSignsLog();
     const body={type:sd.type,sign_type:sd.sign_type,offset_ms:sd.offset_ms,wall_clock:sd.wall_clock};
@@ -6656,6 +6661,24 @@ function removeSign(idx){
   sessionSigns.splice(idx,1);
   renderSignsLog();
   renderWrapupSigns();
+  if(s&&currentSession&&currentSession.id)removeSignMarkerFromTranscript(currentSession.id,s);
+}
+// نشانگرِ علامتِ حذف‌شده از متنِ جلسه هم برداشته می‌شود — حینِ جلسه از متنِ زنده‌ی موتور، بعد از پایان
+// (Wrapup) از متنِ ذخیره‌شده با PUTِ CAS رویِ transcript_version. نشانگر از offset_ms/sign_type ساخته می‌شود،
+// پس برایِ علامتِ بازگردانده‌شده بعد از رفرش هم کار می‌کند. شکست بی‌صداست (علامت از فهرست حذف شده است).
+async function removeSignMarkerFromTranscript(sessionId,s){
+  if(!window.FeeliaRT||!window.FeeliaRT.signMarker||!window.FeeliaRT.removeMarkerFromText)return;
+  const marker=window.FeeliaRT.signMarker(formatTimer(s.offset_ms||0),s.sign_type);
+  if(rtSession){try{rtSession.removeSignMarker(marker);}catch(e){}return;}
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      const r=await api('/api/sessions/'+sessionId);
+      const next=window.FeeliaRT.removeMarkerFromText((r.session&&r.session.transcript)||'',marker);
+      if(next===null)return;
+      await api('/api/sessions/'+sessionId,{method:'PUT',body:{transcript:next,transcript_version:r.session.transcript_version||0}});
+      return;
+    }catch(e){if(!(e&&e.status===409))return;}
+  }
 }
 
 // ⭐ فیکس اصلی: addEventListener + DOM createElement — بجای innerHTML با onclick

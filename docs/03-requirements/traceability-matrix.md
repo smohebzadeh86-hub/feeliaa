@@ -39,6 +39,7 @@
 | REQ-053 | 04 | `RTSession.finish` | T8 | harness PASS |
 | REQ-054 | 04 | `connEpoch`، `openDirectWS` | T13a, T13b | harness PASS |
 | REQ-060…062, 064 | [05](../04-modules/05-notes-and-signs/module-prd.md) / [plan](../04-modules/05-notes-and-signs/implementation-plan.md) | `index.html` signs/notes؛ `sessions.ts` notes | none | code-read |
+| REQ-065 | [05](../04-modules/05-notes-and-signs/module-prd.md) / [subsystem 03](../07-subsystems/03-transcript-integrity.md) | `feelia-rt.js` signMarker؛ `index.html` sign chips/removeSign؛ `stt/signMarkers.ts`، `asyncTranscribe.ts`، `speakerResolve.ts` | T50–T55 + E2Eِ واقعی | `test:rt` PASS 2026-09-27؛ E2E (Chrome + Soniox + MySQLِ dev) PASS |
 | REQ-063 | 05 | `startVoiceNoteDirect`، `stopVoiceNoteDirect`، `batchqueue.ts` note | T15 | **WT: 3 FAIL** (upload، retry، drain)؛ HEAD PASS |
 | REQ-070…078 | [06](../04-modules/06-admin-panel/module-prd.md) / [plan](../04-modules/06-admin-panel/implementation-plan.md) | `http/admin.ts`؛ `index.html` admin | none | code-read |
 | REQ-080…084 | [07](../04-modules/07-ux-analytics/module-prd.md) / [plan](../04-modules/07-ux-analytics/implementation-plan.md) | `feelia-analytics.js`، `clientConfig.ts`، `index.html` | sandbox harness (۴۱ assertion) + route inject (۱۰) — اسکریپت‌ها در repo نیستند | [evidence 2026-09-14](../../verification/2026-09-14-clarity-test-pass.md): PASS؛ کلیکِ واقعی و payloadِ Clarity تأیید نشده |

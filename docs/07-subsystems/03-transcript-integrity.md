@@ -62,3 +62,29 @@
 - **rebaseِ 409:** `serverFilledPlaceholders` (سرور placeholderهایِ متنِ پایه را پر کرده ⇒ متنِ سرور + دُمِ تازه) و `dropResolvedPlaceholders` (placeholderِ دُمِ محلی که کلیدش در متنِ سرور هست حذف می‌شود).
 - **ترتیب:** صفِ سرور (`filesFor`) و صفِ مرورگر (`listForSession`) به ترتیبِ ضبط: (زمانِ شروعِ run، seq) / (createdAt، seq)؛ آرشیو با `client_seq` (migration 027).
 - **تست:** `test:rt` T46–T48؛ E2E رویِ DBِ dev ۱۰ تست ([verification](../../verification/2026-09-26-storage-fixes-full-test-run.md)).
+
+## نشانگرِ علامتِ بدنی در متن (2026-09-27، درخواستِ مالک)
+- **قالب (یک قرارداد، سه جا):** `[علامت · <دقیقه:ثانیه با ارقامِ فارسی> — <نوعِ علامت>]` در یک پاراگرافِ جدا. زمان = `offset_ms`ِ همان علامت
+  (تایمرِ جلسه) با قالبِ `formatTimer`. مالک‌هایِ کد: `signMarker` در `public/feelia-rt.js`، `formatTimer` در `public/index.html`،
+  `server/src/stt/signMarkers.ts`. هر تغییرِ قالب باید هر سه را با هم عوض کند (حذفِ علامت نشانگر را با همین قالب پیدا می‌کند).
+- **درج (کلاینت):** کلیکِ چیپِ علامت ⇒ `rtSession.insertSignMarker` همان لحظه نشانگر را به `confirmed` اضافه می‌کند (مثلِ
+  `noteDiscontinuity`)؛ `curSpeaker=null` تا گفته‌ی بعدی دوباره برچسبِ گوینده بگیرد. فقط در stateهایی که متن هنوز ذخیره می‌شود
+  (ACTIVE/RECONNECTING/RECOVERED/FAILED/MANUAL_PAUSED/NETWORK_PAUSED)؛ STARTING/FINALIZING/COMPLETED/حالتِ `note` ⇒ درج نمی‌شود.
+  مسیرِ legacyِ `SonioxDirect` نشانگر نمی‌گیرد (LAW-015).
+- **دقتِ جایگاه:** نشانگر بعد از آخرین متنِ confirmed و پیش از گفته‌ای که هنوز interim است می‌آید (چند ثانیه). در قطعیِ اینترنت،
+  placeholderِ A2ِ سگمنتی که علامت در آن زده شده بعد از نشانگر درج می‌شود (سگمنت هنگامِ بسته‌شدن placeholder می‌گذارد) — خطایِ
+  جایگاه حداکثر به اندازه‌ی یک سگمنتِ durable.
+- **حذفِ علامت:** حینِ جلسه `removeSignMarker` آخرین رخدادِ نشانگر را از `confirmed` و — اگر آنجا هم هست — از `persistedText` برمی‌دارد
+  تا پایه‌ی rebase پیشوندِ متنِ محلی بماند؛ PUTِ بعدی (CAS) آن را از سرور هم برمی‌دارد. اگر بینِ دو ذخیره نویسنده‌ی دیگری (batch)
+  نسخه را بالا برده باشد، شاخه‌ی واگرایی نشانگر را در متنِ سرور نگه می‌دارد (بدونِ تکرار/گم‌شدنِ متن — T52). بعد از پایان (Wrapup)
+  `removeSignMarkerFromTranscript` در `index.html`: `GET` ⇒ برشِ نشانگر ⇒ `PUT` با `transcript_version` (W1)، یک retry رویِ 409.
+- **بازسازیِ گوینده‌ها (W6):** `speakerResolve.ts` علامت‌هایِ جلسه را از `session_notes` می‌خواند و `buildTextFromAsyncTokens(tokens, signs)`
+  هر نشانگر را پیش از اولین توکنی که `start_ms ≥ offset_ms` می‌گذارد؛ علامتِ بعد از آخرین توکن (یا توکن‌هایِ بدونِ `start_ms`) در انتها
+  به ترتیبِ زمانی. **تأییدشده با Sonioxِ asyncِ واقعی (E2E، 2026-09-27):** توکن‌ها `start_ms` دارند و نشانگرها وسطِ متن می‌آیند؛
+  جایِ آن‌ها ~۲–۳ث دیرتر از جایِ زنده است (زنده قبل از کلماتی می‌آید که هنوز interim بودند). هم‌ترازیِ `offset_ms` (تایمر) با زمانِ صدایِ آرشیو
+  در همان E2E درست بود؛ در توقفِ دستی/قطعی **INFERRED** می‌ماند.
+- **ادغامِ بعد از حذف:** `removeMarkerFromText` (مشترکِ موتور و Wrapup) اگر پاراگرافِ بعد از نشانگر با همان «گوینده N:»ِ پاراگرافِ قبل شروع شود،
+  دو تکه را یک پاراگراف می‌کند (گفته‌ای که علامت وسطش زده و بعد حذف شده دوباره یکی می‌شود). اگر هنوز متنی بعد از نشانگر نیامده، `curSpeaker`
+  به گوینده‌ی پاراگرافِ قبل برمی‌گردد تا ادامه‌ی گفته برچسبِ تکراری نگیرد.
+- **تست:** `test:rt` T50–T55؛ منطقِ درج در متنِ async با تستِ واحدِ موقت (R1–R6)؛ E2Eِ واقعی (Chrome + Soniox realtime/async + MySQLِ dev)
+  ([verification](../../verification/2026-09-27-sign-markers-in-transcript.md)).

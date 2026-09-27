@@ -10,6 +10,7 @@ import { randomBytes } from 'node:crypto';
 import { createReadStream, statSync } from 'node:fs';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SESSION_TRANSCRIPTION_CONTEXT } from './sessionContext.js';
+import { formatSignTime, signMarker, sortedSigns, type SignMark } from './signMarkers.js';
 
 const API_BASE = process.env.SONIOX_API_BASE || 'https://api.soniox.com';
 const POLL_INTERVAL_MS = 2000;
@@ -235,7 +236,7 @@ export function listSonioxTranscriptions(): Promise<SonioxTranscriptionInfo[]> {
   return listPaged<SonioxTranscriptionInfo>('/v1/transcriptions', 'transcriptions');
 }
 
-export interface AsyncToken { text: string; speaker?: number | string; }
+export interface AsyncToken { text: string; speaker?: number | string; start_ms?: number; }
 
 export async function getTranscriptTokens(id: string): Promise<AsyncToken[]> {
   const res = await request('GET', `/v1/transcriptions/${id}/transcript`, { headers: { Authorization: authHeader() } });
@@ -262,18 +263,38 @@ export async function deleteFile(fileId: string): Promise<boolean> {
 
 // همون قراردادِ «گوینده N:» که مسیرِ realtime (soniox.ts) هم استفاده می‌کنه — یکدست
 // بمونه، فرقی نکنه متن از کدوم مسیر اومده.
-export function buildTextFromAsyncTokens(tokens: AsyncToken[]): string {
+// signs (اختیاری، فقط بازسازیِ گوینده‌ها): نشانگرِ هر علامت پیش از اولین توکنی می‌آید که start_msاش به offset_msِ
+// علامت رسیده (هر دو از شروعِ صدایِ جلسه) — تا جایگزینیِ متن علائمِ درج‌شده در متن را پاک نکند. توکنِ بدونِ
+// start_ms هیچ علامتی را جلو نمی‌اندازد؛ علائمِ باقی‌مانده به ترتیبِ زمانی در انتها می‌آیند (گم نمی‌شوند).
+export function buildTextFromAsyncTokens(tokens: AsyncToken[], signs: SignMark[] = []): string {
   let out = '';
   let curSpeaker: number | string | null = null;
+  const pending = sortedSigns(signs);
+  let afterMarker = false;
+  const flushSigns = (uptoMs: number) => {
+    while (pending.length && (Number(pending[0].offset_ms) || 0) <= uptoMs) {
+      const s = pending.shift()!;
+      out += (out ? '\n\n' : '') + signMarker(formatSignTime(s.offset_ms), s.sign_type);
+      curSpeaker = null;
+      afterMarker = true;
+    }
+  };
   for (const t of tokens) {
     if (!t.text) continue;
+    if (pending.length && typeof t.start_ms === 'number') flushSigns(t.start_ms);
     if (t.speaker != null && t.speaker !== curSpeaker) {
       curSpeaker = t.speaker;
       const faSp = String(t.speaker).replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[+d]);
       out += (out ? '\n\n' : '') + `گوینده ${faSp}: `;
+      out += t.text;
+    } else if (afterMarker) {
+      out += '\n\n' + t.text.replace(/^\s+/, '');
+    } else {
+      out += t.text;
     }
-    out += t.text;
+    afterMarker = false;
   }
+  flushSigns(Infinity);
   return out;
 }
 
@@ -283,7 +304,7 @@ export async function transcribeFileAsync(
   buffer: Buffer,
   filenameHint: string,
   clientReferenceId?: string,
-  opts: { sessionContext?: boolean } = {}
+  opts: { sessionContext?: boolean; signs?: SignMark[] } = {}
 ): Promise<string> {
   // نامِ فایل با پیشوندِ feelia- تا sweepِ یتیم‌ها (sweepSonioxOrphans) فقط فایل‌هایِ خودِ ما را بشناسد.
   const fileId = await uploadFile(buffer, 'feelia-' + filenameHint, clientReferenceId);
@@ -311,7 +332,7 @@ export async function transcribeFileAsync(
       if (status === 'error') throw new Error(s.error_message || 'رونویسیِ async ناموفق شد');
     }
     const tokens = await getTranscriptTokens(transcriptionId);
-    return buildTextFromAsyncTokens(tokens);
+    return buildTextFromAsyncTokens(tokens, opts.signs);
   } finally {
     if (transcriptionId) await deleteTranscription(transcriptionId);
     await deleteFile(fileId).catch(() => {});

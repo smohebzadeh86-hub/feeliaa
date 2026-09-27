@@ -89,6 +89,7 @@
 | REQ-062 | یادداشتِ متنیِ بعد از جلسه (`note_after`)؛ حذفِ یادداشت با کنترلِ مالکیت | `addTextNote`، `DELETE /api/notes/:id` | IMPL |
 | REQ-063 | یادداشتِ صوتی به `session_notes(type=voice)` تبدیل می‌شود و **هرگز** واردِ transcript نمی‌شود؛ در شکست با `purpose=note` در صف | `startVoiceNoteDirect`، `stopVoiceNoteDirect` (اکنون با `POST /notes` صریح در مسیرِ موفق)، `batchqueue` | IMPL — رفعِ مسیرِ موفقِ اصلی 2026-09-14، commit شده در `2763414` ([UI-02](../05-plans/ui-ux-audit-2026-09-14.md))؛ harness WT همچنان FAIL فقط برای مسیرِ شکستِ batch (T15، بدونِ ربط به این رفع) |
 | REQ-064 | یادداشت‌ها بر اساسِ `offset_ms` سپس `created_at` مرتب | `GET /api/sessions/:id` | IMPL |
+| REQ-065 | (2026-09-27، درخواستِ مالک) علامتِ بدنیِ حینِ جلسه با زمانش به ترتیبِ زمانی داخلِ متنِ ذخیره‌شده‌ی جلسه درج می‌شود؛ حذفِ علامت نشانگر را برمی‌دارد؛ بازسازیِ گوینده‌ها آن را حفظ می‌کند | `insertSignMarker`/`removeSignMarker` (`feelia-rt.js`)، `removeSignMarkerFromTranscript` (`index.html`)، `buildTextFromAsyncTokens` + `signMarkers.ts` | IMPL — `test:rt` T50–T55 + E2Eِ واقعی |
 
 ## 06 — Admin Panel ([PRD](../04-modules/06-admin-panel/module-prd.md))
 

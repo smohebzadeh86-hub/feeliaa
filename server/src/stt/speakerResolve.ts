@@ -13,6 +13,7 @@ import path from 'node:path';
 import { query } from '../db/connection.js';
 import { getFullSessionAudio } from './sessionAudioArchive.js';
 import { transcribeFileAsync } from './asyncTranscribe.js';
+import type { SignMark } from './signMarkers.js';
 
 const FFMPEG_BIN = process.env.FFMPEG_PATH || 'ffmpeg';
 
@@ -76,7 +77,11 @@ export function startResolveSpeakers(sessionId: string): ResolveJob {
         throw new Error('ffmpeg رویِ سرور نصب نیست — این قابلیت بدونِ ffmpeg در دسترس نیست');
       }
       const { audio, ext } = await fullSessionAudio(sessionId);
-      const text = await transcribeFileAsync(audio, `${sessionId}-resolve${ext}`, `feelia:${sessionId}:resolve-speakers`);
+      // (2026-09-27) علائمِ ثبت‌شده‌ی جلسه در جایِ زمانیِ خودشان دوباره در متنِ بازسازی‌شده می‌آیند — وگرنه
+      // «جایگزینیِ متن» نشانگرهایِ علامت را که حینِ جلسه داخلِ متن نوشته شده بودند پاک می‌کرد.
+      const signs = await query("SELECT sign_type, offset_ms FROM session_notes WHERE session_id = ? AND type = 'sign'", [sessionId]);
+      const text = await transcribeFileAsync(audio, `${sessionId}-resolve${ext}`, `feelia:${sessionId}:resolve-speakers`,
+        { signs: signs.rows as SignMark[] });
       if (!text || !text.trim()) throw new Error('رونویسیِ دوباره متنی برنگردوند');
       const cur = await query('SELECT transcript FROM sessions WHERE id = ?', [sessionId]);
       const curLen = String(cur.rows[0]?.transcript || '').trim().length;
