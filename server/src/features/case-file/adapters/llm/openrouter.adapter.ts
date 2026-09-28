@@ -25,6 +25,11 @@ export function resolveReasoningBody(env: string | undefined): Record<string, un
   return { reasoning: { effort: v } };
 }
 
+function envPositiveInt(name: string, def: number): number {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : def;
+}
+
 export class OpenRouterAdapter implements LLMProvider {
   private client: OpenAI;
   readonly model: string;
@@ -48,6 +53,10 @@ export class OpenRouterAdapter implements LLMProvider {
       // همان مدل ممکن است روی چند provider عرضه شود؛ سریع‌ترین provider برای کارِ تعاملی
       // مناسب‌تر است و کیفیت/مدل را عوض نمی‌کند.
       provider: { sort: 'latency' },
+      // (2026-09-28) بدونِ max_tokens، OpenRouter سقفِ کاملِ مدل (۱۳۱۰۷۲ توکن) را از اعتبار رزرو می‌کند و با اعتبارِ کم
+      // «402 … requires more credits, or fewer max_tokens» می‌دهد، هرچند مصرفِ واقعی کم است (مشاهده‌شده در dev).
+      // ۳۲k بسیار بالاتر از خروجیِ یک پرونده (+ استدلال) است؛ با CASE_FILE_MAX_TOKENS قابلِ تغییر.
+      max_tokens: envPositiveInt('CASE_FILE_MAX_TOKENS', 32_768),
     };
     this.client = new OpenAI({
       apiKey,

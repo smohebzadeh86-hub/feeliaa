@@ -689,6 +689,13 @@ async function main() {
     assert.ok(/اومدی؟⟧\n\n\[علامت · [^\]]+\]\n\nگوینده ۲/.test(withSign), withSign);
   });
 
+  await t('H49 isTransientLlmError: 402 (اعتبارِ OpenRouter تمام شده، فاز ۰B) گذراست؛ 400/401/403/404 نه', async () => {
+    const { isTransientLlmError } = await import('../server/src/features/case-file/adapters/llm/chatJson.js');
+    const withStatus = (status: number) => Object.assign(new Error('x'), { status });
+    assert.equal(isTransientLlmError(withStatus(402)), true);
+    for (const s of [400, 401, 403, 404, 422]) assert.equal(isTransientLlmError(withStatus(s)), false, String(s));
+  });
+
   // ————— ffmpegِ واقعی —————
   let ffmpegOk = true;
   try { execFileSync(process.env.FFMPEG_PATH || 'ffmpeg', ['-version'], { stdio: 'ignore' }); } catch { ffmpegOk = false; }

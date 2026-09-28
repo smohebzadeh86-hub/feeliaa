@@ -4,10 +4,13 @@ import type OpenAI from 'openai';
 import { CaseFileGenerationError } from '../../domain/errors.js';
 
 // خطایِ گذرا: بدونِ status (خطایِ اتصال/timeout/قطعِ بدنه — مثلاً ECONNRESETِ مشاهده‌شده در E2E 2026-09-25) یا
-// statusِ 408/429/5xx. خطایِ 4xxِ دیگر (کلید/مدل/درخواستِ نامعتبر) گذرا نیست — تکرارش فقط هزینه است.
+// statusِ 402/408/429/5xx. خطایِ 4xxِ دیگر (کلید/مدل/درخواستِ نامعتبر) گذرا نیست — تکرارش فقط هزینه است.
+// 402 (2026-09-28، فاز ۰B): OpenRouter وقتی اعتبار تمام شده «402 … exceed your available credits» می‌دهد — با شارژِ
+// حساب رفع می‌شود (همان معنایِ 429 insufficient_quotaِ OpenAI). قبلاً دائمی حساب می‌شد و «متنِ نهایی» بی‌برگشت
+// failed می‌شد. تلاش‌ها در هر دو مسیر (پرونده‌ی آپلود: ۳ بار، متنِ نهایی: ۵ بار با backoff) سقف دارند.
 export function isTransientLlmError(err: unknown): boolean {
   const status = (err as { status?: unknown } | null)?.status;
-  if (typeof status === 'number') return status === 408 || status === 429 || status >= 500;
+  if (typeof status === 'number') return status === 402 || status === 408 || status === 429 || status >= 500;
   const text = err instanceof Error ? `${err.name} ${err.message} ${(err as any).code ?? ''} ${(err as any).cause?.code ?? ''}` : String(err);
   return /connection|timed? ?out|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN|socket|network|fetch failed|terminated|Invalid response body/i.test(text);
 }

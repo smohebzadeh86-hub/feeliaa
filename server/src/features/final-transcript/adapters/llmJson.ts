@@ -19,6 +19,11 @@ function envInt(name: string, def: number): number {
 export function createTranscriptLlm(): LlmJsonPort {
   const kind = process.env.LLM_PROVIDER || 'openai';
   const timeout = envInt('FINAL_TRANSCRIPT_LLM_TIMEOUT_MS', 3 * 60_000);
+  // سقفِ توکنِ خروجی (2026-09-28): بدونِ آن OpenRouter برایِ هر درخواست سقفِ کاملِ مدل (۱۳۱۰۷۲ توکن) را از اعتبار رزرو
+  // می‌کند و با اعتبارِ کم «402 … requires more credits, or fewer max_tokens» می‌دهد، هرچند مصرفِ واقعی کم است.
+  // خروجیِ یک تکه (≤ FINAL_TRANSCRIPT_CHUNK_CHARS نویسه) + استدلال زیرِ این سقف است؛ خروجیِ بریده ⇒ JSONِ نامعتبر ⇒
+  // تکه خام می‌ماند (گذرِ برداشتِ کلی: تلاشِ دوباره).
+  const maxTokens = envInt('FINAL_TRANSCRIPT_MAX_TOKENS', 16_384);
   let client: OpenAI;
   let model: string | undefined;
   let label: string;
@@ -31,6 +36,7 @@ export function createTranscriptLlm(): LlmJsonPort {
     extraBody = {
       ...(resolveReasoningBody(process.env.FINAL_TRANSCRIPT_REASONING_EFFORT || process.env.OPENROUTER_REASONING_EFFORT) ?? {}),
       provider: { sort: 'latency' },
+      max_tokens: maxTokens,
     };
     client = new OpenAI({
       apiKey, baseURL: 'https://openrouter.ai/api/v1', timeout, maxRetries: 0,
@@ -42,6 +48,8 @@ export function createTranscriptLlm(): LlmJsonPort {
     if (!apiKey || !model) throw new FinalTranscriptConfigError('کلید یا مدلِ OpenAI رویِ سرور تنظیم نشده');
     label = 'OpenAI';
     client = new OpenAI({ apiKey, timeout, maxRetries: 0 });
+    // مدل‌هایِ جدیدِ OpenAI (reasoning) فقط max_completion_tokens را می‌پذیرند
+    extraBody = { max_completion_tokens: maxTokens };
   } else {
     throw new FinalTranscriptConfigError(`LLM_PROVIDER نامعتبر: ${kind}`);
   }
