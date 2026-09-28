@@ -13,8 +13,10 @@ import { treatmentUnits } from '../treatment-unit/index.js';
 import {
   uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens,
   buildTextFromAsyncTokens, deleteTranscription, deleteFile, listSonioxFiles, listSonioxTranscriptions,
+  lowConfidenceRatio, markedTextFromTokens, lowConfidenceWarnRatio,
 } from '../../stt/asyncTranscribe.js';
 import { probeMedia, normalizeAudio } from './media.js';
+import { measureAudioQuality, parseAudioQuality } from './quality.js';
 import { uploadDir, removeUploadDir } from './uploadStore.js';
 import { stepJob, giveUpJob, uploadCaseFileEnabled, uploadCaseFileAllowed, type AudioJob, type JobDeps, type JobPatch, type JobStore, type CaseFileJobStatus, type SourcePart } from './jobMachine.js';
 import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
@@ -48,6 +50,7 @@ function rowToJob(r: any): AudioJob {
     transcriptionStartedAt: r.transcription_started_at ? new Date(r.transcription_started_at) : null,
     transcriptAppliedAt: r.transcript_applied_at ? new Date(r.transcript_applied_at) : null,
     caseFileStatus: r.case_file_status, errorCode: r.error_code,
+    audioQuality: parseAudioQuality(r.audio_quality),
   };
 }
 
@@ -55,8 +58,9 @@ const COLS: Record<string, string> = {
   stage: 'stage', attempts: 'attempts', sourcePath: 'source_path', normalizedPath: 'normalized_path',
   durationMs: 'duration_ms', sonioxFileId: 'soniox_file_id', sonioxTranscriptionId: 'soniox_transcription_id',
   transcriptionStartedAt: 'transcription_started_at', caseFileStatus: 'case_file_status', errorCode: 'error_code',
-  sourceParts: 'source_parts',
+  sourceParts: 'source_parts', audioQuality: 'audio_quality',
 };
+const JSON_COLS = new Set(['sourceParts', 'audioQuality']);
 
 export const sqlJobStore: JobStore = {
   async update(job: AudioJob, patch: JobPatch) {
@@ -66,7 +70,7 @@ export const sqlJobStore: JobStore = {
       if ((patch as any)[k] !== undefined) {
         sets.push(`${col} = ?`);
         const v = (patch as any)[k];
-        vals.push(k === 'sourceParts' && v !== null ? JSON.stringify(v) : v);
+        vals.push(JSON_COLS.has(k) && v !== null ? JSON.stringify(v) : v);
         (job as any)[k] = (patch as any)[k];
       }
     }
@@ -78,10 +82,16 @@ export const sqlJobStore: JobStore = {
     vals.push(job.id);
     await query(`UPDATE audio_jobs SET ${sets.join(', ')} WHERE id = ?`, vals);
     if (patch.stage) logEvent({ event: 'audio_job.stage', sessionId: job.sessionId, therapistId: job.therapistId, source: 'job', detail: { stage: patch.stage } });
+    // فقط نامِ flagها (بدونِ صدا/متن) برایِ رصدِ آستانه‌ها با دادهٔ واقعی
+    if (patch.audioQuality && patch.audioQuality.flags.length) {
+      logEvent({ event: 'audio_job.quality_flags', sessionId: job.sessionId, therapistId: job.therapistId, source: 'job', detail: { reason: patch.audioQuality.flags.join(',') } });
+    }
   },
 
-  async applyTranscriptOnce(job: AudioJob, rawText: string, nextStage: 'case_file' | 'done') {
+  async applyTranscriptOnce(job: AudioJob, rawText: string, nextStage: 'case_file' | 'done', meta) {
     const text = (rawText || '').trim();
+    const warning = text ? meta?.qualityWarning ?? null : null;
+    const lowConf = meta?.lowConfRatio ?? null;
     let polishInput: string | null = null;
     const conn = await pool.getConnection();
     try {
@@ -97,9 +107,11 @@ export const sqlJobStore: JobStore = {
         // LAW-008: متنِ موجود هرگز جایگزین نمی‌شود — فقط append (جلسه‌ی upload معمولاً خالی است).
         const cur: string = srow.transcript ?? '';
         const merged = cur.trim() ? cur + '\n\n' + UPLOAD_TRANSCRIPT_LABEL_PREFIX + '\n' + text : text;
-        // ورودیِ «متنِ نهایی»: اگر جلسه از قبل متن داشت، کلِ متن مرتب می‌شود (نه فقط بخشِ آپلودی — وگرنه متنِ نهایی
-        // بخشِ قبلی را پنهان می‌کرد) با شماره‌ی گوینده‌هایِ جدا برایِ بخشِ آپلودی (دو diarizationِ مستقل‌اند).
-        polishInput = cur.trim() ? appendUploadForPolish(cur, UPLOAD_TRANSCRIPT_LABEL_PREFIX, text) : text;
+        // ورودیِ «متنِ نهایی»: متنِ علامت‌خورده (⟦…؟⟧ فقط اینجا، نه در sessions.transcript). اگر جلسه از قبل متن داشت،
+        // کلِ متن مرتب می‌شود (قبلاً فقط بخشِ آپلودی می‌رفت و متنِ نهایی بخشِ قبلی را پنهان می‌کرد) با شماره‌ی
+        // گوینده‌هایِ جدا برایِ بخشِ آپلودی (دو diarizationِ مستقل‌اند — «گوینده ۱» یِ این دو یک نفر نیست).
+        const forPolish = (meta?.markedText || '').trim() || text;
+        polishInput = cur.trim() ? appendUploadForPolish(cur, UPLOAD_TRANSCRIPT_LABEL_PREFIX, forPolish) : forPolish;
         await conn.query(
           `UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1, stt_mode = 'upload',
              batch_status = 'done', realtime_reliable = false, updated_at = NOW() WHERE id = ?`,
@@ -108,18 +120,19 @@ export const sqlJobStore: JobStore = {
         if (nextStage === 'case_file') {
           await conn.query(
             `UPDATE audio_jobs SET transcript_applied_at = NOW(), transcript_chars = ?, stage = 'case_file', attempts = 0,
-               error_code = NULL, next_attempt_at = NOW() WHERE id = ?`,
-            [text.length, job.id]
+               error_code = NULL, next_attempt_at = NOW(), quality_warning = ?, low_conf_ratio = ? WHERE id = ?`,
+            [text.length, warning, lowConf, job.id]
           );
         } else {
           // پایانِ مسیر با ذخیره‌ی متن (تصمیمِ مالک 2026-09-24) — پرونده عمداً ساخته نمی‌شود.
           await conn.query(
             `UPDATE audio_jobs SET transcript_applied_at = NOW(), transcript_chars = ?, stage = 'done', finished_at = NOW(),
-               case_file_status = 'disabled', attempts = 0, error_code = NULL WHERE id = ?`,
-            [text.length, job.id]
+               case_file_status = 'disabled', attempts = 0, error_code = NULL, quality_warning = ?, low_conf_ratio = ? WHERE id = ?`,
+            [text.length, warning, lowConf, job.id]
           );
         }
-        await createNotification({ therapistId: job.therapistId, kind: 'transcript_ready', clientId: job.clientId, sessionId: job.sessionId, jobId: job.id }, conn);
+        // پلنِ B بخشِ ۳: متن در هر حال ذخیره شد؛ فقط نوعِ اعلان صادقانه‌تر است.
+        await createNotification({ therapistId: job.therapistId, kind: warning ? 'transcript_low_quality' : 'transcript_ready', clientId: job.clientId, sessionId: job.sessionId, jobId: job.id }, conn);
       } else {
         // سکوت/بدونِ گفتار: متنی ثبت نمی‌شود؛ job تمام می‌شود و تراپیست صادقانه مطلع می‌شود.
         await conn.query(
@@ -130,6 +143,7 @@ export const sqlJobStore: JobStore = {
         await createNotification({ therapistId: job.therapistId, kind: 'transcript_empty', clientId: job.clientId, sessionId: job.sessionId, jobId: job.id }, conn);
       }
       await conn.commit();
+      if (warning) logEvent({ event: 'audio_job.low_confidence', sessionId: job.sessionId, therapistId: job.therapistId, source: 'job', severity: 'warn', detail: { reason: warning } });
       // «متنِ نهایی»: همین متنِ async (کلِ فایل) مبناست ⇒ بدونِ رونویسیِ دوباره مستقیم به مرتب‌سازی (اگر روشن باشد).
       if (polishInput) void enqueueFinalTranscript(job.sessionId, { asyncText: polishInput });
       job.transcriptAppliedAt = new Date();
@@ -221,11 +235,17 @@ export function productionDeps(): JobDeps {
         return createTranscription(fileId, { clientReferenceId: ref, context });
       },
       poll: pollTranscriptionStatus,
-      getText: async (id) => buildTextFromAsyncTokens(await getTranscriptTokens(id)),
+      // متنِ خام + سهمِ کم‌اطمینان + نسخه‌ی علامت‌خورده برایِ «متنِ نهایی». signها عمداً داده نمی‌شوند: offset_msِ
+      // علامت نسبت به صدایِ جلسه‌ی زنده است، نه فایلِ آپلودی، و علائمِ جلسه‌ی زنده از قبل در بخشِ زنده‌ی متن هستند.
+      getText: async (id) => {
+        const tokens = await getTranscriptTokens(id);
+        return { text: buildTextFromAsyncTokens(tokens), lowConfRatio: lowConfidenceRatio(tokens), markedText: markedTextFromTokens(tokens) };
+      },
       deleteTranscription,
       deleteFile,
     },
-    media: { probe: probeMedia, normalize: normalizeAudio },
+    media: { probe: probeMedia, normalize: normalizeAudio, quality: measureAudioQuality },
+    lowConfWarnRatio: lowConfidenceWarnRatio(),
     archive: (sessionId, filePath, mime, runId) => archiveAudioFileForAdmin(sessionId, filePath, mime, runId),
     caseFile: (clientId, therapistId, ctx) => maybeAutoGenerateCaseFile(clientId, therapistId, {
       notify: { jobId: ctx.jobId, sessionId: ctx.sessionId }, retryTransient: !ctx.lastAttempt,

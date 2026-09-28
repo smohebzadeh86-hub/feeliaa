@@ -13,6 +13,7 @@
 //  - خطایِ گذرا ⇒ backoff؛ خطایِ دائمی (فایلِ بی‌صدا/خراب/طولانی) ⇒ failed بلافاصله، بدونِ هدر دادنِ هزینه.
 import type { ProbeResult, NormalizeResult } from './media.js';
 import { MAX_DURATION_MS } from './media.js';
+import type { AudioQuality } from './quality.js';
 
 export type JobStage = 'queued' | 'normalizing' | 'transcribing' | 'case_file' | 'done' | 'failed';
 export type CaseFileJobStatus = 'not_applicable' | 'skipped' | 'done' | 'failed' | 'busy_gave_up';
@@ -63,15 +64,38 @@ export interface AudioJob {
   transcriptAppliedAt: Date | null;
   caseFileStatus: string | null;
   errorCode: string | null;
+  // سنجشِ کیفیتِ فایلِ نرمال‌شده (quality.ts، پلنِ B) — undefined/null ⇒ سنجیده نشد (fail-open).
+  audioQuality?: AudioQuality | null;
 }
 
 export type JobPatch = Partial<Omit<AudioJob, 'id'>> & { nextAttemptInMs?: number };
+
+// متنِ Soniox و اطمینانش. getText می‌تواند فقط رشته برگرداند (fakeهایِ قدیمیِ harness) ⇒ اطمینان نامعلوم.
+export interface TranscriptResult {
+  text: string;
+  // سهمِ توکن‌هایِ کم‌اطمینان (asyncTranscribe.lowConfidenceRatio)؛ null ⇒ نامعلوم
+  lowConfRatio: number | null;
+  // همان متن با ⟦…؟⟧ دورِ واژه‌هایِ کم‌اطمینان — فقط ورودیِ «متنِ نهایی»، هرگز در sessions.transcript
+  markedText?: string;
+}
+
+export interface TranscriptMeta {
+  lowConfRatio: number | null;
+  qualityWarning: 'low_confidence' | null;
+  markedText: string | null;
+}
+
+// پلنِ B بخشِ ۳: هشدار فقط از confidenceِ Soniox (تنها پیش‌بینی‌کننده در فاز ۰B)، نه از سنجه‌هایِ سطحِ صدا.
+export function qualityWarningFor(lowConfRatio: number | null, threshold: number): 'low_confidence' | null {
+  return lowConfRatio !== null && lowConfRatio > threshold ? 'low_confidence' : null;
+}
 
 export interface JobStore {
   update(job: AudioJob, patch: JobPatch): Promise<void>;
   // تراکنش: قفلِ job ⇒ اگر قبلاً اعمال شده 'already' ⇒ append به متنِ جلسه ⇒ علامتِ اعمال + مرحله‌ی بعد + اعلان.
   // nextStage: 'case_file' (ادامه به پرونده) یا 'done' (پایانِ مسیر با ذخیره‌ی متن — پیش‌فرضِ فعلی).
-  applyTranscriptOnce(job: AudioJob, text: string, nextStage: 'case_file' | 'done'): Promise<'applied' | 'already' | 'gone'>;
+  // meta.qualityWarning ⇒ اعلانِ transcript_low_quality به‌جایِ transcript_ready (متن در هر حال ذخیره می‌شود — LAW-008).
+  applyTranscriptOnce(job: AudioJob, text: string, nextStage: 'case_file' | 'done', meta?: TranscriptMeta): Promise<'applied' | 'already' | 'gone'>;
   fail(job: AudioJob, errorCode: string): Promise<void>;
   finish(job: AudioJob, caseFileStatus: CaseFileJobStatus): Promise<void>;
   setSessionDuration(sessionId: string, durationMs: number): Promise<void>;
@@ -81,7 +105,7 @@ export interface SonioxPort {
   uploadFile(filePath: string, filename: string): Promise<string>;
   createTranscription(fileId: string, clientReferenceId: string): Promise<string>;
   poll(transcriptionId: string): Promise<{ status: string; error_message?: string; notFound?: boolean }>;
-  getText(transcriptionId: string): Promise<string>;
+  getText(transcriptionId: string): Promise<string | TranscriptResult>;
   // true/undefined = حذف شد؛ false = حذف ناموفق (شناسه نگه داشته می‌شود — A4)
   deleteTranscription(id: string): Promise<boolean | void>;
   deleteFile(id: string): Promise<boolean | void>;
@@ -90,6 +114,8 @@ export interface SonioxPort {
 export interface MediaPort {
   probe(filePath: string): Promise<ProbeResult>;
   normalize(srcPath: string | string[], outBase: string, durationMs: number | null): Promise<NormalizeResult>;
+  // اختیاری (fail-open): سنجشِ کیفیتِ فایلِ نرمال‌شده. نبودنش یا null ⇒ بدونِ سنجه.
+  quality?(filePath: string, durationMs: number | null): Promise<AudioQuality | null>;
 }
 
 export interface JobDeps {
@@ -106,6 +132,8 @@ export interface JobDeps {
   // به‌خاطرِ سقف رد/failed نمی‌شود؛ صدا رویِ سرور می‌ماند و بعداً خودکار ادامه می‌یابد. نبودِ این port ⇒ بدونِ سقف.
   quotaWaitMs?(job: AudioJob): Promise<number>;
   normalizedOutBase(job: AudioJob): string;
+  // آستانه‌ی هشدارِ «کم‌اطمینان» (UPLOAD_LOW_CONF_RATIO)؛ نبودن ⇒ ۰٫۰۸ (فاز ۰B).
+  lowConfWarnRatio?: number;
   removeUploadDir(uploadId: string): void;
   now(): number;
   log(msg: string): void;
@@ -199,7 +227,9 @@ export async function stepJob(job: AudioJob, deps: JobDeps): Promise<StepResult>
 async function stepNormalize(job: AudioJob, deps: JobDeps): Promise<StepResult> {
   // ری‌استارت بعد از نرمال‌سازیِ موفق ولی قبل از ثبتِ مرحله‌ی بعد: کارِ انجام‌شده را دوباره نکن.
   if (job.normalizedPath && deps.fileExists(job.normalizedPath)) {
-    await deps.store.update(job, { stage: 'transcribing', attempts: 0, errorCode: null, nextAttemptInMs: 0 });
+    // سنجه‌ای که پیش از این ثبت نشده بود (jobِ پیش از migration 033 یا retry) از همان فایلِ آرشیو گرفته می‌شود.
+    const audioQuality = job.audioQuality ? undefined : await measureQuality(job.normalizedPath, job.durationMs, deps);
+    await deps.store.update(job, { stage: 'transcribing', attempts: 0, errorCode: null, nextAttemptInMs: 0, ...(audioQuality ? { audioQuality } : {}) });
     return CONTINUE;
   }
   // چندبخشی: همه‌ی بخش‌ها به ترتیب؛ هر بخش جدا probe می‌شود و مدت‌ها جمع (سقفِ Soniox برایِ کلِ فایلِ نهایی است).
@@ -228,17 +258,30 @@ async function stepNormalize(job: AudioJob, deps: JobDeps): Promise<StepResult> 
     if (job.attempts + 1 >= 3) return permanent(job, deps, 'normalize-failed');
     return transient(job, deps, 'normalize-failed');
   }
+  // سنجشِ کیفیت پیش از آرشیو (پلنِ B بخشِ ۱): فقط سنجه و flag، هیچ فایلی عوض نمی‌شود. fail-open.
+  const audioQuality = await measureQuality(norm.outPath, norm.durationMs ?? probe.durationMs, deps);
   const archived = await deps.archive(job.sessionId, norm.outPath, norm.mime, 'upload-' + job.id.replace(/-/g, '').slice(0, 24));
   const durationMs = archived.durationMs ?? norm.durationMs ?? probe.durationMs;
   await deps.store.update(job, {
     stage: 'transcribing', normalizedPath: archived.path, durationMs, sourcePath: null, ...(parts ? { sourceParts: null } : {}),
-    attempts: 0, errorCode: null, nextAttemptInMs: 0,
+    attempts: 0, errorCode: null, nextAttemptInMs: 0, ...(audioQuality ? { audioQuality } : {}),
   });
   if (durationMs) await deps.store.setSessionDuration(job.sessionId, durationMs);
   // فایلِ خامِ اصلی دیگر لازم نیست — نسخه‌ی نرمال‌شده در آرشیوِ ۱۴روزه است (LAW-010).
   deps.removeUploadDir(job.uploadId);
   if (parts) for (const p of parts) if (p.uploadId !== job.uploadId) deps.removeUploadDir(p.uploadId);
   return CONTINUE;
+}
+
+// هر خطا یا نبودِ port ⇒ null؛ سنجش هرگز job را متوقف یا شکست‌خورده نمی‌کند.
+async function measureQuality(filePath: string, durationMs: number | null, deps: JobDeps): Promise<AudioQuality | null> {
+  if (!deps.media.quality) return null;
+  try {
+    return await deps.media.quality(filePath, durationMs);
+  } catch (e) {
+    deps.log(`[audio-job] quality measure failed (ignored): ${String((e as Error)?.message || e).slice(0, 120)}`);
+    return null;
+  }
 }
 
 async function stepTranscribe(job: AudioJob, deps: JobDeps): Promise<StepResult> {
@@ -305,15 +348,22 @@ async function stepTranscribe(job: AudioJob, deps: JobDeps): Promise<StepResult>
 
   if (s.status !== 'completed') return transient(job, deps, 'soniox-unknown-status');
 
-  let text: string;
+  let got: TranscriptResult;
   try {
-    text = await deps.soniox.getText(job.sonioxTranscriptionId);
+    const r = await deps.soniox.getText(job.sonioxTranscriptionId);
+    got = typeof r === 'string' ? { text: r, lowConfRatio: null } : r;
   } catch (e) {
     // متن رویِ Soniox آماده است؛ فقط دریافت شکست خورد ⇒ تلاشِ ارزانِ کوتاه‌مدت.
     return transient(job, deps, 'soniox-unavailable', {}, e, true);
   }
-  const res = await deps.store.applyTranscriptOnce(job, text, (await deps.caseFileAfterUpload(job)) ? 'case_file' : 'done');
-  deps.log(`[audio-job] ${job.id} transcript ${res} chars=${text.trim().length}`);
+  const text = got.text;
+  const meta: TranscriptMeta = {
+    lowConfRatio: got.lowConfRatio,
+    qualityWarning: text.trim() ? qualityWarningFor(got.lowConfRatio, deps.lowConfWarnRatio ?? 0.08) : null,
+    markedText: got.markedText ?? null,
+  };
+  const res = await deps.store.applyTranscriptOnce(job, text, (await deps.caseFileAfterUpload(job)) ? 'case_file' : 'done', meta);
+  deps.log(`[audio-job] ${job.id} transcript ${res} chars=${text.trim().length}${meta.qualityWarning ? ' warning=' + meta.qualityWarning : ''}`);
   // متن ذخیره شد (یا قبلاً شده بود) ⇒ صدا/متن رویِ Soniox دیگر لازم نیست (حریمِ خصوصی).
   await cleanupRemote(job, deps);
   if (res === 'gone') return WAIT; // جلسه/job حذف شده

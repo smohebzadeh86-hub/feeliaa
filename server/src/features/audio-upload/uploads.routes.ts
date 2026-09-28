@@ -30,6 +30,7 @@ import {
 } from './uploadStore.js';
 import { ACCEPTED_EXTENSIONS, MAX_DURATION_MS, extensionOf, probeMedia, sniffObviouslyNotAudio } from './media.js';
 import { wakeAudioJobWorker, parseSourceParts } from './jobRunner.js';
+import { parseAudioQuality } from './quality.js';
 import { uploadCaseFileEnabled, uploadCaseFileAllowed } from './jobMachine.js';
 import { existsSync } from 'node:fs';
 import { hasStoredConsent, recordClientConsent } from '../../http/clientConsent.js';
@@ -78,6 +79,7 @@ function uploadView(u: any, received?: number[]) {
 
 const JOB_SELECT = `SELECT j.id, j.stage, j.attempts, j.error_code, j.duration_ms, j.case_file_status,
     j.transcript_applied_at, j.transcript_chars, j.created_at, j.updated_at, j.finished_at, j.next_attempt_at,
+    j.audio_quality, j.quality_warning,
     j.session_id, j.client_id, j.upload_id, s.session_num, c.code AS client_code, c.alias AS client_alias, c.status AS client_status,
     u.original_name, u.parts_total, t.case_file_enabled AS t_case_file_enabled, t.case_file_auto_generate AS t_case_file_auto_generate
   FROM audio_jobs j
@@ -114,6 +116,9 @@ function jobView(j: any) {
     }),
     original_name: j.original_name,
     parts_total: j.parts_total ?? null,
+    // پلنِ B: فقط نامِ flagها (علتِ احتمالی) و هشدارِ کم‌اطمینان — سنجه‌هایِ عددی به UI نمی‌روند.
+    quality_flags: parseAudioQuality(j.audio_quality)?.flags ?? [],
+    quality_warning: j.quality_warning ?? null,
   };
 }
 

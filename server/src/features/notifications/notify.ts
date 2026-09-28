@@ -7,6 +7,8 @@ import { query } from '../../db/connection.js';
 
 export type NotificationKind =
   | 'transcript_ready'
+  // متن ذخیره شد ولی سهمِ واژه‌هایِ کم‌اطمینانِ Soniox بالا بود (پلنِ B، migration 033)
+  | 'transcript_low_quality'
   | 'transcript_empty'
   | 'processing_failed'
   | 'case_file_updated'

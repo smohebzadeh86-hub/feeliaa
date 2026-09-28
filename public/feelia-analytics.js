@@ -33,7 +33,9 @@
     'session_live_resume_clicked', 'session_interrupted_resume_clicked',
     'live_text_toggled', 'sign_added', 'quick_note_added', 'text_note_added',
     'voice_note_started', 'voice_note_stop_clicked',
-    'final_transcript_viewed_raw', 'final_transcript_retry'
+    'final_transcript_viewed_raw', 'final_transcript_retry',
+    // پلنِ B (2026-09-28): هشدارِ «بخش‌هایی از صدا واضح نبود» رویِ کارتِ فایلِ آپلودی نمایش داده شد (یک بار برایِ هر job)
+    'upload_quality_warned'
   ]);
   // نامِ screen در index.html → نامِ امن. Auth و Admin* عمداً اینجا نیستند.
   var SCREENS = {

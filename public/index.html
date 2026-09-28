@@ -693,6 +693,9 @@ input::-ms-reveal{display:none}
 .job-msg{font-size:12.5px;color:var(--ink-2);line-height:1.8}
 .job-card.failed .job-msg{color:var(--clay-deep)}
 .job-actions{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+/* کیفیتِ فایلِ آپلودی (پلنِ B): هشدار فقط با کم‌اطمینانیِ Soniox؛ flagِ تنها ⇒ نکته‌ی خاکستری */
+.job-card .banner.job-quality{margin:9px 0 0;padding:10px 12px;font-size:12.5px;line-height:1.8}
+.job-tip{font-size:12px;color:var(--muted);line-height:1.8;margin-top:7px}
 .pbar{height:8px;border-radius:99px;background:var(--line-soft);overflow:hidden;margin:4px 0 7px}
 .pbar>span{display:block;height:100%;background:var(--sage);border-radius:99px;transition:width .3s ease}
 .pbar.wait>span{background:var(--gold)}
@@ -1411,6 +1414,8 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <strong>انتخابِ فایل یا رهاکردنش همین‌جا</strong>
       <span>هر فرمتِ رایج: m4a، mp3، wav، ogg، amr، ویدیوی mp4 و …<br>اگر ضبطِ جلسه چند تکه شده، همه‌ی تکه‌ها را با هم انتخاب کنید<br>هر فایل تا ۱ گیگابایت؛ کلِ جلسه تا ۵ ساعت</span>
     </div>
+    <!-- پلنِ B: بدترین حالت در فاز ۰B صدایِ گفت‌وگویِ دیگران/تلویزیون بود، نه نویزِ پنکه/کولر -->
+    <div class="up-note" id="audioUploadQualityTip" style="margin:10px 0 0">برایِ متنِ دقیق‌تر: گوشی را نزدیکِ وسطِ جمع بگذارید، دور از صدایِ تلویزیون یا گفت‌وگویِ دیگران، و با برنامه‌ی ضبطِ صدا ضبط کنید، نه تماس.</div>
     <!-- فهرستِ فایل‌هایِ انتخاب‌شده (چند تکه‌ی یک جلسه، به همین ترتیب) — renderAudioUploadFiles -->
     <div class="up-files" id="audioUploadFiles" hidden></div>
     <div class="up-err" id="audioUploadErr" hidden></div>
@@ -8487,6 +8492,7 @@ function jobMessage(job){
   if(job.stage==='case_file'&&job.error_code==='case-file-retry')return 'متن آماده است؛ سرویسِ ساختِ پرونده موقتاً در دسترس نبود — خودکار دوباره تلاش می‌کنیم. لازم نیست کاری بکنید.';
   if(job.stage==='case_file')return job.case_file_status==='waiting'?'متن آماده است؛ پرونده منتظرِ پایانِ یک به‌روزرسانیِ دیگر است…':'متن آماده است؛ پرونده در حالِ به‌روزرسانی…';
   if(!job.transcript_ready||!job.transcript_chars)return 'در این فایل گفتاری تشخیص داده نشد.';
+  if(job.quality_warning==='low_confidence'&&job.case_file_status==='disabled')return 'متن ذخیره شد، ولی بخش‌هایی از صدا واضح نبود.';
   if(job.case_file_status==='disabled')return 'متن با تفکیکِ گوینده در این جلسه ذخیره شد.';
   if(job.case_file_status==='done')return 'متن آماده است و پرونده به‌روز شد.';
   if(job.case_file_status==='failed')return 'متن آماده است؛ به‌روزرسانیِ خودکارِ پرونده ناموفق بود (از بخشِ پرونده دوباره تلاش کنید).';
@@ -8504,6 +8510,30 @@ function jobHasCaseFileStep(job){
   if(job.transcript_ready)return !!cf&&cf!=='not_applicable';
   if(job.stage==='failed')return false;
   return job.case_file_planned===true;
+}
+// ——— کیفیتِ فایلِ آپلودی (پلنِ B؛ verification/2026-09-28-upload-audio-quality-phase0b.md) ———
+// هشدار فقط وقتی سرور quality_warning='low_confidence' داده (Soniox واژه‌هایِ زیادی را نامطمئن شنیده). flagهایِ سطحِ صدا
+// فقط «علتِ احتمالی»اند: همراهِ هشدار، یا به‌تنهایی به شکلِ یک نکته‌ی خاکستری — فاز ۰B نشان داد Soniox معمولاً از پسِ
+// آن‌ها برمی‌آید. متن‌ها برایِ فایل‌اند، نه میکروفونِ زنده (AUDIO_QUALITY_MSG از میکروفون حرف می‌زند).
+const UPLOAD_QUALITY_CAUSE={
+  no_signal:'در بخشِ زیادی از فایل تقریباً صدایی ضبط نشده است.',
+  too_quiet:'صدا خیلی ضعیف ضبط شده است — دفعه‌ی بعد دستگاه را به وسطِ جمع نزدیک‌تر بگذارید.',
+  noisy:'صدایِ پس‌زمینه زیاد است — دفعه‌ی بعد از منبعِ صدا (تلویزیون، گفت‌وگویِ دیگران، کولر) دورتر ضبط کنید.',
+  clipping:'صدا بیش از حد بلند ضبط شده و خش دارد — دفعه‌ی بعد دستگاه را کمی دورتر از گوینده‌ها بگذارید.'
+};
+const UPLOAD_QUALITY_ORDER=['no_signal','noisy','too_quiet','clipping'];
+let uploadQualityTracked={};
+function jobQualityHtml(job){
+  if(!job.transcript_ready||!job.transcript_chars)return '';
+  const flags=(job.quality_flags||[]).filter(function(f){return UPLOAD_QUALITY_CAUSE[f];});
+  flags.sort(function(a,b){return UPLOAD_QUALITY_ORDER.indexOf(a)-UPLOAD_QUALITY_ORDER.indexOf(b);});
+  const cause=flags.length?UPLOAD_QUALITY_CAUSE[flags[0]]:'';
+  if(job.quality_warning==='low_confidence'){
+    if(!uploadQualityTracked[job.id]){uploadQualityTracked[job.id]=true;uxTrack('upload_quality_warned');}
+    return '<div class="banner warn job-quality"><b>بخش‌هایی از صدا واضح نبود.</b> متن ذخیره شد، ولی ممکن است در آن بخش‌ها نادرست باشد؛ پیش از استفاده مرورش کنید.'+(cause?' '+escapeHtml(cause):'')+'</div>';
+  }
+  if(cause)return '<div class="job-tip">نکته برایِ ضبطِ بعدی: '+escapeHtml(cause)+'</div>';
+  return '';
 }
 function jobCardHtml(job,opts){
   opts=opts||{};
@@ -8531,6 +8561,7 @@ function jobCardHtml(job,opts){
     '<div class="jsteps">'+steps+'</div>'+
     ((job.stage==='transcribing'||job.stage==='normalizing'||job.stage==='queued')&&!job.error_code?'<div class="pbar indet"><span></span></div>':'')+
     '<div class="job-msg">'+escapeHtml(jobMessage(job))+'</div>'+
+    jobQualityHtml(job)+
     (actions?'<div class="job-actions">'+actions+'</div>':'')+
   '</div>';
 }
@@ -8574,6 +8605,7 @@ function notifWho(n){return (n.client_alias||n.client_code||'')+(n.session_num?'
 function notifText(n){
   const who=notifWho(n);
   if(n.kind==='transcript_ready')return 'متنِ '+who+' آماده شد.';
+  if(n.kind==='transcript_low_quality')return 'متنِ '+who+' آماده است، ولی بخش‌هایی از صدا واضح نبود و ممکن است متن در آن بخش‌ها نادرست باشد.';
   if(n.kind==='transcript_empty')return 'در فایلِ '+who+' گفتاری تشخیص داده نشد.';
   if(n.kind==='processing_failed')return 'پردازشِ '+who+' انجام نشد: '+(PROC_ERR[n.error_code]||'خطایِ نامشخص');
   if(n.kind==='case_file_updated')return 'پرونده‌ی '+(n.client_alias||n.client_code||'')+' با اطلاعاتِ این جلسه به‌روز شد.';
@@ -8581,10 +8613,11 @@ function notifText(n){
   if(n.kind==='final_transcript_ready')return 'متنِ نهاییِ '+who+' آماده شد.';
   return 'اعلانِ تازه';
 }
-function notifIsBad(n){return n.kind==='processing_failed'||n.kind==='case_file_failed'||n.kind==='transcript_empty';}
+function notifIsBad(n){return n.kind==='processing_failed'||n.kind==='case_file_failed'||n.kind==='transcript_empty'||n.kind==='transcript_low_quality';}
 // متنِ نوتیفیکیشنِ سیستم‌عامل عمداً بدونِ کد/نامِ مراجع است (رویِ صفحه‌ی قفلِ گوشی دیده می‌شود — LAW-001).
 function notifOsText(n){
   if(n.kind==='transcript_ready')return ['متنِ جلسه آماده شد','ترنسکریپتِ فایلِ آپلودی آماده‌ی مرور است.'];
+  if(n.kind==='transcript_low_quality')return ['متنِ جلسه آماده شد','بخش‌هایی از صدا واضح نبود — متن را پیش از استفاده مرور کنید.'];
   if(n.kind==='case_file_updated')return ['پرونده به‌روز شد','پرونده‌ی مراجع با اطلاعاتِ جلسه‌ی تازه به‌روز شد.'];
   if(n.kind==='transcript_empty')return ['گفتاری پیدا نشد','در فایلِ آپلودی گفتاری تشخیص داده نشد.'];
   if(n.kind==='final_transcript_ready')return ['متنِ نهایی آماده شد','متنِ مرتب‌شده‌ی جلسه آماده‌ی مرور است.'];
@@ -8777,7 +8810,9 @@ async function renderSessionUploadJob(sessionId){
   }
   panel.innerHTML=jobCardHtml(job,{inSession:true});
   // بعد از پایانِ موفق و وجودِ متن، پنل فقط اگر پرونده هم نتیجه‌ای دارد می‌ماند.
-  panel.hidden=finished&&job.stage==='done'&&job.transcript_chars>0&&job.case_file_status!=='failed'&&job.case_file_status!=='done'&&job.case_file_status!=='disabled';
+  // هشدارِ کیفیت (یا نکته‌ی ضبطِ بعدی) هم پنل را نگه می‌دارد — وگرنه درمانگر در صفحه‌ی جلسه آن را نمی‌دید.
+  const hasQuality=!!job.quality_warning||!!(job.quality_flags&&job.quality_flags.length);
+  panel.hidden=!hasQuality&&finished&&job.stage==='done'&&job.transcript_chars>0&&job.case_file_status!=='failed'&&job.case_file_status!=='done'&&job.case_file_status!=='disabled';
   if(!finished)sessionJobTimer=setTimeout(function(){renderSessionUploadJob(sessionId);},4000);
 }
 

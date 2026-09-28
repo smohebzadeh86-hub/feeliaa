@@ -1,4 +1,4 @@
-﻿// هارنسِ pipelineِ آپلودِ صدا (migration 023) — بدونِ DB/شبکه/Sonioxِ واقعی؛ دادهٔ ساختگی.
+// هارنسِ pipelineِ آپلودِ صدا (migration 023) — بدونِ DB/شبکه/Sonioxِ واقعی؛ دادهٔ ساختگی.
 // ماشینِ حالت (jobMachine.ts) با portهایِ جعلی تست می‌شود: idempotency، ری‌استارت، retry/backoff،
 // خطایِ دائمی، تکرار، سکوت، پرونده‌ی busy. بخشِ media با ffmpegِ واقعی رویِ فایل‌هایِ ساختگیِ
 // تولیدشده در پوشه‌ی موقت اجرا می‌شود (اگر ffmpeg نباشد SKIP).
@@ -9,10 +9,13 @@ import { mkdtempSync, writeFileSync, existsSync, rmSync, statSync, readFileSync 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import {
-  stepJob, giveUpJob, BACKOFF_MS, MAX_ATTEMPTS, CASE_FILE_BUSY_MAX, transcriptionDeadlineMs,
-  type AudioJob, type JobDeps, type JobPatch, type JobStore, type CaseFileJobStatus,
+  stepJob, giveUpJob, BACKOFF_MS, MAX_ATTEMPTS, CASE_FILE_BUSY_MAX, transcriptionDeadlineMs, qualityWarningFor,
+  type AudioJob, type JobDeps, type JobPatch, type JobStore, type CaseFileJobStatus, type TranscriptMeta,
 } from '../server/src/features/audio-upload/jobMachine.js';
-import { pollTimeoutForBytes } from '../server/src/stt/asyncTranscribe.js';
+import {
+  pollTimeoutForBytes, lowConfidenceRatio, markUncertainTokens, markedTextFromTokens, buildTextFromAsyncTokens, type AsyncToken,
+} from '../server/src/stt/asyncTranscribe.js';
+import { FileQualityMeter, classifyWindow, measureAudioQuality, parseAudioQuality, QUALITY, type AudioQuality } from '../server/src/features/audio-upload/quality.js';
 import { parseProbe, probeMedia, normalizeAudio, sniffObviouslyNotAudio, extensionOf, ACCEPTED_EXTENSIONS, MAX_DURATION_MS } from '../server/src/features/audio-upload/media.js';
 import { expectedChunkBytes } from '../server/src/features/audio-upload/uploadStore.js';
 
@@ -33,10 +36,12 @@ interface World {
   sonioxCalls: string[];
   caseFileCalls: number;
   removedUploadDirs: string[];
+  // پلنِ B: metaِ ثبت‌شده همراهِ متن (هشدارِ کم‌اطمینان، متنِ علامت‌خورده برایِ «متنِ نهایی»)
+  metas: Map<string, TranscriptMeta | undefined>;
 }
 
 function newWorld(): World {
-  return { jobs: new Map(), transcripts: new Map(), notifications: [], sessionDuration: new Map(), files: new Set(), sonioxCalls: [], caseFileCalls: 0, removedUploadDirs: [] };
+  return { jobs: new Map(), transcripts: new Map(), notifications: [], sessionDuration: new Map(), files: new Set(), sonioxCalls: [], caseFileCalls: 0, removedUploadDirs: [], metas: new Map() };
 }
 
 function fakeStore(w: World): JobStore {
@@ -48,18 +53,20 @@ function fakeStore(w: World): JobStore {
       const stored = w.jobs.get(job.id)!;
       for (const [k, v] of Object.entries(patch)) if (v !== undefined) { (stored as any)[k] = v; if (k !== 'nextAttemptInMs') (job as any)[k] = v; }
     },
-    async applyTranscriptOnce(job, raw, nextStage) {
+    async applyTranscriptOnce(job, raw, nextStage, meta) {
       const stored = w.jobs.get(job.id);
       if (!stored) return 'gone';
       if (stored.transcriptAppliedAt) return 'already';
       const text = raw.trim();
+      w.metas.set(job.id, meta);
       if (text) {
         const cur = w.transcripts.get(job.sessionId) || '';
         w.transcripts.set(job.sessionId, cur ? cur + '\n\n' + text : text);
         stored.attempts = 0;
         if (nextStage === 'case_file') stored.stage = 'case_file';
         else { stored.stage = 'done'; stored.caseFileStatus = 'disabled'; stored.finished = true; }
-        notify(job.id, 'transcript_ready');
+        // همان قاعده‌ی sqlJobStore: هشدارِ کم‌اطمینان ⇒ transcript_low_quality به‌جایِ transcript_ready
+        notify(job.id, meta?.qualityWarning ? 'transcript_low_quality' : 'transcript_ready');
       } else {
         stored.stage = 'done'; stored.finished = true;
         notify(job.id, 'transcript_empty');
@@ -89,6 +96,9 @@ interface SonioxScript {
   pollSequence?: Array<'processing' | 'completed' | 'error' | 'notfound' | 'throw' | 'invalid'>;
   text?: string;
   textFails?: number;
+  // پلنِ B: اگر داده شود getText شیِ TranscriptResult برمی‌گرداند (مثلِ productionDeps)
+  lowConfRatio?: number | null;
+  markedText?: string;
 }
 
 function makeDeps(w: World, script: SonioxScript = {}, extra: Partial<JobDeps> = {}): JobDeps & { clock: { t: number } } {
@@ -109,7 +119,11 @@ function makeDeps(w: World, script: SonioxScript = {}, extra: Partial<JobDeps> =
         if (s === 'invalid') return { status: 'error', error_message: 'Invalid audio file' };
         return { status: s };
       },
-      async getText() { w.sonioxCalls.push('text'); if (texts++ < (script.textFails || 0)) throw new Error('503'); return script.text ?? 'گوینده ۱: سلام'; },
+      async getText() {
+        w.sonioxCalls.push('text'); if (texts++ < (script.textFails || 0)) throw new Error('503');
+        const text = script.text ?? 'گوینده ۱: سلام';
+        return script.lowConfRatio !== undefined ? { text, lowConfRatio: script.lowConfRatio, markedText: script.markedText } : text;
+      },
       async deleteTranscription(id) { w.sonioxCalls.push('delT:' + id); },
       async deleteFile(id) { w.sonioxCalls.push('delF:' + id); },
     },
@@ -542,6 +556,139 @@ async function main() {
     assert.equal(w2.jobs.get(j2.id)!.errorCode, 'audio-missing');
   });
 
+  // ————— پلنِ B: کیفیتِ فایلِ آپلودی (2026-09-28) —————
+  const Q_NOISY: AudioQuality = { p10_db: -25, p95_db: -15, clip_frac: 0, windows: 4, flagged_windows: { noisy: 4 }, flags: ['noisy'] };
+
+  await t('H41 سنجشِ کیفیت در normalizing پیش از آرشیو: flagها رویِ job، فایلِ آرشیو همان خروجیِ نرمال‌سازی (بدونِ فیلتر) و همان به Soniox می‌رود', async () => {
+    const w = newWorld();
+    const measured: string[] = [];
+    const archived: string[] = [];
+    const base = makeDeps(w);
+    const deps = makeDeps(w, {}, {
+      media: { ...base.media, quality: async (p) => { measured.push(p); return Q_NOISY; } },
+      archive: async (s, p, m, r) => { archived.push(p); return base.archive(s, p, m, r); },
+    });
+    const job = newJob(w);
+    await drive(w, deps, job.id);
+    const s = w.jobs.get(job.id)!;
+    assert.equal(s.stage, 'done');
+    assert.deepEqual(s.audioQuality?.flags, ['noisy']);
+    assert.deepEqual(measured, ['/uploads/up-1/normalized.ogg'], 'رویِ فایلِ نرمال‌شده، پیش از آرشیو');
+    assert.deepEqual(archived, ['/uploads/up-1/normalized.ogg'], 'همان فایل (اصلاح‌نشده) آرشیو شد');
+    assert.equal(s.normalizedPath, '/archive/normalized.ogg');
+    assert.deepEqual(w.notifications.map((n) => n.kind), ['transcript_ready'], 'flagِ تنها هشدار/اعلانِ متفاوت نمی‌سازد');
+  });
+
+  await t('H42 سنجشِ شکست‌خورده (throw) ⇒ fail-open: job بی‌تغییر تا done، audioQuality ثبت نمی‌شود', async () => {
+    const w = newWorld(); const base = makeDeps(w);
+    const deps = makeDeps(w, {}, { media: { ...base.media, quality: async () => { throw new Error('ffmpeg crashed'); } } });
+    const job = newJob(w);
+    await drive(w, deps, job.id);
+    const s = w.jobs.get(job.id)!;
+    assert.equal(s.stage, 'done');
+    assert.ok(!s.audioQuality);
+    assert.equal(w.transcripts.get('se-1'), 'گوینده ۱: سلام');
+  });
+
+  await t('H43 ری‌استارت بعد از نرمال‌سازی: سنجه‌ی ثبت‌نشده از فایلِ آرشیو گرفته می‌شود؛ سنجه‌ی موجود دوباره گرفته نمی‌شود', async () => {
+    for (const had of [false, true]) {
+      const w = newWorld(); const base = makeDeps(w); let calls = 0;
+      const deps = makeDeps(w, {}, { media: { ...base.media, quality: async () => { calls++; return Q_NOISY; } } });
+      const job = newJob(w, { stage: 'normalizing', normalizedPath: '/archive/n.ogg', ...(had ? { audioQuality: Q_NOISY } : {}) });
+      w.files.add('/archive/n.ogg');
+      await stepJob({ ...w.jobs.get(job.id)! }, deps);
+      assert.equal(calls, had ? 0 : 1, 'had=' + had);
+      assert.deepEqual(w.jobs.get(job.id)!.audioQuality?.flags, ['noisy']);
+      assert.equal(w.jobs.get(job.id)!.stage, 'transcribing');
+    }
+  });
+
+  await t('H44 کم‌اطمینانی: سهمِ بالا ⇒ transcript_low_quality + متن ذخیره؛ پایین/نامعلوم ⇒ transcript_ready؛ متنِ علامت‌خورده فقط در meta', async () => {
+    const cases: Array<[number | null, string]> = [[0.122, 'transcript_low_quality'], [0.038, 'transcript_ready'], [null, 'transcript_ready']];
+    for (const [ratio, kind] of cases) {
+      const w = newWorld();
+      const deps = makeDeps(w, { lowConfRatio: ratio, markedText: 'گوینده ۱: ⟦سلام؟⟧' }, { caseFileAfterUpload: () => false });
+      const job = newJob(w);
+      await drive(w, deps, job.id);
+      assert.deepEqual(w.notifications.map((n) => n.kind), [kind], 'ratio=' + ratio);
+      assert.equal(w.transcripts.get('se-1'), 'گوینده ۱: سلام', 'متنِ خامِ ذخیره‌شده بدونِ علامت');
+      assert.equal(w.metas.get(job.id)?.markedText, 'گوینده ۱: ⟦سلام؟⟧');
+      assert.equal(w.metas.get(job.id)?.lowConfRatio, ratio);
+    }
+    // متنِ خالی با سهمِ بالا ⇒ همان transcript_empty (نه هشدارِ کیفیت)
+    const w = newWorld(); const deps = makeDeps(w, { text: '', lowConfRatio: 0.9 });
+    const job = newJob(w); await drive(w, deps, job.id);
+    assert.deepEqual(w.notifications.map((n) => n.kind), ['transcript_empty']);
+    assert.equal(w.metas.get(job.id)?.qualityWarning, null);
+    // آستانه از deps
+    assert.equal(qualityWarningFor(0.05, 0.04), 'low_confidence');
+    assert.equal(qualityWarningFor(0.08, 0.08), null, 'مرز: بزرگ‌تر، نه مساوی');
+  });
+
+  await t('H45 FileQualityMeter (خالص): سکوت ⇒ no_signal؛ −70dB ⇒ too_quiet؛ سیگنالِ بریده ⇒ clipping؛ نویزِ غالب ⇒ noisy؛ گفتار + نویزِ اتاق ⇒ بدونِ flag', () => {
+    const SR = QUALITY.SAMPLE_RATE;
+    const gen = (seconds: number, f: (t: number, i: number) => number) => { const a = new Float32Array(seconds * SR); for (let i = 0; i < a.length; i++) a[i] = f(i / SR, i); return a; };
+    let seed = 7; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296 * 2 - 1; };
+    const burst = (t: number) => (Math.sin(2 * Math.PI * 0.5 * t) > 0 ? 1 : 0) * (Math.sin(2 * Math.PI * 220 * t) + 0.5 * Math.sin(2 * Math.PI * 440 * t));
+    const run = (a: Float32Array, step = 1234) => { const m = new FileQualityMeter(); for (let i = 0; i < a.length; i += step) m.push(a.subarray(i, i + step)); return m.finish()!; };
+    const speech = gen(100, (t) => 0.25 * burst(t) + 0.0015 * rnd());
+    const r0 = run(speech);
+    assert.deepEqual(r0.flags, [], JSON.stringify(r0));
+    assert.equal(r0.windows, 4, '۱۰۰ث ⇒ ۳ پنجره‌ی کامل + ۱۰ث (≥ یک‌سوم)');
+    assert.deepEqual(run(gen(100, () => 0)).flags, ['no_signal']);
+    assert.deepEqual(run(gen(100, (t) => 0.25 * burst(t) * 0.001)).flags, ['too_quiet']);
+    assert.deepEqual(run(gen(100, (t) => Math.max(-1, Math.min(1, 30 * burst(t))))).flags, ['clipping']);
+    assert.deepEqual(run(gen(100, (t) => 0.25 * burst(t) + 0.33 * rnd())).flags, ['noisy']);
+    // تکه‌بندیِ ورودی نتیجه را عوض نمی‌کند (مرزِ قابِ ۵۰ms وسطِ chunk)
+    assert.deepEqual(run(speech, 7), run(speech, 16000 * 7));
+    // فایلِ کوتاه (کمتر از ۳ پنجره) ⇒ قضاوت رویِ کلِ فایل
+    const short = run(gen(20, (t) => 0.25 * burst(t) * 0.001));
+    assert.equal(short.windows, 1); assert.deepEqual(short.flags, ['too_quiet']);
+    // سکوتِ عادیِ جلسه در یک پنجره از چهار ⇒ بدونِ flag (سهم < ۳۰٪)
+    const pause = gen(120, (t) => (t >= 30 && t < 60 ? 0.0015 * rnd() : 0.25 * burst(t) + 0.0015 * rnd()));
+    const rp = run(pause);
+    assert.equal(rp.flagged_windows.too_quiet, 1); assert.deepEqual(rp.flags, []);
+    assert.equal(new FileQualityMeter().finish(), null, 'بدونِ صدا ⇒ null');
+    assert.equal(classifyWindow(-54, -55.4, 0), null, 'quiet40ِ فاز ۰B (p95 −55.4) flag نمی‌خورد');
+    assert.equal(classifyWindow(-97, -65.5, 0), 'too_quiet', 'quiet50ِ فاز ۰B');
+  });
+
+  await t('H46 parseAudioQuality: JSONِ رشته/شی، flagِ ناشناخته حذف، نامعتبر ⇒ null', () => {
+    assert.deepEqual(parseAudioQuality(JSON.stringify({ ...Q_NOISY, flags: ['noisy', 'evil<script>'] }))?.flags, ['noisy']);
+    assert.deepEqual(parseAudioQuality(Q_NOISY)?.flags, ['noisy']);
+    assert.equal(parseAudioQuality('{bad'), null);
+    assert.equal(parseAudioQuality(null), null);
+    assert.equal(parseAudioQuality({ p10_db: 1 }), null);
+  });
+
+  await t('H47 lowConfidenceRatio: فقط توکن‌هایِ محتوادار با confidence؛ بدونِ confidence ⇒ null', () => {
+    const toks: AsyncToken[] = [
+      { text: 'سل', confidence: 0.99, speaker: 1 }, { text: 'ام', confidence: 0.4, speaker: 1 }, { text: '،', confidence: 0.1, speaker: 1 },
+      { text: ' خوب', confidence: 0.95, speaker: 1 }, { text: ' هستی', confidence: 0.6, speaker: 1 },
+    ];
+    assert.equal(lowConfidenceRatio(toks), 2 / 4);
+    assert.equal(lowConfidenceRatio(toks, 0.5), 1 / 4);
+    assert.equal(lowConfidenceRatio([{ text: 'سلام' }]), null);
+    assert.equal(lowConfidenceRatio([]), null);
+  });
+
+  await t('H48 علامت‌گذاریِ ⟦…؟⟧: کلِ واژه (نه تکه‌توکن)، نقطه‌گذاری بیرون، واژه‌هایِ پیاپی یکی، تغییرِ گوینده جدا، متنِ خام بی‌تغییر، نشانگرِ علامت سرِ جا', () => {
+    const toks: AsyncToken[] = [
+      { text: 'سل', confidence: 0.99, speaker: 1, start_ms: 0 }, { text: 'ام', confidence: 0.3, speaker: 1, start_ms: 100 }, { text: '،', confidence: 0.2, speaker: 1, start_ms: 200 },
+      { text: ' خیلی', confidence: 0.4, speaker: 1, start_ms: 300 }, { text: ' خوش', confidence: 0.9, speaker: 1, start_ms: 400 }, { text: ' اومدی', confidence: 0.2, speaker: 1, start_ms: 500 },
+      { text: ' ممنون', confidence: 0.1, speaker: 2, start_ms: 2000 }, { text: ' نه', confidence: 0.2, speaker: 2, start_ms: 2100 },
+    ];
+    const plain = buildTextFromAsyncTokens(toks);
+    assert.equal(plain, 'گوینده ۱: سلام، خیلی خوش اومدی\n\nگوینده ۲:  ممنون نه');
+    const marked = markedTextFromTokens(toks, [], 0.5);
+    assert.equal(marked, 'گوینده ۱: ⟦سلام؟⟧، ⟦خیلی؟⟧ خوش ⟦اومدی؟⟧\n\nگوینده ۲:  ⟦ممنون نه؟⟧');
+    assert.equal(markedTextFromTokens(toks, [], 0.05), plain, 'هیچ واژه‌ای زیرِ آستانه ⇒ همان متنِ خام');
+    assert.equal(toks[1].text, 'ام', 'توکن‌هایِ ورودی mutate نمی‌شوند');
+    assert.equal(markUncertainTokens([{ text: 'سلام' }], 0.5)[0].text, 'سلام', 'بدونِ confidence ⇒ بدونِ علامت');
+    const withSign = markedTextFromTokens(toks, [{ sign_type: 'crying', offset_ms: 1000 } as any], 0.5);
+    assert.ok(/اومدی؟⟧\n\n\[علامت · [^\]]+\]\n\nگوینده ۲/.test(withSign), withSign);
+  });
+
   // ————— ffmpegِ واقعی —————
   let ffmpegOk = true;
   try { execFileSync(process.env.FFMPEG_PATH || 'ffmpeg', ['-version'], { stdio: 'ignore' }); } catch { ffmpegOk = false; }
@@ -618,6 +765,35 @@ async function main() {
       await t('H34 normalize چندبخشی: بخشِ playlist (whitelist برایِ هر ورودی) ⇒ شکست، بدونِ خواندنِ URL', async () => {
         const r = await normalizeAudio([path.join(dir, 'a.m4a'), path.join(dir, 'list.mp3')], path.join(dir, 'multi-bad'), 8000);
         assert.equal(r.ok, false);
+      });
+      await t('H50 کیفیت با ffmpegِ واقعی (مسیرِ واقعی: normalizeAudio ⇒ measureAudioQuality): تمیز/اتاق/−40dB/mp3/۸kHz بدونِ flag؛ −50dB ⇒ too_quiet؛ +30dB ⇒ clipping؛ SNR −5 ⇒ noisy', async () => {
+        // «گفتارِ» ساختگی: تُنِ ۲۲۰Hz با هارمونیک، ۱ث روشن/۱ث خاموش، + نویزِ اتاق (≈ −61dB)؛ ۱۰۰ث تا ۴ پنجره
+        // ویرگولِ داخلِ عبارت در filtergraph جداکننده‌ی فیلتر است ⇒ «\,»
+        const SIG = '0.25*(gt(sin(2*PI*0.5*t)\\,0))*(sin(2*PI*220*t)+0.5*sin(2*PI*440*t))';
+        ff(['-f', 'lavfi', '-i', `aevalsrc=${SIG}+0.0015*(random(0)*2-1):s=48000:d=100`, '-c:a', 'pcm_s16le', path.join(dir, 'q-clean.wav')]);
+        ff(['-f', 'lavfi', '-i', `aevalsrc=${SIG}+0.33*(random(0)*2-1):s=48000:d=100`, '-c:a', 'pcm_s16le', path.join(dir, 'q-noisy.wav')]);
+        ff(['-i', path.join(dir, 'q-clean.wav'), '-af', 'volume=-40dB', '-c:a', 'pcm_s16le', path.join(dir, 'q-quiet40.wav')]);
+        ff(['-i', path.join(dir, 'q-clean.wav'), '-af', 'volume=-50dB', '-c:a', 'pcm_s16le', path.join(dir, 'q-quiet50.wav')]);
+        ff(['-i', path.join(dir, 'q-clean.wav'), '-af', 'volume=30dB', '-c:a', 'pcm_s16le', path.join(dir, 'q-clip.wav')]);
+        ff(['-i', path.join(dir, 'q-clean.wav'), '-c:a', 'libmp3lame', '-b:a', '32k', path.join(dir, 'q-mp3.mp3')]);
+        ff(['-i', path.join(dir, 'q-clean.wav'), '-af', 'highpass=f=300,lowpass=f=3400', '-ar', '8000', '-c:a', 'pcm_mulaw', path.join(dir, 'q-phone.wav')]);
+        const expect: Array<[string, string[]]> = [
+          ['q-clean.wav', []], ['q-quiet40.wav', []], ['q-mp3.mp3', []], ['q-phone.wav', []],
+          ['q-quiet50.wav', ['too_quiet']], ['q-clip.wav', ['clipping']], ['q-noisy.wav', ['noisy']],
+        ];
+        for (const [name, flags] of expect) {
+          const n = await normalizeAudio(path.join(dir, name), path.join(dir, 'qn-' + name.replace(/\W/g, '')), 100_000);
+          assert.equal(n.ok, true, name + ' ' + n.error);
+          const q = await measureAudioQuality(n.outPath!, 100_000);
+          assert.ok(q, name + ' ⇒ null');
+          assert.deepEqual(q!.flags, flags, name + ' ' + JSON.stringify(q));
+          assert.ok(q!.windows >= 3, name + ' windows=' + q!.windows);
+        }
+      });
+      await t('H51 measureAudioQuality: فایلِ خراب/ناموجود ⇒ null (fail-open، بدونِ throw)', async () => {
+        assert.equal(await measureAudioQuality(path.join(dir, 'corrupt.m4a')), null);
+        assert.equal(await measureAudioQuality(path.join(dir, 'does-not-exist.ogg')), null);
+        assert.equal(await measureAudioQuality(path.join(dir, 'list.mp3')), null, 'whitelist: playlist خوانده نمی‌شود');
       });
     }
   } finally {
