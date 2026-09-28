@@ -47,10 +47,11 @@ feeliaa/
 │       ├── features/final-transcript/  U — جدید 2026-09-27: «متنِ نهایی» — رونویسیِ دوباره + مرتب‌سازی با LLM بعد از پایانِ جلسه ([subsystem 07](../07-subsystems/07-final-transcript.md))، migration 031
 │       ├── features/audio-upload/  U — جدید 2026-09-23: آپلودِ فایلِ صوتیِ جلسه + jobِ پس‌زمینه ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))؛ `quality.ts` (2026-09-28) سنجشِ کیفیتِ فایل، migration 033
 │       ├── features/notifications/ U — جدید 2026-09-23: اعلان‌هایِ پایدار (`notify.ts`)
+│       ├── llm/        U — جدید 2026-09-28: لایه‌ی LLMِ مستقل از provider — `config.ts` (جدولِ providerها، env، ترجمه‌ی سطحِ استدلال) و `jsonCall.ts` (یک فراخوانیِ JSON برایِ هر سه حالتِ schema/object/prompt، خطایِ گذرا، providerِ جایگزین)؛ مشترکِ پرونده‌ی درمان و «متنِ نهایی»؛ harness: `scripts/llm-harness.ts` (`pnpm test:llm`)
 │       │   ├── domain/     types.ts، errors.ts، validate.ts، normalizeText.ts (جدید 2026-09-19)، findings.ts (جدید 2026-09-20: واحدِ «یافته»، شناسه‌ی فکت، finalizeCouple)
 │       │   ├── ports/      llmProvider.port.ts، caseFileRepo.port.ts
 │       │   ├── application/ aggregateClientCorpus.ts، renderDigest.ts (جدید 2026-09-19)، buildCaseFilePrompt.ts، mergeTherapistEdits.ts، applyFieldPatch.ts، generateCaseFile.ts، repairLoop.ts (جدید 2026-09-19)، upgradeLegacyContent.ts (جدید 2026-09-20: ارتقایِ پرونده‌ی قدیمی بدونِ LLM)
-│       │   ├── adapters/   llm/openai.adapter.ts، llm/openrouter.adapter.ts (هر دو با SDKِ 'openai')، llm/registry.ts، llm/chatJson.ts + llm/caseFileDigestSchema.ts (جدید 2026-09-19)، llm/caseFileJsonSchema.ts، repository/caseFileRepository.sql.ts
+│       │   ├── adapters/   llm/chatLlm.adapter.ts (2026-09-28، جایگزینِ openai.adapter.ts/openrouter.adapter.ts/chatJson.ts)، llm/registry.ts + llm/caseFileDigestSchema.ts (جدید 2026-09-19)، llm/caseFileJsonSchema.ts، repository/caseFileRepository.sql.ts
 │       │   └── api/        caseFile.routes.ts
 │       └── ws/   transcription.ts T · p1.ts T
 │
@@ -59,6 +60,7 @@ feeliaa/
 ├── scripts/rt-harness.cjs             T  تستِ FeeliaRT
 ├── scripts/case-file-harness.ts       T  تستِ پرونده‌ی درمان (findings/merge/patch/repairLoop؛ بدونِ شبکه/DB) — 2026-09-20
 ├── scripts/final-transcript-harness.ts U  تستِ «متنِ نهایی» (`pnpm test:ft`؛ ماشینِ حالت، نگهبان‌ها، تکه‌بندی، polish با LLMِ جعلی) — 2026-09-27
+├── scripts/llm-harness.ts             U  تستِ لایه‌ی LLM (`pnpm test:llm`؛ config هر provider، رگرسیونِ بدنه‌ی OpenRouter/OpenAI، JSON، providerِ جایگزین؛ کلاینتِ جعلی) — 2026-09-28
 ├── scripts/upload-harness.ts          U  تستِ pipelineِ آپلودِ صدا (`pnpm test:up`؛ ماشینِ حالت با portهایِ جعلی + ffmpegِ واقعی) — 2026-09-23
 │
 ├── docs/

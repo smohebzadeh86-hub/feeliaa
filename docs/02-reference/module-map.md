@@ -13,7 +13,7 @@
 | 05 | [Notes & Signs](../04-modules/05-notes-and-signs/module-prd.md) | `http/sessions.ts` (notes، voice-note)، `stt/batchqueue.ts` (purpose=note) | `.sign-chip` handlers، `renderSignsLog`، `addQuickNote`، `renderNotesLog`، `addTextNote`، `renderWrapupNotes`، `startVoiceNote`، `startVoiceNoteDirect`، `stopVoiceNoteDirect` | `session_notes` | 02 |
 | 06 | [Admin Panel](../04-modules/06-admin-panel/module-prd.md) | `http/admin.ts`، `stt/sessionAudioArchive.ts` (خواندن) | `#screenAdmin`، `#screenAdminTherapist`، `#screenAdminSessions`؛ `openAdminPanel` … `adminDownloadAll` | همه (خواندن)، `therapists` (نوشتن) | 05 |
 | 07 | [UX Analytics](../04-modules/07-ux-analytics/module-prd.md) | `http/clientConfig.ts` | `public/feelia-analytics.js`؛ `uxTrack`، `data-clarity-mask`، `#uxConsentBox`، `#uxConsentToggle` | — | — |
-| 08 | [AI Case File](../04-modules/08-ai-case-file/module-prd.md) | `server/src/features/case-file/**` (ports/adapters؛ `adapters/llm/openai.adapter.ts` تنها فایلِ وابسته به OpenAI) | `#caseFileSection` در `screenClientDetail`؛ `loadCaseFile`، `renderCaseFile`، `regenerateCaseFile`، `saveCaseFileEdits`، CSSِ اسکوپ‌شده‌ی `.case-file-doc` | `client_case_file` | — |
+| 08 | [AI Case File](../04-modules/08-ai-case-file/module-prd.md) | `server/src/features/case-file/**` (ports/adapters؛ `adapters/llm/chatLlm.adapter.ts` تنها آداپتورِ LLM؛ انتخابِ provider در `server/src/llm/` — 2026-09-28) | `#caseFileSection` در `screenClientDetail`؛ `loadCaseFile`، `renderCaseFile`، `regenerateCaseFile`، `saveCaseFileEdits`، CSSِ اسکوپ‌شده‌ی `.case-file-doc` | `client_case_file` | — |
 
 ## ۲. پلتفرم (cross-cutting) — [06-platform](../06-platform/README.md)
 

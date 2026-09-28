@@ -113,6 +113,7 @@ cd server && npx tsc --noEmit
 - `pnpm test:cf` = harness پرونده‌ی درمان (`scripts/case-file-harness.ts`، اجرا با tsx) — بدونِ شبکه/DB/LLMِ واقعی؛ دادهٔ ساختگی.
 - `pnpm test:up` = harness pipelineِ آپلودِ فایلِ صوتی (`scripts/upload-harness.ts`، 2026-09-23) — ماشینِ حالتِ job با portهایِ جعلی (بدونِ DB/Soniox) + ffmpegِ واقعی رویِ فایل‌هایِ ساختگی.
 - `pnpm test:ft` = harness «متنِ نهایی» (`scripts/final-transcript-harness.ts`، 2026-09-27) — ماشینِ حالت، نگهبان‌ها و polish با LLMِ جعلی؛ بدونِ DB/شبکه.
+- `pnpm test:llm` = harness لایه‌ی LLMِ مستقل از provider (`scripts/llm-harness.ts`، 2026-09-28) — config هر provider (OpenAI/OpenRouter/متیس/DeepSeek/custom)، رگرسیونِ بدنه‌ی درخواست، حالت‌هایِ JSON، providerِ جایگزین؛ کلاینتِ جعلی، بدونِ شبکه.
 - تستِ خودکارِ backend با DB یا CI وجود ندارد.
 
 ## ۹. رفتارِ Agent

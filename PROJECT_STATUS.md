@@ -2,7 +2,7 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-28 — آخرین رویداد: **deployِ «متنِ نهایی»ِ نوبت‌به‌نوبت به production (کد = `97f77e2`، ۱۴۲/۱۴۲، preflight GO، health ok)؛ اعتبارِ OpenRouter هنوز تمام است.** قبل‌ترش: **کیفیتِ «متنِ نهایی»: تنها ردیفِ prod کاملاً خام نمایش داده شده بود (ردِ کلِ تکه)؛ نگهبانِ نوبت‌به‌نوبت با `src` + تلاشِ دوباره + رفعِ دو ردِ کاذب (عدد/نیم‌فاصله) + پرامپتِ درست‌نویسی؛ رویِ متنِ ساختگی با DeepSeek ۰/۱۵ ⇒ ۱۳/۱۵ غلط اصلاح، ۰ نوبتِ خام؛ `test:ft` 52/52؛ commit/deploy نشده.** قبل‌ترش: **deploy به production: کد = `d0cbab7` (۱۴۱/۱۴۱)، migrationهایِ 029–033 applied، backupِ `pre-final-transcript-20260928T065927Z`، کلیدِ LLM (OpenRouter + DeepSeek، همان کلیدِ dev) اضافه شد و smoke ok؛ «متنِ نهایی» برایِ کسی روشن نیست.** قبل‌ترش: **ریشه‌ی 402ِ OpenRouter (نبودِ max_tokens ⇒ رزروِ ۱۳۱k توکن) رفع شد؛ نگهبانِ «نقشِ مجاز ولی غلط» (فقط async/تفکیکِ سالم، بی‌ضرر رویِ LLMِ واقعی)؛ E2Eِ UIِ واقعی با سرور/DB/Soniox ۱۰/۱۰؛ همه‌ی هارنس‌ها سبز؛ commit/deploy نه.** قبل‌ترش: **migration 033 رویِ dev اعمال شد + E2Eِ پلنِ B رویِ MySQLِ dev با Soniox/ffmpeg/LLMِ واقعی ۳۸/۴۰ (۲ FAILِ زمان‌بندیِ خودِ تست؛ پاک‌شدنِ Soniox با شواهد تأیید شد)؛ پاک‌سازی کامل؛ prod/commit نه.** قبل‌ترش: **پلنِ B پیاده شد (سنجشِ کیفیتِ فایل، هشدارِ کم‌اطمینان، ⟦…؟⟧ِ قطعی در متنِ نهایی، 402 ⇒ گذرا، رفعِ برچسبِ آپلود/متنِ الحاقی)؛ همه‌ی هارنس‌ها سبز؛ migration 033 هیچ‌جا اعمال نشده؛ E2Eِ DB انجام نشده؛ commit/deploy نشده.** قبل‌ترش: **فاز ۰Bِ «کیفیتِ فایلِ آپلودی»: هیچ فیلترِ صوتی gate را رد نکرد (B-۲ لغو شد)؛ confidenceِ Soniox تنها پیش‌بینی‌کننده‌ی متنِ خراب است؛ FINDING: اعتبارِ OpenRouter در dev تمام شده (402).** قبل‌ترش (2026-09-27): **deployِ «علائمِ بدنی با زمان داخلِ متنِ جلسه» (`9cee709`) به production؛ preflight GO، health ok، فایل‌هایِ سروشده = نسخه‌ی تست‌شده.** قبل‌ترش: **بازسازیِ ماژولارِ backend بدونِ تغییرِ رفتار (P0–P7) رویِ شاخه‌ی محلیِ `refactor/backend-modular` (worktree، ۱۳ commit، push/merge/deploy نشده)؛ `test:routes`/`test:api` (۳۲۱)/`test:arch` + `rt` 91/91، `cf` 110/110، `up` 41/41 سبز؛ ۱۲ FINDING (رفع نشد)؛ کارِ هم‌زمانِ commitنشده در `feat/clarity` پیش از merge باید منتقل شود.** قبل‌ترش: **E2Eِ واقعیِ علائم در متن PASS (Chrome + Soniox + MySQLِ dev)، رفعِ «گفته‌ی دو تکه» بعد از حذفِ علامت، commitِ جدا از کارِ هم‌زمانِ «واحدِ درمان».** قبل‌ترش: **علائمِ بدنی با زمانشان به ترتیبِ زمانی داخلِ متنِ ذخیره‌شده‌ی جلسه درج می‌شوند (+ حذف/بازسازیِ گوینده‌ها، زمان در کارتِ ادمین)؛ `test:rt` 98/98، `tsc` تمیز، UI رویِ mock PASS؛ commit/deploy نشده.** قبل‌ترش: **deployِ کلِ پلنِ رفعِ ذخیره‌سازی + پنلِ ادمین + رفعِ نمایش + A3ِ کلاینت به production (migrationهایِ 026–028 applied، backupِ `pre-storage-fixes-20260926T185248Z`، preflight GO، health ok؛ فایلِ کاملِ `e78df1a5` = ۲۶.۶ث، `a5617ab2` = ۶۸.۶ دقیقه، ۰ صدایِ یتیم، ۴ جلسه‌ی رهاشده خودکار بسته شد)؛ commit نشده.** قبل‌ترش: **کلِ پلنِ «رفعِ ذخیره‌سازی + ادمین فاز ۱» (A1–A6، B1–B3) پیاده و تست شد: `test:rt` 91/91، `test:cf` 110/110، `test:up` 41/41، E2Eِ DBِ dev 77/77، UI PASS؛ migrationهایِ 026–028 فقط رویِ dev؛ commit/deploy نشده (SSH از این محیط رد شد).** قبل‌ترش: **A1 از پلنِ رفعِ ذخیره‌سازی: ۹ مسیرِ از دست رفتنِ داده رفع شد (صفِ یادداشت، retryِ ذخیره‌ی نهایی، rebaseِ بی‌حذف، timeoutِ آپلود، …)؛ `test:rt` 87/87، `test:cf` 110/110، `test:up` 41/41؛ commit/deploy نشده.** قبل‌ترش: **deployِ `fd5c3f1` به production (شماره‌گذاریِ گوینده از ۱، contextِ چندنفره، هشدارِ کیفیتِ ضبط)؛ preflight GO؛ health ok.** قبل‌ترش: **هشدارِ کیفیتِ ضبط در جلسه‌ی زنده (بی‌صدا/ضعیف/نویز/خش)؛ `test:rt` 78/78؛ commit/deploy نشده.** قبل‌ترش: **deployِ `59ea786` با preflightِ کاربرِ فعال (GO)؛ health ok؛ production = `59ea786`؛ کارِ تفکیکِ گوینده deploy نشد.** قبل‌ترش: **تفکیکِ ۳ گوینده: آزمایشِ کنترل‌شده ثابت کرد کد/کانفیگ/مسیرِ ضبط ۳ نفر را درست جدا می‌کنند؛ صدایِ تستِ مالک حتی با async فقط ۲؛ constraintهایِ میکروفون به حالتِ قبل برگشت؛ شماره‌گذاری از ۱ + contextِ ثابت ماند؛ `test:rt` 72/72؛ commitنشده.** قبل‌ترش: **افزودنِ preflightِ اجباریِ «کاربرِ فعال» به رویه‌ی deploy (فقط سند؛ رویِ production اجرا نشده).** قبل‌ترش: **تستِ کامل + بک‌آپِ production + commitِ رفع‌هایِ تستِ واقعی (بدونِ deploy).** قبل‌ترش: **تفکیکِ بیش از دو گوینده: میکروفونِ خام (بدونِ NS/AGC/EC) + contextِ ثابتِ Soniox؛ `test:rt` 71/71؛ با Sonioxِ واقعی تست نشده؛ commitنشده.** قبل‌ترش: **رفعِ ریشه‌ایِ چالش‌هایِ تستِ واقعی (batch_statusِ گیرکرده، انتسابِ rt.*، آپلودِ تدریجیِ آرشیو، حذفِ جلسه→404، آپلود از Setup، یادداشتِ صوتیِ تکراری) — commitنشده.** قبل‌ترش: **deployِ `a20ccdb` (جلسه‌ی ۱ساعته + تایمرِ جلسه در قطعی) به production؛ health ok.** پیش از آن: **آماده‌سازیِ جلسه‌ی ۱ساعته (Wake Lock، رندرِ افزایشی، autosave، صف، timeoutِ آپلود/ffmpeg، retry از FAILED)؛ `test:rt` 62/62، `test:up` 41/41، `tsc` تمیز؛ commit/deploy نشده.** پیش از آن (2026-09-25): **تلاشِ دوباره‌ی خودکار برایِ خطایِ گذرایِ LLM در پرونده‌ی آپلود + E2Eِ کامل از UIِ واقعی (۵ سناریو PASS)؛ `test:up` 41/41؛ commitهای جدا.** پیش از آن: **رفعِ `MaxListenersExceededWarning` در `assembleUpload` (الحاقِ تکه‌هایِ آپلودِ ≥۱۰ تکه؛ بی‌ضرر برایِ داده)؛ `test:up` 38/38 با mutation-check؛ deploy شد به production (health ok)؛ commit نشده.** پیش از آن: **deploy به production: آپلود فعلاً برایِ همه فقط متن؛ مسیرِ «مراجعِ غیرفعال ⇒ پرونده» (E2Eِ واقعی PASS) رویِ سرور هست ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است؛ health ok؛ commit نشده.** پیش از آن: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — commit `45b0482` (push نشده) و deploy به production؛ migration 025 applied؛ health ok.** پیش از آن: `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16. قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
+> **آخرین به‌روزرسانی:** 2026-09-28 — آخرین رویداد: **لایه‌ی LLMِ مستقل از provider (`server/src/llm/`) + متیس/DeepSeek رویِ dev (سوییچ با `LLM_PROVIDER`)؛ هارنس‌ها سبز، `test:llm` 16/16؛ commit/deploy نشده.** قبل‌ترش: **deployِ «متنِ نهایی»ِ نوبت‌به‌نوبت به production (کد = `97f77e2`، ۱۴۲/۱۴۲، preflight GO، health ok)؛ اعتبارِ OpenRouter هنوز تمام است.** قبل‌ترش: **کیفیتِ «متنِ نهایی»: تنها ردیفِ prod کاملاً خام نمایش داده شده بود (ردِ کلِ تکه)؛ نگهبانِ نوبت‌به‌نوبت با `src` + تلاشِ دوباره + رفعِ دو ردِ کاذب (عدد/نیم‌فاصله) + پرامپتِ درست‌نویسی؛ رویِ متنِ ساختگی با DeepSeek ۰/۱۵ ⇒ ۱۳/۱۵ غلط اصلاح، ۰ نوبتِ خام؛ `test:ft` 52/52؛ commit/deploy نشده.** قبل‌ترش: **deploy به production: کد = `d0cbab7` (۱۴۱/۱۴۱)، migrationهایِ 029–033 applied، backupِ `pre-final-transcript-20260928T065927Z`، کلیدِ LLM (OpenRouter + DeepSeek، همان کلیدِ dev) اضافه شد و smoke ok؛ «متنِ نهایی» برایِ کسی روشن نیست.** قبل‌ترش: **ریشه‌ی 402ِ OpenRouter (نبودِ max_tokens ⇒ رزروِ ۱۳۱k توکن) رفع شد؛ نگهبانِ «نقشِ مجاز ولی غلط» (فقط async/تفکیکِ سالم، بی‌ضرر رویِ LLMِ واقعی)؛ E2Eِ UIِ واقعی با سرور/DB/Soniox ۱۰/۱۰؛ همه‌ی هارنس‌ها سبز؛ commit/deploy نه.** قبل‌ترش: **migration 033 رویِ dev اعمال شد + E2Eِ پلنِ B رویِ MySQLِ dev با Soniox/ffmpeg/LLMِ واقعی ۳۸/۴۰ (۲ FAILِ زمان‌بندیِ خودِ تست؛ پاک‌شدنِ Soniox با شواهد تأیید شد)؛ پاک‌سازی کامل؛ prod/commit نه.** قبل‌ترش: **پلنِ B پیاده شد (سنجشِ کیفیتِ فایل، هشدارِ کم‌اطمینان، ⟦…؟⟧ِ قطعی در متنِ نهایی، 402 ⇒ گذرا، رفعِ برچسبِ آپلود/متنِ الحاقی)؛ همه‌ی هارنس‌ها سبز؛ migration 033 هیچ‌جا اعمال نشده؛ E2Eِ DB انجام نشده؛ commit/deploy نشده.** قبل‌ترش: **فاز ۰Bِ «کیفیتِ فایلِ آپلودی»: هیچ فیلترِ صوتی gate را رد نکرد (B-۲ لغو شد)؛ confidenceِ Soniox تنها پیش‌بینی‌کننده‌ی متنِ خراب است؛ FINDING: اعتبارِ OpenRouter در dev تمام شده (402).** قبل‌ترش (2026-09-27): **deployِ «علائمِ بدنی با زمان داخلِ متنِ جلسه» (`9cee709`) به production؛ preflight GO، health ok، فایل‌هایِ سروشده = نسخه‌ی تست‌شده.** قبل‌ترش: **بازسازیِ ماژولارِ backend بدونِ تغییرِ رفتار (P0–P7) رویِ شاخه‌ی محلیِ `refactor/backend-modular` (worktree، ۱۳ commit، push/merge/deploy نشده)؛ `test:routes`/`test:api` (۳۲۱)/`test:arch` + `rt` 91/91، `cf` 110/110، `up` 41/41 سبز؛ ۱۲ FINDING (رفع نشد)؛ کارِ هم‌زمانِ commitنشده در `feat/clarity` پیش از merge باید منتقل شود.** قبل‌ترش: **E2Eِ واقعیِ علائم در متن PASS (Chrome + Soniox + MySQLِ dev)، رفعِ «گفته‌ی دو تکه» بعد از حذفِ علامت، commitِ جدا از کارِ هم‌زمانِ «واحدِ درمان».** قبل‌ترش: **علائمِ بدنی با زمانشان به ترتیبِ زمانی داخلِ متنِ ذخیره‌شده‌ی جلسه درج می‌شوند (+ حذف/بازسازیِ گوینده‌ها، زمان در کارتِ ادمین)؛ `test:rt` 98/98، `tsc` تمیز، UI رویِ mock PASS؛ commit/deploy نشده.** قبل‌ترش: **deployِ کلِ پلنِ رفعِ ذخیره‌سازی + پنلِ ادمین + رفعِ نمایش + A3ِ کلاینت به production (migrationهایِ 026–028 applied، backupِ `pre-storage-fixes-20260926T185248Z`، preflight GO، health ok؛ فایلِ کاملِ `e78df1a5` = ۲۶.۶ث، `a5617ab2` = ۶۸.۶ دقیقه، ۰ صدایِ یتیم، ۴ جلسه‌ی رهاشده خودکار بسته شد)؛ commit نشده.** قبل‌ترش: **کلِ پلنِ «رفعِ ذخیره‌سازی + ادمین فاز ۱» (A1–A6، B1–B3) پیاده و تست شد: `test:rt` 91/91، `test:cf` 110/110، `test:up` 41/41، E2Eِ DBِ dev 77/77، UI PASS؛ migrationهایِ 026–028 فقط رویِ dev؛ commit/deploy نشده (SSH از این محیط رد شد).** قبل‌ترش: **A1 از پلنِ رفعِ ذخیره‌سازی: ۹ مسیرِ از دست رفتنِ داده رفع شد (صفِ یادداشت، retryِ ذخیره‌ی نهایی، rebaseِ بی‌حذف، timeoutِ آپلود، …)؛ `test:rt` 87/87، `test:cf` 110/110، `test:up` 41/41؛ commit/deploy نشده.** قبل‌ترش: **deployِ `fd5c3f1` به production (شماره‌گذاریِ گوینده از ۱، contextِ چندنفره، هشدارِ کیفیتِ ضبط)؛ preflight GO؛ health ok.** قبل‌ترش: **هشدارِ کیفیتِ ضبط در جلسه‌ی زنده (بی‌صدا/ضعیف/نویز/خش)؛ `test:rt` 78/78؛ commit/deploy نشده.** قبل‌ترش: **deployِ `59ea786` با preflightِ کاربرِ فعال (GO)؛ health ok؛ production = `59ea786`؛ کارِ تفکیکِ گوینده deploy نشد.** قبل‌ترش: **تفکیکِ ۳ گوینده: آزمایشِ کنترل‌شده ثابت کرد کد/کانفیگ/مسیرِ ضبط ۳ نفر را درست جدا می‌کنند؛ صدایِ تستِ مالک حتی با async فقط ۲؛ constraintهایِ میکروفون به حالتِ قبل برگشت؛ شماره‌گذاری از ۱ + contextِ ثابت ماند؛ `test:rt` 72/72؛ commitنشده.** قبل‌ترش: **افزودنِ preflightِ اجباریِ «کاربرِ فعال» به رویه‌ی deploy (فقط سند؛ رویِ production اجرا نشده).** قبل‌ترش: **تستِ کامل + بک‌آپِ production + commitِ رفع‌هایِ تستِ واقعی (بدونِ deploy).** قبل‌ترش: **تفکیکِ بیش از دو گوینده: میکروفونِ خام (بدونِ NS/AGC/EC) + contextِ ثابتِ Soniox؛ `test:rt` 71/71؛ با Sonioxِ واقعی تست نشده؛ commitنشده.** قبل‌ترش: **رفعِ ریشه‌ایِ چالش‌هایِ تستِ واقعی (batch_statusِ گیرکرده، انتسابِ rt.*، آپلودِ تدریجیِ آرشیو، حذفِ جلسه→404، آپلود از Setup، یادداشتِ صوتیِ تکراری) — commitنشده.** قبل‌ترش: **deployِ `a20ccdb` (جلسه‌ی ۱ساعته + تایمرِ جلسه در قطعی) به production؛ health ok.** پیش از آن: **آماده‌سازیِ جلسه‌ی ۱ساعته (Wake Lock، رندرِ افزایشی، autosave، صف، timeoutِ آپلود/ffmpeg، retry از FAILED)؛ `test:rt` 62/62، `test:up` 41/41، `tsc` تمیز؛ commit/deploy نشده.** پیش از آن (2026-09-25): **تلاشِ دوباره‌ی خودکار برایِ خطایِ گذرایِ LLM در پرونده‌ی آپلود + E2Eِ کامل از UIِ واقعی (۵ سناریو PASS)؛ `test:up` 41/41؛ commitهای جدا.** پیش از آن: **رفعِ `MaxListenersExceededWarning` در `assembleUpload` (الحاقِ تکه‌هایِ آپلودِ ≥۱۰ تکه؛ بی‌ضرر برایِ داده)؛ `test:up` 38/38 با mutation-check؛ deploy شد به production (health ok)؛ commit نشده.** پیش از آن: **deploy به production: آپلود فعلاً برایِ همه فقط متن؛ مسیرِ «مراجعِ غیرفعال ⇒ پرونده» (E2Eِ واقعی PASS) رویِ سرور هست ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است؛ health ok؛ commit نشده.** پیش از آن: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — commit `45b0482` (push نشده) و deploy به production؛ migration 025 applied؛ health ok.** پیش از آن: `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16. قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
 > health ok، `SONIOX_ORPHAN_SWEEP=1`، nginxِ زنده کافی بود و تغییری نکرد). پیش از آن: auditِ باگ و رفعِ B2، B3، M1–M4، M6 و L*؛
 > `test:up` 29/29 و E2Eِ DBِ dev 13/13. commit نشده.** قبل‌ترش: **مسیرِ آپلود (فعال و غیرفعال) فقط تا ذخیره‌ی متن؛ پرونده خاموش پشتِ
 > `UPLOAD_CASE_FILE`؛ `test:up` 26/26 + E2Eِ واقعی PASS.** قبل‌ترش: **تستِ کاملِ واقعیِ فیچرِ آپلود (Soniox/LLM/MySQL، فایلِ ۶۰دقیقه‌ای،
@@ -388,6 +388,7 @@
 | ریشه‌ی mintِ یادداشتِ صوتی | purpose=note در `/api/stt/realtime-session` | ✅ **commit + push شد** (`2551943`) | — |
 | **مجموع push** | ۹ کامیت رویِ `origin/feat/clarity`، بعدِ رگرسیونِ نهاییِ کامل (خودکار + دستیِ رویِ سرورِ واقعی) و تأییدِ صریحِ مالک («اره کامیت کن» بعدِ «اگه همچی اوکی بود اوکیم») | ✅ **DONE** — 2026-09-14 | — |
 | UI-Ph1 (باقی‌مانده)…Ph4 | UI-13/14/15/36 (لمسِ `feelia-rt.js`)، UI-09 (تصمیمِ مالک)، UI-05 (متنِ رضایت، به دستورِ مالک دست‌نخورده)، UI-25 (نیازِ فیلدِ جدیدِ API)، UI-30/32/33/35/39/40/43/45/47 (نیازِ تغییرِ بصریِ گسترده یا هم‌پوشانی با کارِ نشستِ دیگر) | ⏳ PENDING | تأییدِ مالک؛ برخی نیازمندِ میکروفون/بصری/تصمیمِ طراحی/تغییرِ API |
+| LLM-SW | لایه‌ی LLMِ مستقل از provider + متیس (`LLM_PROVIDER=metis`) | ✅ کد + تست رویِ dev؛ ⏳ commit/deploy | دستورِ مالک؛ probeِ VPS ⇒ متیس |
 | deploy به production | هیچ‌کدام از این ۹ کامیت هنوز رویِ `feelia.ir` نیستند (فقط push به `origin/feat/clarity`، نه merge به `main`، نه deploy) | ⏳ PENDING | تصمیم و مجوزِ صریحِ مالک (LAW-006) |
 
 ---
@@ -395,6 +396,117 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-28 — TEST — «متنِ نهایی» رویِ متیس واقعاً بهتر می‌کند؟ آزمونِ ۱۵ غلطِ کاشته
+
+- **چه شد:** در پاسخ به سؤالِ مالک («بهتر هم شد؟ قابلِ اتکاست؟») آزمونِ غلط‌هایِ کاشته رویِ متیس flash + low تکرار شد (متنِ ساختگی).
+- **نتیجه:**
+  - غلطِ اصلاح‌شده: ۱۳/۱۵، ۱۵/۱۵ و ۱۳/۱۵ (اجرایِ ۳ برابرِ ۳تکه‌ای). مرجعِ OpenRouter: ۱۳/۱۵ و ۱۲/۱۵.
+  - ۰ نوبتِ خام‌مانده. نقش ۴۲/۴۲، ۴۲/۴۲ و ۱۲۶/۱۲۶ درست.
+  - جمله‌ی شکسته درست یکی شد.
+- **فایل‌ها:** `verification/2026-09-28-metis-deepseek.md` (بخشِ ۴ب).
+- **کارِ باز:** فقط متنِ ساختگی. رویِ جلسه‌ی واقعی سنجیده نشده؛ بعد از deploy باید `polish_report` رصد شود و چند جلسه با متنِ خام مقایسه شود.
+
+### 2026-09-28 — DECISION — مدلِ ویرایشِ «متنِ نهایی» = `deepseek-v4-flash` (نه pro)
+
+- **چه شد:** مالک خواست ادیت با همان flash بماند. `METIS_FINAL_TRANSCRIPT_MODEL` ست نشده ⇒ هر دو مسیر `METIS_MODEL=deepseek-v4-flash` (لاگِ شروعِ dev تأیید کرد: `final-transcript: Metis model=deepseek-v4-flash json=object reasoning=low`).
+- **فایل‌ها:** فقط همین فایل. تغییرِ کد/config لازم نبود.
+- **کارِ باز:** prod هنوز رویِ OpenRouterِ بی‌اعتبار است. پرونده و «متنِ نهایی» در prod تا deploy کار نمی‌کنند. E2Eِ کاملِ HTTP+DB با متیس رویِ dev هنوز اجرا نشده.
+
+### 2026-09-28 — CODE + CONFIG + TEST + DOCS + DECISION — لایه‌ی LLMِ مستقل از provider + متیس (DeepSeek) (commit/deploy نشده)
+
+- **دستورِ مالک:** «اجرا کن، با پیشنهادهای خودت». یعنی:
+  - providerِ جایگزینِ خودکار ساخته شود ولی پیش‌فرض خاموش بماند
+  - مدل `deepseek-v4-flash`
+  - استدلال: خاموش برایِ «متنِ نهایی»، `low` برایِ پرونده
+- **چه شد:**
+  - لایه‌ی مشترکِ `server/src/llm/` ساخته شد: `config.ts` (جدولِ providerها) و `jsonCall.ts`.
+  - providerها: `openai`، `openrouter`، `metis`، `deepseek`، `custom` (هر APIِ سازگار با OpenAI بدونِ کد).
+  - envِ یکدست: `<P>_API_KEY`/`<P>_MODEL`/`<P>_<PURPOSE>_MODEL`/`<P>_BASE_URL`.
+  - providerِ جدا برایِ هر مسیر: `CASE_FILE_LLM_PROVIDER`، `FINAL_TRANSCRIPT_LLM_PROVIDER`.
+  - سطحِ استدلالِ مشترک (`off|minimal|low|medium|high|max|default`) که به پارامترِ هر provider ترجمه می‌شود.
+  - سه حالتِ JSON (`schema|object|prompt`). حالتِ پشتیبانی‌نشده ⇒ پیش‌فرضِ provider + هشدار.
+  - `LLM_FALLBACK_PROVIDER` (پیش‌فرض خاموش؛ فقط برایِ خطایِ گذرا).
+  - مدلِ ذخیره‌شده `provider:model`. لاگِ شروعِ `[llm] …` بدونِ کلید.
+  - **سوییچ = `LLM_PROVIDER` + restart.** متغیرهایِ قدیمیِ OpenRouter/OpenAI سازگار ماندند؛ `FINAL_TRANSCRIPT_MODEL`ِ قدیمی فقط برایِ همان دو provider خوانده می‌شود.
+- **DECISION (از دلِ سنجش):** پیش‌فرضِ استدلالِ «متنِ نهایی» برایِ متیس از `off` به **`low`** تغییر کرد.
+  - `off`: ۲ از ۸ متن بدتر از خام، نقش ۹۶٫۱٪.
+  - `low`: ۸ از ۸ ≤ خام، مجموعِ WER ۳۹٫۲ (OpenRouterِ قبلی: ۴۰٫۱)، ۱۲ تا ۳۷ث (OpenRouter: ۲۶ تا ۷۴ث).
+- **فایل‌ها:**
+  - جدید: `server/src/llm/config.ts`، `server/src/llm/jsonCall.ts`، `case-file/adapters/llm/chatLlm.adapter.ts`، `scripts/llm-harness.ts`
+  - تغییر: `registry.ts`، `final-transcript/adapters/llmJson.ts`، `index.ts`، سه harnessِ دیگر (فقط مسیرِ import و تستِ J1/J2)، `package.json` (`test:llm`)
+  - حذف: `openai.adapter.ts`، `openrouter.adapter.ts`، `case-file/adapters/llm/chatJson.ts`
+  - config: `server/.env`ِ dev ⇐ `LLM_PROVIDER=metis`، `METIS_MODEL=deepseek-v4-flash`. کلیدِ OpenRouter برایِ rollback ماند.
+- **اسنادِ به‌روزشده:**
+  - `configuration-catalog.md` (بخشِ LLM بازنویسی شد)، `07-final-transcript.md`، `06-audio-upload-pipeline.md`
+  - `08-ai-case-file/module-prd.md`، `repository-map.md`، `module-map.md`
+  - `deployment-operations.md` (روالِ سوییچ/rollbackِ prod)، `PROJECT_MASTER_REFERENCE.md` (ریسکِ **R21**)، `CLAUDE.md` (`test:llm`)
+  - `verification/2026-09-28-metis-deepseek.md`
+- **تست / تأیید:**
+  - `tsc --noEmit` تمیز
+  - هارنس‌ها: `test:llm` **16/16** (شاملِ رگرسیونِ دقیقِ بدنه‌ی OpenRouter/OpenAI با envِ prod)، `test:ft` 56/56، `test:cf` 110/110، `test:up` 52/52، `test:tu` 17/17، `test:rt` 100/0
+  - متیسِ واقعی رویِ ۸ متنِ ساختگی: ۴ پیکربندی، صفر خطا، صفر تغییرِ منفی
+  - پرونده‌ی درمانِ ساختگی: OK در ۱۳۵ث، بدونِ تخلف
+- **عامل:** این نشست. commitِ هم‌زمانِ نشستِ دیگر (`1bf2323`، polishTranscript) دست نخورد.
+- **کارِ باز / پیامد:**
+  - commit و deploy فقط با دستورِ مالک. روال در `deployment-operations.md`.
+  - در prod: probeِ دسترسیِ VPS به متیس، افزودنِ `METIS_*` و `LLM_PROVIDER=metis`، restart.
+  - rotateِ کلیدِ متیس (در گفتگو آمده).
+  - اختیاری: `METIS_FINAL_TRANSCRIPT_MODEL=deepseek-v4-pro`. کیفیتِ کمی بهتر در همان سرعت ولی گران‌تر.
+
+### 2026-09-28 — CONFIG + CODE + DEPLOY + TEST — «متنِ نهایی» با مدلِ رایگانِ Dots3-Note در prod کار می‌کند (کلیدِ جدید، استدلال خاموش، حفظِ پیشرفت)
+
+- **دستورِ مالک:** کلیدِ جدیدِ OpenRouter + «از فری‌ها حتماً، یک چیزی بذار درست بشه».
+  - کلید در گفتگو آمده بود؛ فقط در `.env`ِ prod گذاشته شد. hash در dev و prod یکی بود. فایلِ موقتِ محلی حذف شد.
+  - **توصیه:** کلید در تاریخچه‌ی گفتگو هست؛ پس از اطمینان rotate شود.
+- **کلیدِ جدید رویِ همان حساب است:** اعتبار ۲۵ و مصرف ۲۵٫۱۸، پس فقط مدل‌هایِ رایگان کار می‌کنند.
+- **بررسیِ همه‌ی مدل‌هایِ رایگانِ متنیِ فهرست** (endpoints + فراخوانی با `data_collection: deny`):
+  - Inkling / Inkling Small: 403، «فقط agentic harness»
+  - Nemotron 3 Ultra و 3.5 Lightning: فقط endpointِ آموزش‌دهنده دارند، پس برایِ متنِ بالینی حذف شدند
+  - Qwen 3.8 27B: 429 «rate-limited upstream»
+  - LFM و Space Bunny: آموزش/نگهداریِ داده، حذف شدند
+  - Ling 3.0 Flash Sante: در دسترس، بدونِ structured output
+  - Dots3-Note Preview: در دسترس، با structured output
+- **مقایسه رویِ ۸ متنِ ساختگیِ فاز ۰:**
+  - Ling (با حالتِ جدیدِ JSON از پرامپت): دقتِ نقش سه بار ۳۶٪
+  - Dots (با استدلال): نقش یک بار ۳۶٪ و یک بار ۷۲٪؛ WER در ۵ از ۸ بدتر؛ ۷۹ تا ۱۹۹ ثانیه برایِ هر متن
+  - **Dots بدونِ استدلال: نقش ۱۰۰٪ در ۶ مورد، ۹۸٫۷٪ و ۷۲٪ در دو موردِ دیگر؛ WER ≤ خام در ۵ از ۸؛ ۱۵ تا ۲۲ ثانیه**
+- **تشخیص رویِ متنِ واقعی:** Dots با استدلال ۱۲ تا ۱۳ هزار توکن استدلال مصرف می‌کرد و سقفِ ۱۶۳۸۴ پر می‌شد، پس پاسخ خالی/نامعتبر برمی‌گشت. یک خطایِ گذرا در یک تکه هم کلِ job را از اول می‌برد و پیشرفت از دست می‌رفت.
+- **commitها** (همه push شدند):
+  - `2dbb79a`: حالتِ JSON از پرامپت، خاموش به‌طورِ پیش‌فرض (+B13)
+  - `61a9cf6`: تلاشِ دوباره‌ی درجا + ثبتِ علتِ شکست در لاگ
+  - `0b79cee`: `FINAL_TRANSCRIPT_REASONING_EFFORT=off` + یک تلاشِ دوباره برایِ پاسخِ خالی/نامعتبر
+  - `1bf2323`: حفظِ پیشرفت هنگامِ خطایِ گذرا در یک تکه (+B14–B16، ft 56)
+- **deploy:** ۴ بار، هر بار با preflight GO و backup (`pre-free-model-20260928T092629Z`، `code-pre-chunk-progress-*`).
+  - `.env`: کلیدِ جدید، `FINAL_TRANSCRIPT_MODEL=dots-studio/dots-3-note-preview:free`، `FINAL_TRANSCRIPT_FALLBACK_MODELS=qwen/qwen3.8-27b:free,deepseek/deepseek-v4.1-flash`، `FINAL_TRANSCRIPT_LLM_TIMEOUT_MS=300000`، `FINAL_TRANSCRIPT_REASONING_EFFORT=off`
+  - پرونده‌ی درمان رویِ DeepSeek ماند. Dots در مرحله‌ی compose ِ پرونده (schemaِ بزرگ) دو بار شکست خورد (400 و پاسخِ خالی).
+- **نتیجه در prod:** «متنِ نهایی»ِ جلسه‌ی واقعیِ `5dbb946c` (۵۴٬۹۵۳ نویسه) **done** شد.
+  - ۱۵ تکه؛ فقط ۱ تکه `llm-error`
+  - ۵۰۴ نوبت؛ **۳۴۶ نوبت ویرایش شد (۶۹٪)** و ۱۵۸ خام ماند (۱۰۲ نوبت با نگهبانِ `uncertain`، چون مدل ⟦…؟⟧ را برمی‌داشت؛ ۱۲ نوبت با `length`)
+  - ۴۲۸ واژه‌ی نامطمئن؛ صدایِ این جلسه کیفیتِ پایینی داشت
+- **باز:**
+  - پرونده‌ی درمان تا شارژِ حساب کار نمی‌کند.
+  - FINDING: نشستِ دیگر هم‌زمان یک refactorِ بزرگِ لایه‌ی LLM در working tree دارد (حذفِ `case-file/adapters/llm/*`، تغییرِ `llmJson.ts`، `registry.ts` و `index.ts`). commit/deploy نشده و دست نخورد. prod = `1bf2323`.
+
+
+### 2026-09-28 — CONFIG + TEST + AUDIT + PLAN — متیس (Metis AI / DeepSeek): probeِ واقعی + پلنِ لایه‌ی LLMِ مستقل از provider (کدی عوض نشد)
+
+- **چه شد:** مالک کلیدِ متیس را داد و خواست لایه‌ی LLM «وابسته به provider نباشد و راحت سوییچ شود».
+  - `METIS_API_KEY` به `server/.env`ِ dev (gitignored) اضافه شد؛ `LLM_PROVIDER` همچنان `openrouter` است ⇒ رفتارِ dev عوض نشد. کلید چاپ/لاگ نشد.
+  - probeِ واقعی (اسکریپتِ scratchpad، فقط متنِ ساختگی، فقط status/usage/زمان چاپ شد):
+    - `GET /models` ⇒ 200: `deepseek-flash`، `deepseek-v4-flash`، `deepseek-v4.1-flash`، `deepseek-v4-pro`. هر سه نامِ flash در پاسخ `model: deepseek-flash` برمی‌گردانند.
+    - `json_object` + `thinking:{type:disabled}` ⇒ 200، JSONِ معتبر، ۰ توکنِ استدلال، ~۱٫۱ث.
+    - `thinking:enabled` + `reasoning_effort:low` ⇒ 200، ~۵۳۰ توکنِ استدلال، ~۳٫۲ث. **بدونِ پارامتر = استدلال روشن** (~۵۰۸ توکن).
+    - پارامترِ OpenRouter (`reasoning:{enabled:false}`) **بی‌صدا نادیده گرفته می‌شود** (استدلال روشن ماند).
+    - `response_format: json_schema` ⇒ **400** «This response_format type is unavailable now» ⇒ مسیرِ فعلیِ `callStructured` با متیس کار نمی‌کند.
+    - مدلِ نامعتبر ⇒ 400 `model_not_supported`؛ کلیدِ نامعتبر ⇒ 401؛ `max_tokens=5` ⇒ 200 با `finish_reason: length` و JSONِ بریده.
+- **یافته‌هایِ audit:** دانشِ provider در ۴ فایل پخش است (`registry.ts`، `openai.adapter.ts`، `openrouter.adapter.ts`، `final-transcript/adapters/llmJson.ts` که switchِ provider را تکرار می‌کند).
+  - نامِ مدل‌ها و پارامترهایِ استدلال provider-specific‌اند. `FINAL_TRANSCRIPT_MODEL=qwen/…:free`ِ prod با سوییچ به متیس ⇒ 400ِ دائمی.
+- **فایل‌ها:** فقط `server/.env` (dev) و همین فایل.
+- **تست / تأیید:** probeِ بالا. typecheck/harness اجرا نشد (کدی عوض نشد).
+- **عامل:** این نشست. کارِ commitنشده‌ی نشستِ دیگر در `polishTranscript.ts` و harness دست نخورد.
+- **کارِ باز / پیامد:** پلنِ «لایه‌ی LLMِ مستقل از provider» به مالک ارائه شد. پیاده‌سازی فقط با دستورِ صریح.
+  - کلیدِ متیس در متنِ گفتگو آمده؛ پس از راه‌اندازی بهتر است در پنلِ متیس rotate شود.
 
 ### 2026-09-28 — GIT + DEPLOY + FINDING — «متنِ نهایی»: نگهبانِ نوبت‌به‌نوبت به production رفت (کد = `97f77e2`)
 
@@ -421,6 +533,49 @@
   - اعتبارِ OpenRouter تمام است (FINDINGِ نشستِ دیگر). تا شارژ، «متنِ نهایی» و پرونده در prod کار نمی‌کنند. jobِ `5dbb946c` بعد از شارژ خودکار با کدِ جدید ساخته می‌شود.
   - سنجش‌هایِ همین کار رویِ dev هم از همان کلیدِ مشترک خرج کردند (۶ اجرایِ polish رویِ متنِ ساختگی).
   - مدلِ «متنِ نهایی»ِ prod اکنون qwenِ رایگان (با جایگزینِ DeepSeek) است. پرامپت و `src`ِ جدید فقط با DeepSeek سنجیده شده‌اند.
+
+### 2026-09-28 — CODE + DEPLOY + CONFIG + FINDING (فوری) — مدلِ رایگان با جایگزینِ DeepSeek؛ اعتبارِ OpenRouter تمام شده
+
+- **دستورِ مالک:** «یک رایگان را به‌هرحال بگذار» (پس از هشدارِ 429 و ریسکِ آموزش).
+- **کد** (`6908789`، فقط ۲ فایل؛ در worktreeِ تمیز، چون نشستِ دیگری هم‌زمان رویِ `final-transcript` کار می‌کند و کارِ commitنشده‌اش دست نخورد):
+  - `FINAL_TRANSCRIPT_FALLBACK_MODELS` (پارامترِ `models`ِ OpenRouter)
+  - `provider.require_parameters` + `data_collection: 'deny'` در هر دو مسیرِ LLM
+- **تست:**
+  - هارنس‌ها سبز (ft 45، cf 110، up 52، tu 17، rt 100)
+  - رویِ ۸ متنِ ساختگی: qwen رایگان + جایگزینِ DeepSeek ⇒ ۸ از ۸ موفق، نقش ۹۸٫۷–۱۰۰٪، صفر تغییرِ منفی
+  - qwen به‌تنهایی: ۸ از ۸ با 429 شکست
+- **prod:**
+  - backup: `/root/backups/pre-llm-fallback-20260928T081153Z`
+  - `.env` ⇐ `FINAL_TRANSCRIPT_MODEL=qwen/qwen3.8-27b:free` و `FINAL_TRANSCRIPT_FALLBACK_MODELS=deepseek/deepseek-v4.1-flash`
+  - preflight = WAIT، چون یک jobِ «متنِ نهایی» در backoff بود (وضعیتش در DB است، restart بی‌ضرر)
+  - deploy ⇒ health ok، کد = `6908789` (۱۴۱/۱۴۱)
+- **FINDING (فوری):** اعتبارِ حسابِ OpenRouter تمام شده است: `total_credits` = 25، `total_usage` = 25.18.
+  - اثرِ اول: «متنِ نهایی»ِ جلسه‌ی واقعیِ `5dbb946c…` بعد از ۳ فراخوانیِ موفق (۶۲، ۱۳۲ و ۱۸۱ ثانیه) با 402 در backoff است.
+  - اثرِ دوم: پرونده‌ی درمان در prod هم تا شارژ کار نمی‌کند.
+  - qwen رایگان از خودِ سرورِ prod هم «temporarily rate-limited upstream» (429) داد.
+  - smokeِ مسیرِ جدید در prod: 429 ⇒ جایگزینِ DeepSeek ⇒ 402 ⇒ `transient` (درست دسته‌بندی شد).
+  - مقدارِ «قابلِ پرداخت» در چند دقیقه از ۱۱۵۲۶ به ۴۲۵۵ توکن افتاد. احتمالاً کلیدِ مشترکِ dev/prod هم‌زمان جایِ دیگری مصرف می‌شود.
+- **بازِ باقی‌مانده:** شارژِ حسابِ OpenRouter (کارِ مالک). بعد از شارژ jobهایِ در backoff خودکار ادامه می‌یابند.
+
+### 2026-09-28 — AUDIT + TEST + CODE — «ویرایشِ متن افتضاح است»: تشخیص + مقایسه‌ی مدل‌هایِ رایگان
+
+- **درخواستِ مالک:** یکی از مدل‌هایِ رایگانِ OpenRouter برایِ ویرایشِ متن گذاشته شود.
+- **تشخیص (prod، فقط شمارنده):** تنها «متنِ نهایی»ِ prod (`eb9c66c5`، ۳ نوبت، ۶۴ واژه) تنها تکه‌اش را با نگهبانِ `negation` از دست داد.
+  - مدل شمارِ منفی‌ها را عوض کرده بود؛ منفیِ خام بیرون از علامت‌هایِ نامطمئن بود.
+  - یعنی «متنِ نهایی»ای که مالک دید عملاً متنِ خام با نقش‌ها بود، نه ویرایشِ بد. نگهبان درست کار کرد.
+- **مدل‌هایِ رایگانِ فهرستِ مالک** (endpoints از API ِ OpenRouter):
+  - فقط `qwen/qwen3.8-27b:free` از structured output (json_schema) پشتیبانی می‌کند.
+  - Nemotron 3 Ultra، Inkling و Inkling Small پشتیبانی نمی‌کنند؛ با کدِ فعلی هر تکه رد می‌شود.
+  - سیاستِ داده در API گزارش نمی‌شود. توضیحِ بعضی مدل‌هایِ رایگان صریحاً می‌گوید ورودی/خروجی برایِ آموزش استفاده می‌شود؛ برایِ متنِ بالینی ریسکِ حریمِ خصوصی دارد.
+- **مقایسه رویِ ۸ متنِ ساختگیِ فاز ۰** (۴ async + ۴ realtime، با retry برایِ خطایِ شبکه):
+  - `qwen/qwen3.8-27b:free`: **۸ از ۸ شکست** با `429 Provider returned error`، حتی بعد از ۳ تلاش. عملاً در دسترس نیست.
+  - `deepseek/deepseek-v4.1-flash`:
+    - دقتِ نقش ۱۰۰٪ در ۷ مورد و ۹۸٫۷٪ در ۱ مورد
+    - WERِ خروجی ≤ خام در ۸ از ۸
+    - صفر تغییرِ منفی
+    - ۱ تکه از ۸ با نگهبانِ عدد به خام برگشت
+- **کد (commit/deploy نشده):** `provider.require_parameters: true` در `final-transcript/adapters/llmJson.ts` و `case-file/.../openrouter.adapter.ts`. علت: با `sort:'latency'` OpenRouter می‌توانست DeepSeek را به providerی بفرستد که json_schema را پشتیبانی نمی‌کند (Relace، BaseTen، StreamLake، …) و schema نادیده گرفته می‌شد.
+- **تصمیم:** مدل عوض نشد. در انتظارِ نمونه‌ی مشخص از مالک که «بد» دقیقاً چیست.
 
 ### 2026-09-28 — AUDIT (prod، read-only) + FINDING + CODE + TEST + DOCS — کیفیتِ «متنِ نهایی»: متنِ خامِ پرغلط به‌جایِ متنِ ویرایش‌شده (commit/deploy نشده)
 

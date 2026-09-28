@@ -78,13 +78,21 @@ Ports & Adapters در `server/src/features/case-file/` — تعویضِ LLM prov
 
 ## Providerِ LLM
 
-`LLM_PROVIDER` (پیش‌فرض `openai`) بینِ دو آداپتور انتخاب می‌کند — `openai.adapter.ts`
-(مستقیم به OpenAI) یا `openrouter.adapter.ts` (endpointِ سازگار با OpenAI SDK، فقط
-`baseURL`/کلید/مدل فرق دارد). **هیچ مدلی در کد hardcode نشده** (تصمیمِ صریحِ مالک) —
-`OPENAI_CASE_FILE_MODEL`/`OPENROUTER_MODEL` در `.env` الزامی‌اند؛ نبودشان یعنی 502
-`llm-failed` روی هر تلاشِ regenerate، نه یک fallbackِ خاموش. هر دو آداپتور دقیقاً همان
-`CASE_FILE_JSON_SCHEMA`/system prompt را استفاده می‌کنند؛ `application/`/`domain/` از انتخابِ
-provider/مدل بی‌خبرند. جزئیاتِ env: [configuration-catalog](../../02-reference/configuration-catalog.md).
+**از 2026-09-28 مستقل از provider:** یک آداپتور (`adapters/llm/chatLlm.adapter.ts`) رویِ لایه‌ی مشترکِ
+`server/src/llm/` (هم‌رسانِ «متنِ نهایی»). `LLM_PROVIDER` (یا `CASE_FILE_LLM_PROVIDER`) یکی از `openai`،
+`openrouter`، `metis` (DeepSeek از طریقِ متیس، پرداختِ ریالی)، `deepseek` یا `custom` (هر APIِ سازگار با OpenAI
+بدونِ تغییرِ کد) است. سوییچ = یک خط در env + restart. **هیچ مدلی در کد hardcode نشده** (تصمیمِ صریحِ مالک) —
+`<P>_MODEL` (یا `<P>_CASE_FILE_MODEL`) الزامی است؛ نبودش یعنی 502 `llm-failed` روی هر regenerate.
+
+- **حالتِ JSON:** OpenAI/OpenRouter با `json_schema`ِ strict؛ متیس/DeepSeek `json_schema` ندارند (400) ⇒
+  `json_object` + schema در پرامپت، سپس `shapeOk` و `validateCaseFileDraft` در همان آداپتور؛ خروجیِ بدساختار
+  یک بار دوباره پرسیده می‌شود. `repairLoop`/`finalizeDraft` لایه‌ی دوم می‌مانند.
+- **استدلال:** `CASE_FILE_REASONING_EFFORT` (پیش‌فرض `low`) به پارامترِ هر provider ترجمه می‌شود.
+- **مدلِ ذخیره‌شده:** `client_case_file.model` از 2026-09-28 شکلِ `provider:model` دارد (مثلاً
+  `metis:deepseek-v4-flash`)؛ ردیف‌هایِ قدیمی بدونِ پیشوند.
+- **providerِ جایگزین** (`LLM_FALLBACK_PROVIDER`، پیش‌فرض خاموش): فقط با خطایِ گذرایِ providerِ اصلی.
+- پرامپت/`CASE_FILE_JSON_SCHEMA` برایِ همه‌ی providerها یکی است؛ `application/`/`domain/` از provider/مدل بی‌خبرند.
+  جزئیاتِ env: [configuration-catalog](../../02-reference/configuration-catalog.md).
 
 ## ظاهر — تصمیمِ آگاهانه: حالتِ تاریک وجود دارد
 
@@ -97,7 +105,7 @@ provider/مدل بی‌خبرند. جزئیاتِ env: [configuration-catalog](.
 
 ## Out of Scope (فازِ ۱ + بخشِ اولِ فازِ ۲)
 
-مراجعینِ فعال، صفحه/ناوبریِ مستقل، هر providerِ LLM غیر از OpenAI/OpenRouter، صفِ async با
+مراجعینِ فعال، صفحه/ناوبریِ مستقل، providerِ LLMِ غیرِ سازگار با OpenAI (مثلاً APIِ بومیِ Anthropic — نیازمندِ یک ردیفِ جدید با clientِ دیگر)، صفِ async با
 coalesce، گسترشِ trigger به یادداشت‌هایِ خارج از جلسه.
 
 ## رفعِ A1.9 (2026-09-26) — merge

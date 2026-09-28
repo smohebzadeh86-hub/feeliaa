@@ -64,7 +64,11 @@ waiting_audio ──(صدا کامل)──→ transcribing ──→ polishing 
    - **آپلودِ الحاقی:** متنِ کاملِ جلسه + برچسب + بخشِ آپلودی با شماره‌ی گوینده‌هایِ جدا (`appendUploadForPolish`) — دو diarizationِ مستقل‌اند.
    - **سقفِ توکن:** `FINAL_TRANSCRIPT_MAX_TOKENS` (۱۶۳۸۴) — ریشه‌ی 402ِ «requires more credits, or fewer max_tokens».
    - **خطاهایِ LLM:** `402` (اعتبارِ OpenRouter تمام شده) از 2026-09-28 گذراست (`isTransientLlmError`، مشترک با پرونده). JSONِ نامعتبر در گذرِ برداشتِ کلی گذرا حساب می‌شود (در گذرِ تکه همان تکه خام می‌ماند).
-5. **LLM:** همان provider و کلیدِ پرونده‌ی درمان (`LLM_PROVIDER`)، ولی با clientِ جدا. timeout با `FINAL_TRANSCRIPT_LLM_TIMEOUT_MS` تنظیم می‌شود و `maxRetries=0` است. مدل از `FINAL_TRANSCRIPT_MODEL` می‌آید و اگر نبود، مدلِ پرونده استفاده می‌شود. پرامپت و پاسخ لاگ نمی‌شوند (LAW-001).
+5. **LLM (بازنویسیِ 2026-09-28 — مستقل از provider):** لایه‌ی مشترکِ `server/src/llm/` (هم‌رسانِ پرونده‌ی درمان). provider = `FINAL_TRANSCRIPT_LLM_PROVIDER` یا `LLM_PROVIDER` (`openai`، `openrouter`، `metis`، `deepseek`، `custom`)، با clientِ جدا. timeout با `FINAL_TRANSCRIPT_LLM_TIMEOUT_MS`، `maxRetries=0`. پرامپت و پاسخ لاگ نمی‌شوند (LAW-001).
+   - **مدل:** `<P>_FINAL_TRANSCRIPT_MODEL`، وگرنه `<P>_MODEL`. `FINAL_TRANSCRIPT_MODEL`ِ قدیمی فقط برایِ OpenRouter/OpenAI خوانده می‌شود، چون نامِ مدل مالِ provider است (با سوییچ به متیس نادیده گرفته می‌شود، نه 400ِ دائمی).
+   - **حالتِ JSON:** پیش‌فرضِ provider (OpenRouter/OpenAI `schema`؛ متیس/DeepSeek `object` = `json_object` + schema در پرامپت). `FINAL_TRANSCRIPT_JSON_MODE` برایِ همه‌ی providerها؛ حالتی که provider ندارد ⇒ پیش‌فرضِ آن + هشدار.
+   - **استدلال:** `FINAL_TRANSCRIPT_REASONING_EFFORT` (واژگانِ مشترک `off|…|max|default`)؛ پیش‌فرض `low` (سنجشِ متیس 2026-09-28: `off` ۴–۸ث ولی ۲ از ۸ متن بدتر از خام؛ `low` ۱۲–۳۷ث و ۸ از ۸ ≤ خام — `verification/2026-09-28-metis-deepseek.md`).
+   - **لاگِ شروع:** یک خط `[llm] final-transcript: …` با provider/مدل/حالت/استدلال (بدونِ کلید).
 
 ## UI (`public/index.html`)
 نوارِ `#finalTranscriptBar` بالایِ `#transcriptBox`:
@@ -75,7 +79,7 @@ waiting_audio ──(صدا کامل)──→ transcribing ──→ polishing 
 - `⟦…؟⟧` به‌صورتِ `span.ft-unsure` نمایش داده می‌شود. همه‌ی نمایش‌ها با `textContent`/DOM‌اند و innerHTML ندارند.
 
 ## حریمِ خصوصی و ریسک
-- متن (و در مسیرِ async، کلِ صدا) به Soniox و متن به OpenRouter/OpenAI فرستاده می‌شود. **متنِ رضایت این را نمی‌گوید**. تصمیمِ مالک در 2026-09-27: فعلاً تغییر نکند و به‌عنوانِ ریسکِ LAW-009 ثبت شود.
+- متن (و در مسیرِ async، کلِ صدا) به Soniox و متن به providerِ LLMِ فعال (OpenRouter/OpenAI، یا از 2026-09-28 متیس ⇒ DeepSeek) فرستاده می‌شود. **متنِ رضایت این را نمی‌گوید**. تصمیمِ مالک در 2026-09-27: فعلاً تغییر نکند و به‌عنوانِ ریسکِ LAW-009 ثبت شود.
 - `collectUploadSonioxRefs` (هر ۴ مسیرِ حذف) و `sweepSonioxOrphans` شناسه‌هایِ این جدول را هم می‌شناسند.
 - هزینه: هر جلسه یک رونویسیِ async کامل (دو برابرِ هزینه‌ی Soniox) + حدود ۲ تا چند فراخوانیِ LLM. سقفِ روزانه‌ی آپلود (`UPLOAD_DAILY_AUDIO_MINUTES`) این مسیر را **شامل نمی‌شود**.
 

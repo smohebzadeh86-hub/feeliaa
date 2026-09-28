@@ -17,7 +17,7 @@
 > مراجع `inactive` + `therapists.case_file_enabled` + `case_file_auto_generate=true`) — وضعیت لحظه‌ی ثبتِ متن خوانده می‌شود
 > (`jobRunner.ts#uploadCaseFileAllowedForJob`)؛ وگرنه `done/disabled`. UI (`jobHasCaseFileStep`) پیش از ثبتِ متن از `case_file_planned`ِ سرور
 > (همان تابع) می‌خواند ⇒ روشن‌کردن فقط با env است، بدونِ تغییرِ فرانت. «به‌روزرسانی»ِ دستیِ پرونده همیشه متنِ جلسه‌هایِ آپلودی را هم می‌خواند.
-> **خطایِ گذرایِ LLM در مرحله‌ی پرونده (2026-09-25):** `chatJson.ts#isTransientLlmError` (بدونِ status/قطعِ اتصال/timeout، یا 408/429/5xx) ⇒
+> **خطایِ گذرایِ LLM در مرحله‌ی پرونده (2026-09-25):** `chatJson.ts#isTransientLlmError` (از 2026-09-28: `server/src/llm/jsonCall.ts`) (بدونِ status/قطعِ اتصال/timeout، یا 408/429/5xx) ⇒
 > `CaseFileGenerationError.transient`؛ `autoTrigger` با `retryTransient` ⇒ `'transient'` بدونِ اعلان؛ `stepCaseFile` ⇒ `waiting` + `error_code='case-file-retry'`،
 > تلاشِ دوباره بعد از ۱، ۵، ۱۵ دقیقه (`CASE_FILE_TRANSIENT_RETRY_MS`)؛ تلاشِ چهارم `lastAttempt` ⇒ شکستِ عادی (`done/failed` + `case_file_failed`). مسیرِ جلسه‌ی زنده تغییری نکرد.
 > **الحاقِ تکه‌ها (2026-09-25):** `uploadStore.ts#assembleUpload` هر تکه را با `WriteStream`ِ جداگانه (append) می‌نویسد — رفعِ `MaxListenersExceededWarning` برایِ ≥۱۰ تکه.
