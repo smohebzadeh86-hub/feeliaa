@@ -1,13 +1,16 @@
 // ثبت‌نام / ورود / خروج تراپیست — شناسه‌ی اصلی: شماره‌ی موبایل (ایمیل اختیاری، برای آینده)
 import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
-import { query } from '../../db/connection.js';
 import { hashPassword, verifyPassword } from '../../auth/password.js';
 import { createSession, destroySession } from '../../auth/session.js';
 import { SESSION_COOKIE, SESSION_COOKIE_MAX_AGE } from '../../auth/guard.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
 import { toLatinDigits } from '../../shared/persianDigits.js';
+import {
+  findTherapistIdByPhone, insertTherapist, getTherapistProfile, getIsAdmin, grantAdminFlag,
+  findTherapistByPhone, setCaseFileAutoGenerate,
+} from './therapists.repository.js';
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -43,9 +46,9 @@ async function ensureAdminFlag(therapistId: string, normalizedPhone: string): Pr
   if (!adminPhoneRaw) return;
   const adminPhone = normalizePhone(adminPhoneRaw);
   if (!adminPhone || adminPhone !== normalizedPhone) return;
-  const r = await query('UPDATE therapists SET is_admin = true WHERE id = ? AND is_admin = false', [therapistId]);
+  const granted = await grantAdminFlag(therapistId);
   // (A6) ادمین‌شدنِ خودکار (ADMIN_PHONE) — تنها مسیری که نقشِ ادمین بدونِ کلیکِ ادمینِ دیگری داده می‌شود.
-  if (r.rowCount === 1) await recordAudit({ actorId: therapistId, action: 'admin.flag_granted', targetType: 'therapist', targetId: therapistId });
+  if (granted) await recordAudit({ actorId: therapistId, action: 'admin.flag_granted', targetType: 'therapist', targetId: therapistId });
 }
 
 export async function authRoutes(app: FastifyInstance) {
@@ -85,25 +88,20 @@ export async function authRoutes(app: FastifyInstance) {
       return { error: 'تخصص الزامی است' };
     }
 
-    const exists = await query('SELECT id FROM therapists WHERE phone = ?', [normalizedPhone]);
-    if (exists.rows.length > 0) {
+    if (await findTherapistIdByPhone(normalizedPhone)) {
       reply.code(409);
       return { error: 'این شماره قبلاً ثبت شده است' };
     }
 
     const normalizedEmail = email ? email.trim().toLowerCase() : null;
     const newId = randomUUID();
-    await query(
-      'INSERT INTO therapists (id, phone, email, password_hash, name, specialty) VALUES (?, ?, ?, ?, ?, ?)',
-      [newId, normalizedPhone, normalizedEmail, hashPassword(password), trimmedName, trimmedSpecialty]
-    );
-    const inserted = await query(
-      'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate, case_file_enabled, final_transcript_enabled FROM therapists WHERE id = ?',
-      [newId]
-    );
-    const therapist = inserted.rows[0];
+    await insertTherapist({
+      id: newId, phone: normalizedPhone, email: normalizedEmail, passwordHash: hashPassword(password),
+      name: trimmedName, specialty: trimmedSpecialty,
+    });
+    const therapist = await getTherapistProfile(newId);
     await ensureAdminFlag(therapist.id, normalizedPhone);
-    therapist.is_admin = (await query('SELECT is_admin FROM therapists WHERE id = ?', [therapist.id])).rows[0].is_admin;
+    therapist.is_admin = await getIsAdmin(therapist.id);
 
     const token = await createSession(therapist.id);
     reply.setCookie(SESSION_COOKIE, token, {
@@ -123,10 +121,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
     const normalizedPhone = normalizePhone(phone);
 
-    const result = normalizedPhone
-      ? await query('SELECT * FROM therapists WHERE phone = ?', [normalizedPhone])
-      : { rows: [] as any[] };
-    const therapist = result.rows[0];
+    const therapist = normalizedPhone ? await findTherapistByPhone(normalizedPhone) : undefined;
 
     // ⭐ حتی اگر تراپیست پیدا نشه، verifyPassword روی یک هش ساختگی اجرا میشه
     // تا زمان پاسخ لو ندهد که آیا این شماره اصلاً ثبت‌نام شده یا نه.
@@ -146,7 +141,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     await ensureAdminFlag(therapist.id, normalizedPhone!);
-    therapist.is_admin = (await query('SELECT is_admin FROM therapists WHERE id = ?', [therapist.id])).rows[0].is_admin;
+    therapist.is_admin = await getIsAdmin(therapist.id);
 
     const token = await createSession(therapist.id);
     reply.setCookie(SESSION_COOKIE, token, {
@@ -172,16 +167,13 @@ export async function authRoutes(app: FastifyInstance) {
       return { error: 'وارد نشده‌اید' };
     }
 
-    const result = await query(
-      'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate, case_file_enabled, final_transcript_enabled FROM therapists WHERE id = ?',
-      [request.therapistId]
-    );
-    if (result.rows.length === 0) {
+    const row = await getTherapistProfile(request.therapistId);
+    if (!row) {
       reply.code(401);
       return { error: 'وارد نشده‌اید' };
     }
 
-    return { therapist: publicTherapist(result.rows[0]) };
+    return { therapist: publicTherapist(row) };
   });
 
   // PATCH /api/auth/case-file-auto-generate — تنظیمِ خودکارسازیِ تولیدِ پرونده (همیشه قابلِ‌تغییر،
@@ -200,7 +192,7 @@ export async function authRoutes(app: FastifyInstance) {
       reply.code(400);
       return { error: 'enabled باید boolean باشد' };
     }
-    await query('UPDATE therapists SET case_file_auto_generate = ? WHERE id = ?', [enabled, request.therapistId]);
+    await setCaseFileAutoGenerate(request.therapistId, enabled);
     return { case_file_auto_generate: enabled };
   });
 }
