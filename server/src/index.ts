@@ -1,112 +1,13 @@
 // Feelia Server — Entry Point
+// ترتیب: dotenv → ساختِ اپ (app.ts) → migrations → jobهایِ پس‌زمینه (jobs/backgroundJobs.ts) → listen.
 import 'dotenv/config';
-import Fastify from 'fastify';
-import { fastifyStatic } from '@fastify/static';
-import multipart from '@fastify/multipart';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { testConnection } from './db/connection.js';
 import { runMigrations } from './db/migrate.js';
-import { registerAuthContext } from './auth/guard.js';
-import { authRoutes } from './http/auth.js';
-import { adminRoutes } from './http/admin.js';
-import { clientRoutes } from './http/clients.js';
-import { sessionRoutes } from './http/sessions.js';
-import { sttRoutes } from './http/stt.js';
-import { clientConfigRoutes } from './http/clientConfig.js';
-import { transcriptionRoutes } from './ws/transcription.js';
-import { caseFileRoutes } from './features/case-file/api/caseFile.routes.js';
-import { treatmentUnitRoutes } from './features/treatment-unit/index.js';
-import { obsRoutes } from './http/obs.js';
-import { registerObsHooks } from './obs/httpHook.js';
-import { startObsDrainLoop, flushObsQueue, logEvent } from './obs/eventLog.js';
-import { sweepOldObsEvents } from './obs/sweep.js';
-import { sweepOldBatchFiles, retryQueuedBatches, BATCH_SWEEP_INTERVAL_MS } from './stt/batchqueue.js';
-import { sweepOldSessionAudio } from './stt/sessionAudioArchive.js';
-import { sweepOldResolveJobs } from './stt/speakerResolve.js';
-import { audioUploadRoutes, tryFinalizeGroup } from './features/audio-upload/uploads.routes.js';
-import { autoCloseAbandonedSessions, AUTO_CLOSE_INTERVAL_MS } from './http/sessionAutoClose.js';
-import { startAudioJobWorker, sweepSonioxOrphans } from './features/audio-upload/jobRunner.js';
-import { sweepStaleUploads } from './features/audio-upload/uploadStore.js';
-import { sweepOldNotifications, notifyAdmins } from './features/notifications/notify.js';
-import { finalTranscriptRoutes, startFinalTranscriptWorker } from './features/final-transcript/index.js';
-import { describeLlmConfig } from './llm/config.js';
-import { onLlmHealth } from './llm/jsonCall.js';
-import { createLlmAlertTracker, THROTTLE_MS } from './llm/healthAlert.js';
+import { flushObsQueue } from './obs/eventLog.js';
+import { buildApp } from './app.js';
+import { startBackgroundJobs } from './jobs/backgroundJobs.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const app = await buildApp();
 
-// فیکسِ نشتِ حریمِ‌خصوصی (فازِ ۱ِ رصد/حسابرسی، 2026-09-22): پیش‌فرضِ logger:true
-// هر کوکی (شاملِ feelia_session) و هدرِ Authorization را در stdout چاپ می‌کرد.
-// disableRequestLogging:true چون log-per-request حالا کارِ registerObsHooks
-// (server/src/obs/httpHook.ts) است، نه لاگرِ خامِ Fastify.
-const app = Fastify({
-  logger: {
-    level: process.env.LOG_LEVEL || 'info',
-    redact: {
-      paths: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
-      remove: true,
-    },
-  },
-  disableRequestLogging: true,
-});
-
-// Health check
-app.get('/api/health', async () => {
-  const dbOk = await testConnection();
-  return {
-    status: dbOk ? 'ok' : 'degraded',
-    name: 'feelia',
-    version: '0.1.0',
-    database: dbOk ? 'connected' : 'disconnected',
-    timestamp: new Date().toISOString(),
-  };
-});
-
-// API Routes
-// ⭐ سقفِ پیش‌فرضِ ۱MiB برایِ سگمنتِ صوتی کم بود (فایندینگِ audit صدا/۲۰۲۶-۰۹-۱۶):
-// سگمنتِ ۱۵ثانیه‌ای با DURABLE_BITRATE=24kbps ~۴۵KB است، ولی نرخِ واقعیِ مرورگر
-// می‌تونه بالاتر بره، و یادداشتِ صوتیِ legacy می‌تونه طولانی‌تر باشه. ۱۰MB زیرِ
-// MAX_AUDIO_BYTES موجودِ batchqueue.ts (۵۰MB) و کاملاً کافیه.
-await app.register(multipart, { limits: { fileSize: 10 * 1024 * 1024 } });
-await registerAuthContext(app);
-// بلافاصله بعدِ registerAuthContext — طبقِ پلن، تا request.therapistId برایِ هرهوک
-// در دسترس باشد. باید قبل از ثبتِ روت‌ها بیاید تا onRequest/onResponse همه‌ی مسیرها را بپوشاند.
-registerObsHooks(app);
-await app.register(authRoutes);
-await app.register(adminRoutes);
-await app.register(clientRoutes);
-await app.register(sessionRoutes);
-await app.register(sttRoutes);
-await app.register(clientConfigRoutes);
-await app.register(transcriptionRoutes);
-await app.register(caseFileRoutes);
-await app.register(treatmentUnitRoutes);
-await app.register(obsRoutes);
-await app.register(audioUploadRoutes);
-await app.register(finalTranscriptRoutes);
-
-// Serve static (فرانت)
-const publicDir = path.join(__dirname, '..', '..', 'public');
-try {
-  // ⭐ باگِ واقعیِ deploy (۲۰۲۶-۰۹-۲۳): پیش‌فرضِ fastify-static یعنی «public, max-age=0» — مرورگر
-  // اجازه داشت feelia-rt.jsِ کش‌شده را بدونِ پرسیدن از سرور دوباره اجرا کند؛ تبِ مالک بعد از دو
-  // deployِ رفعِ موتورِ رونویسی هنوز نسخه‌ی قدیمی را اجرا می‌کرد (در لاگِ nginx هیچ درخواستی برایِ
-  // /feelia-rt.js نبود). no-cache = همیشه revalidate (ETag/Last-Modified → ۳۰۴ِ ارزان).
-  await app.register(fastifyStatic, {
-    root: publicDir,
-    cacheControl: false,
-    setHeaders: (reply) => { reply.header('Cache-Control', 'no-cache'); },
-  });
-} catch (e) {
-  // public/ وجود نداره
-}
-
-// خاموشیِ تمیز: تلاشِ نهایی برایِ خالی‌کردنِ صفِ obs قبل از خروج (data/logs/obs.jsonl
-// همیشه از قبل نوشته شده؛ این فقط برایِ ردیف‌های هنوز-در-صفِ DB است).
-app.addHook('onClose', async () => {
-  await flushObsQueue();
-});
 process.on('SIGTERM', () => {
   flushObsQueue().finally(() => process.exit(0));
 });
@@ -120,51 +21,7 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 const start = async () => {
   try {
     await runMigrations();
-    // پاک‌سازی فایل‌های صوت batch قدیمی (حریم خصوصی/دیسک) — قبل از حذف، تلاش می‌کنه آرشیو کنه
-    try { await sweepOldBatchFiles(); } catch {}
-    setInterval(() => { sweepOldBatchFiles().catch(() => {}); }, BATCH_SWEEP_INTERVAL_MS);
-    // آرشیوِ صدایِ ادمین: هم سرِ startup هم هر ۲۴ ساعت — سروری که هفته‌ها ری‌استارت
-    // نمی‌شه هم نباید صدایِ بیشتر از سقفِ نگه‌داری رو نگه داره.
-    try { await sweepOldSessionAudio(); } catch {}
-    setInterval(() => { sweepOldSessionAudio().catch(() => {}); }, 24 * 60 * 60 * 1000);
-    setInterval(() => { try { sweepOldResolveJobs(); } catch {} }, 60 * 60 * 1000);
-    // لایه‌ی رصد/حسابرسی (فازِ ۱): صفِ drain به DB + جاروبِ روزانه‌ی retention.
-    startObsDrainLoop();
-    try { await sweepOldObsEvents(); } catch {}
-    setInterval(() => { sweepOldObsEvents().catch(() => {}); }, 24 * 60 * 60 * 1000);
-    // ⭐ workerِ دوره‌ایِ retry برایِ صفِ batch (فایندینگِ audit صدا): شکستِ Soniox/کلید
-    // وقتِ enqueue قبلاً بدونِ رفرشِ صفحه یا ری‌استارتِ سرور هیچ‌وقت دوباره امتحان نمی‌شد.
-    try { await retryQueuedBatches(); } catch {}
-    setInterval(() => { retryQueuedBatches().catch(() => {}); }, 5 * 60 * 1000);
-    // آپلودِ فایلِ صوتیِ جلسه (migration 023): workerِ DB-محور (بعد از ری‌استارت فوراً ادامه می‌دهد)،
-    // جاروبِ آپلودهایِ رهاشده/یتیم، اعلان‌هایِ قدیمی، و فایل/transcriptionِ یتیمِ رویِ Soniox (F3).
-    await startAudioJobWorker();
-    // «متنِ نهایی» (migration 031): رونویسیِ دوباره + مرتب‌سازی با LLM بعد از پایانِ جلسه — فقط درمانگرِ فعال‌شده.
-    await startFinalTranscriptWorker();
-    try { await sweepStaleUploads(tryFinalizeGroup); } catch {}
-    setInterval(() => { sweepStaleUploads(tryFinalizeGroup).catch(() => {}); }, 60 * 60 * 1000);
-    // (A6) در startup هم — سروری که کمتر از ۲۴ ساعت بالا می‌ماند هرگز اعلان‌هایِ قدیمی را پاک نمی‌کرد.
-    try { await sweepOldNotifications(); } catch {}
-    setInterval(() => { sweepOldNotifications().catch(() => {}); }, 24 * 60 * 60 * 1000);
-    // A3: بستنِ خودکارِ جلسه‌ی زنده‌ی رهاشده (بی‌فعالیت > SESSION_AUTO_CLOSE_IDLE_SECONDS، پیش‌فرض ۲ ساعت)
-    void autoCloseAbandonedSessions();
-    setInterval(() => { autoCloseAbandonedSessions().catch(() => {}); }, AUTO_CLOSE_INTERVAL_MS);
-    void sweepSonioxOrphans();
-    setInterval(() => { sweepSonioxOrphans().catch(() => {}); }, 6 * 60 * 60 * 1000);
-    // پیکربندیِ LLM (provider/مدل/حالتِ JSON/استدلال — بدونِ کلید) تا سوییچ/خطایِ env همان اول دیده شود
-    console.log(describeLlmConfig('case-file'));
-    console.log(describeLlmConfig('final-transcript'));
-    // هشدارِ ادمین برایِ قطعیِ سرویسِ LLM (اعتبار/کلید/قطعیِ پیاپی) — حداکثر یک بار در هر ۶ ساعت برایِ هر علت
-    const llmAlerts = createLlmAlertTracker({
-      now: () => Date.now(),
-      alert: (reason, provider) => {
-        const bucket = Math.floor(Date.now() / THROTTLE_MS);
-        logEvent({ event: 'llm.alert', severity: 'error', code: reason, detail: { source: provider } });
-        console.log(`[llm] هشدارِ ادمین: ${provider} ${reason}`);
-        notifyAdmins('llm_unavailable', reason, `llm-${reason}-${bucket}`).catch(() => {});
-      },
-    });
-    onLlmHealth((e) => llmAlerts.handle(e));
+    await startBackgroundJobs();
     console.log('🌿 Feelia server starting...');
     await app.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`🌿 Feelia server running on http://localhost:${PORT}`);

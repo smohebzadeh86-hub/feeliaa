@@ -10,6 +10,8 @@
     "test:up": "pnpm --filter server exec tsx ../scripts/upload-harness.ts",
     "test:tu": "pnpm --filter server exec tsx ../scripts/treatment-unit-harness.ts",
     "test:ft": "pnpm --filter server exec tsx ../scripts/final-transcript-harness.ts",
-    "test:llm": "pnpm --filter server exec tsx ../scripts/llm-harness.ts"
+    "test:llm": "pnpm --filter server exec tsx ../scripts/llm-harness.ts",
+    "test:api": "pnpm --filter server exec tsx ../scripts/api-contract-harness.mts",
+    "test:routes": "pnpm --filter server exec tsx ../scripts/route-snapshot.ts"
   }
 }
