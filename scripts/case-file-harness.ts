@@ -11,7 +11,7 @@ import { mergeCaseFileDraft } from '../server/src/features/case-file/application
 import { applyFieldPatch, dropGhostMedication, migrateAnsweredQuestions } from '../server/src/features/case-file/application/applyFieldPatch.js';
 import { upgradeLegacyContent } from '../server/src/features/case-file/application/upgradeLegacyContent.js';
 import { composeWithRepair, digestWithRepair } from '../server/src/features/case-file/application/repairLoop.js';
-import { resolveReasoningBody } from '../server/src/features/case-file/adapters/llm/openrouter.adapter.js';
+import { resolveLlmConfig } from '../server/src/llm/config.js';
 import { FINDING_ROLES, FINDING_ROLE_LABEL } from '../server/src/features/case-file/domain/types.js';
 import { CASE_FILE_JSON_SCHEMA } from '../server/src/features/case-file/adapters/llm/caseFileJsonSchema.js';
 import { CASE_FILE_SYSTEM_PROMPT as SYSTEM_PROMPT, buildAnsweredQuestionsBlock } from '../server/src/features/case-file/application/buildCaseFilePrompt.js';
@@ -504,15 +504,16 @@ const field = (r: ReturnType<typeof finalizeCouple>, key: string) => r.draft.cou
     assert.equal(beats, after);
   });
 
-  // ================= تنظیمِ reasoning (OpenRouter) =================
+  // ================= تنظیمِ reasoning (OpenRouter، سازگاری با envِ قبلی — src/llm/config.ts) =================
+  const orEnv = (extra: Record<string, string> = {}) => ({ LLM_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'k', OPENROUTER_MODEL: 'm', ...extra });
   await t('J1 reasoning: پیش‌فرض low؛ حساس به حروف نیست؛ default ⇒ بدونِ پارامتر', () => {
-    assert.deepEqual(resolveReasoningBody(undefined), { reasoning: { effort: 'low' } });
-    assert.deepEqual(resolveReasoningBody(''), { reasoning: { effort: 'low' } });
-    assert.deepEqual(resolveReasoningBody(' HIGH '), { reasoning: { effort: 'high' } });
-    assert.equal(resolveReasoningBody('default'), undefined);
+    assert.deepEqual(resolveLlmConfig('case-file', orEnv()).body.reasoning, { effort: 'low' });
+    assert.deepEqual(resolveLlmConfig('case-file', orEnv({ OPENROUTER_REASONING_EFFORT: '' })).body.reasoning, { effort: 'low' });
+    assert.deepEqual(resolveLlmConfig('case-file', orEnv({ OPENROUTER_REASONING_EFFORT: ' HIGH ' })).body.reasoning, { effort: 'high' });
+    assert.equal(resolveLlmConfig('case-file', orEnv({ OPENROUTER_REASONING_EFFORT: 'default' })).body.reasoning, undefined);
   });
   await t('J2 reasoning: مقدارِ نامعتبر خطای واضح می‌دهد', () => {
-    assert.throws(() => resolveReasoningBody('turbo'), /OPENROUTER_REASONING_EFFORT/);
+    assert.throws(() => resolveLlmConfig('case-file', orEnv({ OPENROUTER_REASONING_EFFORT: 'turbo' })), /OPENROUTER_REASONING_EFFORT/);
   });
 
   // ================= واژگانِ نقش‌ها و ترتیبِ محورها =================

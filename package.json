@@ -9,6 +9,7 @@
     "test:cf": "pnpm --filter server exec tsx ../scripts/case-file-harness.ts",
     "test:up": "pnpm --filter server exec tsx ../scripts/upload-harness.ts",
     "test:tu": "pnpm --filter server exec tsx ../scripts/treatment-unit-harness.ts",
-    "test:ft": "pnpm --filter server exec tsx ../scripts/final-transcript-harness.ts"
+    "test:ft": "pnpm --filter server exec tsx ../scripts/final-transcript-harness.ts",
+    "test:llm": "pnpm --filter server exec tsx ../scripts/llm-harness.ts"
   }
 }

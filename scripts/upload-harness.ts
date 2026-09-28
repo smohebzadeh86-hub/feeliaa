@@ -690,7 +690,7 @@ async function main() {
   });
 
   await t('H49 isTransientLlmError: 402 (اعتبارِ OpenRouter تمام شده، فاز ۰B) گذراست؛ 400/401/403/404 نه', async () => {
-    const { isTransientLlmError } = await import('../server/src/features/case-file/adapters/llm/chatJson.js');
+    const { isTransientLlmError } = await import('../server/src/llm/jsonCall.js');
     const withStatus = (status: number) => Object.assign(new Error('x'), { status });
     assert.equal(isTransientLlmError(withStatus(402)), true);
     for (const s of [400, 401, 403, 404, 422]) assert.equal(isTransientLlmError(withStatus(s)), false, String(s));
@@ -844,7 +844,7 @@ async function main() {
   });
 
   await t('H40 isTransientLlmError: شبکه/timeout/429/5xx گذرا؛ 400/401/404 و خطایِ کلید نه', async () => {
-    const { isTransientLlmError } = await import('../server/src/features/case-file/adapters/llm/chatJson.js');
+    const { isTransientLlmError } = await import('../server/src/llm/jsonCall.js');
     const withStatus = (status: number) => Object.assign(new Error('x'), { status });
     assert.equal(isTransientLlmError(new Error('Invalid response body while trying to fetch https://openrouter.ai/api/v1/chat/completions: read ECONNRESET')), true);
     assert.equal(isTransientLlmError(Object.assign(new Error('Connection error.'), { name: 'APIConnectionError' })), true);

@@ -561,7 +561,7 @@ await t('B12 ماشینِ حالت: trustDiarization فقط برایِ asyncِ �
 
 // ——— حالتِ JSON از پرامپت (مدل‌هایِ :free بدونِ structured output، 2026-09-28) ———
 await t('B13 extractJson: بلوکِ <think>، fence و متنِ اضافه حذف می‌شوند؛ JSONِ نامعتبر ⇒ null', async () => {
-  const { extractJson } = await import('../server/src/features/final-transcript/adapters/llmJson.js');
+  const { extractJson } = await import('../server/src/llm/jsonCall.js');
   assert.deepEqual(extractJson('<think>بگذار فکر کنم {نه این}</think>\n```json\n{"turns":[{"speaker_role":"درمانگر","text":"سلام"}]}\n```'), { turns: [{ speaker_role: 'درمانگر', text: 'سلام' }] });
   assert.deepEqual(extractJson('باشه، این خروجی است: {"a":1} امیدوارم کمک کند'), { a: 1 });
   assert.equal(extractJson('هیچ JSONی نیست'), null);

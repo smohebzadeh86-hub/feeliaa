@@ -1,17 +1,14 @@
-// نقطه‌ی تکی برای انتخاب provider — برای عوض‌کردن LLM (مثلاً بعداً Anthropic)، فقط
-// یک آداپتور جدید اینجا اضافه می‌شود؛ application/domain/frontend لمس نمی‌شوند.
+// نقطه‌ی تکی برای انتخاب provider — provider/مدل/پارامترها کاملاً از env (src/llm/config.ts)؛ application/domain/frontend
+// لمس نمی‌شوند. providerِ جدیدِ سازگار با OpenAI = یک ردیف در PROFILES یا LLM_PROVIDER=custom بدونِ تغییرِ کد.
 import type { LLMProvider } from '../../ports/llmProvider.port.js';
-import { OpenAIAdapter } from './openai.adapter.js';
-import { OpenRouterAdapter } from './openrouter.adapter.js';
+import { CaseFileGenerationError } from '../../domain/errors.js';
+import { createJsonCaller } from '../../../../llm/jsonCall.js';
+import { ChatLlmAdapter } from './chatLlm.adapter.js';
 
 export function resolveLLMProvider(): LLMProvider {
-  const kind = process.env.LLM_PROVIDER || 'openai';
-  switch (kind) {
-    case 'openai':
-      return new OpenAIAdapter();
-    case 'openrouter':
-      return new OpenRouterAdapter();
-    default:
-      throw new Error(`LLM_PROVIDER نامعتبر: ${kind}`);
+  try {
+    return new ChatLlmAdapter(createJsonCaller('case-file'));
+  } catch (e) {
+    throw new CaseFileGenerationError('llm-failed', (e as Error).message);
   }
 }

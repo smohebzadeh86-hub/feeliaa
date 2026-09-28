@@ -30,6 +30,7 @@ import { startAudioJobWorker, sweepSonioxOrphans } from './features/audio-upload
 import { sweepStaleUploads } from './features/audio-upload/uploadStore.js';
 import { sweepOldNotifications } from './features/notifications/notify.js';
 import { finalTranscriptRoutes, startFinalTranscriptWorker } from './features/final-transcript/index.js';
+import { describeLlmConfig } from './llm/config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -148,6 +149,9 @@ const start = async () => {
     setInterval(() => { autoCloseAbandonedSessions().catch(() => {}); }, AUTO_CLOSE_INTERVAL_MS);
     void sweepSonioxOrphans();
     setInterval(() => { sweepSonioxOrphans().catch(() => {}); }, 6 * 60 * 60 * 1000);
+    // پیکربندیِ LLM (provider/مدل/حالتِ JSON/استدلال — بدونِ کلید) تا سوییچ/خطایِ env همان اول دیده شود
+    console.log(describeLlmConfig('case-file'));
+    console.log(describeLlmConfig('final-transcript'));
     console.log('🌿 Feelia server starting...');
     await app.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`🌿 Feelia server running on http://localhost:${PORT}`);
