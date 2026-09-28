@@ -124,16 +124,25 @@ export function createTranscriptLlm(): LlmJsonPort {
   return {
     model: m,
     async completeJson<T>(system: string, user: string, schema: unknown): Promise<T> {
-      const startedAt = Date.now();
-      try {
-        const r = jsonMode === 'prompt'
-          ? await promptJson<T>(client, m, label, system, user, schema, extraBody)
-          : await callStructured<T>(client, m, label, system, user, schema, extraBody);
-        console.log(`[final-transcript] ${label} call ok in ${Date.now() - startedAt}ms`);
-        return r;
-      } catch (e) {
-        console.log(`[final-transcript] ${label} call failed after ${Date.now() - startedAt}ms`);
-        throw e;
+      // تلاشِ دوباره‌ی همان فراخوانی برایِ خطایِ گذرا (2026-09-28): مدل‌هایِ :free گاهی کند/ناپایدارند و بدونِ این، یک
+      // خطا در یک تکه کلِ jobِ یک جلسه‌ی بلند را از اول به backoff می‌برد (مشاهده در prod: جلسه‌ی ۵dbb946c هرگز تمام نمی‌شد).
+      const retries = envInt('FINAL_TRANSCRIPT_CALL_RETRIES', 2);
+      for (let attempt = 0; ; attempt++) {
+        const startedAt = Date.now();
+        try {
+          const r = jsonMode === 'prompt'
+            ? await promptJson<T>(client, m, label, system, user, schema, extraBody)
+            : await callStructured<T>(client, m, label, system, user, schema, extraBody);
+          console.log(`[final-transcript] ${label} call ok in ${Date.now() - startedAt}ms${attempt ? ` (retry ${attempt})` : ''}`);
+          return r;
+        } catch (e) {
+          const transient = !!(e as { transient?: boolean })?.transient;
+          // فقط کد/پیامِ خطایِ provider (بدونِ پرامپت/پاسخ — LAW-001) تا علتِ شکست در لاگ دیده شود
+          const why = String((e as Error)?.message || '').replace(/\s+/g, ' ').slice(0, 140);
+          console.log(`[final-transcript] ${label} call failed after ${Date.now() - startedAt}ms: ${why}`);
+          if (!transient || attempt >= retries) throw e;
+          await new Promise((r) => setTimeout(r, 5000 * (attempt + 1)));
+        }
       }
     },
   };
