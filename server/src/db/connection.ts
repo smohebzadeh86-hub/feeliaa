@@ -60,4 +60,3 @@ export async function testConnection(): Promise<boolean> {
 // یادداشتِ همراهش) — چون MySQL برخلافِ Postgres از CTEِ نویسنده (INSERT درونِ WITH)
 // پشتیبانی نمی‌کند؛ آن الگو با pool.getConnection()/beginTransaction بازنویسی شده.
 export { pool };
-export default pool;

@@ -5,7 +5,7 @@ import { query } from '../../../db/connection.js';
 import { generateCaseFile } from './generateCaseFile.js';
 import { caseFileRepo, llmProvider } from '../composition.js';
 import { CaseFileGenerationError } from '../domain/errors.js';
-import { createNotification } from '../../notifications/notify.js';
+import { createNotification } from '../../notifications/index.js';
 
 // ⭐ پی‌ریزی برایِ مراجعینِ فعال (تصمیمِ مالک 2026-09-23: «الان نه ولی پی‌ریزی انجام بشه»):
 // امروز تولیدِ خودکار فقط برایِ مراجعِ غیرفعال است (همان رفتارِ قبلی). روشن‌کردنِ آن برایِ فعال‌ها

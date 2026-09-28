@@ -6,18 +6,15 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../../db/connection.js';
-import { archiveAudioFileForAdmin } from '../transcription/archive/archiveWrite.js';
-import { treatmentUnits } from '../treatment-unit/index.js';
 import {
-  uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens,
-  buildTextFromAsyncTokens, deleteTranscription, deleteFile,
-  lowConfidenceRatio, markedTextFromTokens, lowConfidenceWarnRatio,
-} from '../transcription/soniox/restClient.js';
+  archiveAudioFileForAdmin, uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens, buildTextFromAsyncTokens, deleteTranscription, deleteFile, lowConfidenceRatio, markedTextFromTokens, lowConfidenceWarnRatio,
+} from '../transcription/index.js';
+import { treatmentUnits } from '../treatment-unit/index.js';
 import { probeMedia, normalizeAudio } from './media.js';
 import { measureAudioQuality } from './quality.js';
 import { uploadDir, removeUploadDir } from './uploadStore.js';
 import { stepJob, giveUpJob, uploadCaseFileEnabled, uploadCaseFileAllowed, type AudioJob, type JobDeps } from './jobMachine.js';
-import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
+import { maybeAutoGenerateCaseFile } from '../case-file/index.js';
 import { deleteSonioxRefs } from './sonioxRefs.js';
 import { sqlJobStore, rowToJob } from './jobStore.sql.js';
 import { quotaWaitMsForJob } from './quota.js';

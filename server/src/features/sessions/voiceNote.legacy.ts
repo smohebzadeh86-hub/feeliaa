@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
 import { query } from '../../db/connection.js';
 import { getOwnedSession } from '../../db/ownership.js';
-import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
+import { maybeAutoGenerateCaseFile } from '../case-file/index.js';
 // ⭐ پردازش صدا در background — با API واقعیِ async (stt-async-v5)، نه وانمودِ
 // زنده‌بودن رویِ موتورِ realtime (که طبقِ docsِ Soniox دقتِ تشخیصِ گوینده‌ی پایین‌تری داره)
 // ⭐ باگِ واقعیِ کشف‌شده (2026-09-18): برایِ جلسه‌ی دستی/آرشیو، auto-generate رویِ لحظه‌ی
@@ -23,7 +23,7 @@ async function processVoiceNoteInBackground(
     const sonioxKey = process.env.SONIOX_API_KEY;
     if (!sonioxKey) return;
 
-    const { transcribeFileAsync } = await import('../transcription/soniox/restClient.js');
+    const { transcribeFileAsync } = await import('../transcription/index.js');
 
     console.log('[voice-note] transcribing via async API, size:', buffer.length);
     const text = await transcribeFileAsync(buffer, `${sessionId}-note.webm`, `feelia:${sessionId}:note`, { sessionContext: false });

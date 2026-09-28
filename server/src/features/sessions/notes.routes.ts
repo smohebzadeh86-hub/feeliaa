@@ -2,7 +2,7 @@
 import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
 import { getOwnedSession } from '../../db/ownership.js';
-import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
+import { maybeAutoGenerateCaseFile } from '../case-file/index.js';
 import { insertNote, getNoteRow, isNoteOwned, deleteNote } from './sessions.repository.js';
 
 export async function sessionNotesRoutes(app: FastifyInstance) {

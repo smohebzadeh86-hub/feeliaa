@@ -2,10 +2,9 @@
 // pluginِ فرزندِ sessionRoutes (گاردِ requireAuth از آن به ارث می‌رسد).
 import { FastifyInstance } from 'fastify';
 import { getOwnedSession } from '../../db/ownership.js';
-import { enqueueBatch, processBatchQueue } from '../transcription/batch/processQueue.js';
-import { pendingAudioFor, validateAudioBuffer, type BatchPurpose } from '../transcription/batch/queueFiles.js';
-import { getResolveJob, startResolveSpeakers } from '../transcription/speakerResolve.js';
-import { listSessionAudio } from '../transcription/archive/listing.js';
+import {
+  enqueueBatch, processBatchQueue, pendingAudioFor, validateAudioBuffer, type BatchPurpose, getResolveJob, startResolveSpeakers, listSessionAudio,
+} from '../transcription/index.js';
 import { logEvent } from '../../obs/eventLog.js';
 
 export async function sessionBatchRoutes(app: FastifyInstance) {

@@ -1,6 +1,6 @@
 // «چه اتفاقی افتاد؟» — تشخیصِ یک جلسه از داده‌یِ موجود (ردیفِ جلسه، صدایِ kind='session'، صفِ پردازش، رویدادهایِ
 // obs و UI). تابعِ خالص: بدونِ DB/فایل. متنِ بالینی برگردانده نمی‌شود — فقط شمارش/طول (LAW-001).
-import type { SessionAudioRow } from '../transcription/archive/store.js';
+import type { SessionAudioRow } from '../transcription/index.js';
 
 export interface DiagnosisInput {
   s: any;

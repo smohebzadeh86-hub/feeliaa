@@ -8,7 +8,7 @@
 import https from 'node:https';
 import { randomBytes } from 'node:crypto';
 import { createReadStream, statSync } from 'node:fs';
-import { SESSION_TRANSCRIPTION_CONTEXT } from '../sessionContext.js';
+import { SESSION_TRANSCRIPTION_CONTEXT } from '../../../shared/sessionSttContext.js';
 import { formatSignTime, signMarker, sortedSigns, type SignMark } from '../signMarkers.js';
 import { SONIOX_API_BASE as API_BASE, createProxyAgent as proxyAgent } from './config.js';
 

@@ -5,7 +5,7 @@ import { requireAuth } from '../../auth/guard.js';
 import { getOwnedClient } from '../../db/ownership.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
-import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/purge.js';
+import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/index.js';
 import {
   listClientsWithStats, clearRecordingConsent, listRecoveredSessions, clientCodeExists, insertClient, getClientRow,
   listClientSessions, updateClientAlias, updateClientStatus, setClientPinned, updateClientCategory, countClientCascade,

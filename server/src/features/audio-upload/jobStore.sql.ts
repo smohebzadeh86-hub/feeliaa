@@ -2,7 +2,7 @@
 // ثبتِ متن و شکستِ job هر کدام یک تراکنش‌اند (اعلان داخلِ همان تراکنش — فقط وقتی رویداد واقعاً commit شد).
 import { query, pool } from '../../db/connection.js';
 import { logEvent } from '../../obs/eventLog.js';
-import { createNotification } from '../notifications/notify.js';
+import { createNotification } from '../notifications/index.js';
 import { enqueueFinalTranscript, appendUploadForPolish } from '../final-transcript/index.js';
 import { parseAudioQuality } from './quality.js';
 import type { AudioJob, JobPatch, JobStore, CaseFileJobStatus, SourcePart } from './jobMachine.js';

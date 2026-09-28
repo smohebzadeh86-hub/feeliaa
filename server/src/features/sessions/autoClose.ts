@@ -6,7 +6,7 @@
 import { query } from '../../db/connection.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
-import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
+import { maybeAutoGenerateCaseFile } from '../case-file/index.js';
 import { enqueueFinalTranscript } from '../final-transcript/index.js';
 
 export const AUTO_CLOSE_IDLE_SECONDS = Number(process.env.SESSION_AUTO_CLOSE_IDLE_SECONDS || 2 * 60 * 60);

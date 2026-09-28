@@ -2,16 +2,11 @@
 // تمامِ وضعیت در DB، lease + heartbeat، آزادسازیِ leaseها در startup (LAW-013: تک‌پروسه).
 import { query, pool } from '../../db/connection.js';
 import { logEvent } from '../../obs/eventLog.js';
-import { createNotification } from '../notifications/notify.js';
+import { createNotification } from '../notifications/index.js';
 import { treatmentUnits } from '../treatment-unit/index.js';
-import { getFullSessionAudio } from '../transcription/archive/fullAudio.js';
-import { listSessionAudio, deriveSessionStatus } from '../transcription/archive/listing.js';
-import { pendingAudiosFor } from '../transcription/batch/queueFiles.js';
 import {
-  uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens,
-  markedTextFromTokens, deleteTranscription, deleteFile,
-} from '../transcription/soniox/restClient.js';
-import type { SignMark } from '../transcription/signMarkers.js';
+  getFullSessionAudio, listSessionAudio, deriveSessionStatus, pendingAudiosFor, uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens, markedTextFromTokens, deleteTranscription, deleteFile, type SignMark,
+} from '../transcription/index.js';
 import {
   stepFinalTranscript, giveUp, DEFAULT_FT_CONFIG,
   type FtDeps, type FtJob, type FtPatch, type FtStore, type AudioState,

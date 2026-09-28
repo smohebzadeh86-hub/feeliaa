@@ -13,7 +13,7 @@ import { clientRoutes } from './features/clients/clients.routes.js';
 import { sessionRoutes } from './features/sessions/sessions.routes.js';
 import { sttRoutes } from './features/transcription/stt.routes.js';
 import { clientConfigRoutes } from './features/client-config/clientConfig.routes.js';
-import { transcriptionRoutes } from './features/legacy-ws/transcription.js';
+import { transcriptionRoutes } from './features/legacy-ws/transcription.routes.js';
 import { caseFileRoutes } from './features/case-file/api/caseFile.routes.js';
 import { treatmentUnitRoutes } from './features/treatment-unit/index.js';
 import { obsRoutes } from './obs/obs.routes.js';

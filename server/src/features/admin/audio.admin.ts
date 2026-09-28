@@ -2,11 +2,9 @@
 // پخش فقط از همین endpointها با stream (LAW-005). pluginِ فرزندِ adminRoutes (requireAdmin).
 import { FastifyInstance } from 'fastify';
 import { statSync } from 'node:fs';
-import { listSessionAudio, getSessionAudioRow, deriveSessionStatus, checkSeqContiguous } from '../transcription/archive/listing.js';
-import { getFullSessionAudio } from '../transcription/archive/fullAudio.js';
-import { deleteSessionAudioDirs } from '../transcription/archive/sweep.js';
-import { SESSION_AUDIO_RETENTION_MS } from '../transcription/archive/store.js';
-import { pendingAudiosFor } from '../transcription/batch/queueFiles.js';
+import {
+  listSessionAudio, getSessionAudioRow, deriveSessionStatus, checkSeqContiguous, getFullSessionAudio, deleteSessionAudioDirs, SESSION_AUDIO_RETENTION_MS, pendingAudiosFor,
+} from '../transcription/index.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
 import { sendFileWithRange } from '../../shared/httpRange.js';

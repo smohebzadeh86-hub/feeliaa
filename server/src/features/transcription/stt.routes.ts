@@ -15,7 +15,7 @@ import {
   TempKeyError,
   mintTemporaryKey,
 } from './soniox/tempKey.js';
-import { SESSION_TRANSCRIPTION_CONTEXT } from './sessionContext.js';
+import { SESSION_TRANSCRIPTION_CONTEXT } from '../../shared/sessionSttContext.js';
 import { treatmentUnits } from '../treatment-unit/index.js';
 import { createRateLimiter } from '../../shared/rateLimit.js';
 

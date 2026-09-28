@@ -13,11 +13,6 @@ export function ensureDir() {
   if (!existsSync(QUEUE_DIR)) mkdirSync(QUEUE_DIR, { recursive: true });
 }
 
-export function queueDir(): string {
-  ensureDir();
-  return QUEUE_DIR;
-}
-
 // چهار هدفِ جدا:
 //   'transcript' → صوتِ fallback جلسه (realtime واقعاً شکست خورده)، رونویسی و وارد
 //                  sessions.transcript می‌شود (merge نسخه‌ای)، بعد آرشیو می‌شود. فقط

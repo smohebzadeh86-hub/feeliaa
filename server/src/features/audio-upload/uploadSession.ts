@@ -1,7 +1,7 @@
 // ساختِ اتمیکِ «جلسه + job + بستنِ آپلود» — یک تراکنش با FOR UPDATE رویِ ردیف‌هایِ آپلود و شماره‌ی جلسه (رفعِ M7:
 // تداخلِ شماره/deadlock ⇒ کلِ تراکنش دوباره). همان SQLِ قبلیِ uploads.routes (تک‌فایلی و چندبخشی)، بدونِ تغییر.
 import { pool } from '../../db/connection.js';
-import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../sessions/sessionNumber.js';
+import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../sessions/index.js';
 
 // آپلودِ تک‌فایلی: 'closed' اگر آپلود دیگر در حالِ آپلود نیست (هم‌زمان بسته شد).
 export async function createSessionAndJobForUpload(

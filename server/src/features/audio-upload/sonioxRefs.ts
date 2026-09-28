@@ -1,7 +1,7 @@
 // شناسه‌هایِ Soniox (فایل/transcription) که jobهایِ آپلود نگه می‌دارند — جمع‌آوری پیش از حذفِ جلسه‌ها و پاک‌کردن
 // رویِ Soniox بعد از حذفِ موفقِ DB (session-media/purge)؛ و پاک‌سازیِ منابعِ jobی که وسطِ کار حذف شد (worker).
 import { query } from '../../db/connection.js';
-import { deleteTranscription, deleteFile } from '../transcription/soniox/restClient.js';
+import { deleteTranscription, deleteFile } from '../transcription/index.js';
 
 // ————— رفعِ M3: حذفِ جلسه/مراجع/تراپیست وسطِ پردازش ⇒ پاک‌سازیِ منابعِ Soniox —————
 // cascadeِ DB ردیفِ job (و شناسه‌هایِ Soniox) را پاک می‌کند؛ بدونِ این، صدا/متنِ بالینی رویِ Soniox می‌ماند و

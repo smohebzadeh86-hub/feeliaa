@@ -265,7 +265,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
     // پرونده نمی‌رسید (هیچ triggerی نبود). همان سیاستِ مرکزیِ auto-generate صدا زده می‌شود.
     if (appliedLate) {
       // triggerCaseFileForSession خودش فقط جلسه‌ی completed را trigger می‌کند.
-      const { triggerCaseFileForSession } = await import('../../case-file/application/autoTrigger.js');
+      const { triggerCaseFileForSession } = await import('../../case-file/index.js');
       void triggerCaseFileForSession(sessionId, purpose === 'late-transcript' ? 'late-transcript' : 'batch-after-complete');
     }
   } catch (err) {

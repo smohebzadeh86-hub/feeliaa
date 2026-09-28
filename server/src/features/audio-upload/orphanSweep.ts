@@ -1,6 +1,6 @@
 import { query } from '../../db/connection.js';
 import { logEvent } from '../../obs/eventLog.js';
-import { deleteTranscription, deleteFile, listSonioxFiles, listSonioxTranscriptions } from '../transcription/soniox/restClient.js';
+import { deleteTranscription, deleteFile, listSonioxFiles, listSonioxTranscriptions } from '../transcription/index.js';
 
 // ————— رفعِ F3: پاک‌سازیِ فایل/transcriptionِ یتیمِ Feelia رویِ Soniox —————
 // فقط منابعی که قطعاً مالِ Feelia‌اند (نامِ فایلِ feelia-* یا نامِ UUIDِ قدیمیِ صفِ batch؛

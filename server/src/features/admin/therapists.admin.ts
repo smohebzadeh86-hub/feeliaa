@@ -1,7 +1,7 @@
 // ادمین: آمار، تراپیست‌ها (فهرست/فعال‌سازی/نقشِ ادمین/حذف)، مراجعینِ هر تراپیست و جلساتِ هر مراجع، حذفِ مراجع.
 // pluginِ فرزندِ adminRoutes (requireAdmin).
 import { FastifyInstance } from 'fastify';
-import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/purge.js';
+import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/index.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
 import {

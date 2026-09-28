@@ -11,12 +11,12 @@ import {
   normalizeStartTime,
   nowInTehran,
 } from './sessionDate.js';
-import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/purge.js';
+import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/index.js';
 import { logEvent } from '../../obs/eventLog.js';
-import { hasStoredConsent, recordClientConsent } from '../clients/consent.js';
+import { hasStoredConsent, recordClientConsent } from '../clients/index.js';
 // خودکارسازیِ تولیدِ پرونده بعدِ پایانِ کاملِ جلسه (فازِ ۲ِ Module 08) — سیاستِ مرکزی حالا در
 // features/case-file/application/autoTrigger.ts است (jobِ آپلودِ صدا هم از همان استفاده می‌کند).
-import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
+import { maybeAutoGenerateCaseFile } from '../case-file/index.js';
 import { recordAudit } from '../../obs/audit.js';
 import { enqueueFinalTranscript } from '../final-transcript/index.js';
 import { treatmentUnits, TreatmentUnitValidationError } from '../treatment-unit/index.js';

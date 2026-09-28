@@ -30,7 +30,7 @@ export function deleteSessionAudioDirs(sessionIds: string[]): void {
   void sweepAudioWithoutSession().catch(() => {});
   // فایل‌هایِ آپلودِ صدا (data/uploads/<uploadId>، migration 023) — ردیف‌هایِ audio_uploads با
   // cascade حذف شده‌اند؛ هر پوشه‌ای که دیگر ردیفِ متناظر ندارد همین‌جا پاک می‌شود (هر ۴ مسیرِ حذف).
-  void import('../../audio-upload/uploadStore.js')
+  void import('../../audio-upload/index.js')
     .then((m) => m.sweepOrphanUploadDirs())
     .catch(() => {});
 }

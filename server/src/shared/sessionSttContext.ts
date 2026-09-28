@@ -1,3 +1,4 @@
+// (پیش‌تر features/transcription/sessionContext.ts — به shared آمد تا treatment-unit بدونِ چرخه از آن بخواند)
 // contextِ ثابتِ Soniox برایِ رونویسیِ جلسه (2026-09-26) — مشترک بینِ realtime (stt_defaults) و async.
 // طبقِ docsِ Soniox («Improving speaker diarization»)، اطلاعاتِ گوینده‌ها در context.general به مدل
 // کمک می‌کند صداها را قابل‌اعتمادتر جدا کند. تعدادِ دقیقِ حاضرین را از تراپیست نمی‌گیریم (تصمیمِ

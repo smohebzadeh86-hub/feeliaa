@@ -20,7 +20,7 @@ import { randomUUID, createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../auth/guard.js';
 import { getOwnedClient, getOwnedSession } from '../../db/ownership.js';
-import { normalizeSessionDate, nowInTehran, INVALID_DATE_ERROR } from '../sessions/sessionDate.js';
+import { normalizeSessionDate, nowInTehran, INVALID_DATE_ERROR } from '../sessions/index.js';
 import { logEvent } from '../../obs/eventLog.js';
 import {
   CHUNK_SIZE, MAX_UPLOAD_BYTES, MAX_ACTIVE_UPLOADS_PER_THERAPIST, MAX_PARTS_PER_SESSION,
@@ -32,7 +32,7 @@ import { parseSourceParts } from './jobStore.sql.js';
 import { parseAudioQuality } from './quality.js';
 import { uploadCaseFileEnabled, uploadCaseFileAllowed } from './jobMachine.js';
 import { existsSync } from 'node:fs';
-import { hasStoredConsent, recordClientConsent } from '../clients/consent.js';
+import { hasStoredConsent, recordClientConsent } from '../clients/index.js';
 import { withUploadLock as withLock } from './uploadLocks.js';
 import { finalizeGroup } from './groupFinalize.js';
 import { createSessionAndJobForUpload } from './uploadSession.js';

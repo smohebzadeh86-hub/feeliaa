@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { logEvent } from '../../obs/eventLog.js';
-import { nowInTehran } from '../sessions/sessionDate.js';
+import { nowInTehran } from '../sessions/index.js';
 import { assembledPath, removeUploadDir } from './uploadStore.js';
 import { MAX_DURATION_MS, extensionOf } from './media.js';
 import { wakeAudioJobWorker } from './worker.js';

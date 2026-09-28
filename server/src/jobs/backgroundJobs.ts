@@ -3,16 +3,12 @@
 // (تنها awaitِ بدونِ try) مثلِ قبل به caller می‌رسد و سرور بالا نمی‌آید.
 import { startObsDrainLoop, logEvent } from '../obs/eventLog.js';
 import { sweepOldObsEvents } from '../obs/sweep.js';
-import { sweepOldBatchFiles, BATCH_SWEEP_INTERVAL_MS } from '../features/transcription/batch/sweep.js';
-import { retryQueuedBatches } from '../features/transcription/batch/processQueue.js';
-import { sweepOldSessionAudio } from '../features/transcription/archive/sweep.js';
-import { sweepOldResolveJobs } from '../features/transcription/speakerResolve.js';
-import { tryFinalizeGroup } from '../features/audio-upload/groupFinalize.js';
-import { autoCloseAbandonedSessions, AUTO_CLOSE_INTERVAL_MS } from '../features/sessions/autoClose.js';
-import { startAudioJobWorker } from '../features/audio-upload/worker.js';
-import { sweepSonioxOrphans } from '../features/audio-upload/orphanSweep.js';
-import { sweepStaleUploads } from '../features/audio-upload/uploadStore.js';
-import { sweepOldNotifications, notifyAdmins } from '../features/notifications/notify.js';
+import {
+  sweepOldBatchFiles, BATCH_SWEEP_INTERVAL_MS, retryQueuedBatches, sweepOldSessionAudio, sweepOldResolveJobs,
+} from '../features/transcription/index.js';
+import { tryFinalizeGroup, startAudioJobWorker, sweepSonioxOrphans, sweepStaleUploads } from '../features/audio-upload/index.js';
+import { autoCloseAbandonedSessions, AUTO_CLOSE_INTERVAL_MS } from '../features/sessions/index.js';
+import { sweepOldNotifications, notifyAdmins } from '../features/notifications/index.js';
 import { startFinalTranscriptWorker } from '../features/final-transcript/index.js';
 import { describeLlmConfig } from '../llm/config.js';
 import { onLlmHealth } from '../llm/jsonCall.js';
