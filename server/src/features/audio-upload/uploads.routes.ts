@@ -1,4 +1,4 @@
-// API ِ آپلودِ فایلِ صوتیِ جلسه + وضعیتِ jobها + اعلان‌ها (migration 023).
+// API ِ آپلودِ فایلِ صوتیِ جلسه + وضعیتِ jobها (migration 023). اعلان‌ها: features/notifications.
 //
 // POST   /api/uploads                     شروع/ادامه (dedupe با fingerprint)
 // GET    /api/uploads/:id                 تکه‌هایِ دریافت‌شده (برایِ ادامه بعد از قطعی/رفرش)
@@ -14,7 +14,6 @@
 // GET    /api/audio-jobs/:id
 // POST   /api/audio-jobs/:id/retry        تلاشِ دوباره بدونِ آپلودِ دوباره
 // GET    /api/sessions/:id/audio-job      آخرین jobِ یک جلسه
-// GET    /api/notifications               + POST /api/notifications/read
 //
 // مالکیت (LAW-004): همه با therapist_id؛ منبعِ غیرمالک ⇒ 404.
 import { randomUUID, createHash } from 'node:crypto';
@@ -22,7 +21,7 @@ import type { FastifyInstance } from 'fastify';
 import { query, pool } from '../../db/connection.js';
 import { requireAuth } from '../../auth/guard.js';
 import { getOwnedClient, getOwnedSession } from '../../db/ownership.js';
-import { normalizeSessionDate, nowInTehran, INVALID_DATE_ERROR } from '../../http/sessionDate.js';
+import { normalizeSessionDate, nowInTehran, INVALID_DATE_ERROR } from '../sessions/sessionDate.js';
 import { logEvent } from '../../obs/eventLog.js';
 import {
   CHUNK_SIZE, MAX_UPLOAD_BYTES, MAX_ACTIVE_UPLOADS_PER_THERAPIST, MAX_PARTS_PER_SESSION,
@@ -33,8 +32,8 @@ import { wakeAudioJobWorker, parseSourceParts } from './jobRunner.js';
 import { parseAudioQuality } from './quality.js';
 import { uploadCaseFileEnabled, uploadCaseFileAllowed } from './jobMachine.js';
 import { existsSync } from 'node:fs';
-import { hasStoredConsent, recordClientConsent } from '../../http/clientConsent.js';
-import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../../http/sessions.js';
+import { hasStoredConsent, recordClientConsent } from '../clients/consent.js';
+import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../sessions/sessions.routes.js';
 import { createKeyedLock } from '../../shared/keyedLock.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -267,13 +266,16 @@ export async function tryFinalizeGroup(groupId: string, therapistId: string): Pr
   return g.kind === 'created' || g.kind === 'already';
 }
 
-export async function audioUploadRoutes(app: FastifyInstance) {
-  app.addHook('preHandler', requireAuth);
-
-  // تکه‌ها بایتِ خام‌اند — parser فقط داخلِ همین plugin (encapsulated) ثبت می‌شود.
+// تکه‌ها بایتِ خام‌اند — parser فقط در scopeِ encapsulatedِ آپلود ثبت می‌شود (app.ts: همان scope که اعلان‌ها هم
+// پیش از جداشدن در آن بودند).
+export function registerUploadChunkParser(app: FastifyInstance): void {
   app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer', bodyLimit: CHUNK_SIZE + 1024 }, (_req, body, done) => {
     done(null, body);
   });
+}
+
+export async function audioUploadRoutes(app: FastifyInstance) {
+  app.addHook('preHandler', requireAuth);
 
   app.post('/api/uploads', async (request, reply) => {
     const b = (request.body || {}) as {
@@ -690,36 +692,5 @@ export async function audioUploadRoutes(app: FastifyInstance) {
     if (!owned) { reply.code(404); return { error: 'جلسه یافت نشد' }; }
     const r = await query(`${JOB_SELECT} WHERE j.session_id = ? ORDER BY j.created_at DESC LIMIT 1`, [id]);
     return { job: r.rows[0] ? jobView(r.rows[0]) : null };
-  });
-
-  // ————— اعلان‌ها —————
-  app.get('/api/notifications', async (request) => {
-    const r = await query(
-      `SELECT n.id, n.kind, n.client_id, n.session_id, n.job_id, n.error_code, n.created_at, n.read_at,
-              c.code AS client_code, c.alias AS client_alias, s.session_num
-       FROM notifications n
-       LEFT JOIN clients c ON c.id = n.client_id
-       LEFT JOIN sessions s ON s.id = n.session_id
-       WHERE n.therapist_id = ? ORDER BY n.created_at DESC LIMIT 30`,
-      [request.therapistId]
-    );
-    const unread = await query('SELECT COUNT(*) AS n FROM notifications WHERE therapist_id = ? AND read_at IS NULL', [request.therapistId]);
-    return { notifications: r.rows, unread: Number(unread.rows[0]?.n || 0) };
-  });
-
-  app.post('/api/notifications/read', async (request) => {
-    const b = (request.body || {}) as { ids?: string[]; all?: boolean };
-    if (b.all) {
-      await query('UPDATE notifications SET read_at = NOW() WHERE therapist_id = ? AND read_at IS NULL', [request.therapistId]);
-    } else if (Array.isArray(b.ids) && b.ids.length) {
-      const ids = b.ids.filter((x) => UUID_RE.test(String(x))).slice(0, 100);
-      if (ids.length) {
-        await query(
-          `UPDATE notifications SET read_at = NOW() WHERE therapist_id = ? AND read_at IS NULL AND id IN (${ids.map(() => '?').join(',')})`,
-          [request.therapistId, ...ids]
-        );
-      }
-    }
-    return { ok: true };
   });
 }

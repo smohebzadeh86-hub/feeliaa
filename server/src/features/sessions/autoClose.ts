@@ -3,11 +3,11 @@
 // ادمین نمی‌فهمید تمام شده یا نه، پرونده هرگز trigger نمی‌شد و preflightِ deploy همیشه «جلسه‌ی زنده» می‌دید.
 // این worker جلسه‌ای را می‌بندد که در هیچ‌کدام از سه سیگنال فعالیتی نداشته: ذخیره‌ی خودِ جلسه (updated_at —
 // autosaveِ متن/مدت)، رسیدنِ صدا (session_audio) و رویدادِ obs (rt.*، mint، …). جلسه‌ی خودکاربسته قابلِ ادامه است.
-import { query } from '../db/connection.js';
-import { logEvent } from '../obs/eventLog.js';
-import { recordAudit } from '../obs/audit.js';
-import { maybeAutoGenerateCaseFile } from '../features/case-file/application/autoTrigger.js';
-import { enqueueFinalTranscript } from '../features/final-transcript/index.js';
+import { query } from '../../db/connection.js';
+import { logEvent } from '../../obs/eventLog.js';
+import { recordAudit } from '../../obs/audit.js';
+import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
+import { enqueueFinalTranscript } from '../final-transcript/index.js';
 
 export const AUTO_CLOSE_IDLE_SECONDS = Number(process.env.SESSION_AUTO_CLOSE_IDLE_SECONDS || 2 * 60 * 60);
 export const AUTO_CLOSE_INTERVAL_MS = 15 * 60 * 1000;

@@ -8,10 +8,10 @@
 import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
 import websocket from '@fastify/websocket';
-import { query } from '../db/connection.js';
-import { getOwnedSession } from '../db/ownership.js';
-import { requireAuth } from '../auth/guard.js';
-import { SonioxEngine } from '../stt/soniox.js';
+import { query } from '../../db/connection.js';
+import { getOwnedSession } from '../../db/ownership.js';
+import { requireAuth } from '../../auth/guard.js';
+import { SonioxEngine } from './soniox.js';
 import {
   P1_PARAMS,
   getOrCreateRecord,

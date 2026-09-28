@@ -1,13 +1,13 @@
 // ثبت‌نام / ورود / خروج تراپیست — شناسه‌ی اصلی: شماره‌ی موبایل (ایمیل اختیاری، برای آینده)
 import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
-import { query } from '../db/connection.js';
-import { hashPassword, verifyPassword } from '../auth/password.js';
-import { createSession, destroySession } from '../auth/session.js';
-import { SESSION_COOKIE, SESSION_COOKIE_MAX_AGE } from '../auth/guard.js';
-import { logEvent } from '../obs/eventLog.js';
-import { recordAudit } from '../obs/audit.js';
-import { toLatinDigits } from '../shared/persianDigits.js';
+import { query } from '../../db/connection.js';
+import { hashPassword, verifyPassword } from '../../auth/password.js';
+import { createSession, destroySession } from '../../auth/session.js';
+import { SESSION_COOKIE, SESSION_COOKIE_MAX_AGE } from '../../auth/guard.js';
+import { logEvent } from '../../obs/eventLog.js';
+import { recordAudit } from '../../obs/audit.js';
+import { toLatinDigits } from '../../shared/persianDigits.js';
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

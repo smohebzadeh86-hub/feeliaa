@@ -1,9 +1,9 @@
 // CRUD برای جلسات — همیشه از مسیر مراجعِ متعلق به تراپیستِ واردشده
 import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
-import { query, pool } from '../db/connection.js';
-import { requireAuth } from '../auth/guard.js';
-import { getOwnedClient, getOwnedSession } from '../db/ownership.js';
+import { query, pool } from '../../db/connection.js';
+import { requireAuth } from '../../auth/guard.js';
+import { getOwnedClient, getOwnedSession } from '../../db/ownership.js';
 import {
   INVALID_DATE_ERROR,
   INVALID_TIME_ERROR,
@@ -16,18 +16,18 @@ import {
   pendingAudioFor,
   processBatchQueue,
   validateAudioBuffer,
-} from '../stt/batchqueue.js';
-import { getResolveJob, startResolveSpeakers } from '../stt/speakerResolve.js';
-import { listSessionAudio, deleteSessionAudioDirs } from '../stt/sessionAudioArchive.js';
-import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
-import { logEvent } from '../obs/eventLog.js';
-import { hasStoredConsent, recordClientConsent } from './clientConsent.js';
+} from '../transcription/batch/batchQueue.js';
+import { getResolveJob, startResolveSpeakers } from '../transcription/speakerResolve.js';
+import { listSessionAudio, deleteSessionAudioDirs } from '../transcription/archive/sessionAudioArchive.js';
+import { collectUploadSonioxRefs, releaseSonioxRefs } from '../audio-upload/jobRunner.js';
+import { logEvent } from '../../obs/eventLog.js';
+import { hasStoredConsent, recordClientConsent } from '../clients/consent.js';
 // خودکارسازیِ تولیدِ پرونده بعدِ پایانِ کاملِ جلسه (فازِ ۲ِ Module 08) — سیاستِ مرکزی حالا در
 // features/case-file/application/autoTrigger.ts است (jobِ آپلودِ صدا هم از همان استفاده می‌کند).
-import { maybeAutoGenerateCaseFile } from '../features/case-file/application/autoTrigger.js';
-import { recordAudit } from '../obs/audit.js';
-import { enqueueFinalTranscript } from '../features/final-transcript/index.js';
-import { treatmentUnits, TreatmentUnitValidationError } from '../features/treatment-unit/index.js';
+import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
+import { recordAudit } from '../../obs/audit.js';
+import { enqueueFinalTranscript } from '../final-transcript/index.js';
+import { treatmentUnits, TreatmentUnitValidationError } from '../treatment-unit/index.js';
 
 // سقفِ یادداشتِ «پیش از جلسه» (configuration-catalog)
 const PRE_NOTE_MAX_CHARS = Number(process.env.PRE_NOTE_MAX_CHARS) > 0 ? Number(process.env.PRE_NOTE_MAX_CHARS) : 2000;
@@ -49,7 +49,7 @@ async function processVoiceNoteInBackground(
     const sonioxKey = process.env.SONIOX_API_KEY;
     if (!sonioxKey) return;
 
-    const { transcribeFileAsync } = await import('../stt/asyncTranscribe.js');
+    const { transcribeFileAsync } = await import('../transcription/soniox/restClient.js');
 
     console.log('[voice-note] transcribing via async API, size:', buffer.length);
     const text = await transcribeFileAsync(buffer, `${sessionId}-note.webm`, `feelia:${sessionId}:note`, { sessionContext: false });
@@ -626,7 +626,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       q?.purpose === 'note' ? 'note' : q?.purpose === 'archive' ? 'archive' :
       q?.purpose === 'note-archive' ? 'note-archive' :
       q?.purpose === 'late-transcript' ? 'late-transcript' : 'transcript'
-    ) as import('../stt/batchqueue.js').BatchPurpose;
+    ) as import('../transcription/batch/batchQueue.js').BatchPurpose;
     // seq: ترتیبِ واقعیِ ضبطِ این سگمنت (از کلاینت) — برایِ اسمِ فایل و مرتب‌سازیِ درست،
     // چون آپلودها ممکنه به ترتیبِ رسیدن با ترتیبِ ضبط فرق کنن.
     const seqRaw = Number(q?.seq);
@@ -712,7 +712,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     const purposeRaw = (request.query as any)?.purpose;
     const purpose = (
       purposeRaw === 'note' ? 'note' : purposeRaw === 'late-transcript' ? 'late-transcript' : 'transcript'
-    ) as import('../stt/batchqueue.js').BatchPurpose;
+    ) as import('../transcription/batch/batchQueue.js').BatchPurpose;
     const owned = await getOwnedSession(id, request.therapistId!);
     if (!owned) {
       reply.code(404);

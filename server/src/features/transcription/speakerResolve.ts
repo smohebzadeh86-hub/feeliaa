@@ -10,12 +10,12 @@
 import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { query } from '../db/connection.js';
-import { getFullSessionAudio } from './sessionAudioArchive.js';
-import { transcribeFileAsync } from './asyncTranscribe.js';
-import { treatmentUnits } from '../features/treatment-unit/index.js';
+import { query } from '../../db/connection.js';
+import { getFullSessionAudio } from './archive/sessionAudioArchive.js';
+import { transcribeFileAsync } from './soniox/restClient.js';
+import { treatmentUnits } from '../treatment-unit/index.js';
 import type { SignMark } from './signMarkers.js';
-import { FFMPEG_BIN } from '../shared/ffmpeg.js';
+import { FFMPEG_BIN } from '../../shared/ffmpeg.js';
 
 function run(cmd: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {

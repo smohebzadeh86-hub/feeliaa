@@ -5,9 +5,9 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { query, pool } from '../db/connection.js';
-import { logEvent } from '../obs/eventLog.js';
-import { createKeyedLock } from '../shared/keyedLock.js';
+import { query, pool } from '../../../db/connection.js';
+import { logEvent } from '../../../obs/eventLog.js';
+import { createKeyedLock } from '../../../shared/keyedLock.js';
 
 export type BatchStatus = 'queued' | 'processing' | 'done' | 'failed';
 
@@ -384,7 +384,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
 
   if (purpose === 'archive' || purpose === 'note-archive') {
     const { readFileSync } = await import('node:fs');
-    const { archiveAudioForAdmin } = await import('./sessionAudioArchive.js');
+    const { archiveAudioForAdmin } = await import('../archive/sessionAudioArchive.js');
     for (const file of files) {
       let buffer: Buffer;
       try { buffer = readFileSync(file); } catch { continue; }
@@ -414,8 +414,8 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
   }
   try {
     const { readFileSync } = await import('node:fs');
-    const { transcribeFileAsync } = await import('./asyncTranscribe.js');
-    const { archiveAudioForAdmin } = await import('./sessionAudioArchive.js');
+    const { transcribeFileAsync } = await import('../soniox/restClient.js');
+    const { archiveAudioForAdmin } = await import('../archive/sessionAudioArchive.js');
     let appliedLate = false;
     // ⭐ (2026-09-26، جلسه‌ی cee2e5d2 در تستِ واقعی): اگر همه‌ی سگمنت‌ها غیرقابلِ‌رونویسی بودند،
     // وضعیت قبلاً 'done' می‌شد — انگار رونویسی موفق بوده. حالا فقط وقتی هیچ سگمنتی اعمال نشده، 'failed'.
@@ -453,7 +453,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       console.log(`[batch] processing session=${sessionId} purpose=${purpose} bytes=${buffer.length} (async API)`);
       let text = '';
       try {
-        const { treatmentUnits } = await import('../features/treatment-unit/index.js');
+        const { treatmentUnits } = await import('../../treatment-unit/index.js');
         const context = purpose === 'note' ? undefined : await treatmentUnits.sessionSttContext(sessionId);
         text = await transcribeFileAsync(buffer, `${sessionId}.webm`, `feelia:${sessionId}:${purpose}`, { sessionContext: purpose !== 'note', context });
       } catch (e) {
@@ -491,7 +491,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
     // پرونده نمی‌رسید (هیچ triggerی نبود). همان سیاستِ مرکزیِ auto-generate صدا زده می‌شود.
     if (appliedLate) {
       // triggerCaseFileForSession خودش فقط جلسه‌ی completed را trigger می‌کند.
-      const { triggerCaseFileForSession } = await import('../features/case-file/application/autoTrigger.js');
+      const { triggerCaseFileForSession } = await import('../../case-file/application/autoTrigger.js');
       void triggerCaseFileForSession(sessionId, purpose === 'late-transcript' ? 'late-transcript' : 'batch-after-complete');
     }
   } catch (err) {
@@ -523,7 +523,7 @@ export async function sweepOldBatchFiles(): Promise<void> {
     ensureDir();
     const now = Date.now();
     const { readFileSync } = await import('node:fs');
-    const { archiveAudioForAdmin } = await import('./sessionAudioArchive.js');
+    const { archiveAudioForAdmin } = await import('../archive/sessionAudioArchive.js');
     for (const f of readdirSync(QUEUE_DIR)) {
       const p = path.join(QUEUE_DIR, f);
       try {

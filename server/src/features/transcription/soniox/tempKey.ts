@@ -10,7 +10,7 @@
 // media-plane (ساعت‌ها استریم) هرگز از VPS عبور نمی‌کند. mint از PROXY_URL
 // (اگر ست باشد) عبور می‌کند تا control-plane هم قابل نجات باشد.
 import https from 'node:https';
-import { SONIOX_API_BASE, createProxyAgent } from '../features/transcription/soniox/config.js';
+import { SONIOX_API_BASE, createProxyAgent } from './config.js';
 
 export const SONIOX_WS_URL =
   process.env.SONIOX_WS_URL || 'wss://stt-rt.soniox.com/transcribe-websocket';

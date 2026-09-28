@@ -38,7 +38,7 @@ export interface P1Record {
   generation: number;
   connectionState: P1ConnectionState;
   // موتور زنده + نسلی که با آن ساخته شده (authority)
-  engine: import('../stt/soniox.js').SonioxEngine | null;
+  engine: import('./soniox.js').SonioxEngine | null;
   engineGeneration: number;
   // --- ordering (chunk identity = (sessionId, seq)، پایدار در طول session) ---
   nextExpected: number; // کوچک‌ترین seq حل‌نشده — فقط به جلو

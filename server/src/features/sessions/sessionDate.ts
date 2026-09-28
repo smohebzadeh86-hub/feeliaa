@@ -3,7 +3,7 @@
 // (`clients.ts`، `admin.ts`) و فرمتِ ثابتِ صفرپُرشده به ترتیبِ زمانی sort می‌شود.
 // ⚠️ الگوریتمِ `gregorianToJalali` عیناً در migration `013_session_date_jalali.sql` تکرار شده — هر تغییر در هر دو.
 
-import { toLatinDigits } from '../shared/persianDigits.js';
+import { toLatinDigits } from '../../shared/persianDigits.js';
 
 export const INVALID_DATE_ERROR = 'تاریخ نامعتبر است (مثال: ۱۴۰۵/۰۶/۲۳)';
 export const INVALID_TIME_ERROR = 'ساعت نامعتبر است (مثال: ۱۰:۳۰)';

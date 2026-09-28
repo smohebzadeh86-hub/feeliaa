@@ -4,7 +4,7 @@
 // ⭐ برای ادمین همیشه null — پنلِ ادمین تلفن/ایمیلِ همه‌ی تراپیست‌ها و صدایِ جلسات را دارد.
 // مستندات: docs/analytics-clarity.md
 import { FastifyInstance } from 'fastify';
-import { requireAuth } from '../auth/guard.js';
+import { requireAuth } from '../../auth/guard.js';
 
 // شناسه‌ی پروژه‌های Clarity حروف کوچک + رقم است؛ هر چیزِ دیگری (فاصله، URL، کوتیشن)
 // یعنی .env اشتباه است و نباید به src اسکریپت در مرورگر برسد.

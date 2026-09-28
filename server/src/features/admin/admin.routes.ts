@@ -2,14 +2,14 @@
 import { FastifyInstance } from 'fastify';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { query } from '../db/connection.js';
-import { requireAdmin } from '../auth/guard.js';
-import { listSessionAudio, getSessionAudioRow, getFullSessionAudio, deleteSessionAudioDirs, deriveSessionStatus, checkSeqContiguous, SESSION_AUDIO_RETENTION_MS } from '../stt/sessionAudioArchive.js';
-import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
-import { pendingAudiosFor } from '../stt/batchqueue.js';
-import { logEvent, obsQueueStats } from '../obs/eventLog.js';
-import { recordAudit } from '../obs/audit.js';
-import { sendFileWithRange } from '../shared/httpRange.js';
+import { query } from '../../db/connection.js';
+import { requireAdmin } from '../../auth/guard.js';
+import { listSessionAudio, getSessionAudioRow, getFullSessionAudio, deleteSessionAudioDirs, deriveSessionStatus, checkSeqContiguous, SESSION_AUDIO_RETENTION_MS } from '../transcription/archive/sessionAudioArchive.js';
+import { collectUploadSonioxRefs, releaseSonioxRefs } from '../audio-upload/jobRunner.js';
+import { pendingAudiosFor } from '../transcription/batch/batchQueue.js';
+import { logEvent, obsQueueStats } from '../../obs/eventLog.js';
+import { recordAudit } from '../../obs/audit.js';
+import { sendFileWithRange } from '../../shared/httpRange.js';
 
 // ————— فیلترهایِ مشترکِ آرشیوِ صدا / یادداشت‌هایِ صوتی (B2/B3، 2026-09-26) —————
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

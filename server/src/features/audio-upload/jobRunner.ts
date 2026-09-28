@@ -8,13 +8,13 @@ import path from 'node:path';
 import { query, pool } from '../../db/connection.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { createNotification } from '../notifications/notify.js';
-import { archiveAudioFileForAdmin } from '../../stt/sessionAudioArchive.js';
+import { archiveAudioFileForAdmin } from '../transcription/archive/sessionAudioArchive.js';
 import { treatmentUnits } from '../treatment-unit/index.js';
 import {
   uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens,
   buildTextFromAsyncTokens, deleteTranscription, deleteFile, listSonioxFiles, listSonioxTranscriptions,
   lowConfidenceRatio, markedTextFromTokens, lowConfidenceWarnRatio,
-} from '../../stt/asyncTranscribe.js';
+} from '../transcription/soniox/restClient.js';
 import { probeMedia, normalizeAudio } from './media.js';
 import { measureAudioQuality, parseAudioQuality } from './quality.js';
 import { uploadDir, removeUploadDir } from './uploadStore.js';

@@ -7,19 +7,20 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { testConnection } from './db/connection.js';
 import { registerAuthContext } from './auth/guard.js';
-import { authRoutes } from './http/auth.js';
-import { adminRoutes } from './http/admin.js';
-import { clientRoutes } from './http/clients.js';
-import { sessionRoutes } from './http/sessions.js';
-import { sttRoutes } from './http/stt.js';
-import { clientConfigRoutes } from './http/clientConfig.js';
-import { transcriptionRoutes } from './ws/transcription.js';
+import { authRoutes } from './features/auth/auth.routes.js';
+import { adminRoutes } from './features/admin/admin.routes.js';
+import { clientRoutes } from './features/clients/clients.routes.js';
+import { sessionRoutes } from './features/sessions/sessions.routes.js';
+import { sttRoutes } from './features/transcription/stt.routes.js';
+import { clientConfigRoutes } from './features/client-config/clientConfig.routes.js';
+import { transcriptionRoutes } from './features/legacy-ws/transcription.js';
 import { caseFileRoutes } from './features/case-file/api/caseFile.routes.js';
 import { treatmentUnitRoutes } from './features/treatment-unit/index.js';
-import { obsRoutes } from './http/obs.js';
+import { obsRoutes } from './obs/obs.routes.js';
 import { registerObsHooks } from './obs/httpHook.js';
 import { flushObsQueue } from './obs/eventLog.js';
-import { audioUploadRoutes } from './features/audio-upload/uploads.routes.js';
+import { audioUploadRoutes, registerUploadChunkParser } from './features/audio-upload/uploads.routes.js';
+import { notificationRoutes } from './features/notifications/notifications.routes.js';
 import { finalTranscriptRoutes } from './features/final-transcript/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -78,7 +79,15 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(caseFileRoutes);
   await app.register(treatmentUnitRoutes);
   await app.register(obsRoutes);
-  await app.register(audioUploadRoutes);
+  // آپلودِ صدا + اعلان‌ها در یک scopeِ encapsulated با parserِ application/octet-stream (تکه‌هایِ خامِ آپلود).
+  // routeهایِ اعلان تا پیش از جداشدن (refactorِ ماژولار) داخلِ pluginِ آپلود بودند و این parser را داشتند؛ برایِ
+  // حفظِ دقیقِ قراردادِ HTTP در همین scope می‌مانند (FINDING در PROJECT_STATUS: octet-stream رویِ
+  // POST /api/notifications/read ⇒ 200ِ بی‌اثر، نه 415).
+  await app.register(async (uploadScope) => {
+    registerUploadChunkParser(uploadScope);
+    await uploadScope.register(audioUploadRoutes);
+    await uploadScope.register(notificationRoutes);
+  });
   await app.register(finalTranscriptRoutes);
 
   // Serve static (فرانت)

@@ -6,11 +6,11 @@ import { createHash, randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { query } from '../db/connection.js';
-import { extForMime, mimeForExt, allQueueFilesFor, queueFilesWithSession, removeAudioFile, runStartMs } from './batchqueue.js';
-import { logEvent } from '../obs/eventLog.js';
-import { createKeyedLock } from '../shared/keyedLock.js';
-import { FFMPEG_BIN } from '../shared/ffmpeg.js';
+import { query } from '../../../db/connection.js';
+import { extForMime, mimeForExt, allQueueFilesFor, queueFilesWithSession, removeAudioFile, runStartMs } from '../batch/batchQueue.js';
+import { logEvent } from '../../../obs/eventLog.js';
+import { createKeyedLock } from '../../../shared/keyedLock.js';
+import { FFMPEG_BIN } from '../../../shared/ffmpeg.js';
 
 const ARCHIVE_DIR = path.join(process.cwd(), 'data', 'session-audio');
 const RETENTION_MS = 14 * 24 * 60 * 60 * 1000; // ۱۴ روز — طبقِ تصمیمِ تیم
@@ -324,7 +324,7 @@ export function deleteSessionAudioDirs(sessionIds: string[]): void {
   void sweepAudioWithoutSession().catch(() => {});
   // فایل‌هایِ آپلودِ صدا (data/uploads/<uploadId>، migration 023) — ردیف‌هایِ audio_uploads با
   // cascade حذف شده‌اند؛ هر پوشه‌ای که دیگر ردیفِ متناظر ندارد همین‌جا پاک می‌شود (هر ۴ مسیرِ حذف).
-  void import('../features/audio-upload/uploadStore.js')
+  void import('../../audio-upload/uploadStore.js')
     .then((m) => m.sweepOrphanUploadDirs())
     .catch(() => {});
 }

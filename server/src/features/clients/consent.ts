@@ -1,9 +1,9 @@
 // رضایتِ ضبط و رونویسی — یک بار برایِ هر مراجع (migration 024، دستورِ مالک 2026-09-24).
 // LAW-009 همچنان برقرار است: هیچ جلسه/آپلودی بدونِ رضایتِ صریح شروع نمی‌شود — فقط رضایتِ صریحِ قبلیِ
 // همان مراجع (ثبت‌شده با زمان) برایِ دفعاتِ بعد معتبر می‌ماند تا وقتی تراپیست لغوش کند.
-import { query } from '../db/connection.js';
-import { logEvent } from '../obs/eventLog.js';
-import { recordAudit } from '../obs/audit.js';
+import { query } from '../../db/connection.js';
+import { logEvent } from '../../obs/eventLog.js';
+import { recordAudit } from '../../obs/audit.js';
 
 export function hasStoredConsent(client: { recording_consent_at?: unknown } | null | undefined): boolean {
   return !!client?.recording_consent_at;

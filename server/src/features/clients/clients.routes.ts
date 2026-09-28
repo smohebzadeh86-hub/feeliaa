@@ -1,14 +1,14 @@
 // CRUD برای مراجعین — همیشه محدود به تراپیستِ واردشده
 import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
-import { query } from '../db/connection.js';
-import { requireAuth } from '../auth/guard.js';
-import { getOwnedClient } from '../db/ownership.js';
-import { deleteSessionAudioDirs } from '../stt/sessionAudioArchive.js';
-import { logEvent } from '../obs/eventLog.js';
-import { recordAudit } from '../obs/audit.js';
-import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-upload/jobRunner.js';
-import { treatmentUnits, TreatmentUnitValidationError } from '../features/treatment-unit/index.js';
+import { query } from '../../db/connection.js';
+import { requireAuth } from '../../auth/guard.js';
+import { getOwnedClient } from '../../db/ownership.js';
+import { deleteSessionAudioDirs } from '../transcription/archive/sessionAudioArchive.js';
+import { logEvent } from '../../obs/eventLog.js';
+import { recordAudit } from '../../obs/audit.js';
+import { collectUploadSonioxRefs, releaseSonioxRefs } from '../audio-upload/jobRunner.js';
+import { treatmentUnits, TreatmentUnitValidationError } from '../treatment-unit/index.js';
 
 const VALID_CATEGORIES = ['child', 'teen', 'adult'];
 const VALID_GENDERS = ['f', 'm'];

@@ -14,7 +14,7 @@ import {
 } from '../server/src/features/audio-upload/jobMachine.js';
 import {
   pollTimeoutForBytes, lowConfidenceRatio, markUncertainTokens, markedTextFromTokens, buildTextFromAsyncTokens, type AsyncToken,
-} from '../server/src/stt/asyncTranscribe.js';
+} from '../server/src/features/transcription/soniox/restClient.js';
 import { FileQualityMeter, classifyWindow, measureAudioQuality, parseAudioQuality, QUALITY, type AudioQuality } from '../server/src/features/audio-upload/quality.js';
 import { parseProbe, probeMedia, normalizeAudio, sniffObviouslyNotAudio, extensionOf, ACCEPTED_EXTENSIONS, MAX_DURATION_MS } from '../server/src/features/audio-upload/media.js';
 import { expectedChunkBytes } from '../server/src/features/audio-upload/uploadStore.js';

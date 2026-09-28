@@ -4,10 +4,10 @@
 import { FastifyInstance } from 'fastify';
 import { requireAuth } from '../auth/guard.js';
 import { getOwnedSession } from '../db/ownership.js';
-import { logEvent, logUiEvents } from '../obs/eventLog.js';
-import { isSafeToken, sanitizeDetail } from '../obs/redact.js';
-import { OBS_CLIENT_EVENTS } from '../obs/types.js';
-import type { ObsUiEventInput, ObsUiKind } from '../obs/types.js';
+import { logEvent, logUiEvents } from './eventLog.js';
+import { isSafeToken, sanitizeDetail } from './redact.js';
+import { OBS_CLIENT_EVENTS } from './types.js';
+import type { ObsUiEventInput, ObsUiKind } from './types.js';
 import { createRateLimiter } from '../shared/rateLimit.js';
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;

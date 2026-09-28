@@ -4,20 +4,20 @@
 //   هرگز به browser داده/لاگ نمی‌شود — فقط طول آن در لاگ می‌آید.
 //   مسیر قدیمی proxy (/ws/t) دست‌نخورده به‌عنوان legacy باقی است؛(sprite در ws/).
 import { FastifyInstance } from 'fastify';
-import { requireAuth } from '../auth/guard.js';
-import { getOwnedSession } from '../db/ownership.js';
-import { query } from '../db/connection.js';
-import { logEvent } from '../obs/eventLog.js';
+import { requireAuth } from '../../auth/guard.js';
+import { getOwnedSession } from '../../db/ownership.js';
+import { query } from '../../db/connection.js';
+import { logEvent } from '../../obs/eventLog.js';
 import {
   SONIOX_WS_URL,
   TEMP_KEY_EXPIRES_IN_SECONDS,
   TEMP_KEY_MAX_SESSION_SECONDS,
   TempKeyError,
   mintTemporaryKey,
-} from '../stt/tempkey.js';
-import { SESSION_TRANSCRIPTION_CONTEXT } from '../stt/sessionContext.js';
-import { treatmentUnits } from '../features/treatment-unit/index.js';
-import { createRateLimiter } from '../shared/rateLimit.js';
+} from './soniox/tempKey.js';
+import { SESSION_TRANSCRIPTION_CONTEXT } from './sessionContext.js';
+import { treatmentUnits } from '../treatment-unit/index.js';
+import { createRateLimiter } from '../../shared/rateLimit.js';
 
 // rate-limit ساده درون‌حافظه‌ای: هر تراپیست حداکثر ۳۰ mint در دقیقه
 const mintRateLimited = createRateLimiter(30);

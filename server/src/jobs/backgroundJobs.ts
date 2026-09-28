@@ -3,11 +3,11 @@
 // (تنها awaitِ بدونِ try) مثلِ قبل به caller می‌رسد و سرور بالا نمی‌آید.
 import { startObsDrainLoop, logEvent } from '../obs/eventLog.js';
 import { sweepOldObsEvents } from '../obs/sweep.js';
-import { sweepOldBatchFiles, retryQueuedBatches, BATCH_SWEEP_INTERVAL_MS } from '../stt/batchqueue.js';
-import { sweepOldSessionAudio } from '../stt/sessionAudioArchive.js';
-import { sweepOldResolveJobs } from '../stt/speakerResolve.js';
+import { sweepOldBatchFiles, retryQueuedBatches, BATCH_SWEEP_INTERVAL_MS } from '../features/transcription/batch/batchQueue.js';
+import { sweepOldSessionAudio } from '../features/transcription/archive/sessionAudioArchive.js';
+import { sweepOldResolveJobs } from '../features/transcription/speakerResolve.js';
 import { tryFinalizeGroup } from '../features/audio-upload/uploads.routes.js';
-import { autoCloseAbandonedSessions, AUTO_CLOSE_INTERVAL_MS } from '../http/sessionAutoClose.js';
+import { autoCloseAbandonedSessions, AUTO_CLOSE_INTERVAL_MS } from '../features/sessions/autoClose.js';
 import { startAudioJobWorker, sweepSonioxOrphans } from '../features/audio-upload/jobRunner.js';
 import { sweepStaleUploads } from '../features/audio-upload/uploadStore.js';
 import { sweepOldNotifications, notifyAdmins } from '../features/notifications/notify.js';

@@ -4,13 +4,13 @@ import { query, pool } from '../../db/connection.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { createNotification } from '../notifications/notify.js';
 import { treatmentUnits } from '../treatment-unit/index.js';
-import { getFullSessionAudio, listSessionAudio, deriveSessionStatus } from '../../stt/sessionAudioArchive.js';
-import { pendingAudiosFor } from '../../stt/batchqueue.js';
+import { getFullSessionAudio, listSessionAudio, deriveSessionStatus } from '../transcription/archive/sessionAudioArchive.js';
+import { pendingAudiosFor } from '../transcription/batch/batchQueue.js';
 import {
   uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens,
   markedTextFromTokens, deleteTranscription, deleteFile,
-} from '../../stt/asyncTranscribe.js';
-import type { SignMark } from '../../stt/signMarkers.js';
+} from '../transcription/soniox/restClient.js';
+import type { SignMark } from '../transcription/signMarkers.js';
 import {
   stepFinalTranscript, giveUp, DEFAULT_FT_CONFIG,
   type FtDeps, type FtJob, type FtPatch, type FtStore, type AudioState,

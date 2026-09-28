@@ -8,9 +8,9 @@
 import https from 'node:https';
 import { randomBytes } from 'node:crypto';
 import { createReadStream, statSync } from 'node:fs';
-import { SESSION_TRANSCRIPTION_CONTEXT } from './sessionContext.js';
-import { formatSignTime, signMarker, sortedSigns, type SignMark } from './signMarkers.js';
-import { SONIOX_API_BASE as API_BASE, createProxyAgent as proxyAgent } from '../features/transcription/soniox/config.js';
+import { SESSION_TRANSCRIPTION_CONTEXT } from '../sessionContext.js';
+import { formatSignTime, signMarker, sortedSigns, type SignMark } from '../signMarkers.js';
+import { SONIOX_API_BASE as API_BASE, createProxyAgent as proxyAgent } from './config.js';
 
 const POLL_INTERVAL_MS = 2000;
 // ⭐ رفعِ F2 (audit آپلود، 2026-09-23): سقفِ ثابتِ ۱۰ دقیقه برایِ فایلِ بزرگ همیشه timeout می‌شد،
