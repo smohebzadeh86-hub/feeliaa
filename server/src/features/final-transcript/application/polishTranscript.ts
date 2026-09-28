@@ -115,6 +115,8 @@ export async function polishTranscript(
   report.chunks = chunks.length;
   const out: CleanTurn[] = [];
   let lastRole = 'درمانگر';
+  let succeededChunks = 0;
+  let transientChunkFailures = 0;
   for (const chunk of chunks) {
     const fallback = (): CleanTurn[] => {
       const res: CleanTurn[] = [];
@@ -151,8 +153,14 @@ export async function polishTranscript(
         const r = await llm.completeJson<{ turns: LlmTurn[] }>(CHUNK_SYSTEM_PROMPT, feedback ? `${user}\n\n${feedback}` : user, CHUNK_SCHEMA);
         a = evaluateAttempt(Array.isArray(r?.turns) ? r.turns : [], speechTurns, cfg.guards);
       } catch (e) {
-        // خطایِ گذرا ⇒ job دوباره تلاش می‌کند (کارِ انجام‌شده ارزان است). خطایِ دیگر ⇒ تلاشِ بعدی، یا همین تکه خام.
-        if ((e as { transient?: boolean })?.transient) throw e;
+        // خطایِ گذرا (بعد از تلاش‌هایِ درجایِ آداپتور): تا وقتی هیچ تکه‌ای موفق نشده ⇒ job دوباره تلاش می‌کند (چیزی از دست
+        // نمی‌رود). بعد از آن ⇒ فقط همین تکه خام می‌ماند و پیشرفت حفظ می‌شود — قبلاً یک خطا در تکه‌ی ۱۱ از ۱۴ کلِ کارِ یک
+        // جلسه‌ی بلند را از اول به backoff می‌برد و با مدلِ رایگانِ ناپایدار هرگز تمام نمی‌شد (prod، 2026-09-28).
+        if ((e as { transient?: boolean })?.transient) {
+          if (!succeededChunks) throw e;
+          transientChunkFailures++;
+          break;
+        }
       }
       if (attempt > 0) report.retries++;
       if (a && (!best || a.fallbackChars < best.fallbackChars)) best = a;
@@ -166,6 +174,7 @@ export async function polishTranscript(
       out.push(...fallback());
       continue;
     }
+    succeededChunks++;
     for (const g of best.groups) if (g.fail) bump(g.fail);
     if (best.groups.every((g) => g.fail)) report.fallback_chunks++;
 
@@ -233,6 +242,10 @@ export async function polishTranscript(
       out.push({ role: '', text: t.text, marker: true });
     }
     while (u < units.length) units[u++].emit();
+  }
+  // بیش از نیمِ تکه‌ها با خطایِ گذرا خام ماندند ⇒ نتیجه عملاً ویرایش‌نشده است؛ job بعداً دوباره تلاش می‌کند.
+  if (transientChunkFailures * 2 > chunks.length) {
+    throw Object.assign(new Error(`بیش از نیمِ تکه‌ها با خطایِ گذرایِ LLM خام ماندند (${transientChunkFailures}/${chunks.length})`), { transient: true, code: 'llm-failed' });
   }
   return { text: renderClean(out), report };
 }

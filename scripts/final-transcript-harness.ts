@@ -8,7 +8,7 @@ import {
   type FtJob, type FtDeps, type FtPatch, type AudioState, type FullAudio, type PolishOutcome,
 } from '../server/src/features/final-transcript/domain/jobMachine.js';
 import { parseTurns, chunkTurns, renderClean, sampleForOverview, UPLOAD_LABEL, appendUploadForPolish, maxSpeakerNumber } from '../server/src/features/final-transcript/domain/transcriptText.js';
-import { checkPolishedChunk, negationCount, numberBag } from '../server/src/features/final-transcript/domain/polishGuards.js';
+import { checkPolishedChunk, negationCount, numberBag, DEFAULT_GUARD_LIMITS } from '../server/src/features/final-transcript/domain/polishGuards.js';
 import { polishTranscript } from '../server/src/features/final-transcript/application/polishTranscript.js';
 import type { LlmJsonPort } from '../server/src/features/final-transcript/ports.js';
 
@@ -567,6 +567,36 @@ await t('B13 extractJson: بلوکِ <think>، fence و متنِ اضافه حذ
   assert.equal(extractJson('هیچ JSONی نیست'), null);
   assert.equal(extractJson('{"a": 1,,}'), null);
 });
+
+// ——— خطایِ گذرا در یک تکه نباید کلِ کارِ جلسه‌ی بلند را از اول ببرد (prod، 2026-09-28) ———
+{
+  const LONG = Array.from({ length: 6 }, (_, i) => `گوینده ${i % 2 ? '۲' : '۱'}: این جمله‌ی شماره ${i + 1} است و کمی طولانی‌تر نوشته شده تا تکه جدا شود`).join('\n\n');
+  const echo = (user: string) => {
+    const part = user.split('تکه‌ای که باید مرتب شود:\n')[1] || '';
+    const turns = part.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean).map((b, i) => {
+      const m = /^(?:\[(\d+)\]\s*)?گوینده\s+[۰-۹0-9]+:\s*(.*)$/s.exec(b);
+      return { src: [m?.[1] ? Number(m[1]) : i + 1], speaker_role: 'درمانگر', text: (m?.[2] ?? b) + '.' };
+    });
+    return { turns };
+  };
+  // شکست بر اساسِ محتوایِ تکه (نه شماره‌ی فراخوانی — یک تکه ممکن است با بازخوردِ نگهبان دو بار فراخوانده شود)
+  const chunkOf = (user: string) => user.split('تکه‌ای که باید مرتب شود:\n')[1] || '';
+  const failing = (failOn: (chunkText: string) => boolean) =>
+    fakeLlm((user) => { if (failOn(chunkOf(user))) throw Object.assign(new Error('503'), { transient: true }); return echo(user); });
+  const CFG = { chunkChars: 120, overviewChars: 60000, guards: DEFAULT_GUARD_LIMITS };
+  await t('B14 خطایِ گذرا در تکه‌ی ۳ (تکه‌هایِ قبلی موفق) ⇒ فقط همان تکه خام، کار تمام می‌شود', async () => {
+    const r = await polishTranscript(LONG, null, failing((c) => c.includes('شماره 3 ')), CFG);
+    assert.ok(r.report.chunks >= 3, 'chunks=' + r.report.chunks);
+    assert.equal(r.report.fallback_reasons['llm-error'], 1);
+    assert.ok(r.text.includes('شماره 1 است') && r.text.includes('شماره 6 است'), r.text.slice(0, 160));
+  });
+  await t('B15 خطایِ گذرا در اولین تکه ⇒ پرتاب (job بعداً دوباره تلاش می‌کند؛ چیزی از دست نمی‌رود)', async () => {
+    await assert.rejects(polishTranscript(LONG, null, failing((c) => c.includes('شماره 1 ')), CFG), (e: any) => e.transient === true);
+  });
+  await t('B16 بیش از نیمِ تکه‌ها با خطایِ گذرا ⇒ پرتابِ گذرا (نتیجه‌ی عملاً خام تحویل نمی‌شود)', async () => {
+    await assert.rejects(polishTranscript(LONG, null, failing((c) => !c.includes('شماره 1 ')), CFG), (e: any) => e.transient === true);
+  });
+}
 
 console.log(`\n${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);
