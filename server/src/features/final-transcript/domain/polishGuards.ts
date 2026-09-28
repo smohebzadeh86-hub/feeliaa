@@ -55,9 +55,13 @@ const NUM_WORDS: Record<string, number> = {
   پانصد: 500, هزار: 1000, میلیون: 1000000,
 };
 // «نه» هم عدد است و هم منفی — در شمارشِ عدد شمرده نمی‌شود (منفی سخت‌گیرانه‌تر چک می‌شود).
+// نیم‌فاصله این‌جا واژه را نمی‌شکند (2026-09-28، تنها «متنِ نهایی»ِ prod): LLM «پنجشنبه» را درست «پنج‌شنبه» می‌نوشت، words()
+// نیم‌فاصله را فاصله می‌کرد و «پنج» عددِ تازه شمرده می‌شد ⇒ کلِ تکه به‌خاطرِ «تغییرِ عدد» خام می‌ماند. نامِ روزها با فاصله هم یکی می‌شوند.
+const WEEKDAY_RE = /(^|[^آ-ی])(یک|دو|سه|چهار|پنج)[\s‌]*(شنبه)/g;
 export function numberBag(s: string): string[] {
   const out: string[] = [];
-  for (const w of dedupeAdjacent(words(s))) {
+  const joined = s.replace(/‌/g, '').replace(WEEKDAY_RE, '$1$2$3');
+  for (const w of dedupeAdjacent(words(joined))) {
     if (/^\d+$/.test(w)) out.push(String(Number(w)));
     else if (NUM_WORDS[w] !== undefined) out.push(String(NUM_WORDS[w]));
   }
@@ -96,10 +100,15 @@ export function checkPolishedChunk(raw: string, polished: string, limits: GuardL
   const pn = negationCount(polished);
   if (rn !== pn) return 'negation';
   if (!sameBag(numberBag(raw), numberBag(polished))) return 'number';
-  if (rw.length >= 5) {
-    const set = new Set(pw);
-    const uniq = Array.from(new Set(rw));
-    const kept = uniq.filter((w) => set.has(w)).length;
+  // هم‌پوشانی بدونِ نیم‌فاصله (2026-09-28): اصلاحِ درستِ «نمیدونم» ⇒ «نمی‌دونم» یا «هیچ وقت» ⇒ «هیچ‌وقت» واژه‌یِ خام را
+  // «گم‌شده» نشان می‌داد و نوبتِ کوتاه با دو اصلاحِ نیم‌فاصله رد می‌شد. واژه‌ی خام (≥ ۳ نویسه) داخلِ واژه‌یِ چسبیده هم پیداست.
+  const rj = words(raw.replace(/‌/g, ''));
+  if (rj.length >= 5) {
+    const pj = words(polished.replace(/‌/g, ''));
+    const set = new Set(pj);
+    const flat = pj.join('');
+    const uniq = Array.from(new Set(rj));
+    const kept = uniq.filter((w) => set.has(w) || (w.length >= 3 && flat.includes(w))).length;
     if (kept / uniq.length < limits.minOverlap) return 'overlap';
   }
   return null;

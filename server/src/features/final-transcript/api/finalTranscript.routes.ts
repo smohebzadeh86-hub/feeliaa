@@ -29,7 +29,7 @@ export async function finalTranscriptRoutes(app: FastifyInstance) {
       stale: row.stage === 'done' && Number(row.transcript_version || 0) > Number(row.source_version ?? -1),
       clean_text: row.stage === 'done' ? row.clean_text : null,
       error_code: row.error_code,
-      report: report ? { chunks: report.chunks ?? null, fallback_chunks: report.fallback_chunks ?? null, uncertain: report.uncertain ?? null } : null,
+      report: report ? { chunks: report.chunks ?? null, fallback_chunks: report.fallback_chunks ?? null, turns: report.turns ?? null, fallback_turns: report.fallback_turns ?? null, uncertain: report.uncertain ?? null } : null,
     };
   });
 

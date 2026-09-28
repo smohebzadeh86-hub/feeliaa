@@ -6205,7 +6205,9 @@ function renderFinalTranscript(){
   if(st.stage==='done'){
     const rep=st.report||{};
     let t=showFinal?'متنِ نهایی':'متنِ خامِ رونویسی';
-    if(showFinal&&rep.fallback_chunks)t+=' · '+toFa(rep.fallback_chunks)+' بخش بدونِ ویرایش ماند';
+    // (2026-09-28) فقط نوبتِ ردشده خام می‌ماند، نه کلِ تکه ⇒ نکته فقط وقتی سهمِ خام‌مانده چشمگیر است (گزارشِ قدیمی: fallback_chunks)
+    const rawShare=rep.turns?(rep.fallback_turns||0)/rep.turns:(rep.fallback_chunks&&rep.chunks?rep.fallback_chunks/rep.chunks:0);
+    if(showFinal&&rawShare>0.25)t+=' · بخشی از متن بدونِ ویرایش ماند';
     if(st.stale)t+=' · متنِ جلسه بعد از آماده‌سازی تغییر کرده';
     label.textContent=t;
     actions.appendChild(ftButton(showFinal?'نمایشِ متنِ خام':'نمایشِ متنِ نهایی',function(){

@@ -1,10 +1,11 @@
 // مرتب‌سازیِ متنِ جلسه با LLM در دو گذر:
 //  ۱) برداشتِ کلی (یک فراخوانی رویِ کلِ متن یا نمونه‌ی فشرده‌اش): نگاشتِ «گوینده N» ⇒ نقش، خلاصه‌ی ماجرا، واژه‌نامه.
 //  ۲) ویرایشِ تکه‌به‌تکه رویِ مرزِ نوبت، با برداشتِ کلی و دو نوبتِ قبلی به‌عنوانِ زمینه.
-// هر تکه از نگهبان‌هایِ قطعی (polishGuards) رد می‌شود؛ تکه‌ی ردشده با متنِ خامِ خودش جایگزین می‌شود.
+// هر نوبتِ خروجی (با src به نوبت‌هایِ خام گره خورده) از نگهبان‌هایِ قطعی (polishGuards) رد می‌شود؛ نوبتِ ردشده با متنِ خامِ
+// خودش جایگزین می‌شود. اگر بخشِ بزرگی از تکه رد شد، یک تلاشِ دوباره با گفتنِ علت.
 // ⚠️ LAW-001: متن هرگز لاگ نمی‌شود — فقط شمارنده‌ها در گزارش می‌آیند.
 import {
-  chunkTurns, parseTurns, renderClean, sampleForOverview, type CleanTurn, type Turn,
+  chunkTurns, parseTurns, renderClean, sampleForOverview, toFaDigits, type CleanTurn, type Turn,
 } from '../domain/transcriptText.js';
 import { checkPolishedChunk, uncertainCount, type GuardFailure, type GuardLimits } from '../domain/polishGuards.js';
 import type { LlmJsonPort, SpeakerRoster } from '../ports.js';
@@ -28,7 +29,13 @@ export interface Overview {
 export interface PolishReport {
   model: string;
   chunks: number;
+  // تکه‌هایی که هیچ بخشی از آن‌ها ویرایش نشد
   fallback_chunks: number;
+  // نوبت‌هایِ گفتار: کل، و آن‌هایی که (به‌خاطرِ نگهبان/خطا) خام ماندند
+  turns: number;
+  fallback_turns: number;
+  // تلاشِ دوباره‌ی تکه (وقتی بخشِ بزرگی رد شد)
+  retries: number;
   fallback_reasons: Partial<Record<GuardFailure | 'llm-error', number>>;
   uncertain: number;
   overview_ok: boolean;
@@ -64,7 +71,7 @@ export async function polishTranscript(
   cfg: PolishConfig
 ): Promise<PolishResult> {
   const turns = parseTurns(rawText);
-  const report: PolishReport = { model: llm.model, chunks: 0, fallback_chunks: 0, fallback_reasons: {}, uncertain: 0, overview_ok: false, role_fixes: 0, role_reverts: 0 };
+  const report: PolishReport = { model: llm.model, chunks: 0, fallback_chunks: 0, turns: 0, fallback_turns: 0, retries: 0, fallback_reasons: {}, uncertain: 0, overview_ok: false, role_fixes: 0, role_reverts: 0 };
   // نقش‌هایِ مجاز: فقط وقتی فهرستِ حاضرین معلوم است. نقشِ بیرون از فهرست (مثلاً «مراجع» در جلسه‌ی زوج، یا «گوینده ۳»)
   // نامِ نمایشیِ نادرست می‌سازد ⇒ با نقشِ نگاشت‌شده‌ی همان نوبت (اگر هم‌تراز است) یا نقشِ قبلی جایگزین می‌شود.
   const allowed = roster && roster.speakers.length ? new Set(['درمانگر', ...roster.speakers.map((s) => s.trim())]) : null;
@@ -122,6 +129,7 @@ export async function polishTranscript(
     };
     const speechTurns = chunk.filter((t) => !t.marker);
     if (!speechTurns.length) { out.push(...fallback()); continue; }
+    report.turns += speechTurns.length;
 
     const prev = out.filter((t) => !t.marker).slice(-2).map((t) => `${t.role}: ${t.text}`).join('\n');
     const user = [
@@ -133,78 +141,163 @@ export async function polishTranscript(
       `تکه‌ای که باید مرتب شود:\n${chunkToPrompt(chunk)}`,
     ].filter(Boolean).join('\n\n');
 
-    let polished: Array<{ speaker_role: string; text: string }>;
-    try {
-      const r = await llm.completeJson<{ turns: Array<{ speaker_role: string; text: string }> }>(CHUNK_SYSTEM_PROMPT, user, CHUNK_SCHEMA);
-      polished = Array.isArray(r?.turns) ? r.turns : [];
-    } catch (e) {
-      // خطایِ گذرا ⇒ job دوباره تلاش می‌کند (کارِ انجام‌شده ارزان است). خطایِ دیگر ⇒ فقط همین تکه خام می‌ماند.
-      if ((e as { transient?: boolean })?.transient) throw e;
+    // تلاشِ اول؛ اگر بخشِ بزرگی رد شد (یا پاسخ خراب بود)، یک تلاشِ دوباره با گفتنِ علتِ رد — بهترینِ دو تلاش می‌ماند.
+    const totalChars = speechTurns.reduce((n, t) => n + t.text.length, 0) || 1;
+    let best: Attempt | null = null;
+    let feedback = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      let a: Attempt | null = null;
+      try {
+        const r = await llm.completeJson<{ turns: LlmTurn[] }>(CHUNK_SYSTEM_PROMPT, feedback ? `${user}\n\n${feedback}` : user, CHUNK_SCHEMA);
+        a = evaluateAttempt(Array.isArray(r?.turns) ? r.turns : [], speechTurns, cfg.guards);
+      } catch (e) {
+        // خطایِ گذرا ⇒ job دوباره تلاش می‌کند (کارِ انجام‌شده ارزان است). خطایِ دیگر ⇒ تلاشِ بعدی، یا همین تکه خام.
+        if ((e as { transient?: boolean })?.transient) throw e;
+      }
+      if (attempt > 0) report.retries++;
+      if (a && (!best || a.fallbackChars < best.fallbackChars)) best = a;
+      if (best && best.fallbackChars / totalChars <= RETRY_ABOVE) break;
+      feedback = a ? retryFeedback(a) : '';
+    }
+    if (!best) {
       bump('llm-error');
       report.fallback_chunks++;
+      report.fallback_turns += speechTurns.length;
       out.push(...fallback());
       continue;
     }
+    for (const g of best.groups) if (g.fail) bump(g.fail);
+    if (best.groups.every((g) => g.fail)) report.fallback_chunks++;
 
-    // نشانگرها را LLM نمی‌بیند که جابه‌جا کند: خروجی با نشانگرهایِ خام در جایِ نسبیِ خودشان ترکیب می‌شود.
-    const rawPlain = plain(speechTurns);
-    const polPlain = polished.map((t) => String(t.text || '')).join('\n');
-    const fail = checkPolishedChunk(rawPlain, polPlain, cfg.guards);
-    if (fail) {
-      bump(fail);
-      report.fallback_chunks++;
-      out.push(...fallback());
-      continue;
-    }
-    report.uncertain += uncertainCount(polPlain);
-    // نقشِ خروجیِ نوبتِ i: اگر در فهرست نیست ⇒ نقشِ نگاشت‌شده‌ی نوبتِ خامِ هم‌تراز (وقتی تعدادِ نوبت‌ها برابر است) یا نقشِ قبلی
-    const aligned = polished.length === speechTurns.length;
+    // نقش‌ها: برگشت به نگاشت وقتی LLM بیشترِ نقش‌هایِ هم‌ترازِ یک تکه را برخلافِ تفکیکِ سالم عوض کرده (R20)
     let revert = false;
-    if (mapTrusted && aligned) {
+    if (mapTrusted) {
       let comparable = 0;
       let deviated = 0;
-      for (let i = 0; i < polished.length; i++) {
-        const r = String(polished[i].speaker_role || '').trim();
-        const sp = speechTurns[i].speaker;
+      for (const g of best.groups) {
+        if (g.fail || g.out.length !== 1) continue;
+        const r = String(g.out[0].speaker_role || '').trim();
+        const sp = speechTurns[g.start].speaker;
         if (!r || !allowed!.has(r) || !sp || !map.has(sp)) continue;
         comparable++;
         if (r !== map.get(sp)) deviated++;
       }
       if (comparable >= 2 && deviated / comparable > 0.5) { revert = true; report.role_reverts++; }
     }
-    const roleAt = (i: number): string => {
-      if (revert) {
-        const sp = speechTurns[i].speaker;
-        if (sp && map.has(sp)) return map.get(sp)!;
-      }
-      const r = String(polished[i].speaker_role || '').trim();
+    // نقشِ نوبتِ مرتب‌شده: اگر در فهرست نیست ⇒ نقشِ نگاشت‌شده‌ی نوبتِ خامِ متناظر (اگر معلوم است) یا نقشِ قبلی
+    const roleOf = (t: LlmTurn, sp: string | null | undefined): string => {
+      if (revert && sp && map.has(sp)) return map.get(sp)!;
+      const r = String(t.speaker_role || '').trim();
       if (r && (!allowed || allowed.has(r))) return r;
       if (r) report.role_fixes++;
-      const mapped = aligned ? roleFor(speechTurns[i].speaker, map, lastRole) : lastRole;
+      const mapped = sp !== undefined ? roleFor(sp, map, lastRole) : lastRole;
       return !allowed || allowed.has(mapped) ? mapped : lastRole;
     };
-    const emit = (i: number) => { const role = roleAt(i); out.push({ role, text: String(polished[i].text || '') }); lastRole = role; };
-    const markersInChunk = chunk.filter((t) => t.marker);
-    if (!markersInChunk.length) {
-      for (let i = 0; i < polished.length; i++) emit(i);
-    } else {
-      // تکه‌ی دارایِ نشانگر: نشانگرها به ترتیب، پیش از نوبتی که در متنِ خام بعدشان آمده، می‌آیند (تقریبِ جایگاه)
-      const ratio = polished.length / speechTurns.length;
-      let speechIdx = 0;
-      let polIdx = 0;
-      for (const t of chunk) {
-        if (t.marker) {
-          const upto = Math.min(polished.length, Math.round(speechIdx * ratio));
-          while (polIdx < upto) emit(polIdx++);
-          out.push({ role: '', text: t.text, marker: true });
-        } else speechIdx++;
+
+    // واحدهایِ خروجی به ترتیب، هر کدام با جایگاهش در نوبت‌هایِ خام (برایِ درجِ نشانگرها در جایِ خودشان)
+    const units: Array<{ start: number; emit: () => void }> = [];
+    for (const g of best.groups) {
+      if (g.fail) {
+        // فقط همین نوبت(ها) خام می‌مانند، نه کلِ تکه
+        report.fallback_turns += g.end - g.start;
+        for (let i = g.start; i < g.end; i++) {
+          const t = speechTurns[i];
+          units.push({ start: i, emit: () => {
+            const role = roleFor(t.speaker, map, lastRole);
+            out.push({ role, text: t.text });
+            report.uncertain += uncertainCount(t.text);
+            lastRole = role;
+          } });
+        }
+        continue;
       }
-      while (polIdx < polished.length) emit(polIdx++);
+      // گروهِ چندخروجی فقط وقتی پیش می‌آید که src نامعتبر و تعدادِ نوبت‌ها نابرابر است (کلِ تکه یک گروه) ⇒ جایگاهِ تقریبی
+      const sp = g.out.length === 1 ? speechTurns[g.start].speaker : undefined;
+      g.out.forEach((t, k) => {
+        const start = g.start + Math.round((k * (g.end - g.start)) / g.out.length);
+        units.push({ start, emit: () => {
+          const role = roleOf(t, sp);
+          const text = String(t.text || '');
+          out.push({ role, text });
+          report.uncertain += uncertainCount(text);
+          lastRole = role;
+        } });
+      });
     }
+    // نشانگرها را LLM نمی‌بیند که جابه‌جا کند: پیش از اولین واحدی می‌آیند که در متنِ خام بعدشان است.
+    let speechIdx = 0;
+    let u = 0;
+    for (const t of chunk) {
+      if (!t.marker) { speechIdx++; continue; }
+      while (u < units.length && units[u].start < speechIdx) units[u++].emit();
+      out.push({ role: '', text: t.text, marker: true });
+    }
+    while (u < units.length) units[u++].emit();
   }
   return { text: renderClean(out), report };
 }
 
+type LlmTurn = { src?: unknown; speaker_role: string; text: string };
+// نوبت‌هایِ خامِ [start, end) و نوبت‌هایِ خروجیِ ساخته‌شده از آن‌ها؛ fail = نتیجه‌ی نگهبان برایِ همین گروه
+interface Group { start: number; end: number; out: LlmTurn[]; fail: GuardFailure | null; }
+interface Attempt { groups: Group[]; fallbackChars: number; }
+
+// بیش از این سهم از متنِ تکه خام بماند ⇒ یک تلاشِ دوباره
+const RETRY_ABOVE = 0.15;
+
+// src معتبر: شماره‌ها (از ۱) پیوسته و به ترتیب، هر نوبتِ خام دقیقاً یک بار.
+function groupsFromSrc(polished: LlmTurn[], n: number): Group[] | null {
+  const groups: Group[] = [];
+  let next = 1;
+  for (const t of polished) {
+    const src = Array.isArray(t.src) ? t.src.map((x) => Number(x)) : [];
+    if (!src.length) return null;
+    for (let k = 0; k < src.length; k++) if (src[k] !== next + k) return null;
+    groups.push({ start: next - 1, end: next - 1 + src.length, out: [t], fail: null });
+    next += src.length;
+  }
+  return next === n + 1 ? groups : null;
+}
+
+// نگهبان رویِ هر گروه جدا (2026-09-28): قبلاً کلِ تکه (تا ۶۰۰۰ نویسه) با اولین ردشدن خام می‌ماند — تنها «متنِ نهایی»ِ prod
+// بی‌هیچ ویرایشی نمایش داده شد. حالا فقط نوبتِ ردشده خام می‌ماند.
+function evaluateAttempt(polished: LlmTurn[], speech: Turn[], guards: GuardLimits): Attempt {
+  const n = speech.length;
+  const groups = groupsFromSrc(polished, n)
+    ?? (polished.length === n
+      ? polished.map((t, i) => ({ start: i, end: i + 1, out: [t], fail: null }))
+      : [{ start: 0, end: n, out: polished, fail: null }]);
+  let fallbackChars = 0;
+  for (const g of groups) {
+    const raw = speech.slice(g.start, g.end);
+    g.fail = checkPolishedChunk(plain(raw), g.out.map((t) => String(t.text || '')).join('\n'), guards);
+    if (g.fail) fallbackChars += raw.reduce((s, t) => s + t.text.length, 0);
+  }
+  return { groups, fallbackChars };
+}
+
+const FAIL_HINT: Record<GuardFailure, string> = {
+  negation: 'یک واژه‌ی منفی («نه»، «نمی‌…»، «هیچ…») اضافه یا حذف شده بود',
+  number: 'یک عدد عوض یا حذف شده بود',
+  length: 'متن خیلی کوتاه یا بلند شده بود (خلاصه یا اضافه)',
+  overlap: 'واژه‌هایِ زیادی عوض شده بود',
+  marker: 'نشانگرِ علامت جابه‌جا یا حذف شده بود',
+  uncertain: 'علامتِ ⟦…؟⟧ برداشته شده بود',
+  empty: 'متنِ نوبت خالی مانده بود',
+};
+
+function retryFeedback(a: Attempt): string {
+  const failed = a.groups.filter((g) => g.fail);
+  const lines = failed.slice(0, 12).map((g) => {
+    const nums = Array.from({ length: g.end - g.start }, (_, k) => toFaDigits(String(g.start + k + 1))).join('، ');
+    return `- نوبتِ [${nums}]: ${FAIL_HINT[g.fail!]}`;
+  });
+  if (!lines.length) lines.push('- ساختارِ پاسخ نامعتبر بود: src باید همه‌ی نوبت‌ها را به ترتیب و هر کدام یک بار پوشش دهد');
+  return `تلاشِ قبلیِ تو برایِ این تکه رد شد:\n${lines.join('\n')}\nدوباره انجام بده: همه‌ی منفی‌ها، عددها و گفته‌ها را دقیقاً نگه دار و فقط املا، نیم‌فاصله، نقطه‌گذاری و واژه‌هایِ بدشنیده را درست کن.`;
+}
+
 function chunkToPrompt(chunk: Turn[]): string {
-  return chunk.filter((t) => !t.marker).map((t) => (t.speaker ? `گوینده ${t.speaker}: ${t.text}` : t.text)).join('\n\n');
+  return chunk.filter((t) => !t.marker)
+    .map((t, i) => `[${toFaDigits(String(i + 1))}] ${t.speaker ? `گوینده ${t.speaker}: ${t.text}` : t.text}`)
+    .join('\n\n');
 }

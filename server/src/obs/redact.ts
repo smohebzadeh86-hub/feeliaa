@@ -28,6 +28,8 @@ export const ALLOWED_DETAIL_KEYS = new Set([
   'chunks', 'fallback_chunks', 'uncertain',
   // پلنِ B (2026-09-28): نقشِ اصلاح‌شده توسطِ نگهبانِ نقش — فقط شمارنده
   'role_fixes', 'role_reverts',
+  // (2026-09-28) نگهبانِ نوبت‌به‌نوبت: کلِ نوبت‌ها و نوبت‌هایِ خام‌مانده — فقط شمارنده (retries بالاتر آمده)
+  'turns', 'fallback_turns',
 ]);
 
 function isFiniteNumber(v: unknown): v is number {

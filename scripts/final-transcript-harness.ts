@@ -303,18 +303,102 @@ await t('polish: نقش‌گذاری + نشانگر در جایِ خود + گز�
   assert.deepEqual(llm.calls, ['overview', 'chunk']);
 });
 
-await t('polish: تکه‌ی ردشده (منفی حذف شد) ⇒ متنِ خام با نقشِ نگاشت‌شده', async () => {
+await t('polish: نوبتِ ردشده (منفی حذف شد) ⇒ فقط همان نوبت خام با نقشِ نگاشت‌شده، بقیه‌ی تکه مرتب می‌ماند', async () => {
   const llm = fakeLlm(() => ({ turns: [
     { speaker_role: 'درمانگر', text: 'سلام مهسا، خوش اومدی.' },
     { speaker_role: 'مراجع', text: 'می‌دونم از کجا شروع کنم. من دو بار حمله داشتم.' },
     { speaker_role: 'درمانگر', text: 'دو بار. بیشتر بگو.' },
   ] }));
   const r = await polishTranscript(RAW_SESSION, null, llm, { chunkChars: 6000, overviewChars: 60000, guards: { minLengthRatio: 0.65, maxLengthRatio: 1.15, minOverlap: 0.7 } });
-  assert.equal(r.report.fallback_chunks, 1);
+  assert.equal(r.report.fallback_chunks, 0);
+  assert.equal(r.report.fallback_turns, 1);
+  assert.equal(r.report.turns, 3);
   assert.equal(r.report.fallback_reasons.negation, 1);
-  assert.ok(r.text.startsWith('درمانگر: سلام مهسا خوش اومدی'));
-  assert.ok(r.text.includes('مراجع: اِ... نمی‌دونم'));
-  assert.ok(r.text.includes('[علامت · ۰۰:۴۰ — گریه]'));
+  assert.equal(r.report.retries, 1, 'بیش از ۱۵٪ خام ماند ⇒ یک تلاشِ دوباره');
+  assert.equal(r.text, 'درمانگر: سلام مهسا، خوش اومدی.\n\nمراجع: اِ... نمی‌دونم از کجا شروع کنم من من دو بار حمله داشتم\n\n[علامت · ۰۰:۴۰ — گریه]\n\nدرمانگر: دو بار. بیشتر بگو.');
+});
+
+// ——— 2026-09-28: تنها «متنِ نهایی»ِ prod بی‌هیچ ویرایشی نمایش داده شد (کلِ تکه به‌خاطرِ یک ردِ کاذب خام ماند) ———
+const NCFG = { chunkChars: 6000, overviewChars: 60000, guards: { minLengthRatio: 0.65, maxLengthRatio: 1.15, minOverlap: 0.7 } };
+await t('N1 نگهبانِ عدد: «پنجشنبه» ⇒ «پنج‌شنبه» / «پنج شنبه» عددِ تازه نیست؛ تغییرِ واقعیِ عدد هنوز رد می‌شود', () => {
+  assert.equal(checkPolishedChunk('آره پنجشنبه ساعت پنج میام', 'آره، پنج‌شنبه ساعت پنج میام.'), null);
+  assert.equal(checkPolishedChunk('آره پنج شنبه ساعت پنج میام', 'آره، پنج‌شنبه ساعت پنج میام.'), null);
+  assert.equal(checkPolishedChunk('از دوشنبه شروع شد و سه روز طول کشید', 'از دوشنبه شروع شد و سه روز طول کشید.'), null);
+  assert.equal(checkPolishedChunk('آره پنجشنبه ساعت پنج میام', 'آره، پنج‌شنبه ساعت شش میام.'), 'number');
+});
+
+await t('N2 نگهبانِ هم‌پوشانی: اصلاحِ نیم‌فاصله در نوبتِ کوتاه رد نمی‌شود؛ بازنویسیِ واقعی هنوز رد می‌شود', () => {
+  assert.equal(checkPolishedChunk('ببخشید اِ نمیدونم چرا یهو اینجوری شدم', 'ببخشید، نمی‌دونم چرا یهو این‌جوری شدم.'), null);
+  assert.equal(checkPolishedChunk('ولی خب هنوز هر شب بهش فکر میکنم هیچ وقت نشده', 'ولی خب هنوز هر شب بهش فکر می‌کنم. هیچ‌وقت نشده.'), null);
+  assert.notEqual(checkPolishedChunk('ببخشید اِ نمیدونم چرا یهو اینجوری شدم', 'عذر می‌خوام، معلوم نیست چه اتفاقی برام افتاد.'), null);
+  assert.equal(checkPolishedChunk('من دیروز با مادرم سر کار دعوا کردم', 'من امروز با پدرم توی خونه بحث کردم'), 'overlap');
+});
+
+const RAW4 = 'گوینده ۱: سلام خوش اومدی\n\nگوینده ۲: من این هفته\n\nگوینده ۲: خیلی خسته بودم و نمیدونم چرا\n\n[علامت · ۰۰:۴۰ — گریه]\n\nگوینده ۱: از کی شروع شد';
+await t('N3 src: دو نوبتِ خامِ شکسته در یک نوبت ⇒ پذیرفته؛ نشانگر در جایِ دقیقِ خودش؛ نوبت‌ها در prompt شماره دارند', async () => {
+  let seen = '';
+  const llm = fakeLlm((user) => { seen = user; return { turns: [
+    { src: [1], speaker_role: 'درمانگر', text: 'سلام، خوش اومدی.' },
+    { src: [2, 3], speaker_role: 'مراجع', text: 'من این هفته خیلی خسته بودم و نمی‌دونم چرا.' },
+    { src: [4], speaker_role: 'درمانگر', text: 'از کی شروع شد؟' },
+  ] }; });
+  const r = await polishTranscript(RAW4, { unitLabel: 'فردی', speakers: ['مراجع'], terms: [] }, llm, NCFG);
+  assert.ok(seen.includes('[۱] گوینده ۱: سلام') && seen.includes('[۳] گوینده ۲: خیلی'), seen);
+  assert.equal(r.text, 'درمانگر: سلام، خوش اومدی.\n\nمراجع: من این هفته خیلی خسته بودم و نمی‌دونم چرا.\n\n[علامت · ۰۰:۴۰ — گریه]\n\nدرمانگر: از کی شروع شد؟');
+  assert.equal(r.report.fallback_turns, 0);
+  assert.equal(r.report.retries, 0);
+});
+
+await t('N4 src: گروهِ ادغام‌شده که معنا را عوض کرد ⇒ فقط همان دو نوبت خام، بقیه مرتب', async () => {
+  const llm = fakeLlm(() => ({ turns: [
+    { src: [1], speaker_role: 'درمانگر', text: 'سلام، خوش اومدی.' },
+    { src: [2, 3], speaker_role: 'مراجع', text: 'من این هفته خیلی خسته بودم و می‌دونم چرا.' },
+    { src: [4], speaker_role: 'درمانگر', text: 'از کی شروع شد؟' },
+  ] }));
+  const r = await polishTranscript(RAW4, { unitLabel: 'فردی', speakers: ['مراجع'], terms: [] }, llm, NCFG);
+  assert.equal(r.report.fallback_turns, 2);
+  assert.equal(r.text, 'درمانگر: سلام، خوش اومدی.\n\nمراجع: من این هفته خیلی خسته بودم و نمیدونم چرا\n\n[علامت · ۰۰:۴۰ — گریه]\n\nدرمانگر: از کی شروع شد؟');
+});
+
+await t('N5 src نامعتبر + تعدادِ نابرابر ⇒ کلِ تکه یک گروه؛ ردشدن ⇒ کلِ تکه خام (fallback_chunks)', async () => {
+  const llm = fakeLlm(() => ({ turns: [
+    { src: [1, 3], speaker_role: 'درمانگر', text: 'سلام. من این هفته خیلی خسته بودم.' },
+    { src: [9], speaker_role: 'مراجع', text: 'از کی؟' },
+  ] }));
+  const r = await polishTranscript(RAW4, null, llm, NCFG);
+  assert.equal(r.report.fallback_chunks, 1);
+  assert.equal(r.report.fallback_turns, 4);
+  assert.equal(r.report.retries, 1);
+  assert.ok(r.text.includes('نمیدونم چرا') && r.text.includes('[علامت · ۰۰:۴۰ — گریه]'), r.text);
+});
+
+await t('N6 تلاشِ دوباره با گفتنِ علت: اولی منفی را حذف کرد، دومی درست ⇒ نتیجه‌ی دوم، بدونِ خام', async () => {
+  const users: string[] = [];
+  const good = { turns: [
+    { src: [1], speaker_role: 'درمانگر', text: 'سلام، خوش اومدی.' },
+    { src: [2, 3], speaker_role: 'مراجع', text: 'من این هفته خیلی خسته بودم و نمی‌دونم چرا.' },
+    { src: [4], speaker_role: 'درمانگر', text: 'از کی شروع شد؟' },
+  ] };
+  const bad = { turns: good.turns.map((x, i) => (i === 1 ? { ...x, text: 'من این هفته خیلی خسته بودم و می‌دونم چرا.' } : x)) };
+  const llm = fakeLlm((user) => { users.push(user); return users.length === 1 ? bad : good; });
+  const r = await polishTranscript(RAW4, { unitLabel: 'فردی', speakers: ['مراجع'], terms: [] }, llm, NCFG);
+  assert.equal(users.length, 2);
+  assert.ok(users[1].includes('تلاشِ قبلیِ تو') && users[1].includes('نوبتِ [۲، ۳]') && users[1].includes('منفی'), users[1]);
+  assert.equal(r.report.retries, 1);
+  assert.equal(r.report.fallback_turns, 0);
+  assert.equal(r.report.fallback_reasons.negation, undefined, 'فقط دلیل‌هایِ تلاشِ انتخاب‌شده شمرده می‌شوند');
+});
+
+await t('N7 خطایِ غیرگذرا در تلاشِ اول، تلاشِ دوم سالم ⇒ مرتب، بدونِ llm-error', async () => {
+  let n = 0;
+  const llm = fakeLlm(() => { if (++n === 1) throw new Error('bad json'); return { turns: [
+    { src: [1], speaker_role: 'درمانگر', text: 'سلام، خوش اومدی.' },
+    { src: [2, 3], speaker_role: 'مراجع', text: 'من این هفته خیلی خسته بودم و نمی‌دونم چرا.' },
+    { src: [4], speaker_role: 'درمانگر', text: 'از کی شروع شد؟' },
+  ] }; });
+  const r = await polishTranscript(RAW4, null, llm, NCFG);
+  assert.equal(r.report.fallback_reasons['llm-error'], undefined);
+  assert.equal(r.report.fallback_turns, 0);
 });
 
 await t('polish: خطایِ گذرایِ LLM بالا می‌رود (job دوباره تلاش می‌کند)', async () => {

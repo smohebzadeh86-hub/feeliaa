@@ -96,9 +96,9 @@ export const sqlFtStore: FtStore = {
       conn.release();
     }
     job.stage = 'done';
-    const rep = (report || {}) as { chunks?: number; fallback_chunks?: number; uncertain?: number; role_fixes?: number; role_reverts?: number };
+    const rep = (report || {}) as { chunks?: number; fallback_chunks?: number; turns?: number; fallback_turns?: number; retries?: number; uncertain?: number; role_fixes?: number; role_reverts?: number };
     logEvent({ event: 'final_transcript.done', sessionId: job.sessionId, therapistId: job.therapistId, source: 'job',
-      detail: { source: job.source, chunks: rep.chunks, fallback_chunks: rep.fallback_chunks, uncertain: rep.uncertain, role_fixes: rep.role_fixes, role_reverts: rep.role_reverts } });
+      detail: { source: job.source, chunks: rep.chunks, fallback_chunks: rep.fallback_chunks, turns: rep.turns, fallback_turns: rep.fallback_turns, retries: rep.retries, uncertain: rep.uncertain, role_fixes: rep.role_fixes, role_reverts: rep.role_reverts } });
   },
 
   async skip(job: FtJob, code: string) {
@@ -134,7 +134,7 @@ async function polishFor(sessionId: string, text: string, opts?: { trustDiarizat
     const roster = await treatmentUnits.sessionSpeakerRoster(sessionId);
     const res = await polishTranscript(text, roster, llm, {
       trustDiarization: !!opts?.trustDiarization,
-      chunkChars: envInt('FINAL_TRANSCRIPT_CHUNK_CHARS', 6000),
+      chunkChars: envInt('FINAL_TRANSCRIPT_CHUNK_CHARS', 4000),
       overviewChars: envInt('FINAL_TRANSCRIPT_OVERVIEW_CHARS', 60000),
       guards: {
         minLengthRatio: envFloat('FINAL_TRANSCRIPT_MIN_LENGTH_RATIO', DEFAULT_GUARD_LIMITS.minLengthRatio),

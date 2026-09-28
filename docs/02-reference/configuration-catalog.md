@@ -42,7 +42,7 @@
 | `CASE_FILE_MAX_TOKENS` | `features/case-file/adapters/llm/openrouter.adapter.ts` | `32768` | خیر | خیر | **2026-09-28.** همان سقف برایِ پرونده‌ی درمان (فقط OpenRouter) — همان علتِ 402 |
 | `FINAL_TRANSCRIPT_REASONING_EFFORT` | همان | `OPENROUTER_REASONING_EFFORT` | خیر | خیر | فقط OpenRouter |
 | `FINAL_TRANSCRIPT_LLM_TIMEOUT_MS` | همان | `180000` | خیر | خیر | timeoutِ هر فراخوانیِ LLM (`maxRetries=0`، retry با backoffِ job) |
-| `FINAL_TRANSCRIPT_CHUNK_CHARS` | `features/final-transcript/runner.ts` | `6000` | خیر | خیر | سقفِ نویسه‌ی هر تکه (مرزِ نوبت) |
+| `FINAL_TRANSCRIPT_CHUNK_CHARS` | `features/final-transcript/runner.ts` | `4000` (تا 2026-09-28: `6000`) | خیر | خیر | سقفِ نویسه‌ی هر تکه (مرزِ نوبت) |
 | `FINAL_TRANSCRIPT_OVERVIEW_CHARS` | همان | `60000` | خیر | خیر | متنِ بلندتر ⇒ برداشتِ کلی رویِ نمونه‌ی ابتدا/میانه/انتها |
 | `FINAL_TRANSCRIPT_AUDIO_WAIT_MS` | همان | `1800000` | خیر | خیر | سقفِ انتظار برایِ sync ِ آرشیوِ صدا، بعد از آن ⇒ realtime |
 | `FINAL_TRANSCRIPT_SETTLE_MS` | همان | `90000` | خیر | خیر | مکثِ اولیه بعد از پایانِ جلسه (تکه‌هایِ دُمِ مرورگر) |

@@ -180,7 +180,7 @@ UIِ فعلی فقط برایِ `status='inactive'` رندر می‌شود. جز
 
 | متد | مسیر | بدنه / خروجی |
 |---|---|---|
-| GET | `/api/sessions/:id/final-transcript` | owned (404). `{enabled, stage, source, stale, clean_text (فقط done), error_code, report:{chunks,fallback_chunks,uncertain}}` — بدونِ ردیف ⇒ `{enabled, stage:null}` |
+| GET | `/api/sessions/:id/final-transcript` | owned (404). `{enabled, stage, source, stale, clean_text (فقط done), error_code, report:{chunks,fallback_chunks,turns,fallback_turns,uncertain}}` — بدونِ ردیف ⇒ `{enabled, stage:null}` |
 | POST | `/api/sessions/:id/final-transcript/retry` | owned (404). failed/skipped یا doneِ stale ⇒ دوباره در صف (`{ok:true}`). بدونِ ردیف ⇒ enqueue (409 `session-not-completed`، 403 `forbidden` اگر قابلیت خاموش است). 409 `busy` (در جریان)، 409 `fresh` (doneِ به‌روز) |
 
 
