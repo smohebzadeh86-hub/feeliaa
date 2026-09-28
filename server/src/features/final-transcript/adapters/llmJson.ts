@@ -33,9 +33,17 @@ export function createTranscriptLlm(): LlmJsonPort {
     model = process.env.FINAL_TRANSCRIPT_MODEL || process.env.OPENROUTER_MODEL;
     if (!apiKey || !model) throw new FinalTranscriptConfigError('کلید یا مدلِ OpenRouter رویِ سرور تنظیم نشده');
     label = 'OpenRouter';
+    // مدل‌هایِ جایگزین (2026-09-28، دستورِ مالک: مدلِ رایگان): اگر مدلِ اصلی (مثلاً یک مدلِ :free) با 429/خطا جواب ندهد،
+    // خودِ OpenRouter همان درخواست را به این‌ها می‌فرستد ⇒ «متنِ نهایی» به محدودیتِ نرخِ مدلِ رایگان گیر نمی‌کند.
+    const fallbacks = String(process.env.FINAL_TRANSCRIPT_FALLBACK_MODELS || '').split(',').map((s) => s.trim()).filter((s) => s && s !== model);
     extraBody = {
       ...(resolveReasoningBody(process.env.FINAL_TRANSCRIPT_REASONING_EFFORT || process.env.OPENROUTER_REASONING_EFFORT) ?? {}),
-      provider: { sort: 'latency' },
+      // require_parameters (2026-09-28): فقط providerهایی که json_schema را واقعاً پشتیبانی می‌کنند. بدونِ آن sort:'latency'
+      // ممکن بود درخواست را به providerی بفرستد که schema را نادیده می‌گیرد (مثلاً چند provider ِ DeepSeek) ⇒ خروجیِ آزاد.
+      // data_collection:'deny' (2026-09-28): متنِ بالینی هرگز به providerی نمی‌رود که داده را نگه می‌دارد یا با آن آموزش
+      // می‌دهد — به‌ویژه مهم برایِ مدل‌هایِ :free (LAW-001).
+      provider: { sort: 'latency', require_parameters: true, data_collection: 'deny' },
+      ...(fallbacks.length ? { models: [model, ...fallbacks] } : {}),
       max_tokens: maxTokens,
     };
     client = new OpenAI({

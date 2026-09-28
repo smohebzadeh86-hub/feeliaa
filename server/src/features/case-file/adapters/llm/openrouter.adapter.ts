@@ -52,7 +52,10 @@ export class OpenRouterAdapter implements LLMProvider {
       ...(resolveReasoningBody(process.env.OPENROUTER_REASONING_EFFORT) ?? {}),
       // همان مدل ممکن است روی چند provider عرضه شود؛ سریع‌ترین provider برای کارِ تعاملی
       // مناسب‌تر است و کیفیت/مدل را عوض نمی‌کند.
-      provider: { sort: 'latency' },
+      // require_parameters (2026-09-28): فقط providerهایی که json_schema را پشتیبانی می‌کنند (بعضی providerهایِ همان مدل
+      // schema را نادیده می‌گیرند و خروجیِ آزاد می‌دهند).
+      // data_collection:'deny': دادهٔ بالینی فقط به providerهایی که داده را نگه نمی‌دارند/با آن آموزش نمی‌دهند (LAW-001).
+      provider: { sort: 'latency', require_parameters: true, data_collection: 'deny' },
       // (2026-09-28) بدونِ max_tokens، OpenRouter سقفِ کاملِ مدل (۱۳۱۰۷۲ توکن) را از اعتبار رزرو می‌کند و با اعتبارِ کم
       // «402 … requires more credits, or fewer max_tokens» می‌دهد، هرچند مصرفِ واقعی کم است (مشاهده‌شده در dev).
       // ۳۲k بسیار بالاتر از خروجیِ یک پرونده (+ استدلال) است؛ با CASE_FILE_MAX_TOKENS قابلِ تغییر.
