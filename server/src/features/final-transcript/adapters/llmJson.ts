@@ -2,13 +2,64 @@
 // پورت و پرامپت‌هایِ case-file دست نمی‌خورند. از callStructuredِ مشترک استفاده می‌شود (خطایِ گذرا ⇒ transient).
 // ⚠️ LAW-001: هیچ‌جا payload/response لاگ نمی‌شود — فقط مدت و نامِ گذر.
 import OpenAI from 'openai';
-import { callStructured } from '../../case-file/adapters/llm/chatJson.js';
+import { callStructured, isTransientLlmError } from '../../case-file/adapters/llm/chatJson.js';
+import { CaseFileGenerationError } from '../../case-file/domain/errors.js';
 import { resolveReasoningBody } from '../../case-file/adapters/llm/openrouter.adapter.js';
 import type { LlmJsonPort } from '../ports.js';
 
 export class FinalTranscriptConfigError extends Error {
   transient = false;
   constructor(message: string) { super(message); this.name = 'FinalTranscriptConfigError'; }
+}
+
+// JSON از متنِ آزاد: حذفِ بلوکِ استدلال (<think>…</think>) و fence، سپس اولین «{» تا آخرین «}». نامعتبر ⇒ null.
+export function extractJson(raw: string): unknown | null {
+  let s = String(raw || '').replace(/<think>[\s\S]*?<\/think>/gi, '').replace(/```(?:json)?/gi, '').trim();
+  const a = s.indexOf('{');
+  const b = s.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  s = s.slice(a, b + 1);
+  try { return JSON.parse(s); } catch { return null; }
+}
+
+// مقایسه‌ی ساختارِ خروجی با schema (فقط کلیدهایِ required و نوعِ آرایه/رشته در سطحِ اول و آیتم‌ها) — نه اعتبارسنجِ کامل،
+// فقط تا خروجیِ بی‌ربط (مثلاً {"answer": …}) به‌جایِ نوبت‌ها پذیرفته نشود.
+function shapeOk(v: unknown, schema: any): boolean {
+  const s = schema?.schema ?? schema;
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+  for (const key of s?.required || []) {
+    const val = (v as any)[key];
+    const t = s.properties?.[key]?.type;
+    if (val === undefined) return false;
+    if (t === 'array' && !Array.isArray(val)) return false;
+    if (t === 'string' && typeof val !== 'string') return false;
+    if (t === 'array' && s.properties[key].items?.type === 'object') {
+      for (const it of val) if (!shapeOk(it, s.properties[key].items)) return false;
+    }
+  }
+  return true;
+}
+
+async function promptJson<T>(client: OpenAI, model: string, label: string, system: string, user: string, schema: unknown, extraBody?: Record<string, unknown>): Promise<T> {
+  const spec = JSON.stringify((schema as any)?.schema ?? schema);
+  const sys = `${system}\n\nقالبِ خروجی: فقط و فقط یک شیءِ JSONِ معتبر مطابقِ این JSON Schema برگردان — بدونِ هیچ توضیح، مقدمه، یا \`\`\`:\n${spec}`;
+  // یک تلاشِ دوباره برایِ خروجیِ نامعتبر (مدل‌هایِ بدونِ structured output گاهی متنِ آزاد می‌دهند)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let raw: string | null | undefined;
+    try {
+      const res = await client.chat.completions.create({
+        model,
+        messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
+        ...(extraBody ?? {}),
+      } as any);
+      raw = (res as any).choices?.[0]?.message?.content;
+    } catch (err) {
+      throw new CaseFileGenerationError('llm-failed', `فراخوانی ${label} ناموفق بود: ` + (err instanceof Error ? err.message : 'خطای نامشخص'), { transient: isTransientLlmError(err) });
+    }
+    const parsed = extractJson(raw || '');
+    if (parsed && shapeOk(parsed, schema)) return parsed as T;
+  }
+  throw new CaseFileGenerationError('llm-invalid-output', `پاسخ ${label} JSON معتبر نبود`);
 }
 
 function envInt(name: string, def: number): number {
@@ -62,12 +113,22 @@ export function createTranscriptLlm(): LlmJsonPort {
     throw new FinalTranscriptConfigError(`LLM_PROVIDER نامعتبر: ${kind}`);
   }
   const m = model;
+  // حالتِ JSON (2026-09-28): 'schema' (پیش‌فرض) = response_format: json_schema ِ strict. 'prompt' = برایِ مدل‌هایی که
+  // structured output ندارند (بیشترِ مدل‌هایِ :free — Nemotron، Inkling، Ling): schema در پرامپت می‌آید و خروجی با parseِ
+  // مقاوم خوانده می‌شود. نگهبان‌هایِ قطعیِ polish در هر دو حالت همان‌اند، پس خروجیِ بد به متنِ خام برمی‌گردد نه به متنِ نهایی.
+  const jsonMode = kind === 'openrouter' && process.env.FINAL_TRANSCRIPT_JSON_MODE === 'prompt' ? 'prompt' : 'schema';
+  if (jsonMode === 'prompt' && extraBody) {
+    // require_parameters بدونِ response_format معنایی ندارد و providerهایِ بی‌پشتیبانی از max_tokens را هم حذف می‌کرد
+    extraBody = { ...extraBody, provider: { sort: 'latency', data_collection: 'deny' } };
+  }
   return {
     model: m,
     async completeJson<T>(system: string, user: string, schema: unknown): Promise<T> {
       const startedAt = Date.now();
       try {
-        const r = await callStructured<T>(client, m, label, system, user, schema, extraBody);
+        const r = jsonMode === 'prompt'
+          ? await promptJson<T>(client, m, label, system, user, schema, extraBody)
+          : await callStructured<T>(client, m, label, system, user, schema, extraBody);
         console.log(`[final-transcript] ${label} call ok in ${Date.now() - startedAt}ms`);
         return r;
       } catch (e) {

@@ -559,6 +559,15 @@ await t('B12 ماشینِ حالت: trustDiarization فقط برایِ asyncِ �
   assert.deepEqual(seen, [true, false, false]);
 });
 
+// ——— حالتِ JSON از پرامپت (مدل‌هایِ :free بدونِ structured output، 2026-09-28) ———
+await t('B13 extractJson: بلوکِ <think>، fence و متنِ اضافه حذف می‌شوند؛ JSONِ نامعتبر ⇒ null', async () => {
+  const { extractJson } = await import('../server/src/features/final-transcript/adapters/llmJson.js');
+  assert.deepEqual(extractJson('<think>بگذار فکر کنم {نه این}</think>\n```json\n{"turns":[{"speaker_role":"درمانگر","text":"سلام"}]}\n```'), { turns: [{ speaker_role: 'درمانگر', text: 'سلام' }] });
+  assert.deepEqual(extractJson('باشه، این خروجی است: {"a":1} امیدوارم کمک کند'), { a: 1 });
+  assert.equal(extractJson('هیچ JSONی نیست'), null);
+  assert.equal(extractJson('{"a": 1,,}'), null);
+});
+
 console.log(`\n${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);
 })();
