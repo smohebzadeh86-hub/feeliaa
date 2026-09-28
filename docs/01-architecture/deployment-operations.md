@@ -51,6 +51,8 @@ pnpm --filter server start
 | `feelia` | `/root/feeliaa` | **stopped** | یک git repo واقعی (branch `main`)؛ کدِ Postgresِ قدیمی/متروک؛ فقط برایِ مرجعِ تاریخی نگه‌داشته شده — **این production نیست.** |
 | `feelia-mysql` | `/root/feeliaa-mysql` | **online، همان که واقعاً سرویس می‌دهد** | یک checkout بدونِ `.git` (کپیِ ساده، آپدیت با آپلودِ دستیِ tar + استخراج مستقیم روی همین مسیر، نه `git pull`)؛ `.env`ِ واقعی فقط `/root/feeliaa-mysql/.env` (`-rw-------`) است — کدِ برنامه `<cwd>/.env` را می‌خواند (جدولِ بخشِ ۳). نسخه‌ی کهنه‌ی `server/.env` (credentialِ DBِ نامعتبر، world-writable) در 2026-09-23 به `server/.env.stale-2026-09-23` (`chmod 600`) منتقل شد. |
 
+**LLM در production (2026-09-28):** تا این تاریخ `.env`ِ زنده هیچ کلیدِ LLMی نداشت (تولیدِ پرونده هرگز کار نکرده بود). از deployِ `d0cbab7`: `LLM_PROVIDER=openrouter`، `OPENROUTER_API_KEY` (همان کلیدِ dev — اعتبارِ مشترک، مثلِ Soniox)، `OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash`. سقفِ توکن در کد (`FINAL_TRANSCRIPT_MAX_TOKENS`/`CASE_FILE_MAX_TOKENS`) است. بدونِ آن، OpenRouter با اعتبارِ کم 402 می‌دهد.
+
 nginx رویِ پورتِ ۳۰۰۰ به `feelia-mysql` وصل است (`ss -tlnp` تأیید کرد فقط یک پروسه‌ی node رویِ ۳۰۰۰ گوش می‌دهد).
 `$HOME/server-deploy` (ادعایِ قدیمیِ `diag-collect.sh`) دیگر بررسی نشد — با دو پروسه‌ی بالا بی‌ربط به نظر می‌رسد.
 
