@@ -1,12 +1,16 @@
 // CRUD برای مراجعین — همیشه محدود به تراپیستِ واردشده
 import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
-import { query } from '../../db/connection.js';
 import { requireAuth } from '../../auth/guard.js';
 import { getOwnedClient } from '../../db/ownership.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
 import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/purge.js';
+import {
+  listClientsWithStats, clearRecordingConsent, listRecoveredSessions, clientCodeExists, insertClient, getClientRow,
+  listClientSessions, updateClientAlias, updateClientStatus, setClientPinned, updateClientCategory, countClientCascade,
+  listSessionIdsOfClient, deleteOwnedClient,
+} from './clients.repository.js';
 import { treatmentUnits, TreatmentUnitValidationError } from '../treatment-unit/index.js';
 
 const VALID_CATEGORIES = ['child', 'teen', 'adult'];
@@ -34,31 +38,14 @@ export async function clientRoutes(app: FastifyInstance) {
 
   // GET /api/clients — لیست مراجعینِ همین تراپیست
   app.get('/api/clients', async (request) => {
-    const result = await query(`
-      SELECT
-        c.id, c.code, c.alias, c.created_at,
-        c.status, c.status_reason, c.category, c.gender, c.pinned_at, c.recording_consent_at, c.unit_type,
-        (SELECT COUNT(*) FROM client_members m WHERE m.client_id = c.id) as member_count,
-        COUNT(s.id) as session_count,
-        MAX(s.date) as last_session_date
-      FROM clients c
-      LEFT JOIN sessions s ON s.client_id = c.id
-      WHERE c.therapist_id = ?
-      GROUP BY c.id
-      ORDER BY c.created_at DESC
-    `, [request.therapistId]);
-    return { clients: result.rows };
+    return { clients: await listClientsWithStats(request.therapistId) };
   });
 
   // DELETE /api/clients/:id/recording-consent — لغوِ رضایتِ یک‌باره‌ی ضبط/رونویسی (migration 024).
   // مراجع رضایتش را پس گرفت ⇒ از جلسه/آپلودِ بعدی دوباره پرسیده می‌شود. جلسه‌ها و متن‌هایِ قبلی دست‌نخورده می‌مانند.
   app.delete('/api/clients/:id/recording-consent', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const r = await query(
-      'UPDATE clients SET recording_consent_at = NULL WHERE id = ? AND therapist_id = ?',
-      [id, request.therapistId]
-    );
-    if (r.rowCount === 0) {
+    if ((await clearRecordingConsent(id, request.therapistId)) === 0) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
@@ -70,18 +57,7 @@ export async function clientRoutes(app: FastifyInstance) {
   // ⭐ GET /api/recovered — جلسات قطع‌شده‌ی همین تراپیست (یک query)
   // ⭐ مرتب بر اساس session_num DESC — همیشه جدیدترین جلسه (نه updated_at)
   app.get('/api/recovered', async (request) => {
-    const result = await query(`
-      SELECT
-        s.id, s.client_id, s.session_num, s.date, s.start_time,
-        s.duration_ms, s.status, s.transcript,
-        CHAR_LENGTH(COALESCE(s.transcript, '')) as transcript_chars,
-        c.code as client_code, c.alias as client_alias
-      FROM sessions s
-      JOIN clients c ON c.id = s.client_id
-      WHERE s.status = 'recovered' AND c.therapist_id = ?
-      ORDER BY s.session_num DESC
-    `, [request.therapistId]);
-    return { recovered: result.rows };
+    return { recovered: await listRecoveredSessions(request.therapistId) };
   });
 
   // POST /api/clients — ساخت مراجع جدید برای همین تراپیست
@@ -127,21 +103,20 @@ export async function clientRoutes(app: FastifyInstance) {
 
     let code = generateClientCode();
     for (let i = 0; i < 5; i++) {
-      const exists = await query('SELECT id FROM clients WHERE code = ?', [code]);
-      if (exists.rows.length === 0) break;
+      if (!(await clientCodeExists(code))) break;
       code = generateClientCode();
     }
 
     const newId = randomUUID();
-    await query(
-      'INSERT INTO clients (id, code, alias, therapist_id, category, gender, status, status_reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [newId, code, alias || null, request.therapistId, category || null, finalGender, finalStatus, statusReason]
-    );
+    await insertClient({
+      id: newId, code, alias: alias || null, therapistId: request.therapistId, category: category || null,
+      gender: finalGender, status: finalStatus, statusReason,
+    });
     if (hasUnit) await treatmentUnits.saveUnit(newId, unit_type!, members as any);
-    const result = await query('SELECT * FROM clients WHERE id = ?', [newId]);
+    const created = await getClientRow(newId);
 
     reply.code(201);
-    return { client: result.rows[0], unit: await treatmentUnits.describeUnit(newId) };
+    return { client: created, unit: await treatmentUnits.describeUnit(newId) };
   });
 
   // GET /api/clients/:id — جزئیات یک مراجع + جلساتش (فقط اگر مالِ همین تراپیست باشه)
@@ -154,17 +129,12 @@ export async function clientRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
 
-    const sessionsResult = await query(`
-      SELECT id, session_num, date, start_time, duration_ms, status, source, batch_status, auto_closed_at, created_at
-      FROM sessions
-      WHERE client_id = ?
-      ORDER BY session_num DESC
-    `, [id]);
+    const sessions = await listClientSessions(id);
 
     return {
       client,
       unit: await treatmentUnits.describeUnit(id),
-      sessions: sessionsResult.rows,
+      sessions,
     };
   });
 
@@ -179,18 +149,12 @@ export async function clientRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
 
-    const update = await query(
-      'UPDATE clients SET alias = ? WHERE id = ? AND therapist_id = ?',
-      [alias, id, request.therapistId]
-    );
-
-    if (update.rowCount === 0) {
+    if ((await updateClientAlias(id, request.therapistId, alias)) === 0) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
 
-    const result = await query('SELECT * FROM clients WHERE id = ?', [id]);
-    return { client: result.rows[0] };
+    return { client: await getClientRow(id) };
   });
 
   // PATCH /api/clients/:id/status — انتقال فعال/غیرفعال (همیشه اقدامِ دستیِ تراپیست)
@@ -218,21 +182,15 @@ export async function clientRoutes(app: FastifyInstance) {
 
     // غیرفعال‌شدن یعنی از صفحه‌ی اول (نمای «امروز») هم می‌رود؛ سنجاقِ متناقض روی
     // مراجعِ غیرفعال نگه داشته نمی‌شود.
-    const update = await query(
-      status === 'inactive'
-        ? 'UPDATE clients SET status = ?, status_reason = ?, pinned_at = NULL WHERE id = ? AND therapist_id = ?'
-        : 'UPDATE clients SET status = ?, status_reason = ? WHERE id = ? AND therapist_id = ?',
-      [status, statusReason, id, request.therapistId]
-    );
+    const updated = await updateClientStatus(id, request.therapistId, status, statusReason);
 
     // مراجع بینِ چکِ مالکیت و UPDATE حذف شده — مثلِ PUT، نه 200 با client خالی
-    if (update.rowCount === 0) {
+    if (updated === 0) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
 
-    const result = await query('SELECT * FROM clients WHERE id = ?', [id]);
-    return { client: result.rows[0] };
+    return { client: await getClientRow(id) };
   });
 
   // PATCH /api/clients/:id/pin — سنجاق/برداشتنِ سنجاق به صفحه‌ی اول (نمای «امروز»)
@@ -251,18 +209,12 @@ export async function clientRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
 
-    const update = await query(
-      'UPDATE clients SET pinned_at = ? WHERE id = ? AND therapist_id = ?',
-      [pinned ? new Date() : null, id, request.therapistId]
-    );
-
-    if (update.rowCount === 0) {
+    if ((await setClientPinned(id, request.therapistId, pinned)) === 0) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
 
-    const result = await query('SELECT * FROM clients WHERE id = ?', [id]);
-    return { client: result.rows[0] };
+    return { client: await getClientRow(id) };
   });
 
   // PATCH /api/clients/:id/category — تغییرِ دسته‌بندیِ دموگرافیک (+ جنسیتِ اختیاری)
@@ -288,13 +240,9 @@ export async function clientRoutes(app: FastifyInstance) {
     // جنسیت فقط برایِ نوجوان/بزرگسال معنا داره — با تغییرِ دسته به کودک، پاک می‌شه
     const finalGender = (category === 'child' || category === 'teen' || category === 'adult') ? (gender || null) : null;
 
-    await query(
-      'UPDATE clients SET category = ?, gender = ? WHERE id = ? AND therapist_id = ?',
-      [category || null, finalGender, id, request.therapistId]
-    );
+    await updateClientCategory(id, request.therapistId, category || null, finalGender);
 
-    const result = await query('SELECT * FROM clients WHERE id = ?', [id]);
-    return { client: result.rows[0] };
+    return { client: await getClientRow(id) };
   });
 
   // DELETE /api/clients/:id — حذف آبشاری
@@ -307,25 +255,14 @@ export async function clientRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
 
-    const countResult = await query(`
-      SELECT
-        (SELECT COUNT(*) FROM sessions WHERE client_id = ?) as session_count,
-        (SELECT COUNT(*) FROM session_notes WHERE session_id IN
-          (SELECT id FROM sessions WHERE client_id = ?)) as note_count
-    `, [id, id]);
+    const cascade = await countClientCascade(id);
     // LAW-010: قبل از cascadeِ DB، شناسه‌ی جلسه‌ها را نگه می‌داریم — بعدِ حذف دیگر قابلِ
     // خواندن نیستند، ولی فایل‌هایِ آرشیوشده‌ی هرکدام (data/session-audio/<sessionId>/)
     // بدونِ این لیست یتیم می‌مانند.
-    const sessionIdsResult = await query('SELECT id FROM sessions WHERE client_id = ?', [id]);
-    const sessionIds = sessionIdsResult.rows.map((r: { id: string }) => r.id);
+    const sessionIds = await listSessionIdsOfClient(id);
     const media = await prepareSessionMediaPurge(sessionIds);
 
-    const del = await query(
-      'DELETE FROM clients WHERE id = ? AND therapist_id = ?',
-      [id, request.therapistId]
-    );
-
-    if (del.rowCount === 0) {
+    if ((await deleteOwnedClient(id, request.therapistId)) === 0) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
@@ -335,7 +272,7 @@ export async function clientRoutes(app: FastifyInstance) {
 
     return {
       deleted: owned.code,
-      cascade: countResult.rows[0],
+      cascade,
     };
   });
 }
