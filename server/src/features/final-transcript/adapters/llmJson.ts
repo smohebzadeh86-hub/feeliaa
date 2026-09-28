@@ -87,8 +87,12 @@ export function createTranscriptLlm(): LlmJsonPort {
     // مدل‌هایِ جایگزین (2026-09-28، دستورِ مالک: مدلِ رایگان): اگر مدلِ اصلی (مثلاً یک مدلِ :free) با 429/خطا جواب ندهد،
     // خودِ OpenRouter همان درخواست را به این‌ها می‌فرستد ⇒ «متنِ نهایی» به محدودیتِ نرخِ مدلِ رایگان گیر نمی‌کند.
     const fallbacks = String(process.env.FINAL_TRANSCRIPT_FALLBACK_MODELS || '').split(',').map((s) => s.trim()).filter((s) => s && s !== model);
+    // FINAL_TRANSCRIPT_REASONING_EFFORT=off (2026-09-28): مدل‌هایِ «فکرکننده» (مثلِ Dots3-Note) رویِ یک تکه‌ی ۴۰۰۰نویسه‌ای
+    // ۱۲ تا ۱۳ هزار توکنِ استدلال مصرف می‌کردند (۱۱۶ تا ۱۴۷ث، و رویِ متنِ واقعی پاسخِ خالی چون سقفِ توکن پر می‌شد). بدونِ
+    // استدلال: ۱۳ تا ۱۶ث، ~۱۳۰۰ توکن، JSONِ معتبر. ویرایشِ متن به استدلالِ طولانی نیاز ندارد.
+    const effort = String(process.env.FINAL_TRANSCRIPT_REASONING_EFFORT || '').trim().toLowerCase();
     extraBody = {
-      ...(resolveReasoningBody(process.env.FINAL_TRANSCRIPT_REASONING_EFFORT || process.env.OPENROUTER_REASONING_EFFORT) ?? {}),
+      ...(effort === 'off' ? { reasoning: { enabled: false } } : resolveReasoningBody(effort || process.env.OPENROUTER_REASONING_EFFORT) ?? {}),
       // require_parameters (2026-09-28): فقط providerهایی که json_schema را واقعاً پشتیبانی می‌کنند. بدونِ آن sort:'latency'
       // ممکن بود درخواست را به providerی بفرستد که schema را نادیده می‌گیرد (مثلاً چند provider ِ DeepSeek) ⇒ خروجیِ آزاد.
       // data_collection:'deny' (2026-09-28): متنِ بالینی هرگز به providerی نمی‌رود که داده را نگه می‌دارد یا با آن آموزش
@@ -137,10 +141,13 @@ export function createTranscriptLlm(): LlmJsonPort {
           return r;
         } catch (e) {
           const transient = !!(e as { transient?: boolean })?.transient;
+          // پاسخِ خالی/JSONِ نامعتبر هم یک بار دوباره امتحان می‌شود (مدل‌هایِ :free گاهی خالی جواب می‌دهند)؛ بعد از آن همان
+          // رفتارِ قبلی: تکه خام می‌ماند (گذرِ تکه) یا job دوباره تلاش می‌کند (گذرِ برداشتِ کلی).
+          const invalid = (e as { code?: string })?.code === 'llm-invalid-output';
           // فقط کد/پیامِ خطایِ provider (بدونِ پرامپت/پاسخ — LAW-001) تا علتِ شکست در لاگ دیده شود
           const why = String((e as Error)?.message || '').replace(/\s+/g, ' ').slice(0, 140);
           console.log(`[final-transcript] ${label} call failed after ${Date.now() - startedAt}ms: ${why}`);
-          if (!transient || attempt >= retries) throw e;
+          if (!(transient || (invalid && attempt < 1)) || attempt >= retries) throw e;
           await new Promise((r) => setTimeout(r, 5000 * (attempt + 1)));
         }
       }
