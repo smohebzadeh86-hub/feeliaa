@@ -9,7 +9,7 @@
 > **🔶 تصمیمِ مالک (2026-09-24):** مسیرِ آپلود برایِ **مراجعِ فعال و غیرفعال** فعلاً با **ذخیره‌ی متن** تمام می‌شود — پرونده ساخته نمی‌شود
 > («در نهایت همون متنش ذخیره بشه … تبدیل به پرونده باشه بعدش، الان نه»). job بعد از ثبتِ متن مستقیم `done` با `case_file_status='disabled'`
 > می‌شود؛ UI سه مرحله نشان می‌دهد (دریافت ← تبدیل به متن ← متن ذخیره شد). مرحله‌ی `case_file` (§۴، §۷) در کد و تست باقی است و با
-> `UPLOAD_CASE_FILE=1` + `UPLOAD_SHOW_CASE_FILE_STEP=true` روشن می‌شود. تنها اعلانِ این مسیر: `transcript_ready`/`transcript_empty`/`processing_failed`.
+> `UPLOAD_CASE_FILE=1` + `UPLOAD_SHOW_CASE_FILE_STEP=true` روشن می‌شود. تنها اعلانِ این مسیر: `transcript_ready`/`transcript_low_quality` (2026-09-28)/`transcript_empty`/`processing_failed`.
 >
 > **🔶 تصمیمِ مالک (2026-09-25):** «فعلاً متن ذخیره بشه؛ بعداً اگه خواستم پرونده» (پرونده هنوز برایِ همه‌ی تراپیست‌ها فعال نیست) ⇒ **پیش‌فرض
 > هنوز برایِ همه فقط متن است.** مسیرِ «مراجعِ غیرفعال ⇒ پرونده» پیاده و با E2Eِ واقعی تأیید شده ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است.
@@ -107,7 +107,7 @@ queued → normalizing → transcribing → case_file → done
 ## ۶. اعلان‌ها (`notifications`)
 
 - فقط از رویدادِ واقعیِ backend، داخلِ همان تراکنشِ تغییرِ وضعیت. `UNIQUE(job_id, kind)` + `INSERT IGNORE` ⇒ retry اعلانِ تکراری نمی‌سازد.
-- انواع: `transcript_ready`، `transcript_empty`، `processing_failed` (+`error_code`)، `case_file_updated`، `case_file_failed`. متنِ فارسی در UI از `kind` ساخته می‌شود ⇒ هیچ داده‌ی بالینی در جدول نیست.
+- انواع: `transcript_ready`، `transcript_low_quality` (متن ذخیره شد ولی کم‌اطمینان — بخشِ ۱۰)، `transcript_empty`، `processing_failed` (+`error_code`)، `case_file_updated`، `case_file_failed`. متنِ فارسی در UI از `kind` ساخته می‌شود ⇒ هیچ داده‌ی بالینی در جدول نیست.
 - «در صف/در حالِ تبدیل» **وضعیت** است، نه اعلان (پرهیز از خستگیِ اعلان).
 - UI: سینیِ «پردازش‌ها و اعلان‌ها» (زنگوله با شمارنده) — poll هر ۵ث وقتی کاری فعال است، وگرنه ۳۰ث، و با برگشت به تب. اعلانِ تازه ⇒ بنرِ درون‌اپ + Notificationِ مرورگر (فقط اگر تب پس‌زمینه است و اجازه داده شده؛ متنِ عمومی بدونِ کد/نامِ مراجع چون رویِ صفحه‌ی قفلِ گوشی دیده می‌شود). اعلان‌هایِ خوانده‌نشده بعد از ورودِ دوباره در سینی می‌مانند. نگه‌داری ۳۰ روز.
 - **محدودیت:** Push واقعی وقتی مرورگر کاملاً بسته است (Service Worker + Web Push) پیاده نشده.
@@ -150,3 +150,15 @@ queued → normalizing → transcribing → case_file → done
 - **A1.3 گروهِ گیرکرده:** `POST /api/uploads` برایِ بخشِ `complete`ِ بدونِ جلسه `finalizeGroup` را دوباره (زیرِ قفلِ گروه، idempotent) اجرا می‌کند؛ اگر جلسه ساخته شد/بود پاسخ `duplicate:true` با `job` است، وگرنه `part_done` با `parts_received/parts_total`. `sweepStaleUploads(tryFinalizeGroup)` هر ساعت گروه‌هایِ کاملِ بدونِ جلسه (قدیمی‌تر از ۱۰ دقیقه) را finalize می‌کند، نه اینکه بعد از ۷ روز حذف کند.
 - **A1.8 رضایت:** `feelia-upload.js` فقط در شروعِ دستی (`start`/`startGroup`) و فقط تا اولین پاسخِ موفقِ `POST /api/uploads`، `consent:true` می‌فرستد؛ resume بعد از رفرش و retry نمی‌فرستند. سرور رضایت را فقط بعد از گذشتنِ validationها (تاریخ، گروهِ بسته) ثبت می‌کند.
 - ⚠️ این دو با DBِ واقعی (E2E) تست نشده‌اند — فقط `tsc` و `test:up` (بدونِ رگرسیون).
+
+## ۱۰. کیفیتِ فایلِ آپلودی (پلنِ B، 2026-09-28 — migration 033)
+
+مبنا: فاز ۰B ([verification](../../verification/2026-09-28-upload-audio-quality-phase0b.md)). Soniox در برابرِ صدایِ آرام تا −50dB، وزوز/نویزِ ایستا تا SNR 0، ۸kHz، mp3ِ ۳۲k و clipping +20 مقاوم بود؛ اولین آسیب ادغامِ گوینده‌ها بود و تنها آسیبِ جدیِ واژه‌ای همهمه‌یِ هم‌سطح (WER ۲۲٫۵٪). **تنها پیش‌بینی‌کننده‌ی متنِ خراب confidenceِ خودِ Soniox بود.** هیچ فیلترِ صوتی (loudnorm/dynaudnorm/highpass/notch/afftdn) gate را رد نکرد ⇒ **پیش‌پردازش ساخته نشد**؛ فایلِ آرشیو و فایلِ Soniox همان خروجیِ `normalizeAudio` است.
+
+- **سنجش (`quality.ts`)**: در مرحله‌ی `normalizing`، بعد از `normalizeAudio` و **پیش از** `archive`، یک گذرِ ffmpeg (`-f f32le -ar 16000`، stream، whitelistِ همان `media.ts`) ⇒ `FileQualityMeter` (portِ `createAudioQualityMonitor`، قاب ۵۰ms، پنجره ۳۰ث). خروجی `{p10_db, p95_db, clip_frac, windows, flagged_windows, flags}` در `audio_jobs.audio_quality`. آستانه‌ها در configuration-catalog (`QUALITY`)؛ `too_quiet` −60 (نه −45ِ زنده). flag فقط وقتی ≥۳۰٪ پنجره‌ها مشکل دارند (سکوتِ عادیِ جلسه flag نمی‌سازد). **fail-open**: خطا/timeout ⇒ `null`، job بی‌تغییر ادامه می‌دهد. ری‌استارت بعد از نرمال‌سازی: سنجه‌ی ثبت‌نشده از فایلِ آرشیو گرفته می‌شود. هیچ فایلی رد نمی‌شود (فقط `no-audio`/`unreadable` مثلِ قبل).
+- **flagها فقط «علتِ احتمالی»‌اند** (`noisy` نویزِ بی‌خطر را هم می‌گیرد و همهمه را از نویزِ ایستا جدا نمی‌کند) ⇒ هیچ‌وقت به‌تنهایی هشدار/اعلان نمی‌سازند؛ در UI فقط «نکته برایِ ضبطِ بعدی».
+- **هشدار (`quality_warning='low_confidence'`)**: `getText` حالا `{text, lowConfRatio, markedText}` برمی‌گرداند. `lowConfRatio` = سهمِ توکن‌هایِ محتوادار با confidence<0.7. بیشتر از `UPLOAD_LOW_CONF_RATIO` (۰٫۰۸) ⇒ متن **در هر حال ذخیره می‌شود** (LAW-008) ولی اعلان `transcript_low_quality` به‌جایِ `transcript_ready`، و `audio_jobs.quality_warning/low_conf_ratio` ثبت می‌شود. بدونِ confidence ⇒ بدونِ هشدار (fail-open). متنِ خالی ⇒ همان `transcript_empty`.
+- **«متنِ نهایی» از آپلود**: ورودیِ polish نسخه‌ی علامت‌خورده (`markedTextFromTokens`: واژه‌هایِ confidence<`TRANSCRIPT_UNCERTAIN_CONFIDENCE` داخلِ `⟦…؟⟧`) است؛ `sessions.transcript` بدونِ علامت. اگر جلسه از قبل متن داشت، **کلِ متن** (نه فقط بخشِ آپلودی — قبلاً متنِ نهایی بخشِ قبلی را پنهان می‌کرد) با برچسبِ جداکننده و شماره‌ی گوینده‌هایِ جدا برایِ بخشِ آپلودی (`appendUploadForPolish`) مرتب می‌شود.
+- **signها عمداً به متنِ آپلودی داده نمی‌شوند** (برخلافِ پیش‌نویسِ پلن): `offset_ms`ِ علامت نسبت به صدایِ جلسه‌ی زنده است، نه فایلِ آپلودی، و علائمِ زنده از قبل در بخشِ زنده‌ی متن هستند.
+- **UI**: خطِ راهنما در مودالِ آپلود؛ کارتِ job (سینی و صفحه‌ی جلسه): `low_confidence` ⇒ بنرِ زرد + علتِ احتمالی از flag؛ فقط flag ⇒ نکته‌ی خاکستری؛ هشدار پنلِ صفحه‌ی جلسه را نگه می‌دارد. Clarity: `upload_quality_warned` (فقط نام). obs: `audio_job.quality_flags`، `audio_job.low_confidence` (فقط `reason`).
+- **آزمون**: `test:up` H41–H51 (ماشینِ حالت، meterِ خالص، علامت‌گذاری، ffmpegِ واقعی: تمیز/−40dB/mp3/۸kHz بدونِ flag؛ −50dB/+30dB/SNR −5 flag درست؛ فایلِ خراب ⇒ null).

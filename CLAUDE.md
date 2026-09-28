@@ -112,6 +112,7 @@ cd server && npx tsc --noEmit
 - `pnpm test:rt` = harness موتورِ realtime (`scripts/rt-harness.cjs`) — بدونِ شبکه/DB. وضعیتِ فعلی: بخش 20 Master Reference.
 - `pnpm test:cf` = harness پرونده‌ی درمان (`scripts/case-file-harness.ts`، اجرا با tsx) — بدونِ شبکه/DB/LLMِ واقعی؛ دادهٔ ساختگی.
 - `pnpm test:up` = harness pipelineِ آپلودِ فایلِ صوتی (`scripts/upload-harness.ts`، 2026-09-23) — ماشینِ حالتِ job با portهایِ جعلی (بدونِ DB/Soniox) + ffmpegِ واقعی رویِ فایل‌هایِ ساختگی.
+- `pnpm test:ft` = harness «متنِ نهایی» (`scripts/final-transcript-harness.ts`، 2026-09-27) — ماشینِ حالت، نگهبان‌ها و polish با LLMِ جعلی؛ بدونِ DB/شبکه.
 - تستِ خودکارِ backend با DB یا CI وجود ندارد.
 
 ## ۹. رفتارِ Agent

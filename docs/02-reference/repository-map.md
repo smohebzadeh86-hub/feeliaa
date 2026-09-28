@@ -44,7 +44,8 @@ feeliaa/
 │       ├── stt/  batchqueue.ts M · soniox.ts M · tempkey.ts T · asyncTranscribe.ts U · sessionAudioArchive.ts U (+ `deriveSessionStatus` جدید، فازِ ۱) · speakerResolve.ts U · sessionContext.ts (contextِ ثابتِ تفکیکِ گوینده، 2026-09-26) · signMarkers.ts (قالبِ نشانگرِ علامت در متن، 2026-09-27)
 │       ├── features/case-file/  U — جدید 2026-09-17: AI Case File (Ports & Adapters)؛ `application/autoTrigger.ts` (2026-09-23، سیاستِ مرکزیِ تولیدِ خودکار)
 │       ├── features/treatment-unit/  U — جدید 2026-09-27: واحدِ درمان (فردی/زوج/خانواده) + contextِ پویای Soniox (Ports & Adapters)؛ کاتالوگ در DB (migration 029)؛ harness: `scripts/treatment-unit-harness.ts` (`pnpm test:tu`)
-│       ├── features/audio-upload/  U — جدید 2026-09-23: آپلودِ فایلِ صوتیِ جلسه + jobِ پس‌زمینه ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))
+│       ├── features/final-transcript/  U — جدید 2026-09-27: «متنِ نهایی» — رونویسیِ دوباره + مرتب‌سازی با LLM بعد از پایانِ جلسه ([subsystem 07](../07-subsystems/07-final-transcript.md))، migration 031
+│       ├── features/audio-upload/  U — جدید 2026-09-23: آپلودِ فایلِ صوتیِ جلسه + jobِ پس‌زمینه ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))؛ `quality.ts` (2026-09-28) سنجشِ کیفیتِ فایل، migration 033
 │       ├── features/notifications/ U — جدید 2026-09-23: اعلان‌هایِ پایدار (`notify.ts`)
 │       │   ├── domain/     types.ts، errors.ts، validate.ts، normalizeText.ts (جدید 2026-09-19)، findings.ts (جدید 2026-09-20: واحدِ «یافته»، شناسه‌ی فکت، finalizeCouple)
 │       │   ├── ports/      llmProvider.port.ts، caseFileRepo.port.ts
@@ -57,6 +58,7 @@ feeliaa/
 │
 ├── scripts/rt-harness.cjs             T  تستِ FeeliaRT
 ├── scripts/case-file-harness.ts       T  تستِ پرونده‌ی درمان (findings/merge/patch/repairLoop؛ بدونِ شبکه/DB) — 2026-09-20
+├── scripts/final-transcript-harness.ts U  تستِ «متنِ نهایی» (`pnpm test:ft`؛ ماشینِ حالت، نگهبان‌ها، تکه‌بندی، polish با LLMِ جعلی) — 2026-09-27
 ├── scripts/upload-harness.ts          U  تستِ pipelineِ آپلودِ صدا (`pnpm test:up`؛ ماشینِ حالت با portهایِ جعلی + ffmpegِ واقعی) — 2026-09-23
 │
 ├── docs/

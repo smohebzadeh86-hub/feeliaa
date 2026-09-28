@@ -25,6 +25,8 @@
 | `PRE_NOTE_MAX_CHARS` | `http/sessions.ts` | `2000` | ست نشده | خیر | **جدید 2026-09-27.** سقفِ یادداشتِ پیش از جلسه |
 | `SONIOX_ORPHAN_SWEEP` | `features/audio-upload/jobRunner.ts` | خاموش | **رویِ production: `1`** (در `/root/feeliaa-mysql/.env` ست شد 2026-09-24؛ dry-run پیش از آن: ۱ transcription + ۱ فایلِ یتیمِ 2026-09-16) | خیر | **جدید 2026-09-23.** فقط `1` پاک‌سازیِ فایل/transcriptionِ یتیمِ فیلیا رویِ Soniox را فعال می‌کند. رویِ dev عمداً خاموش — کلیدِ Soniox بینِ dev و production مشترک است و DBِ dev از jobهایِ زنده‌ی production خبر ندارد |
 | `UPLOAD_DAILY_AUDIO_MINUTES` | `features/audio-upload/jobRunner.ts` (`quotaWaitMsForJob`) | `600` | ست نشده (پیش‌فرض ۶۰۰) | خیر | **جدید 2026-09-24 (رفعِ L6).** سقفِ دقیقه‌ی صدایِ رونویسی‌شده‌ی آپلودی برایِ هر تراپیست در ۲۴ ساعتِ غلتان. بیش از آن ⇒ job **صف می‌ماند** (`error_code='quota-wait'`، چکِ دوباره هر ۳۰ دقیقه) — هرگز رد/failed نمی‌شود؛ اولین job همیشه اجرا می‌شود؛ `0` ⇒ بدونِ سقف |
+| `TRANSCRIPT_UNCERTAIN_CONFIDENCE` | `stt/asyncTranscribe.ts` (`uncertainConfidence`) | `0.5` | خیر | خیر | **جدید 2026-09-28 (پلنِ B).** واژه‌ای که کمینه‌ی confidenceِ توکن‌هایش زیرِ این است در **ورودیِ «متنِ نهایی»** با `⟦…؟⟧` علامت می‌خورد (هرگز در `sessions.transcript`). بازه‌ی معتبر (0,1)؛ نامعتبر ⇒ پیش‌فرض |
+| `UPLOAD_LOW_CONF_RATIO` | `stt/asyncTranscribe.ts` (`lowConfidenceWarnRatio`) ⇒ `jobRunner.productionDeps` | `0.08` | خیر | خیر | **جدید 2026-09-28 (پلنِ B).** سهمِ توکن‌هایِ confidence<0.7 که بالاتر از آن jobِ آپلود `quality_warning=low_confidence` و اعلانِ `transcript_low_quality` می‌گیرد. مبنا: فاز ۰B (بی‌آسیب ≤ ۰٫۰۳۸، متنِ خراب ۰٫۱۲۲) — با دادهٔ واقعی بازتنظیم شود. در startup خوانده می‌شود |
 | `UPLOAD_CASE_FILE` | `features/audio-upload/jobMachine.ts#uploadCaseFileEnabled` | خاموش | خیر | خیر | **جدید 2026-09-24 (تصمیمِ مالک).** مسیرِ آپلودِ فایلِ صوتی برایِ مراجعِ فعال و غیرفعال با «ذخیره‌ی متن» تمام می‌شود (`audio_jobs.case_file_status='disabled'`)؛ فقط `1` مرحله‌ی پرونده را بعد از متن روشن می‌کند (UI هم ثابتِ `UPLOAD_SHOW_CASE_FILE_STEP` در `index.html` را دارد که باید هم‌زمان `true` شود). فقط مراجعِ غیرفعال را می‌خواهید؟ ⇒ `UPLOAD_CASE_FILE_INACTIVE` |
 | `UPLOAD_CASE_FILE_INACTIVE` | `features/audio-upload/jobMachine.ts#uploadCaseFileInactiveEnabled` | خاموش | خیر | خیر | **جدید 2026-09-25 (تصمیمِ مالک: «فعلاً متن»).** فقط `1` ⇒ آپلودِ مراجعِ **غیرفعال** بعد از متن پرونده را هم به‌روز می‌کند، به شرطِ `case_file_enabled` و `case_file_auto_generate=true` برایِ آن تراپیست (`uploadCaseFileAllowed`). مراجعِ فعال اثر نمی‌گیرد. UI خودکار از `case_file_planned` پیروی می‌کند. نیازمندِ ری‌استارت |
 | `CASE_FILE_AUTO_ACTIVE_CLIENTS` | `features/case-file/application/autoTrigger.ts` | خاموش | خیر | خیر | **جدید 2026-09-23 (پی‌ریزی، تصمیمِ مالک «الان نه»).** `1` ⇒ تولیدِ خودکارِ پرونده برایِ مراجعِ **فعال** هم (امروز فقط غیرفعال) |
@@ -35,6 +37,16 @@
 | `OPENROUTER_SITE_URL` | همان | `https://feelia.ir` | خیر | خیر | هدرِ `HTTP-Referer` — فقط شناساییِ اپ در داشبوردِ OpenRouter، بدونِ دیتایِ کاربر |
 | `OPENROUTER_REASONING_EFFORT` | همان | `low` | خیر | خیر | سقفِ «فکرِ پنهان» (reasoning) مدل: `minimal`|`low`|`medium`|`high` یا `default` (هیچ پارامتری نفرست). دلیل (2026-09-20، دادهٔ ساختگی): بدونِ سقف یک اجرا ۱۴٬۱۳۲ توکنِ reasoning داشت و ۷۸۹ث طول کشید؛ با `low` ۱۸۴ث. مقدارِ نامعتبر ⇒ خطای `llm-failed`. |
 | `LLM_PROVIDER` | `features/case-file/adapters/llm/registry.ts` | `openai` | خیر | خیر | `openai` یا `openrouter`؛ مقدارِ دیگر → throw |
+| `FINAL_TRANSCRIPT_MODEL` | `features/final-transcript/adapters/llmJson.ts` | مدلِ پرونده (`OPENROUTER_MODEL` / `OPENAI_CASE_FILE_MODEL`) | خیر | خیر | **2026-09-27.** مدلِ مرتب‌سازیِ «متنِ نهایی» |
+| `FINAL_TRANSCRIPT_MAX_TOKENS` | `features/final-transcript/adapters/llmJson.ts` | `16384` | خیر | خیر | **2026-09-28.** سقفِ توکنِ خروجیِ هر فراخوانیِ «متنِ نهایی» (`max_tokens` در OpenRouter، `max_completion_tokens` در OpenAI). بدونِ آن OpenRouter سقفِ کاملِ مدل (۱۳۱۰۷۲) را از اعتبار رزرو می‌کرد و با اعتبارِ کم 402 می‌داد (مشاهده در dev) |
+| `CASE_FILE_MAX_TOKENS` | `features/case-file/adapters/llm/openrouter.adapter.ts` | `32768` | خیر | خیر | **2026-09-28.** همان سقف برایِ پرونده‌ی درمان (فقط OpenRouter) — همان علتِ 402 |
+| `FINAL_TRANSCRIPT_REASONING_EFFORT` | همان | `OPENROUTER_REASONING_EFFORT` | خیر | خیر | فقط OpenRouter |
+| `FINAL_TRANSCRIPT_LLM_TIMEOUT_MS` | همان | `180000` | خیر | خیر | timeoutِ هر فراخوانیِ LLM (`maxRetries=0`، retry با backoffِ job) |
+| `FINAL_TRANSCRIPT_CHUNK_CHARS` | `features/final-transcript/runner.ts` | `6000` | خیر | خیر | سقفِ نویسه‌ی هر تکه (مرزِ نوبت) |
+| `FINAL_TRANSCRIPT_OVERVIEW_CHARS` | همان | `60000` | خیر | خیر | متنِ بلندتر ⇒ برداشتِ کلی رویِ نمونه‌ی ابتدا/میانه/انتها |
+| `FINAL_TRANSCRIPT_AUDIO_WAIT_MS` | همان | `1800000` | خیر | خیر | سقفِ انتظار برایِ sync ِ آرشیوِ صدا، بعد از آن ⇒ realtime |
+| `FINAL_TRANSCRIPT_SETTLE_MS` | همان | `90000` | خیر | خیر | مکثِ اولیه بعد از پایانِ جلسه (تکه‌هایِ دُمِ مرورگر) |
+| `FINAL_TRANSCRIPT_MIN_LENGTH_RATIO` / `_MAX_LENGTH_RATIO` / `_MIN_OVERLAP` | همان | `0.65` / `1.15` / `0.7` | خیر | خیر | آستانه‌هایِ نگهبانِ هر تکه (`polishGuards.ts`) |
 | `LOG_LEVEL` | `index.ts` (سطحِ لاگرِ Fastify) | `info` | خیر | خیر | **جدید، فازِ ۱ِ رصد/حسابرسی، 2026-09-22** — قبلاً `logger:true` هارد بود |
 | `OBS_SLOW_MS` | `obs/httpHook.ts` | `1500` | خیر | خیر | آستانه‌ی «کند» برایِ ثبتِ `http.request` در DB (پایین‌ترش فقط در JSONL می‌ماند) |
 | `OBS_EVENTS_RETENTION_DAYS` | `obs/sweep.ts` | `180` | خیر | خیر | نگهداریِ `obs_events` |
@@ -65,6 +77,7 @@
 | `POLL_INTERVAL_MS` / سقفِ poll / timeoutِ درخواست | 2000 / **۱۰ دقیقه + ۱ دقیقه به ازایِ هر MB** (`pollTimeoutForBytes`، رفعِ F2، 2026-09-23؛ قبلاً ثابتِ ۱۰ دقیقه) / 20000 (آپلودِ stream: 60000 idle) | `stt/asyncTranscribe.ts` |
 | آپلودِ فایلِ صوتی: `CHUNK_SIZE` / `MAX_UPLOAD_BYTES` / `MAX_ACTIVE_UPLOADS_PER_THERAPIST` / نگهداریِ نیمه‌کاره | ۴MB / ۱GB (تصمیمِ مالک) / ۵ / ۷ روز | `features/audio-upload/uploadStore.ts` (2026-09-23) |
 | `MAX_DURATION_MS` | ۳۰۰ دقیقه (سقفِ Soniox؛ تصمیمِ مالک) | `features/audio-upload/media.ts` |
+| `QUALITY` (سنجشِ فایلِ آپلودی) | قاب ۵۰ms، پنجره ۳۰ث؛ `no_signal` p95<−85، `too_quiet` p95<**−60** (زنده: −45)، `clipping` سهمِ قابِ peak≥0.99 > ۰٫۰۲، `noisy` p10>−40 و p95−p10<12؛ flag وقتی ≥۳۰٪ پنجره‌ها (فایلِ زیرِ ۳ پنجره: کلِ فایل) | `features/audio-upload/quality.ts` |
 | نرمال‌سازی | Opus/Ogg mono 16kHz 32kbps (fallback AAC/M4A 48kbps)؛ timeout = max(۵ دقیقه، طولِ صدا/۱۰) | `media.ts` |
 | workerِ jobها: tick / هم‌زمانی / lease / heartbeat | ۳s / ۲ / ۲۰ دقیقه / ۶۰s | `features/audio-upload/jobRunner.ts` |
 | `BACKOFF_MS` / `MAX_ATTEMPTS` / busyِ پرونده | [30s, 2m, 10m, 30m, 1h, 3h] / 6 / هر ۲ دقیقه تا ۱۵ بار | `features/audio-upload/jobMachine.ts` |

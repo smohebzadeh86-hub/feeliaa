@@ -158,10 +158,10 @@ UIِ فعلی فقط برایِ `status='inactive'` رندر می‌شود. جز
 | GET | `/api/audio-jobs/:id` | — | `{job}` | 404 | — |
 | POST | `/api/audio-jobs/:id/retry` | — | `{job}` — بدونِ آپلودِ دوباره (از نسخه‌ی نرمال‌شده/خامِ رویِ سرور) | 404، 409 `not-failed`، 410 `audio-expired`، 422 (خطایِ دائمیِ فایل: `unreadable`/`no-audio`/`too-long`/`audio-missing`/`audio-expired` — از 2026-09-24 بدونِ استثنایِ «نسخه‌ی نرمال‌شده موجود») | UI |
 | GET | `/api/sessions/:id/audio-job` | — | `{job\|null}` آخرین jobِ جلسه | 404 owned | UI |
-| GET | `/api/notifications` | — | `{notifications[30], unread}` — هر ردیف `{id, kind, client_id, session_id, job_id, error_code, created_at, read_at, client_code, client_alias, session_num}` | — | UI |
+| GET | `/api/notifications` | — | `{notifications[30], unread}` — `kind` شاملِ `transcript_low_quality` (2026-09-28: متن ذخیره شد ولی کم‌اطمینان) — هر ردیف `{id, kind, client_id, session_id, job_id, error_code, created_at, read_at, client_code, client_alias, session_num}` | — | UI |
 | POST | `/api/notifications/read` | `{ids?: string[] (≤100)}` یا `{all:true}` | `{ok:true}` | — | UI |
 
-`AudioJobView` = `{id, stage:"queued"|"normalizing"|"transcribing"|"case_file"|"done"|"failed", attempts, error_code, duration_ms, case_file_status, transcript_ready, transcript_chars, created_at, updated_at, finished_at, next_attempt_at, session_id, session_num, client_id, client_code, client_alias, client_status, case_file_planned, original_name, parts_total}` (2026-09-25: `client_status` وضعیتِ فعلیِ مراجع؛ `case_file_planned` = خروجیِ `uploadCaseFileAllowed` با وضعیتِ فعلی — UI پیش از ثبتِ متن با آن مرحله‌ی «پرونده» را نشان می‌دهد؛ پیش‌فرض false).
+`AudioJobView` = `{id, stage:"queued"|"normalizing"|"transcribing"|"case_file"|"done"|"failed", attempts, error_code, duration_ms, case_file_status, transcript_ready, transcript_chars, created_at, updated_at, finished_at, next_attempt_at, session_id, session_num, client_id, client_code, client_alias, client_status, case_file_planned, original_name, parts_total, quality_flags, quality_warning}` (2026-09-28، پلنِ B / migration 033: `quality_flags` = فهرستِ `no_signal|too_quiet|clipping|noisy` (فقط «علتِ احتمالی»، سنجه‌یِ عددی نه)؛ `quality_warning` = `"low_confidence"|null` — سهمِ توکن‌هایِ کم‌اطمینانِ Soniox > `UPLOAD_LOW_CONF_RATIO`) (2026-09-25: `client_status` وضعیتِ فعلیِ مراجع؛ `case_file_planned` = خروجیِ `uploadCaseFileAllowed` با وضعیتِ فعلی — UI پیش از ثبتِ متن با آن مرحله‌ی «پرونده» را نشان می‌دهد؛ پیش‌فرض false).
 
 **تغییرِ مرتبط:** `GET /api/clients/:id` حالا `sessions[].batch_status` هم برمی‌گرداند؛ `PUT /api/sessions/:id` پاک‌کردنِ تاریخ را برایِ `source='upload'` هم می‌پذیرد (مثلِ `manual`).
 
@@ -175,6 +175,16 @@ UIِ فعلی فقط برایِ `status='inactive'` رندر می‌شود. جز
 | GET/PUT | `/api/therapist/modalities` | `{modalities:[code]}` — 400 `modalities-invalid`/`modality-unknown` |
 
 **تغییرِ مسیرهای موجود:** `POST /api/clients` — اختیاری `unit_type` + `members` (همان خطاهایِ 400 بالا، پیش از INSERT)؛ پاسخ `unit` هم دارد. `GET /api/clients` — `unit_type`، `member_count`. `GET /api/clients/:id` — `unit`. `POST /api/sessions` (زنده) — اختیاری `attendees:[memberId]` (نبود/همه ⇒ NULL؛ 400 `attendees-invalid`/`attendees-empty`/`attendees-unknown`) و `pre_note` (400 `pre-note-too-long`). `POST /api/stt/realtime-session` — `stt_defaults.context` حالا مخصوصِ جلسه است (fail-open به contextِ ثابت).
+
+## ۸.۳ متنِ نهایی — `server/src/features/final-transcript/api/finalTranscript.routes.ts` (همه `auth`) — جدید 2026-09-27
+
+| متد | مسیر | بدنه / خروجی |
+|---|---|---|
+| GET | `/api/sessions/:id/final-transcript` | owned (404). `{enabled, stage, source, stale, clean_text (فقط done), error_code, report:{chunks,fallback_chunks,uncertain}}` — بدونِ ردیف ⇒ `{enabled, stage:null}` |
+| POST | `/api/sessions/:id/final-transcript/retry` | owned (404). failed/skipped یا doneِ stale ⇒ دوباره در صف (`{ok:true}`). بدونِ ردیف ⇒ enqueue (409 `session-not-completed`، 403 `forbidden` اگر قابلیت خاموش است). 409 `busy` (در جریان)، 409 `fresh` (doneِ به‌روز) |
+
+
+**روشن/خاموش فقط از ادمین** (تصمیمِ مالک 2026-09-28؛ `PATCH /api/auth/final-transcript` حذف شد). **تغییرِ مسیرهای موجود:** `GET /api/auth/me`، login و register — فیلدِ `final_transcript_enabled`. `GET /api/admin/therapists` — `final_transcript_enabled`. `PATCH /api/admin/therapists/:id` — اختیاری `final_transcript_enabled` (audit: `purpose=final_transcript_on/off`). `GET /api/notifications` — kindِ جدیدِ `final_transcript_ready`.
 
 ## ۹. WebSocket (LEGACY — LAW-015) — `server/src/ws/transcription.ts`
 

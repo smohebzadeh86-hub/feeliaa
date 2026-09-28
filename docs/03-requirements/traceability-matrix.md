@@ -50,6 +50,8 @@
 
 | REQ-055…059 | [04](../04-modules/04-transcription/module-prd.md) / [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md) | `server/src/features/audio-upload/*`، `features/notifications/notify.ts`، `public/feelia-upload.js` | `scripts/upload-harness.ts` (H1–H24، `pnpm test:up`) | harness 24/24 + mock-UI + **E2Eِ واقعی** (Soniox/LLM/MySQL، ۶۰ دقیقه، kill ِ سرور، UIِ واقعی) — [verification](../../verification/2026-09-23-audio-upload-pipeline.md) §۴.۱ |
 | REQ-060 | 04 | `stt/batchqueue.ts#applyBatchSegmentOnce` | E2E موقت (C3 + mutation، F8-real) | MySQLِ واقعی — همان verification |
+| REQ-101…104 | 04 / [subsystem 07](../07-subsystems/07-final-transcript.md) | `server/src/features/final-transcript/*`، `index.html#renderFinalTranscript` | `scripts/final-transcript-harness.ts` (`pnpm test:ft`، ۳۳) | harness 33/33 + mock-UI + فاز ۰ رویِ ۴ صدا (gate ۸ از ۸) + **E2E رویِ MySQLِ dev با Soniox/LLMِ واقعی ۱۲/۱۲** — [verification](../../verification/2026-09-28-final-transcript-implementation.md) |
+| REQ-105…108 | 04 / [subsystem 06 §۱۰](../07-subsystems/06-audio-upload-pipeline.md)، [07](../07-subsystems/07-final-transcript.md) | `audio-upload/quality.ts`، `jobMachine.ts`، `jobRunner.ts`، `stt/asyncTranscribe.ts`، `final-transcript/domain/{polishGuards,transcriptText}.ts`، `index.html#jobQualityHtml` | `test:up` H41–H51، `test:ft` B1–B8 | harness 52/52 و 41/41 + ffmpegِ واقعی + mock-UI؛ آستانه‌ها از فاز ۰B — [verification](../../verification/2026-09-28-upload-audio-quality-phase0b.md)؛ **E2E رویِ MySQLِ dev + Soniox/ffmpeg/LLMِ واقعی: ۳۸/۴۰ (۲ FAILِ زمان‌بندیِ خودِ تست، نه کد)** |
 
 ## شکاف‌های پوشش (برای master plan)
 1. هیچ تستِ backend (auth، مالکیت، CAS، admin guards، batch merge).
