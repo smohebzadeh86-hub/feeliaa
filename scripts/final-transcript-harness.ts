@@ -10,6 +10,7 @@ import {
 import { parseTurns, chunkTurns, renderClean, sampleForOverview, UPLOAD_LABEL, appendUploadForPolish, maxSpeakerNumber } from '../server/src/features/final-transcript/domain/transcriptText.js';
 import { checkPolishedChunk, negationCount, numberBag, DEFAULT_GUARD_LIMITS } from '../server/src/features/final-transcript/domain/polishGuards.js';
 import { polishTranscript } from '../server/src/features/final-transcript/application/polishTranscript.js';
+import { applyRoleEdit, allowedRoles } from '../server/src/features/final-transcript/domain/roleEdit.js';
 import type { LlmJsonPort } from '../server/src/features/final-transcript/ports.js';
 
 let pass = 0;
@@ -597,6 +598,67 @@ await t('B13 extractJson: بلوکِ <think>، fence و متنِ اضافه حذ
     await assert.rejects(polishTranscript(LONG, null, failing((c) => !c.includes('شماره 1 ')), CFG), (e: any) => e.transient === true);
   });
 }
+
+// ——— 2026-09-28: نوبت‌هایِ ساختاریافته (migration 034) برایِ اصلاحِ نقش و نمایشِ ویرایش‌ها ———
+await t('R1 polish: هر نوبت متنِ خامِ سازنده (raw) و شماره‌ی گوینده (sp) دارد؛ نوبتِ ردشده raw = text', async () => {
+  const llm = fakeLlm(() => ({ turns: [
+    { speaker_role: 'درمانگر', text: 'سلام مهسا، خوش اومدی.' },
+    { speaker_role: 'مراجع', text: 'می‌دونم از کجا شروع کنم. من دو بار حمله داشتم.' },
+    { speaker_role: 'درمانگر', text: 'دو بار. بیشتر بگو.' },
+  ] }));
+  const r = await polishTranscript(RAW_SESSION, null, llm, NCFG);
+  assert.equal(r.turns.length, 4);
+  assert.deepEqual(r.turns[0], { role: 'درمانگر', text: 'سلام مهسا، خوش اومدی.', raw: 'سلام مهسا خوش اومدی', sp: '۱' });
+  assert.equal(r.turns[1].text, r.turns[1].raw, 'نوبتِ ردشده (منفی) خام');
+  assert.equal(r.turns[1].sp, '۲');
+  assert.equal(r.turns[2].marker, true);
+  assert.equal(r.turns[3].sp, '۱');
+});
+
+await t('R2 polish: دو نوبتِ خامِ شکسته (src=[2,3]) ⇒ raw هر دو؛ گوینده‌ی مختلف ⇒ sp=null', async () => {
+  const raw = 'گوینده ۱: از کی شروع شد\n\nگوینده ۲: از دوشنبه که\n\nگوینده ۲: کارم زیاد شد';
+  const llm = fakeLlm(() => ({ turns: [
+    { src: [1], speaker_role: 'درمانگر', text: 'از کی شروع شد؟' },
+    { src: [2, 3], speaker_role: 'مراجع', text: 'از دوشنبه که کارم زیاد شد.' },
+  ] }));
+  const r = await polishTranscript(raw, null, llm, NCFG);
+  assert.equal(r.turns[1].raw, 'از دوشنبه که کارم زیاد شد');
+  assert.equal(r.turns[1].sp, '۲');
+  const mixed = 'گوینده ۱: از کی شروع شد\n\nگوینده ۲: از دوشنبه که کارم زیاد شد';
+  const llm2 = fakeLlm(() => ({ turns: [{ src: [1, 2], speaker_role: 'مراجع', text: 'از کی شروع شد؟ از دوشنبه که کارم زیاد شد.' }] }));
+  const r2 = await polishTranscript(mixed, null, llm2, NCFG);
+  assert.equal(r2.turns[0].sp, null);
+});
+
+await t('R3 اصلاحِ نقش: یک بخش؛ همه‌ی بخش‌هایِ همان صدا؛ متن دست نمی‌خورد؛ پاراگراف‌ها دوباره یکی می‌شوند', () => {
+  const turns = [
+    { role: 'درمانگر', text: 'سلام.', raw: 'سلام', sp: '۱' },
+    { role: 'خانم', text: 'خسته‌ام.', raw: 'خستم', sp: '۲' },
+    { role: '', text: '[علامت · ۰۱:۰۰ — گریه]', marker: true },
+    { role: 'آقا', text: 'من هم.', raw: 'من هم', sp: '۳' },
+    { role: 'خانم', text: 'آره.', raw: 'آره', sp: '۳' },
+  ];
+  const allowed = allowedRoles({ speakers: ['خانم', 'آقا'] }, turns);
+  assert.deepEqual(allowed, ['درمانگر', 'خانم', 'آقا']);
+  const one = applyRoleEdit(turns, { indices: [4], role: 'آقا', sameSpeaker: false }, allowed);
+  assert.ok(one.ok);
+  if (one.ok) {
+    assert.equal(one.changed, 1);
+    assert.equal(one.turns[4].text, 'آره.');
+    assert.equal(one.text, 'درمانگر: سلام.\n\nخانم: خسته‌ام.\n\n[علامت · ۰۱:۰۰ — گریه]\n\nآقا: من هم. آره.');
+    assert.equal(turns[4].role, 'خانم', 'ورودی تغییر نمی‌کند');
+  }
+  const all = applyRoleEdit(turns, { indices: [1], role: 'آقا', sameSpeaker: true }, allowed);
+  assert.ok(all.ok && all.changed === 1, 'فقط sp=۲');
+  const swap = applyRoleEdit(turns, { indices: [3], role: 'خانم', sameSpeaker: true }, allowed);
+  assert.ok(swap.ok && swap.changed === 1 && swap.turns[3].role === 'خانم' && swap.turns[4].role === 'خانم');
+  assert.deepEqual(applyRoleEdit(turns, { indices: [1], role: 'مراجع', sameSpeaker: false }, allowed), { ok: false, error: 'bad-role' });
+  assert.deepEqual(applyRoleEdit(turns, { indices: [2], role: 'آقا', sameSpeaker: false }, allowed), { ok: false, error: 'bad-index' });
+  assert.deepEqual(applyRoleEdit(turns, { indices: [9], role: 'آقا', sameSpeaker: false }, allowed), { ok: false, error: 'bad-index' });
+  assert.deepEqual(applyRoleEdit(turns, { indices: [], role: 'آقا', sameSpeaker: false }, allowed), { ok: false, error: 'bad-index' });
+  // بدونِ فهرستِ حاضرین: نقش‌هایِ موجود + درمانگر/مراجع
+  assert.deepEqual(allowedRoles(null, turns), ['درمانگر', 'مراجع', 'خانم', 'آقا']);
+});
 
 console.log(`\n${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);

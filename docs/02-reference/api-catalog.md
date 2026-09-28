@@ -180,11 +180,12 @@ UIِ فعلی فقط برایِ `status='inactive'` رندر می‌شود. جز
 
 | متد | مسیر | بدنه / خروجی |
 |---|---|---|
-| GET | `/api/sessions/:id/final-transcript` | owned (404). `{enabled, stage, source, stale, clean_text (فقط done), error_code, report:{chunks,fallback_chunks,turns,fallback_turns,uncertain}}` — بدونِ ردیف ⇒ `{enabled, stage:null}` |
+| GET | `/api/sessions/:id/final-transcript` | owned (404). `{enabled, stage, source, stale, clean_text (فقط done), turns, roles, speaker_edit, error_code, report:{chunks,fallback_chunks,turns,fallback_turns,uncertain}}` — بدونِ ردیف ⇒ `{enabled, stage:null}`. **(2026-09-28، migration 034)** `turns` = `[{role, text, raw?, sp?, marker?}]` (فقط done؛ ردیفِ قدیمی ⇒ `null`)، `roles` = نقش‌هایِ مجاز (حاضرینِ واحدِ درمان)، `speaker_edit` = `source==='async'` (شماره‌ی گوینده در کلِ جلسه یکدست است) |
+| PATCH | `/api/sessions/:id/final-transcript/roles` | **جدید 2026-09-28.** owned (404). body `{indices:number[], role, same_speaker?}` ⇒ `{clean_text, turns, changed}`. فقط نقش عوض می‌شود، نه متن. `same_speaker` فقط وقتی `source=async` اثر دارد (همه‌ی نوبت‌هایِ همان `sp`). 400 `bad-role`/`bad-index`، 409 `not-editable` (نه done یا بدونِ `turns`)، 409 `conflict` (هم‌زمان دوباره ساخته شد). رویداد: `final_transcript.role_edit` (`count`، `mode=turn\|speaker`) |
 | POST | `/api/sessions/:id/final-transcript/retry` | owned (404). failed/skipped یا doneِ stale ⇒ دوباره در صف (`{ok:true}`). بدونِ ردیف ⇒ enqueue (409 `session-not-completed`، 403 `forbidden` اگر قابلیت خاموش است). 409 `busy` (در جریان)، 409 `fresh` (doneِ به‌روز) |
 
 
-**روشن/خاموش فقط از ادمین** (تصمیمِ مالک 2026-09-28؛ `PATCH /api/auth/final-transcript` حذف شد). **تغییرِ مسیرهای موجود:** `GET /api/auth/me`، login و register — فیلدِ `final_transcript_enabled`. `GET /api/admin/therapists` — `final_transcript_enabled`. `PATCH /api/admin/therapists/:id` — اختیاری `final_transcript_enabled` (audit: `purpose=final_transcript_on/off`). `GET /api/notifications` — kindِ جدیدِ `final_transcript_ready`.
+**روشن/خاموش فقط از ادمین** (تصمیمِ مالک 2026-09-28؛ `PATCH /api/auth/final-transcript` حذف شد). **تغییرِ مسیرهای موجود:** `GET /api/auth/me`، login و register — فیلدِ `final_transcript_enabled`. `GET /api/admin/therapists` — `final_transcript_enabled`. `PATCH /api/admin/therapists/:id` — اختیاری `final_transcript_enabled` (audit: `purpose=final_transcript_on/off`). `GET /api/notifications` — kindِ جدیدِ `final_transcript_ready`؛ از 2026-09-28 `llm_unavailable` (فقط ادمین‌ها، `error_code` = `credit\|auth\|unavailable`، بدونِ مراجع/جلسه).
 
 ## ۹. WebSocket (LEGACY — LAW-015) — `server/src/ws/transcription.ts`
 

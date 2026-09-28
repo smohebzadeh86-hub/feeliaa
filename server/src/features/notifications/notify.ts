@@ -13,7 +13,9 @@ export type NotificationKind =
   | 'processing_failed'
   | 'case_file_updated'
   | 'case_file_failed'
-  | 'final_transcript_ready';
+  | 'final_transcript_ready'
+  // فقط برایِ ادمین (2026-09-28): سرویسِ LLM در دسترس نیست — error_code = auth | credit | unavailable
+  | 'llm_unavailable';
 
 export interface NewNotification {
   therapistId: string;
@@ -32,6 +34,16 @@ export async function createNotification(n: NewNotification, conn?: PoolConnecti
   const params = [randomUUID(), n.therapistId, n.kind, n.clientId ?? null, n.sessionId ?? null, n.jobId ?? null, n.errorCode ?? null];
   if (conn) await conn.query(sql, params);
   else await query(sql, params);
+}
+
+// اعلان به همه‌ی ادمین‌هایِ فعال (بدونِ مراجع/جلسه). dedupeKey در job_id می‌رود تا تکرارِ همان هشدار
+// (مثلاً پس از restart) با UNIQUE(job_id, kind) بی‌اثر شود — به ازایِ هر ادمین جدا.
+export async function notifyAdmins(kind: NotificationKind, errorCode: string, dedupeKey: string): Promise<number> {
+  const r = await query('SELECT id FROM therapists WHERE is_admin = TRUE AND active = TRUE');
+  for (const row of r.rows) {
+    await createNotification({ therapistId: row.id, kind, errorCode, jobId: `${dedupeKey}-${String(row.id).slice(0, 8)}`.slice(0, 36) });
+  }
+  return r.rows.length;
 }
 
 const RETENTION_DAYS = 30;

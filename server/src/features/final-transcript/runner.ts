@@ -76,14 +76,14 @@ export const sqlFtStore: FtStore = {
     if (patch.stage) logEvent({ event: 'final_transcript.stage', sessionId: job.sessionId, therapistId: job.therapistId, source: 'job', detail: { state: patch.stage } });
   },
 
-  async finish(job: FtJob, cleanText: string, report: unknown) {
+  async finish(job: FtJob, cleanText: string, report: unknown, turns?: unknown[]) {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
       const [r] = await conn.query(
-        `UPDATE final_transcripts SET stage = 'done', clean_text = ?, polish_report = ?, error_code = NULL, attempts = 0,
+        `UPDATE final_transcripts SET stage = 'done', clean_text = ?, clean_turns = ?, polish_report = ?, error_code = NULL, attempts = 0,
            finished_at = NOW(), locked_until = NULL WHERE session_id = ?`,
-        [cleanText, JSON.stringify(report ?? {}), job.sessionId]);
+        [cleanText, turns ? JSON.stringify(turns) : null, JSON.stringify(report ?? {}), job.sessionId]);
       if ((r as any).affectedRows) {
         // job_id = session_id: یک اعلان به ازایِ هر جلسه (UNIQUE(job_id, kind)) — retry اعلانِ تکراری نمی‌سازد.
         await createNotification({ therapistId: job.therapistId, kind: 'final_transcript_ready', clientId: job.clientId, sessionId: job.sessionId, jobId: job.sessionId }, conn);
@@ -142,7 +142,7 @@ async function polishFor(sessionId: string, text: string, opts?: { trustDiarizat
         minOverlap: envFloat('FINAL_TRANSCRIPT_MIN_OVERLAP', DEFAULT_GUARD_LIMITS.minOverlap),
       },
     });
-    return { ok: true as const, text: res.text, report: res.report };
+    return { ok: true as const, text: res.text, report: res.report, turns: res.turns };
   } catch (e) {
     const transient = !!(e as { transient?: boolean })?.transient;
     const code = e && (e as Error).name === 'FinalTranscriptConfigError' ? 'llm-not-configured' : transient ? 'llm-unavailable' : 'llm-failed';

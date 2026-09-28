@@ -108,7 +108,9 @@ export function chunkTurns(turns: Turn[], maxChars: number): Turn[][] {
 }
 
 // متنِ نهایی: «نقش: متن»، نشانگرها دست‌نخورده در جایِ خودشان.
-export interface CleanTurn { role: string; text: string; marker?: boolean; }
+// raw: متنِ خامِ نوبت‌هایِ سازنده (برایِ نمایشِ ویرایش‌ها در UI)؛ sp: شماره‌ی گوینده‌ی Soniox (برایِ «اصلاحِ نقش برایِ همه‌ی
+// نوبت‌هایِ همین گوینده»). هر دو اختیاری‌اند و در clean_text نمی‌آیند.
+export interface CleanTurn { role: string; text: string; marker?: boolean; raw?: string; sp?: string | null; }
 export function renderClean(turns: CleanTurn[]): string {
   const out: string[] = [];
   for (const t of turns) {

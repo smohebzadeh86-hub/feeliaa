@@ -45,7 +45,7 @@ export interface PolishReport {
   role_reverts: number;
 }
 
-export interface PolishResult { text: string; report: PolishReport; }
+export interface PolishResult { text: string; report: PolishReport; turns: CleanTurn[]; }
 
 function rosterText(r: SpeakerRoster | null): string {
   if (!r) return 'اطلاعاتِ حاضرین در دسترس نیست. نقش‌ها را فقط از محتوا تشخیص بده (یکی درمانگر است).';
@@ -123,7 +123,7 @@ export async function polishTranscript(
       for (const t of chunk) {
         if (t.marker) { res.push({ role: '', text: t.text, marker: true }); continue; }
         const role = roleFor(t.speaker, map, lastRole);
-        res.push({ role, text: t.text });
+        res.push({ role, text: t.text, raw: t.text, sp: t.speaker });
         report.uncertain += uncertainCount(t.text);
         lastRole = role;
       }
@@ -213,7 +213,7 @@ export async function polishTranscript(
           const t = speechTurns[i];
           units.push({ start: i, emit: () => {
             const role = roleFor(t.speaker, map, lastRole);
-            out.push({ role, text: t.text });
+            out.push({ role, text: t.text, raw: t.text, sp: t.speaker });
             report.uncertain += uncertainCount(t.text);
             lastRole = role;
           } });
@@ -222,12 +222,16 @@ export async function polishTranscript(
       }
       // گروهِ چندخروجی فقط وقتی پیش می‌آید که src نامعتبر و تعدادِ نوبت‌ها نابرابر است (کلِ تکه یک گروه) ⇒ جایگاهِ تقریبی
       const sp = g.out.length === 1 ? speechTurns[g.start].speaker : undefined;
+      // متنِ خامِ سازنده فقط وقتی گروه یک خروجی دارد (نگاشتِ یک‌به‌چند نامعلوم است)؛ گوینده فقط اگر همه‌ی نوبت‌هایِ خام یکی‌اند
+      const srcTurns = speechTurns.slice(g.start, g.end);
+      const raw = g.out.length === 1 ? srcTurns.map((x) => x.text).join(' ') : undefined;
+      const oneSp = g.out.length === 1 && srcTurns.every((x) => x.speaker === srcTurns[0].speaker) ? srcTurns[0].speaker : null;
       g.out.forEach((t, k) => {
         const start = g.start + Math.round((k * (g.end - g.start)) / g.out.length);
         units.push({ start, emit: () => {
           const role = roleOf(t, sp);
           const text = String(t.text || '');
-          out.push({ role, text });
+          out.push({ role, text, ...(raw !== undefined ? { raw } : {}), sp: oneSp });
           report.uncertain += uncertainCount(text);
           lastRole = role;
         } });
@@ -247,7 +251,7 @@ export async function polishTranscript(
   if (transientChunkFailures * 2 > chunks.length) {
     throw Object.assign(new Error(`بیش از نیمِ تکه‌ها با خطایِ گذرایِ LLM خام ماندند (${transientChunkFailures}/${chunks.length})`), { transient: true, code: 'llm-failed' });
   }
-  return { text: renderClean(out), report };
+  return { text: renderClean(out), report, turns: out };
 }
 
 type LlmTurn = { src?: unknown; speaker_role: string; text: string };

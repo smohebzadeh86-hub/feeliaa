@@ -38,7 +38,8 @@ export interface FtStore {
   update(job: FtJob, patch: FtPatch): Promise<void>;
   // تراکنش: متنِ نهایی + stage=done + اعلان. اگر نسخه‌ی متنِ جلسه در این فاصله عوض شده باشد، باز هم ذخیره می‌شود
   // (UI آن را stale نشان می‌دهد) — کارِ انجام‌شده دور ریخته نمی‌شود.
-  finish(job: FtJob, cleanText: string, report: unknown): Promise<void>;
+  // turns: نوبت‌هایِ ساختاریافته (migration 034) برایِ اصلاحِ نقش و نمایشِ ویرایش‌ها — اختیاری
+  finish(job: FtJob, cleanText: string, report: unknown, turns?: unknown[]): Promise<void>;
   skip(job: FtJob, code: string): Promise<void>;
   fail(job: FtJob, code: string): Promise<void>;
 }
@@ -59,7 +60,7 @@ export interface FtSonioxPort {
 }
 
 export type PolishOutcome =
-  | { ok: true; text: string; report: unknown }
+  | { ok: true; text: string; report: unknown; turns?: unknown[] }
   | { ok: false; transient: boolean; code: string };
 
 export interface FtDeps {
@@ -251,7 +252,7 @@ async function stepPolish(job: FtJob, deps: FtDeps): Promise<StepResult> {
     deps.log(`[final-transcript] ${job.sessionId} polish failed permanently: ${res.code}`);
     return WAIT;
   }
-  await deps.store.finish(job, res.text, res.report);
+  await deps.store.finish(job, res.text, res.report, res.turns);
   deps.log(`[final-transcript] ${job.sessionId} done source=${job.source}`);
   return WAIT;
 }

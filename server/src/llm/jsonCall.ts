@@ -8,10 +8,22 @@ import { resolveLlmConfig, resolveLlmFallbackConfig, type LlmConfig, type LlmPur
 
 // خطایِ دامنه‌ایِ مستقل از provider. مصرف‌کننده‌ها فقط code/transient را می‌خوانند (duck typing).
 export class LlmError extends Error {
-  constructor(public code: 'llm-failed' | 'llm-invalid-output', message: string, public transient = false) {
+  constructor(public code: 'llm-failed' | 'llm-invalid-output', message: string, public transient = false, public status?: number) {
     super(message);
     this.name = 'LlmError';
   }
+}
+
+// سلامتِ سرویس (2026-09-28): هر پاسخِ provider (موفق/خطا) به یک شنونده‌ی اختیاری گزارش می‌شود تا ادمین از قطعیِ
+// سرویس (تمام‌شدنِ اعتبار، کلیدِ نامعتبر، قطعیِ طولانی) باخبر شود — دو بار اعتبار بی‌صدا تمام شد و همه‌چیز خوابید.
+// پاسخِ JSONِ نامعتبر «سلامت» حساب می‌شود (سرویس جواب داد). فقط status/provider — هرگز متن (LAW-001).
+export type LlmHealthEvent =
+  | { ok: true; provider: string; purpose: string }
+  | { ok: false; provider: string; purpose: string; status?: number; transient: boolean };
+let healthListener: ((e: LlmHealthEvent) => void) | null = null;
+export function onLlmHealth(fn: ((e: LlmHealthEvent) => void) | null): void { healthListener = fn; }
+function reportHealth(e: LlmHealthEvent): void {
+  try { healthListener?.(e); } catch { /* شنونده هرگز فراخوانی را نمی‌شکند */ }
 }
 
 // خطایِ گذرا: بدونِ status (خطایِ اتصال/timeout/قطعِ بدنه — مثلاً ECONNRESETِ مشاهده‌شده در E2E 2026-09-25) یا
@@ -101,8 +113,12 @@ export async function completeJsonWith<T>(client: ChatClient, cfg: LlmConfig, sy
       raw = res?.choices?.[0]?.message?.content;
       finish = res?.choices?.[0]?.finish_reason;
     } catch (err) {
-      throw new LlmError('llm-failed', `فراخوانی ${cfg.label} ناموفق بود: ` + (err instanceof Error ? err.message : 'خطای نامشخص'), isTransientLlmError(err));
+      const status = typeof (err as { status?: unknown })?.status === 'number' ? (err as { status: number }).status : undefined;
+      const transient = isTransientLlmError(err);
+      reportHealth({ ok: false, provider: cfg.provider, purpose: cfg.purpose, status, transient });
+      throw new LlmError('llm-failed', `فراخوانی ${cfg.label} ناموفق بود: ` + (err instanceof Error ? err.message : 'خطای نامشخص'), transient, status);
     }
+    reportHealth({ ok: true, provider: cfg.provider, purpose: cfg.purpose });
     if (!raw) { why = `پاسخ خالی از ${cfg.label}`; continue; }
     // خروجیِ بریده به سقفِ توکن ⇒ JSONِ ناقص؛ فقط کدِ آن در پیام (نه متن)
     const cut = finish === 'length' ? ' (بریده به سقفِ توکن)' : '';

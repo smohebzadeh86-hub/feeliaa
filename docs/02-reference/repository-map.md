@@ -47,7 +47,7 @@ feeliaa/
 │       ├── features/final-transcript/  U — جدید 2026-09-27: «متنِ نهایی» — رونویسیِ دوباره + مرتب‌سازی با LLM بعد از پایانِ جلسه ([subsystem 07](../07-subsystems/07-final-transcript.md))، migration 031
 │       ├── features/audio-upload/  U — جدید 2026-09-23: آپلودِ فایلِ صوتیِ جلسه + jobِ پس‌زمینه ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))؛ `quality.ts` (2026-09-28) سنجشِ کیفیتِ فایل، migration 033
 │       ├── features/notifications/ U — جدید 2026-09-23: اعلان‌هایِ پایدار (`notify.ts`)
-│       ├── llm/        U — جدید 2026-09-28: لایه‌ی LLMِ مستقل از provider — `config.ts` (جدولِ providerها، env، ترجمه‌ی سطحِ استدلال) و `jsonCall.ts` (یک فراخوانیِ JSON برایِ هر سه حالتِ schema/object/prompt، خطایِ گذرا، providerِ جایگزین)؛ مشترکِ پرونده‌ی درمان و «متنِ نهایی»؛ harness: `scripts/llm-harness.ts` (`pnpm test:llm`)
+│       ├── llm/        U — جدید 2026-09-28: لایه‌ی LLMِ مستقل از provider — `config.ts` (جدولِ providerها، env، ترجمه‌ی سطحِ استدلال) و `jsonCall.ts` (یک فراخوانیِ JSON برایِ هر سه حالتِ schema/object/prompt، خطایِ گذرا، providerِ جایگزین)؛ `healthAlert.ts` (هشدارِ ادمین برایِ قطعیِ سرویس)؛ مشترکِ پرونده‌ی درمان و «متنِ نهایی»؛ harness: `scripts/llm-harness.ts` (`pnpm test:llm`)
 │       │   ├── domain/     types.ts، errors.ts، validate.ts، normalizeText.ts (جدید 2026-09-19)، findings.ts (جدید 2026-09-20: واحدِ «یافته»، شناسه‌ی فکت، finalizeCouple)
 │       │   ├── ports/      llmProvider.port.ts، caseFileRepo.port.ts
 │       │   ├── application/ aggregateClientCorpus.ts، renderDigest.ts (جدید 2026-09-19)، buildCaseFilePrompt.ts، mergeTherapistEdits.ts، applyFieldPatch.ts، generateCaseFile.ts، repairLoop.ts (جدید 2026-09-19)، upgradeLegacyContent.ts (جدید 2026-09-20: ارتقایِ پرونده‌ی قدیمی بدونِ LLM)

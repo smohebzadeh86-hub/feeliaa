@@ -411,6 +411,9 @@ input::-ms-reveal{display:none}
 .tu-member .cat-select{margin-bottom:0}
 .tu-add{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
 .tu-link{border:none;background:none;color:var(--sage-deep);font:inherit;font-size:12px;cursor:pointer;padding:0;text-decoration:underline}
+.rec-tips{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:10px 14px;margin:0 0 14px;background:var(--card);font-size:13px}
+.rec-tips summary{cursor:pointer;color:var(--sage-deep);font-weight:600;list-style-position:inside}
+.rec-tips ul{margin:8px 0 2px;padding-inline-start:18px;line-height:1.9;color:var(--muted)}
 .presence-box{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:12px 14px;margin-bottom:14px;background:var(--card)}
 .presence-line{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--ink-2)}
 .presence-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
@@ -746,6 +749,13 @@ input::-ms-reveal{display:none}
 .ft-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;border-radius:10px;background:var(--gold-soft);font-size:12.5px;color:var(--gold-deep)}
 .ft-bar.quiet{background:transparent;padding:0 0 4px;color:var(--muted)}
 .ft-bar .ft-actions{display:flex;gap:6px;flex-wrap:wrap}
+.ft-para{margin:0 0 12px;white-space:normal}
+.ft-para.ft-marker{color:var(--muted);font-size:12.5px}
+.ft-role{border:none;background:none;font:inherit;font-weight:700;color:var(--ink);padding:0 2px;border-radius:4px;cursor:pointer;border-bottom:1px dotted var(--muted)}
+.ft-role:hover,.ft-role:focus-visible{background:var(--gold-soft)}
+.ft-edit{background:var(--sage-soft,rgba(120,150,120,.14));border-bottom:1px solid var(--sage-deep);border-radius:3px;padding:0 1px;cursor:help}
+.ft-role-menu{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:-6px 0 12px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--card);font-size:12.5px;white-space:normal}
+.ft-role-menu label{display:flex;align-items:center;gap:4px;width:100%;color:var(--muted)}
 .ft-unsure{background:var(--gold-soft);color:var(--gold-deep);border-bottom:1px dashed var(--gold-deep);border-radius:3px;padding:0 2px;cursor:help}
 
 /* ===== پوسته‌ی پنلِ ادمین (B1، 2026-09-26): sidebarِ راست رویِ دسکتاپ، tab barِ بالا رویِ موبایل؛ فقط توکن‌هایِ موجود ===== */
@@ -1152,6 +1162,16 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <div class="banner info" id="preflightSttRow">در حال بررسی اتصال رونویسی…</div>
       <button class="btn btn-ghost btn-block" onclick="runPreflight()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><path d="M21 3v6h-6"/></svg>بررسی دوباره‌ی میکروفون و اتصال</button>
     </div>
+    <!-- (2026-09-28) بیشترین افتِ کیفیتِ متن و جداکردنِ گوینده‌ها از خودِ صداست، نه از پردازش (فاز ۰B) -->
+    <details class="rec-tips" id="recTips">
+      <summary>برایِ متنِ دقیق‌تر و جداشدنِ درستِ گوینده‌ها</summary>
+      <ul>
+        <li>دستگاه را وسطِ جمع و رو به بالا بگذارید، نه در جیب، زیرِ کاغذ یا رویِ مبلِ نرم.</li>
+        <li>دور از تلویزیون، پنکه، کولر و پنجره‌ی رو به خیابان.</li>
+        <li>در جلسه‌ی زوج و خانواده، هم‌زمان حرف‌زدن جداکردنِ گوینده‌ها را سخت می‌کند؛ هر وقت شد یک‌به‌یک صحبت کنید.</li>
+        <li>اگر هشدارِ کیفیتِ صدا دیدید، جایِ دستگاه را عوض کنید.</li>
+      </ul>
+    </details>
     <button class="btn btn-primary btn-xl btn-block" id="btnStartSession" disabled onclick="startSession()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
       شروع جلسه و رونویسی
@@ -6117,6 +6137,7 @@ function doBackToClientDetailFromSession(){
 // متنِ خام (sessions.transcript) هرگز عوض نمی‌شود؛ این‌جا فقط نمایش بینِ خام و نهایی جابه‌جا می‌شود.
 let ftState=null;         // پاسخِ GET /final-transcript برایِ currentViewSession
 let ftShowRaw=false;
+let ftShowEdits=false;
 let ftPollTimer=null;
 let ftSessionId=null;
 // (تصمیمِ مالک 2026-09-28) پیام‌ها به هیچ سرویسِ بیرونی/ارسالِ صدا یا متن اشاره نمی‌کنند — فقط وضعیت.
@@ -6133,7 +6154,7 @@ function ftStopPoll(){if(ftPollTimer){clearTimeout(ftPollTimer);ftPollTimer=null
 function ftBusy(s){return !!s&&(s.stage==='waiting_audio'||s.stage==='transcribing'||s.stage==='polishing');}
 async function loadFinalTranscript(sessionId,isManual){
   ftStopPoll();
-  ftSessionId=sessionId;ftState=null;ftShowRaw=false;
+  ftSessionId=sessionId;ftState=null;ftShowRaw=false;ftShowEdits=false;
   const bar=$('finalTranscriptBar');bar.hidden=true;bar.innerHTML='';
   if(isManual)return;
   try{
@@ -6161,6 +6182,9 @@ async function loadFinalTranscriptKeepView(sessionId){
 // متنِ نهایی با textContent؛ ⟦…؟⟧ به span ِ «نامطمئن» (بدونِ innerHTML — متن داده‌ی بالینی است)
 function ftFillBox(box,text){
   box.textContent='';
+  ftAppendText(box,text);
+}
+function ftAppendText(el,text){
   const parts=String(text).split(/(⟦[^⟧]*⟧)/);
   parts.forEach(function(p){
     if(!p)return;
@@ -6168,9 +6192,103 @@ function ftFillBox(box,text){
       const sp=document.createElement('span');sp.className='ft-unsure';sp.title='نامطمئن — همان چیزی که شنیده شد';
       // «؟»ِ پایانیِ نشانگر فقط قراردادِ علامت‌گذاری است (asyncTranscribe.markUncertainTokens) — نمایشش در متنِ بالینی
       // شبیهِ سؤال خوانده می‌شد (E2Eِ UI 2026-09-28)؛ رنگ و tooltipِ span نامطمئن‌بودن را نشان می‌دهند.
-      sp.textContent=p.slice(1,-1).replace(/؟$/,'');box.appendChild(sp);
-    }else box.appendChild(document.createTextNode(p));
+      sp.textContent=p.slice(1,-1).replace(/؟$/,'');el.appendChild(sp);
+    }else el.appendChild(document.createTextNode(p));
   });
+}
+// ——— نمایشِ ویرایش‌ها (2026-09-28): واژه‌هایی که ویرایش عوض کرده، با واژه‌ی خام در tooltip ———
+// مقایسه بدونِ نیم‌فاصله/نقطه‌گذاری/ی‌ک عربی ⇒ اصلاحِ نیم‌فاصله یا نقطه‌گذاری «تغییر» شمرده نمی‌شود. حذف‌ها (مکث، تکرار) نشان داده نمی‌شوند.
+function ftTokens(s){return String(s||'').match(/⟦[^⟧]*⟧\S*|\S+/g)||[];}
+function ftNorm(w){return w.replace(/[\u200c\u200e\u200f⟦⟧]/g,'').replace(/[.,،؛:!?؟«»"'()\-…]/g,'').replace(/ي/g,'ی').replace(/ك/g,'ک');}
+function ftDiff(raw,text){
+  const a=ftTokens(raw),b=ftTokens(text),n=a.length,m=b.length;
+  if(!n||!m||n*m>2000000)return null;
+  const na=a.map(ftNorm),nb=b.map(ftNorm);
+  const dp=[];for(let i=0;i<=n;i++)dp.push(new Int32Array(m+1));
+  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)dp[i][j]=na[i]===nb[j]?dp[i+1][j+1]+1:Math.max(dp[i+1][j],dp[i][j+1]);
+  const segs=[];let del=[],ins=[];
+  const flush=function(){if(ins.length)segs.push({text:ins.join(' '),was:del.join(' ')});del=[];ins=[];};
+  let i=0,j=0;
+  while(i<n||j<m){
+    if(i<n&&j<m&&na[i]===nb[j]){flush();segs.push({text:b[j]});i++;j++;}
+    else if(j>=m||(i<n&&dp[i+1][j]>=dp[i][j+1])){del.push(a[i]);i++;}
+    else{ins.push(b[j]);j++;}
+  }
+  flush();
+  return segs;
+}
+function ftAppendTurn(el,t){
+  const segs=ftShowEdits&&typeof t.raw==='string'&&t.raw!==t.text?ftDiff(t.raw,t.text):null;
+  if(!segs){ftAppendText(el,t.text);return;}
+  segs.forEach(function(s,k){
+    if(k)el.appendChild(document.createTextNode(' '));
+    if(s.was===undefined){ftAppendText(el,s.text);return;}
+    const sp=document.createElement('span');sp.className='ft-edit';
+    sp.title=s.was?'پیش از ویرایش: '+s.was.replace(/[⟦⟧]/g,''):'افزوده در ویرایش';
+    ftAppendText(sp,s.text);el.appendChild(sp);
+  });
+}
+// ——— نمایشِ ساختاریافته + اصلاحِ نقش (2026-09-28، migration 034) ———
+// نوبت‌هایِ پیاپیِ هم‌نقش یک پاراگراف‌اند (همان قاعده‌ی renderClean در سرور)؛ برچسبِ نقش دکمه است.
+function ftRenderTurns(box,st){
+  box.textContent='';
+  const turns=st.turns;
+  let i=0;
+  while(i<turns.length){
+    const t=turns[i];
+    if(t.marker){const mk=document.createElement('div');mk.className='ft-para ft-marker';mk.textContent=t.text;box.appendChild(mk);i++;continue;}
+    if(!String(t.text||'').trim()){i++;continue;}
+    const idx=[i];let j=i+1;
+    while(j<turns.length&&!turns[j].marker&&turns[j].role===t.role){if(String(turns[j].text||'').trim())idx.push(j);j++;}
+    const para=document.createElement('div');para.className='ft-para';
+    const rb=document.createElement('button');rb.type='button';rb.className='ft-role';rb.textContent=t.role+':';
+    rb.title='اصلاحِ گوینده';
+    rb.addEventListener('click',function(){ftToggleRoleMenu(para,idx);});
+    para.appendChild(rb);para.appendChild(document.createTextNode(' '));
+    idx.forEach(function(k,n){if(n)para.appendChild(document.createTextNode(' '));ftAppendTurn(para,turns[k]);});
+    box.appendChild(para);
+    i=j;
+  }
+}
+function ftToggleRoleMenu(para,idx){
+  const open=para.nextElementSibling&&para.nextElementSibling.classList.contains('ft-role-menu');
+  document.querySelectorAll('.ft-role-menu').forEach(function(m){m.remove();});
+  if(open)return;
+  const st=ftState;if(!st||!st.turns)return;
+  const cur=st.turns[idx[0]].role;
+  const menu=document.createElement('div');menu.className='ft-role-menu';
+  const lbl=document.createElement('span');lbl.textContent='این بخش را گفته:';menu.appendChild(lbl);
+  // «همه‌ی بخش‌هایِ همین صدا»: فقط وقتی شماره‌گذاریِ گوینده در کلِ جلسه یکدست است (رونویسیِ کاملِ صدا)
+  const sps={};idx.forEach(function(k){if(st.turns[k].sp)sps[st.turns[k].sp]=1;});
+  const same=st.speaker_edit&&Object.keys(sps).length?st.turns.filter(function(t){return !t.marker&&t.sp&&sps[t.sp];}).length:0;
+  let cb=null;
+  (st.roles||[]).forEach(function(r){
+    if(r===cur)return;
+    menu.appendChild(ftButton(r,function(){ftApplyRole(idx,r,!!(cb&&cb.checked),menu);},'btn-ghost'));
+  });
+  if(same>idx.length){
+    const l=document.createElement('label');cb=document.createElement('input');cb.type='checkbox';cb.checked=true;
+    l.appendChild(cb);l.appendChild(document.createTextNode(' برایِ همه‌ی '+toFa(same)+' بخشِ همین صدا در این جلسه'));
+    menu.appendChild(l);
+  }
+  menu.appendChild(ftButton('انصراف',function(){menu.remove();},'btn-ghost'));
+  para.after(menu);
+}
+async function ftApplyRole(idx,role,sameSpeaker,menu){
+  if(!currentViewSession||!ftState)return;
+  const id=currentViewSession.id;
+  menu.querySelectorAll('button').forEach(function(b){b.disabled=true;});
+  try{
+    const r=await api('/api/sessions/'+id+'/final-transcript/roles',{method:'PATCH',body:{indices:idx,role:role,same_speaker:sameSpeaker}});
+    if(!ftState||ftSessionId!==id)return;
+    ftState.turns=r.turns;ftState.clean_text=r.clean_text;
+    uxTrack('final_transcript_role_edit');
+    renderFinalTranscript();
+    if(r.changed>1)showBanner('info','گوینده‌ی '+toFa(r.changed)+' بخش اصلاح شد.');
+  }catch(e){
+    showBanner('error',e.message);
+    menu.querySelectorAll('button').forEach(function(b){b.disabled=false;});
+  }
 }
 function ftButton(label,fn,cls){
   const b=document.createElement('button');b.className='btn btn-sm '+(cls||'btn-ghost');b.textContent=label;
@@ -6187,7 +6305,7 @@ function renderFinalTranscript(){
   // جعبه‌ی متن
   if(showFinal){
     box.hidden=false;
-    ftFillBox(box,st.clean_text);
+    if(Array.isArray(st.turns)&&st.turns.length)ftRenderTurns(box,st);else ftFillBox(box,st.clean_text);
     box.dataset.ft='1';
     attachTranscriptExpander(box,st.clean_text,s.duration_ms,'');
   }else if(box.dataset.ft==='1'){
@@ -6210,6 +6328,11 @@ function renderFinalTranscript(){
     if(showFinal&&rawShare>0.25)t+=' · بخشی از متن بدونِ ویرایش ماند';
     if(st.stale)t+=' · متنِ جلسه بعد از آماده‌سازی تغییر کرده';
     label.textContent=t;
+    if(showFinal&&Array.isArray(st.turns)&&st.turns.some(function(x){return typeof x.raw==='string';})){
+      actions.appendChild(ftButton(ftShowEdits?'پنهان‌کردنِ ویرایش‌ها':'نمایشِ ویرایش‌ها',function(){
+        ftShowEdits=!ftShowEdits;if(ftShowEdits)uxTrack('final_transcript_viewed_edits');renderFinalTranscript();
+      }));
+    }
     actions.appendChild(ftButton(showFinal?'نمایشِ متنِ خام':'نمایشِ متنِ نهایی',function(){
       ftShowRaw=!ftShowRaw;if(ftShowRaw)uxTrack('final_transcript_viewed_raw');renderFinalTranscript();
     }));
@@ -8613,9 +8736,12 @@ function notifText(n){
   if(n.kind==='case_file_updated')return 'پرونده‌ی '+(n.client_alias||n.client_code||'')+' با اطلاعاتِ این جلسه به‌روز شد.';
   if(n.kind==='case_file_failed')return 'به‌روزرسانیِ خودکارِ پرونده‌ی '+(n.client_alias||n.client_code||'')+' ناموفق بود.';
   if(n.kind==='final_transcript_ready')return 'متنِ نهاییِ '+who+' آماده شد.';
+  // فقط ادمین (2026-09-28): سرویسِ هوشِ مصنوعی جواب نمی‌دهد ⇒ متنِ نهایی و پرونده ساخته نمی‌شوند
+  if(n.kind==='llm_unavailable')return 'سرویسِ هوشِ مصنوعی در دسترس نیست'+(LLM_ALERT[n.error_code]?' ('+LLM_ALERT[n.error_code]+')':'')+' — متنِ نهایی و پرونده تا رفعِ آن ساخته نمی‌شوند.';
   return 'اعلانِ تازه';
 }
-function notifIsBad(n){return n.kind==='processing_failed'||n.kind==='case_file_failed'||n.kind==='transcript_empty'||n.kind==='transcript_low_quality';}
+const LLM_ALERT={credit:'اعتبارِ حساب تمام شده',auth:'کلید نامعتبر است',unavailable:'چند خطایِ پیاپی'};
+function notifIsBad(n){return n.kind==='llm_unavailable'||n.kind==='processing_failed'||n.kind==='case_file_failed'||n.kind==='transcript_empty'||n.kind==='transcript_low_quality';}
 // متنِ نوتیفیکیشنِ سیستم‌عامل عمداً بدونِ کد/نامِ مراجع است (رویِ صفحه‌ی قفلِ گوشی دیده می‌شود — LAW-001).
 function notifOsText(n){
   if(n.kind==='transcript_ready')return ['متنِ جلسه آماده شد','ترنسکریپتِ فایلِ آپلودی آماده‌ی مرور است.'];
@@ -8623,6 +8749,7 @@ function notifOsText(n){
   if(n.kind==='case_file_updated')return ['پرونده به‌روز شد','پرونده‌ی مراجع با اطلاعاتِ جلسه‌ی تازه به‌روز شد.'];
   if(n.kind==='transcript_empty')return ['گفتاری پیدا نشد','در فایلِ آپلودی گفتاری تشخیص داده نشد.'];
   if(n.kind==='final_transcript_ready')return ['متنِ نهایی آماده شد','متنِ مرتب‌شده‌ی جلسه آماده‌ی مرور است.'];
+  if(n.kind==='llm_unavailable')return ['سرویسِ هوشِ مصنوعی در دسترس نیست','متنِ نهایی و پرونده تا رفعِ آن ساخته نمی‌شوند.'];
   return ['پردازش انجام نشد','برای جزئیات به فیلیا برگردید.'];
 }
 function notifTimeFa(ts){

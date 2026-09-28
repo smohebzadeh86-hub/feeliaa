@@ -2,7 +2,8 @@
 // اجرا: pnpm test:llm
 import assert from 'node:assert/strict';
 import { resolveLlmConfig, resolveLlmFallbackConfig, reasoningBody, describeLlmConfig, LlmConfigError } from '../server/src/llm/config.js';
-import { buildRequest, completeJsonWith, createJsonCaller, LlmError, type ChatClient } from '../server/src/llm/jsonCall.js';
+import { buildRequest, completeJsonWith, createJsonCaller, LlmError, onLlmHealth, type ChatClient, type LlmHealthEvent } from '../server/src/llm/jsonCall.js';
+import { createLlmAlertTracker, FAIL_STREAK, THROTTLE_MS } from '../server/src/llm/healthAlert.js';
 import { ChatLlmAdapter } from '../server/src/features/case-file/adapters/llm/chatLlm.adapter.js';
 import { CaseFileGenerationError } from '../server/src/features/case-file/domain/errors.js';
 import { CASE_FILE_JSON_SCHEMA } from '../server/src/features/case-file/adapters/llm/caseFileJsonSchema.js';
@@ -259,6 +260,43 @@ await t('L16 لاگِ شروع: provider/مدل/حالت، هرگز کلید', (
   assert.match(line, /fallback: OpenRouter/);
   assert.ok(!line.includes('tpsg-fake') && !line.includes('sk-or-fake'));
   assert.match(describeLlmConfig('case-file', { LLM_PROVIDER: 'nope' }), /پیکربندی نامعتبر/);
+});
+
+await t('L17 سلامت: هر پاسخِ provider گزارش می‌شود (خطا با status)؛ JSONِ نامعتبر = سرویس سالم', async () => {
+  const seen: LlmHealthEvent[] = [];
+  onLlmHealth((e) => seen.push(e));
+  try {
+    await assert.rejects(() => completeJsonWith(fake([{ status: 402 }]).client, metisCfg(), 'S', 'U', SCHEMA));
+    await completeJsonWith(fake(['{"x":1}', OK]).client, metisCfg(), 'S', 'U', SCHEMA);
+  } finally { onLlmHealth(null); }
+  assert.deepEqual(seen[0], { ok: false, provider: 'metis', purpose: 'final-transcript', status: 402, transient: true });
+  assert.deepEqual(seen.slice(1).map((e) => e.ok), [true, true]);
+  // شنونده‌ی خراب فراخوانی را نمی‌شکند
+  onLlmHealth(() => { throw new Error('boom'); });
+  try { assert.deepEqual(await completeJsonWith(fake([OK]).client, metisCfg(), 'S', 'U', SCHEMA), JSON.parse(OK)); } finally { onLlmHealth(null); }
+});
+
+await t('L18 هشدارِ ادمین: 402/401 فوری؛ خطایِ گذرا فقط پس از چند خطایِ پیاپی؛ موفقیت صفر می‌کند؛ هر ۶ ساعت یک بار', () => {
+  let now = 0;
+  const alerts: string[] = [];
+  const tr = createLlmAlertTracker({ now: () => now, alert: (r, p) => alerts.push(`${p}:${r}`) });
+  const fail = (status?: number) => tr.handle({ ok: false, provider: 'metis', purpose: 'case-file', status, transient: status !== 401 });
+  fail(402);
+  assert.deepEqual(alerts, ['metis:credit']);
+  fail(402); now += THROTTLE_MS - 1; fail(402);
+  assert.equal(alerts.length, 1, 'تکرار در همان ۶ ساعت');
+  now += 2; fail(402);
+  assert.deepEqual(alerts, ['metis:credit', 'metis:credit']);
+  alerts.length = 0;
+  tr.handle({ ok: true, provider: 'metis', purpose: 'case-file' });
+  for (let i = 1; i < FAIL_STREAK; i++) fail(503);
+  tr.handle({ ok: true, provider: 'metis', purpose: 'case-file' });
+  for (let i = 1; i < FAIL_STREAK; i++) fail();
+  assert.deepEqual(alerts, [], 'قطعیِ کوتاه با پاسخِ موفقِ میانی ⇒ بی‌هشدار');
+  fail(503);
+  assert.deepEqual(alerts, ['metis:unavailable']);
+  fail(401);
+  assert.deepEqual(alerts, ['metis:unavailable', 'metis:auth']);
 });
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);

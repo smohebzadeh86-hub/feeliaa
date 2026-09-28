@@ -19,7 +19,7 @@ import { caseFileRoutes } from './features/case-file/api/caseFile.routes.js';
 import { treatmentUnitRoutes } from './features/treatment-unit/index.js';
 import { obsRoutes } from './http/obs.js';
 import { registerObsHooks } from './obs/httpHook.js';
-import { startObsDrainLoop, flushObsQueue } from './obs/eventLog.js';
+import { startObsDrainLoop, flushObsQueue, logEvent } from './obs/eventLog.js';
 import { sweepOldObsEvents } from './obs/sweep.js';
 import { sweepOldBatchFiles, retryQueuedBatches, BATCH_SWEEP_INTERVAL_MS } from './stt/batchqueue.js';
 import { sweepOldSessionAudio } from './stt/sessionAudioArchive.js';
@@ -28,9 +28,11 @@ import { audioUploadRoutes, tryFinalizeGroup } from './features/audio-upload/upl
 import { autoCloseAbandonedSessions, AUTO_CLOSE_INTERVAL_MS } from './http/sessionAutoClose.js';
 import { startAudioJobWorker, sweepSonioxOrphans } from './features/audio-upload/jobRunner.js';
 import { sweepStaleUploads } from './features/audio-upload/uploadStore.js';
-import { sweepOldNotifications } from './features/notifications/notify.js';
+import { sweepOldNotifications, notifyAdmins } from './features/notifications/notify.js';
 import { finalTranscriptRoutes, startFinalTranscriptWorker } from './features/final-transcript/index.js';
 import { describeLlmConfig } from './llm/config.js';
+import { onLlmHealth } from './llm/jsonCall.js';
+import { createLlmAlertTracker, THROTTLE_MS } from './llm/healthAlert.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -152,6 +154,17 @@ const start = async () => {
     // پیکربندیِ LLM (provider/مدل/حالتِ JSON/استدلال — بدونِ کلید) تا سوییچ/خطایِ env همان اول دیده شود
     console.log(describeLlmConfig('case-file'));
     console.log(describeLlmConfig('final-transcript'));
+    // هشدارِ ادمین برایِ قطعیِ سرویسِ LLM (اعتبار/کلید/قطعیِ پیاپی) — حداکثر یک بار در هر ۶ ساعت برایِ هر علت
+    const llmAlerts = createLlmAlertTracker({
+      now: () => Date.now(),
+      alert: (reason, provider) => {
+        const bucket = Math.floor(Date.now() / THROTTLE_MS);
+        logEvent({ event: 'llm.alert', severity: 'error', code: reason, detail: { source: provider } });
+        console.log(`[llm] هشدارِ ادمین: ${provider} ${reason}`);
+        notifyAdmins('llm_unavailable', reason, `llm-${reason}-${bucket}`).catch(() => {});
+      },
+    });
+    onLlmHealth((e) => llmAlerts.handle(e));
     console.log('🌿 Feelia server starting...');
     await app.listen({ port: PORT, host: '0.0.0.0' });
     console.log(`🌿 Feelia server running on http://localhost:${PORT}`);

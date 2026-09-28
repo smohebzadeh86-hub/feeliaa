@@ -64,11 +64,17 @@ waiting_audio ──(صدا کامل)──→ transcribing ──→ polishing 
    - **آپلودِ الحاقی:** متنِ کاملِ جلسه + برچسب + بخشِ آپلودی با شماره‌ی گوینده‌هایِ جدا (`appendUploadForPolish`) — دو diarizationِ مستقل‌اند.
    - **سقفِ توکن:** `FINAL_TRANSCRIPT_MAX_TOKENS` (۱۶۳۸۴) — ریشه‌ی 402ِ «requires more credits, or fewer max_tokens».
    - **خطاهایِ LLM:** `402` (اعتبارِ OpenRouter تمام شده) از 2026-09-28 گذراست (`isTransientLlmError`، مشترک با پرونده). JSONِ نامعتبر در گذرِ برداشتِ کلی گذرا حساب می‌شود (در گذرِ تکه همان تکه خام می‌ماند).
+4ب. **نوبت‌هایِ ساختاریافته، اصلاحِ گوینده و نمایشِ ویرایش‌ها (2026-09-28، migration 034):**
+   - polish علاوه بر `clean_text` فهرستِ `turns` را برمی‌گرداند و در `final_transcripts.clean_turns` ذخیره می‌شود: نقش، متنِ مرتب، `raw` (متنِ خامِ نوبت‌هایِ سازنده؛ برایِ گروهِ چندخروجی ندارد) و `sp` (شماره‌ی گوینده‌ی Soniox؛ `null` اگر نوبت‌هایِ سازنده از چند گوینده‌اند).
+   - **اصلاحِ گوینده:** برچسبِ نقشِ هر پاراگراف در UI دکمه است ⇒ انتخابِ نقشِ درست از حاضرینِ واحدِ درمان. در متنِ async (شماره‌گذاریِ یکدست در کلِ جلسه) گزینه‌ی «برایِ همه‌ی N بخشِ همین صدا» پیش‌فرض روشن است. `PATCH /final-transcript/roles` (منطقِ خالص: `domain/roleEdit.ts`) فقط نقش را عوض و `clean_text` را از نو می‌سازد؛ متن دست نمی‌خورد. «ساختِ دوباره» اصلاح‌ها را از بین می‌برد.
+   - **نمایشِ ویرایش‌ها:** دکمه‌ی «نمایشِ ویرایش‌ها» واژه‌هایی را که ویرایش عوض کرده رنگی می‌کند و واژه‌ی خام را در tooltip نشان می‌دهد. مقایسه (LCSِ واژه‌ای در مرورگر) نیم‌فاصله، نقطه‌گذاری و ی/کِ عربی را نادیده می‌گیرد. حذف‌ها (مکث، تکرار) نشان داده نمی‌شوند.
+   - ردیفِ پیش از 034 (`clean_turns` NULL) مثلِ قبل فقط `clean_text` را نشان می‌دهد.
 5. **LLM (بازنویسیِ 2026-09-28 — مستقل از provider):** لایه‌ی مشترکِ `server/src/llm/` (هم‌رسانِ پرونده‌ی درمان). provider = `FINAL_TRANSCRIPT_LLM_PROVIDER` یا `LLM_PROVIDER` (`openai`، `openrouter`، `metis`، `deepseek`، `custom`)، با clientِ جدا. timeout با `FINAL_TRANSCRIPT_LLM_TIMEOUT_MS`، `maxRetries=0`. پرامپت و پاسخ لاگ نمی‌شوند (LAW-001).
    - **مدل:** `<P>_FINAL_TRANSCRIPT_MODEL`، وگرنه `<P>_MODEL`. `FINAL_TRANSCRIPT_MODEL`ِ قدیمی فقط برایِ OpenRouter/OpenAI خوانده می‌شود، چون نامِ مدل مالِ provider است (با سوییچ به متیس نادیده گرفته می‌شود، نه 400ِ دائمی).
    - **حالتِ JSON:** پیش‌فرضِ provider (OpenRouter/OpenAI `schema`؛ متیس/DeepSeek `object` = `json_object` + schema در پرامپت). `FINAL_TRANSCRIPT_JSON_MODE` برایِ همه‌ی providerها؛ حالتی که provider ندارد ⇒ پیش‌فرضِ آن + هشدار.
    - **استدلال:** `FINAL_TRANSCRIPT_REASONING_EFFORT` (واژگانِ مشترک `off|…|max|default`)؛ پیش‌فرض `low` (سنجشِ متیس 2026-09-28: `off` ۴–۸ث ولی ۲ از ۸ متن بدتر از خام؛ `low` ۱۲–۳۷ث و ۸ از ۸ ≤ خام — `verification/2026-09-28-metis-deepseek.md`).
    - **لاگِ شروع:** یک خط `[llm] final-transcript: …` با provider/مدل/حالت/استدلال (بدونِ کلید).
+   - **هشدارِ ادمین (2026-09-28):** هر پاسخِ provider به `onLlmHealth` گزارش می‌شود (`server/src/llm/healthAlert.ts`). 402 (اعتبار) یا 401/403 (کلید) ⇒ فوراً، و ۳ خطایِ پیاپیِ دیگر بدونِ پاسخِ موفق ⇒ اعلانِ `llm_unavailable` به همه‌ی ادمین‌هایِ فعال، حداکثر یک بار در هر ۶ ساعت برایِ هر علت. رویدادِ `llm.alert` در obs. مشترک با پرونده‌ی درمان.
 
 ## UI (`public/index.html`)
 نوارِ `#finalTranscriptBar` بالایِ `#transcriptBox`:
