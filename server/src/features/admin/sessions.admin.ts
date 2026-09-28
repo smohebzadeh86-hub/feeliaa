@@ -1,8 +1,8 @@
 // ادمین: جلسه (متن + یادداشت‌ها، فقط‌خواندنی)، فهرستِ سراسریِ جلساتِ اخیر، تشخیص و timeline. pluginِ فرزندِ
 // adminRoutes (requireAdmin).
 import { FastifyInstance } from 'fastify';
-import { listSessionAudio } from '../transcription/archive/sessionAudioArchive.js';
-import { pendingAudiosFor } from '../transcription/batch/batchQueue.js';
+import { listSessionAudio } from '../transcription/archive/listing.js';
+import { pendingAudiosFor } from '../transcription/batch/queueFiles.js';
 import { recordAudit } from '../../obs/audit.js';
 import { diagnoseSession } from './diagnosis.js';
 import {

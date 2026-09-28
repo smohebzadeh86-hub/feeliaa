@@ -3,8 +3,9 @@
 // (تنها awaitِ بدونِ try) مثلِ قبل به caller می‌رسد و سرور بالا نمی‌آید.
 import { startObsDrainLoop, logEvent } from '../obs/eventLog.js';
 import { sweepOldObsEvents } from '../obs/sweep.js';
-import { sweepOldBatchFiles, retryQueuedBatches, BATCH_SWEEP_INTERVAL_MS } from '../features/transcription/batch/batchQueue.js';
-import { sweepOldSessionAudio } from '../features/transcription/archive/sessionAudioArchive.js';
+import { sweepOldBatchFiles, BATCH_SWEEP_INTERVAL_MS } from '../features/transcription/batch/sweep.js';
+import { retryQueuedBatches } from '../features/transcription/batch/processQueue.js';
+import { sweepOldSessionAudio } from '../features/transcription/archive/sweep.js';
 import { sweepOldResolveJobs } from '../features/transcription/speakerResolve.js';
 import { tryFinalizeGroup } from '../features/audio-upload/groupFinalize.js';
 import { autoCloseAbandonedSessions, AUTO_CLOSE_INTERVAL_MS } from '../features/sessions/autoClose.js';

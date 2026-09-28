@@ -6,7 +6,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../../db/connection.js';
-import { archiveAudioFileForAdmin } from '../transcription/archive/sessionAudioArchive.js';
+import { archiveAudioFileForAdmin } from '../transcription/archive/archiveWrite.js';
 import { treatmentUnits } from '../treatment-unit/index.js';
 import {
   uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens,

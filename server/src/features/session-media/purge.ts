@@ -3,7 +3,7 @@
 // صدا می‌زند:
 //   const media = await prepareSessionMediaPurge(sessionIds);   ← پیش از DELETE (بعد از آن شناسه‌ها قابلِ خواندن نیستند)
 //   purgeSessionMedia(media);                                   ← فقط بعد از DELETEِ موفق
-import { deleteSessionAudioDirs } from '../transcription/archive/sessionAudioArchive.js';
+import { deleteSessionAudioDirs } from '../transcription/archive/sweep.js';
 import { collectUploadSonioxRefs, releaseSonioxRefs, type SonioxRef } from '../audio-upload/sonioxRefs.js';
 
 export interface SessionMediaPurge {

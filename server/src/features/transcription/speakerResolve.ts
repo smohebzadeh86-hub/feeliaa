@@ -11,7 +11,7 @@ import { execFile } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../../db/connection.js';
-import { getFullSessionAudio } from './archive/sessionAudioArchive.js';
+import { getFullSessionAudio } from './archive/fullAudio.js';
 import { transcribeFileAsync } from './soniox/restClient.js';
 import { treatmentUnits } from '../treatment-unit/index.js';
 import type { SignMark } from './signMarkers.js';

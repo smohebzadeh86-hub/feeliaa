@@ -4,8 +4,9 @@ import { query, pool } from '../../db/connection.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { createNotification } from '../notifications/notify.js';
 import { treatmentUnits } from '../treatment-unit/index.js';
-import { getFullSessionAudio, listSessionAudio, deriveSessionStatus } from '../transcription/archive/sessionAudioArchive.js';
-import { pendingAudiosFor } from '../transcription/batch/batchQueue.js';
+import { getFullSessionAudio } from '../transcription/archive/fullAudio.js';
+import { listSessionAudio, deriveSessionStatus } from '../transcription/archive/listing.js';
+import { pendingAudiosFor } from '../transcription/batch/queueFiles.js';
 import {
   uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens,
   markedTextFromTokens, deleteTranscription, deleteFile,
