@@ -1,12 +1,12 @@
 # Module 07 — UX Analytics · Implementation Plan
 
 ## Current State
-پیاده‌سازی‌شده روی branch `feat/clarity`؛ کدِ برنامه commit شده (`public/feelia-analytics.js`، `server/src/http/clientConfig.ts`، تغییراتِ `index.html`/`index.ts` — در `2763414`). فقط سندِ `docs/analytics-clarity.md` خودش هنوز untracked است (مستندات، نه کد). evidence: [verification/2026-09-14-clarity-test-pass.md](../../../verification/2026-09-14-clarity-test-pass.md) — route inject 10/10، sandbox 41/41، mask/allowlist استاتیک OK. **تست‌نشده:** کلیکِ واقعی در مرورگر و payloadِ واقعیِ Clarity (`clarity.ms` از شبکه‌ی dev در دسترس نیست).
+پیاده‌سازی‌شده روی branch `feat/clarity`؛ کدِ برنامه commit شده (`public/feelia-analytics.js`، `server/src/features/client-config/clientConfig.routes.ts`، تغییراتِ `index.html`/`index.ts` — در `2763414`). فقط سندِ `docs/analytics-clarity.md` خودش هنوز untracked است (مستندات، نه کد). evidence: [verification/2026-09-14-clarity-test-pass.md](../../../verification/2026-09-14-clarity-test-pass.md) — route inject 10/10، sandbox 41/41، mask/allowlist استاتیک OK. **تست‌نشده:** کلیکِ واقعی در مرورگر و payloadِ واقعیِ Clarity (`clarity.ms` از شبکه‌ی dev در دسترس نیست).
 
 ## Code Anchors
 | لایه | anchor |
 |---|---|
-| server | `server/src/http/clientConfig.ts` (`CLARITY_PROJECT_ID_RE`، `clarityProjectId`، `GET /api/client-config`)؛ ثبت در `server/src/index.ts` |
+| server | `server/src/features/client-config/clientConfig.routes.ts` (`CLARITY_PROJECT_ID_RE`، `clarityProjectId`، `GET /api/client-config`)؛ ثبت در `server/src/index.ts` |
 | client | `public/feelia-analytics.js` (`EVENTS`، `SCREENS`، `MIC_ERRORS`، `boot`، `activate`، `injectScript`، `grant`، `deny`، `onLogout`، `renderUI`) |
 | glue | `index.html`: `uxTrack`، `showScreen` → `FeeliaAnalytics.screen`، `enterApp` → `boot`، `logout` → `onLogout`، `runPreflight` → `micError`، `#uxConsentToggle`، `data-clarity-mask` |
 | docs | `docs/analytics-clarity.md` |

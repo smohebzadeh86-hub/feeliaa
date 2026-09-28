@@ -105,6 +105,12 @@ pnpm test:cf
 pnpm test:up
 ```
 ```bash
+pnpm test:routes
+```
+```bash
+pnpm test:arch
+```
+```bash
 cd server && npx tsc --noEmit
 ```
 
@@ -114,7 +120,10 @@ cd server && npx tsc --noEmit
 - `pnpm test:up` = harness pipelineِ آپلودِ فایلِ صوتی (`scripts/upload-harness.ts`، 2026-09-23) — ماشینِ حالتِ job با portهایِ جعلی (بدونِ DB/Soniox) + ffmpegِ واقعی رویِ فایل‌هایِ ساختگی.
 - `pnpm test:ft` = harness «متنِ نهایی» (`scripts/final-transcript-harness.ts`، 2026-09-27) — ماشینِ حالت، نگهبان‌ها و polish با LLMِ جعلی؛ بدونِ DB/شبکه.
 - `pnpm test:llm` = harness لایه‌ی LLMِ مستقل از provider (`scripts/llm-harness.ts`، 2026-09-28) — config هر provider (OpenAI/OpenRouter/متیس/DeepSeek/custom)، رگرسیونِ بدنه‌ی درخواست، حالت‌هایِ JSON، providerِ جایگزین؛ کلاینتِ جعلی، بدونِ شبکه.
-- تستِ خودکارِ backend با DB یا CI وجود ندارد.
+- `pnpm test:routes` = قراردادِ routeها (method/path + hookهایِ مؤثر مثلِ `requireAuth`/`requireAdmin` + bodyLimit) در برابرِ `scripts/route-snapshot.txt`؛ بدونِ DB. `-- --update` فقط وقتی route عمداً عوض شده.
+- `pnpm test:arch` = قواعدِ مرزِ ماژول‌هایِ backend (`scripts/check-backend-boundaries.mjs`، 2026-09-28): importِ بینِ featureها فقط از `features/<x>/index.ts`، platform (`shared/db/auth/obs`) هرگز از features، بدونِ چرخه‌ی importِ استاتیک. ساختار: `docs/01-architecture/application-architecture.md` §1.
+- `pnpm test:api` = characterizationِ APIِ backend رویِ **DBِ مشترکِ dev** با fixtureِ ساختگی + Sonioxِ mock (`scripts/api-contract-harness.mts`). فقط با `FEELIA_E2E_OK=1` و **مجوزِ صریحِ مالک در همان گفتگو** اجرا می‌شود؛ `FEELIA_E2E_ENV_FILE` (مسیرِ `.env` برایِ فقط `DATABASE_URL`)، `FEELIA_API_GOLDEN` برایِ مقایسه. fixtureها در پایان پاک می‌شوند.
+- CI وجود ندارد.
 
 ## ۹. رفتارِ Agent
 

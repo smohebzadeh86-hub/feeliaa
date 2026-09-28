@@ -38,7 +38,7 @@
 | UI-21 | Escape و کلیک روی پس‌زمینه مدال را نمی‌بندند | پابرجا |
 | UI-26 | سیستم روی حالتِ تیره، اپ روشن | پابرجا |
 
-بقیه‌ی موارد: خطوطِ کدِ مربوط دوباره از commit استخراج شد و بدونِ تغییر است — مثلاً UI-01 `logout()` خطِ ۱۳۷۸ (بدونِ توقفِ ضبط)؛ UI-02 `stopVoiceNoteDirect()` خطِ ۲۷۹۵ (فقط `wrapupNotes.push`)؛ UI-03 `normalizePhone` خطِ ۱۵ در `server/src/http/auth.ts`؛ UI-08 `runPreflight()` خطوطِ ۲۴۶۵/۲۴۷۶/۲۴۹۷؛ UI-13 `RTSession.pause` خطِ ۸۳۷ در `feelia-rt.js`؛ UI-14/15 `rtOnState` خطوطِ ۲۶۹۰–۲۶۹۶؛ UI-20 تنها `keydown` خطِ ۳۱۱۶ (یادداشتِ سریع)؛ UI-25 خطِ ۲۲۸۴؛ UI-26 `toggleTheme` خطِ ۱۲۸۲؛ UI-41 خطِ ۲۸۱.
+بقیه‌ی موارد: خطوطِ کدِ مربوط دوباره از commit استخراج شد و بدونِ تغییر است — مثلاً UI-01 `logout()` خطِ ۱۳۷۸ (بدونِ توقفِ ضبط)؛ UI-02 `stopVoiceNoteDirect()` خطِ ۲۷۹۵ (فقط `wrapupNotes.push`)؛ UI-03 `normalizePhone` خطِ ۱۵ در `server/src/features/auth/auth.routes.ts`؛ UI-08 `runPreflight()` خطوطِ ۲۴۶۵/۲۴۷۶/۲۴۹۷؛ UI-13 `RTSession.pause` خطِ ۸۳۷ در `feelia-rt.js`؛ UI-14/15 `rtOnState` خطوطِ ۲۶۹۰–۲۶۹۶؛ UI-20 تنها `keydown` خطِ ۳۱۱۶ (یادداشتِ سریع)؛ UI-25 خطِ ۲۲۸۴؛ UI-26 `toggleTheme` خطِ ۱۲۸۲؛ UI-41 خطِ ۲۸۱.
 
 ### چرا ممکن است در تستِ محلی دیده نشوند؟
 
@@ -78,7 +78,7 @@
 
 | ID | فایل | تغییر |
 |---|---|---|
-| UI-03 | `server/src/http/auth.ts` | تابعِ `toLatinDigits` اضافه شد؛ `normalizePhone` قبل از regex، ارقامِ فارسی (`۰-۹`) و عربی (`٠-٩`) را به لاتین تبدیل می‌کند |
+| UI-03 | `server/src/features/auth/auth.routes.ts` | تابعِ `toLatinDigits` اضافه شد؛ `normalizePhone` قبل از regex، ارقامِ فارسی (`۰-۹`) و عربی (`٠-٩`) را به لاتین تبدیل می‌کند |
 | UI-01 | `public/index.html` | تابعِ سراسریِ `hasActiveRecording()` (همان سیگنالِ `beforeunload`: `ws`/`voiceWS`/`SonioxDirect.ws`/`FeeliaRT.hasOpenConnection()`)؛ `logout()` و `openAdminPanel()` اگر ضبط فعال باشد، بنرِ هشدار نشان می‌دهند و کاری نمی‌کنند (به‌جای `abort()` که صفِ IndexedDB را پاک می‌کند) |
 | UI-06 | `public/index.html` | `id="newClientCreateBtn"` به دکمه اضافه شد؛ `createNewClient()` تا پایانِ درخواست دکمه را `disabled` می‌کند (`finally` همیشه دوباره فعال می‌کند) |
 | UI-04 | `public/index.html` | `startSession()` دکمه‌ی `#btnStartSession` را قبل از `POST` غیرفعال می‌کند؛ روی خطا با `updateStartButtonState()` (نه بی‌قیدوشرط) دوباره فعال می‌شود |
@@ -292,7 +292,7 @@ UI-08، UI-09، UI-11، UI-13، UI-14، UI-15، UI-22 تا UI-24، UI-27، UI-36
 ### تشخیص
 - `GET /api/stt/check` رویِ سرورِ لوکال → `mint-ok`, `proxy.ok:true` — یعنی سرور به Soniox درست وصل می‌شود؛ مشکل از آنجا نیست.
 - یک WS آزمایشیِ مستقیم از مرورگر به `wss://stt-rt.soniox.com` در ۹۶۵ms وصل شد — یعنی خودِ سرویس هم در دسترسه (حداقل از این محیط).
-- ریشه‌یابیِ کد: `POST /api/sessions/:id/batch-audio` (`server/src/http/sessions.ts`) هر آپلودِ غیرِ`archive` را رویِ جلسه‌ی `completed`/`canceled` با ۴۰۰ رد می‌کرد. `endNewRTSession()` (`public/index.html`) دقیقاً همان لحظه‌ی «پایان جلسه» بلافاصله `PUT status:'completed'` می‌فرستد — یعنی تا وقتی کاربر وارد Wrapup می‌شود و «یادداشت صوتی» می‌زند، status از قبل completedه. پس **هر یادداشتِ صوتی‌ای که نیازمندِ batch fallback بود** (چون realtimeِ خودش وصل نشده بود) در همان قدمِ آپلودِ صدا با ۴۰۰ رد می‌شد — نه گاه‌به‌گاه، بلکه **قطعی و صددرصد**.
+- ریشه‌یابیِ کد: `POST /api/sessions/:id/batch-audio` (`server/src/features/sessions/`) هر آپلودِ غیرِ`archive` را رویِ جلسه‌ی `completed`/`canceled` با ۴۰۰ رد می‌کرد. `endNewRTSession()` (`public/index.html`) دقیقاً همان لحظه‌ی «پایان جلسه» بلافاصله `PUT status:'completed'` می‌فرستد — یعنی تا وقتی کاربر وارد Wrapup می‌شود و «یادداشت صوتی» می‌زند، status از قبل completedه. پس **هر یادداشتِ صوتی‌ای که نیازمندِ batch fallback بود** (چون realtimeِ خودش وصل نشده بود) در همان قدمِ آپلودِ صدا با ۴۰۰ رد می‌شد — نه گاه‌به‌گاه، بلکه **قطعی و صددرصد**.
 - `git blame`: این گارد از commitِ `f9b0a9c` (۲۰۲۶-۰۹-۱۱) می‌آید که **جدِّ commitِ productionِ فعلی (`8bcdf0e`) هم هست** — یعنی این باگ رویِ سایتِ زنده هم فعاله، فقط چون آنجا معمولاً realtime موفق می‌شود، مسیرِ batchِ یادداشت کمتر اجرا می‌شود و باگ کمتر دیده می‌شود. این دقیقاً همان چیزی‌ست که حسِ «سرور بهتر کار می‌کند» را توضیح می‌دهد — نه اینکه نسخه‌ی دیگری از کد باشد، بلکه شرایطِ شبکه‌ی متفاوت باعثِ کمتر-دیده‌شدنِ همین باگ می‌شود.
 
 ### رفع
@@ -305,7 +305,7 @@ UI-08، UI-09، UI-11، UI-13، UI-14، UI-15، UI-22 تا UI-24، UI-27، UI-36
 | `POST batch-audio?purpose=transcript` رویِ جلسه‌ی completed (رگرسیون) | ۴۰۰ | همچنان ۴۰۰ — بدونِ تغییر |
 | `POST batch-audio?purpose=archive` رویِ جلسه‌ی completed (رگرسیون) | ۲۰۲ | همچنان ۲۰۲ — بدونِ تغییر |
 
-روش: یک مراجع+جلسه‌ی واقعی ساخته شد، دقیقاً با همان `PUT status:'completed'`ی که کلاینت می‌فرستد completed شد، سه درخواست بالا مستقیماً زده شد، بعد داده‌ی تستی حذف شد. `cd server && npx tsc --noEmit` → exit 0؛ `node scripts/rt-harness.cjs` → 29 PASS/6 FAIL (همان baseline). `feelia-rt.js` در این فیکس اصلاً باز نشد — فقط `server/src/http/sessions.ts` (+۱۰/−۳).
+روش: یک مراجع+جلسه‌ی واقعی ساخته شد، دقیقاً با همان `PUT status:'completed'`ی که کلاینت می‌فرستد completed شد، سه درخواست بالا مستقیماً زده شد، بعد داده‌ی تستی حذف شد. `cd server && npx tsc --noEmit` → exit 0؛ `node scripts/rt-harness.cjs` → 29 PASS/6 FAIL (همان baseline). `feelia-rt.js` در این فیکس اصلاً باز نشد — فقط `server/src/features/sessions/` (+۱۰/−۳).
 
 ### کارِ باز
 دو سؤالِ دیگرِ مالک هنوز بی‌جواب‌اند و **ربطی به این فیکس ندارند** (این فیکس فقط مسیرِ «ذخیره» را درست کرد، نه «چرا realtime وصل نمی‌شود» یا «چرا کند بود»):
@@ -423,7 +423,7 @@ if (owned.status === 'completed' || owned.status === 'canceled') {
 |---|---|---|---|---|---|
 | **UI-01** ✅ FIXED 2026-09-14 | «خروج از حساب» وسطِ جلسه ضبط را متوقف نمی‌کند؛ دکمه‌ی خروج (و برای ادمین، پنلِ ادمین) روی صفحه‌ی جلسه‌ی زنده هم در دسترس است | صفحه‌ی ورود نمایش داده می‌شود ولی **میکروفون روشن، اتصالِ Soniox باز و تایمر در حالِ شمارش** می‌ماند؛ فردِ بعدی پشتِ همان دستگاه ضبط می‌شود | اجرا: پس از logout → `engineState=ACTIVE`، `micTrackLive=true`، `wsOpen=true`، `timerRunning=true` | ✅ | `logout()` و `openAdminPanel()` هیچ‌کدام `stopAllAudio`/finish را صدا نمی‌زنند → **رفع:** `hasActiveRecording()` هر دو را بلاک می‌کند ([جزئیات](#رفعِ-فازِ-۰--2026-09-14))، working tree، commitنشده |
 | **UI-02** ✅ FIXED 2026-09-14 | یادداشتِ صوتی (مسیرِ اصلی) هرگز به سرور ارسال نمی‌شود | پیامِ «ثبت شد» می‌آید، در فهرستِ Wrapup دیده می‌شود، ولی پس از «ذخیره و پایان» **در پرونده نیست** → از دست رفتنِ یادداشتِ بالینی | اجرا: `voiceNotePOSTs=0`؛ یادداشت‌های سرور پس از ذخیره فقط `note_after` | ✅ | `stopVoiceNoteDirect()` فقط `wrapupNotes.push(...)`؛ `finishSession()` یادداشت‌ها را ذخیره نمی‌کند → **رفع:** `POST /api/sessions/:id/notes` صریح ([جزئیات](#رفعِ-فازِ-۰--2026-09-14))، working tree، commitنشده |
-| **UI-03** ✅ FIXED 2026-09-14 | شماره‌ی موبایل با ارقامِ فارسی/عربی رد می‌شود | کسی که با کیبوردِ فارسی «۰۹۱۲…» می‌نویسد (دقیقاً همان که placeholder نشان می‌دهد) خطای «شماره موبایل معتبر نیست» می‌گیرد → **ثبت‌نام و ورود ناممکن** | محاسبه: `normalizePhone('۰۹۱۲۰۰۰۰۰۰۰') = null` | ✅ | `server/src/http/auth.ts` `normalizePhone` (`\d` فقط 0–9ِ ASCII)؛ همین در تأییدِ تایپیِ حذفِ تراپیست → **رفع:** `toLatinDigits()` ([جزئیات](#رفعِ-فازِ-۰--2026-09-14))، working tree، commitنشده |
+| **UI-03** ✅ FIXED 2026-09-14 | شماره‌ی موبایل با ارقامِ فارسی/عربی رد می‌شود | کسی که با کیبوردِ فارسی «۰۹۱۲…» می‌نویسد (دقیقاً همان که placeholder نشان می‌دهد) خطای «شماره موبایل معتبر نیست» می‌گیرد → **ثبت‌نام و ورود ناممکن** | محاسبه: `normalizePhone('۰۹۱۲۰۰۰۰۰۰۰') = null` | ✅ | `server/src/features/auth/auth.routes.ts` `normalizePhone` (`\d` فقط 0–9ِ ASCII)؛ همین در تأییدِ تایپیِ حذفِ تراپیست → **رفع:** `toLatinDigits()` ([جزئیات](#رفعِ-فازِ-۰--2026-09-14))، working tree، commitنشده |
 | **UI-04** ✅ FIXED 2026-09-14 | دوبار کلیک روی «شروع جلسه و رونویسی» | **دو جلسه** در پرونده، دو ضبط و دو اتصالِ هم‌زمان، شماره‌ی جلسه‌ی پرش‌دار | اجرا: ۲ درخواستِ `POST /api/sessions` | ✅ | `startSession()` بدونِ قفل/`disabled` → **رفع:** `disabled` تا پایانِ درخواست ([جزئیات](#رفعِ-فازِ-۰--2026-09-14))، working tree، commitنشده |
 | **UI-05** | متنِ کارتِ رضایت: «صدا هیچ‌جا ذخیره نمی‌شود» و پانویس: «صدای خام هرگز ذخیره نمی‌شود» | اطلاعِ نادرست به مراجع (اخلاقی/حقوقی) | کد (تعارضِ C1) | جزئی — production صدا را فقط در مسیرِ شکست موقتاً به سرور می‌فرستد؛ working tree آرشیوِ ۱۴روزه دارد | `#consentBox`، `.privacy-note` — **عمداً رفع‌نشده، منتظرِ تصمیمِ مالک P0-1** |
 | **UI-06** ✅ FIXED 2026-09-14 | دوبار کلیک روی «ایجاد» مراجعِ جدید | مراجعِ تکراری با دو کدِ متفاوت | اجرا: ۲ درخواستِ `POST /api/clients` | ✅ | `createNewClient()`؛ همین الگو در `addTextNote`، `finishSession`، `saveSessionMeta`، `confirmDeactivateClient`، `confirmEditCategory` → **رفع (فقط `createNewClient`؛ بقیه هنوز باز):** `disabled` تا پایانِ درخواست ([جزئیات](#رفعِ-فازِ-۰--2026-09-14))، working tree، commitنشده |

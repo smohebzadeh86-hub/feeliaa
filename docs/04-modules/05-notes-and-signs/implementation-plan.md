@@ -6,9 +6,9 @@
 ## Code Anchors
 | لایه | anchor |
 |---|---|
-| API | `server/src/http/sessions.ts`: `POST /api/sessions/:id/notes`، `DELETE /api/notes/:id`، `processVoiceNoteInBackground`، `voice-note` (legacy) |
-| batch | `server/src/stt/batchqueue.ts` (`purpose==='note'`) |
-| legacy WS | `server/src/ws/transcription.ts` `/ws/voice` |
+| API | `server/src/features/sessions/`: `POST /api/sessions/:id/notes`، `DELETE /api/notes/:id`، `processVoiceNoteInBackground`، `voice-note` (legacy) |
+| batch | `server/src/features/transcription/batch/` (`purpose==='note'`) |
+| legacy WS | `server/src/features/legacy-ws/transcription.routes.ts` `/ws/voice` |
 | UI Live | `.sign-chip` handler، `renderSignsLog`، `removeSign`، `addQuickNote`، `renderNotesLog` |
 | UI Wrapup | `renderWrapupSigns`، `renderWrapupNotesLog`، `renderWrapupNotes`، `showTextInput`، `addTextNote`، `startVoiceNote`، `startVoiceNoteDirect`، `stopVoiceNote`، `stopVoiceNoteDirect`، `cleanupVoice` |
 | DB | migration 003 |

@@ -40,8 +40,8 @@
 ### 2.4 کامنت‌های کد
 کامنت‌ها (عمدتاً فارسی و مفصل) ارزشمندند ولی **بعضی قدیمی‌اند**. نمونه‌های تأییدشده:
 - `public/feelia-rt.js` (سربرگ): «صوت durable فقط در failure به سرور می‌رود و بعد حذف می‌شود» — دیگر درست نیست (`archiveQueuedAudioOnly`).
-- `server/src/stt/soniox.ts` (کامنتِ `enable_endpoint_detection`): می‌گوید این موتور برای batch/یادداشتِ صوتی استفاده می‌شود — batch اکنون از `asyncTranscribe.ts` استفاده می‌کند.
-- `server/src/stt/batchqueue.ts` (سربرگ): «صوت فقط در مسیرِ شکست… بلافاصله بعد از موفقیت حذف می‌شود» — اکنون قبل از حذف آرشیو می‌شود.
+- `server/src/features/legacy-ws/soniox.ts` (کامنتِ `enable_endpoint_detection`): می‌گوید این موتور برای batch/یادداشتِ صوتی استفاده می‌شود — batch اکنون از `asyncTranscribe.ts` استفاده می‌کند.
+- `server/src/features/transcription/batch/` (سربرگ): «صوت فقط در مسیرِ شکست… بلافاصله بعد از موفقیت حذف می‌شود» — اکنون قبل از حذف آرشیو می‌شود.
 در تعارض، کدِ اجرایی برنده است.
 
 ### 2.5 رفتارِ Soniox

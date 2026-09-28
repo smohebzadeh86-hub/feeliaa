@@ -6,9 +6,9 @@
 ## Code Anchors
 | لایه | anchor |
 |---|---|
-| API | `server/src/http/admin.ts`: `buildTherapistExport`، stats، therapists، therapists/:id/clients، clients/:id/sessions، sessions/:id/audio، session-audio stream، exportها، PATCH، DELETEها |
+| API | `server/src/features/admin/`: `buildTherapistExport`، stats، therapists، therapists/:id/clients، clients/:id/sessions، sessions/:id/audio، session-audio stream، exportها، PATCH، DELETEها |
 | guard | `server/src/auth/guard.ts#requireAdmin` |
-| archive | `server/src/stt/sessionAudioArchive.ts` (`listSessionAudio`، `getSessionAudioRow`) |
+| archive | `server/src/features/transcription/archive/` (`listSessionAudio`، `getSessionAudioRow`) |
 | UI | `index.html`: `openAdminPanel`، `loadAdminStats`، `renderAdminStats`، `loadAdminTherapists`، `searchAdminTherapists`، `renderAdminTherapists`، `adminSetActive`، `adminSetIsAdmin`، `showDeleteTherapist`/`checkDeleteTherapistConfirm`/`confirmDeleteTherapist`، `openAdminTherapistDetail`، `openAdminClientSessions`، `adminDeleteClient`، `adminDownloadTherapist`، `adminDownloadAll` |
 
 ## Architecture Impact

@@ -1,6 +1,6 @@
 # API Catalog
 
-> **وضعیت:** ACTIVE-CANONICAL (مالکِ endpoint و payload) · منبع: `server/src/index.ts`، `server/src/http/*.ts`، `server/src/ws/transcription.ts` · Snapshot 2026-09-15 (commit `54a17fd`).
+> **وضعیت:** ACTIVE-CANONICAL (مالکِ endpoint و payload) · منبع: `server/src/index.ts`، `server/src/http/*.ts`، `server/src/features/legacy-ws/transcription.routes.ts` · Snapshot 2026-09-15 (commit `54a17fd`).
 > Auth: `public` = بدونِ guard · `auth` = `requireAuth` (401) · `admin` = `requireAdmin` (401/403).
 > مالکیت: `owned` = اگر منبع مالِ تراپیست نباشد 404.
 > خطاها: شکلِ کلی `{ "error": "<فارسی>", "code"?: "<machine>" }` — [error-code-catalog](error-code-catalog.md).
@@ -13,7 +13,7 @@
 | GET | `/api/health` | public | `{status:"ok"|"degraded", name, version, database:"connected"|"disconnected", timestamp}` | — (ops) |
 | GET | `/*` | public | فایل‌های `public/` (`@fastify/static`) | مرورگر |
 
-## ۲. Auth — `server/src/http/auth.ts`
+## ۲. Auth — `server/src/features/auth/auth.routes.ts`
 
 | Method | Path | Auth | Body | موفق | خطاها | مصرف |
 |---|---|---|---|---|---|---|
@@ -25,7 +25,7 @@
 
 `therapist` = `{id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate}` — سه‌حالته (`null`/`true`/`false`، migration 020). کوکی: `feelia_session`، `path=/`، `httpOnly`، `sameSite=lax`، `maxAge=2592000`.
 
-## ۳. Clients — `server/src/http/clients.ts` (همه `auth`)
+## ۳. Clients — `server/src/features/clients/clients.routes.ts` (همه `auth`)
 
 | Method | Path | Body/Query | موفق | خطاها | مصرف |
 |---|---|---|---|---|---|
@@ -40,7 +40,7 @@
 | DELETE | `/api/clients/:id` | — | `{deleted: code, cascade:{session_count, note_count}}` | 404 | UI |
 | DELETE | `/api/clients/:id/recording-consent` | — | `{recording_consent_at:null}` — لغوِ رضایتِ یک‌باره (2026-09-24). جلسه‌هایِ قبلی دست‌نخورده؛ رویدادِ `client.consent_revoked` | 404 (غیرمالک) | بدونِ caller (دکمه‌ی UI در 2026-09-25 به دستورِ مالک حذف شد) |
 
-## ۴. Sessions و Notes — `server/src/http/sessions.ts` (همه `auth`)
+## ۴. Sessions و Notes — `server/src/features/sessions/` (همه `auth`)
 
 | Method | Path | Body/Query | موفق | خطاها | مصرف |
 |---|---|---|---|---|---|
@@ -58,20 +58,20 @@
 | POST | `/api/sessions/:id/resolve-speakers` | — | 202 `{status}` (idempotent) | 400 (جلسه completed نیست؛ صدای آرشیو نیست)، 404 | UI |
 | GET | `/api/sessions/:id/resolve-speakers` | — | `{status: processing|done|error, text?, error?}` | 404 (جلسه یا job) | UI |
 
-## ۵. STT — `server/src/http/stt.ts` (همه `auth`)
+## ۵. STT — `server/src/features/transcription/stt.routes.ts` (همه `auth`)
 
 | Method | Path | Body | موفق | خطاها | مصرف |
 |---|---|---|---|---|---|
 | GET | `/api/stt/check` | — | همیشه 200: `{ok:true, code:"mint-ok", websocket_url}` یا `{ok:false, code, error}` (فیلدِ `proxy` و probeِ legacy از 2026-09-24 حذف شد) | — | UI (preflight، غیرمسدودکننده) |
 | POST | `/api/stt/realtime-session` | `{session_id}` | `{websocket_url, model:"stt-rt-v5", api_key:<temp>, expires_in_seconds:120, single_use:true, credential_scope:"transcribe_websocket", expires_at, stt_defaults}` | 400، 401، 404 owned، 400 جلسه پایان‌یافته (جلسه‌ی خودکاربسته با `purpose=transcript` به‌جایش دوباره باز می‌شود — A3، 2026-09-26)، 429 (>30/min)، 500 `no-key`، 502 `mint-rejected`، 503 `mint-transport|mint-timeout` | RT، UI (`SonioxDirect`) |
 
-## ۶. Client config — `server/src/http/clientConfig.ts`
+## ۶. Client config — `server/src/features/client-config/clientConfig.routes.ts`
 
 | Method | Path | Auth | پاسخ | نکته |
 |---|---|---|---|---|
 | GET | `/api/client-config` | auth | `{clarity: {projectId} \| null, obs: {enabled, sample}}`، هدر `Cache-Control: no-store` | Clarity برای ادمین همیشه null؛ ID نامعتبر → null. `obs` **(جدید، فازِ ۱ِ رصد/حسابرسی، 2026-09-22)** برخلافِ Clarity برایِ ادمین هم پر می‌شود — از `OBS_CLIENT_ENABLED`/`OBS_CLIENT_SAMPLE` |
 
-## ۶.۱ Observability — `server/src/http/obs.ts` (`auth`) — جدید، فازِ ۱ (2026-09-22)
+## ۶.۱ Observability — `server/src/obs/obs.routes.ts` (`auth`) — جدید، فازِ ۱ (2026-09-22)
 
 | Method | Path | Body | موفق | خطاها | مصرف |
 |---|---|---|---|---|---|
@@ -82,7 +82,7 @@
 `session_id` مالِ تراپیستِ درخواست‌دهنده نباشد، ردیف با `session_id=null` ذخیره می‌شود + یک
 رویدادِ جداگانه‌ی `obs.session_mismatch` — تله‌متری هرگز 404 نمی‌دهد (نباید existence oracle شود).
 
-## ۷. Admin — `server/src/http/admin.ts` (همه `admin`)
+## ۷. Admin — `server/src/features/admin/` (همه `admin`)
 
 | Method | Path | Body/Query | موفق | خطاها |
 |---|---|---|---|---|
@@ -102,7 +102,7 @@
 
 نکته: پارامترهای `:id` اعتبارسنجیِ UUID ندارند؛ مقدارِ غیر-UUID احتمالاً خطای pg و 500 می‌دهد (**INFERRED**).
 
-### ۷.۱ Observability — پنلِ ادمین (`server/src/http/admin.ts`، همه `admin`) — جدید، فازِ ۱ (2026-09-22)
+### ۷.۱ Observability — پنلِ ادمین (`server/src/features/admin/`، همه `admin`) — جدید، فازِ ۱ (2026-09-22)
 
 | Method | Path | Query | موفق | نکته |
 |---|---|---|---|---|
@@ -134,7 +134,7 @@ UIِ فعلی فقط برایِ `status='inactive'` رندر می‌شود. جز
 
 `CaseFileRecord` = `{clientId, content, status:"ready"|"generating"|"error"|"stale", generatingStartedAt, model, promptVersion, generatedAt, generatedFromSessionId, corpusSignature, therapistEditedAt, forceRegeneratedAt, forceRegeneratedBy, errorMessage}`؛ ساختارِ `content` در [database-catalog §client_case_file](database-catalog.md). `corpusSignature`/`generatingStartedAt` ستون‌هایِ migration 019 (2026-09-17) — به ترتیب برایِ ردِ regenerateِ بدونِ داده‌ی جدید و قفلِ نرمِ race.
 
-`content` (2026-09-18) سه فیلدِ سطحِ‌بالایِ جدید هم دارد (همه از جنسِ `CaseFileField`؛ `application/computeTreatmentRhythm.ts`/`buildCaseFilePrompt.ts`): `overallStatus` (خلاصه‌ی کلیِ AI برایِ status-pillِ هدر)، `safetyRisk` (هشدارِ ایمنی/خطرِ جانی — مفهوماً جدا از `axis.sensitiveDoNotDiscussInFrontOfClient`)، `sensitiveContext` (خلاصه‌ی زمینه‌ی حساسِ پرونده). هر سه فقط وقتی متن واقعاً پشتیبان دارد پر می‌شوند؛ در غیرِ این صورت `pending:true`/`value:""` و UI بنری نشان نمی‌دهد.
+`content` (2026-09-18) سه فیلدِ سطحِ‌بالایِ جدید هم دارد (همه از جنسِ `CaseFileField`؛ `application/computeTreatmentRhythm.ts`/`prompts/userPrompts.ts`): `overallStatus` (خلاصه‌ی کلیِ AI برایِ status-pillِ هدر)، `safetyRisk` (هشدارِ ایمنی/خطرِ جانی — مفهوماً جدا از `axis.sensitiveDoNotDiscussInFrontOfClient`)، `sensitiveContext` (خلاصه‌ی زمینه‌ی حساسِ پرونده). هر سه فقط وقتی متن واقعاً پشتیبان دارد پر می‌شوند؛ در غیرِ این صورت `pending:true`/`value:""` و UI بنری نشان نمی‌دهد.
 
 `TreatmentRhythm` = `{sessionCount: number, startDate: string|null, avgGapDays: number|null, durationDays: number|null}` — **محاسبه‌ای، نه از LLM** (`application/computeTreatmentRhythm.ts`، از رویِ `sessions.date`ِ جلساتِ `completed`/`recovered`)؛ همیشه زنده است، حتی بدونِ regenerate کردنِ پرونده. `startDate` شمسیِ `YYYY/MM/DD`؛ `avgGapDays`/`durationDays` فقط با ≥۲ جلسه‌ی تاریخ‌دار محاسبه می‌شوند، وگرنه `null` (UI: «در انتظار ثبت»).
 
@@ -187,7 +187,7 @@ UIِ فعلی فقط برایِ `status='inactive'` رندر می‌شود. جز
 
 **روشن/خاموش فقط از ادمین** (تصمیمِ مالک 2026-09-28؛ `PATCH /api/auth/final-transcript` حذف شد). **تغییرِ مسیرهای موجود:** `GET /api/auth/me`، login و register — فیلدِ `final_transcript_enabled`. `GET /api/admin/therapists` — `final_transcript_enabled`. `PATCH /api/admin/therapists/:id` — اختیاری `final_transcript_enabled` (audit: `purpose=final_transcript_on/off`). `GET /api/notifications` — kindِ جدیدِ `final_transcript_ready`؛ از 2026-09-28 `llm_unavailable` (فقط ادمین‌ها، `error_code` = `credit\|auth\|unavailable`، بدونِ مراجع/جلسه).
 
-## ۹. WebSocket (LEGACY — LAW-015) — `server/src/ws/transcription.ts`
+## ۹. WebSocket (LEGACY — LAW-015) — `server/src/features/legacy-ws/transcription.routes.ts`
 
 هر دو مسیر پشتِ `requireAuth` (کوکی در upgrade) و مالکیتِ جلسه.
 

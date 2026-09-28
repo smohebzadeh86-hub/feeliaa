@@ -5,10 +5,10 @@
 | # | Subsystem | فایل‌های اصلی | چرا پرریسک است | قوانینِ کلیدی |
 |---|---|---|---|---|
 | 01 | [Browser Realtime Engine](01-browser-realtime-engine.md) | `public/feelia-rt.js` | state machineِ ۱۱ حالته، race‌های async، epoch | LAW-003، LAW-008، LAW-012 |
-| 02 | [Audio Durability & Batch Fallback](02-audio-durability-batch-fallback.md) | `feelia-rt.js` (AudioQueueDB)، `stt/batchqueue.ts`، `stt/asyncTranscribe.ts` | duplicate/گم‌شدنِ متن، حجمِ صدا، حریمِ خصوصی | LAW-008، LAW-009، LAW-010 |
+| 02 | [Audio Durability & Batch Fallback](02-audio-durability-batch-fallback.md) | `feelia-rt.js` (AudioQueueDB)، `features/transcription/batch/`، `features/transcription/soniox/restClient.ts` | duplicate/گم‌شدنِ متن، حجمِ صدا، حریمِ خصوصی | LAW-008، LAW-009، LAW-010 |
 | 03 | [Transcript Integrity](03-transcript-integrity.md) | `PUT /api/sessions/:id`، `persistConfirmed`، `mergeBatchTranscript` | از دست رفتنِ متنِ جلسه | LAW-008 |
-| 04 | [Legacy WS Proxy (P1)](04-legacy-ws-proxy-p1.md) | `server/src/ws/*`، `stt/soniox.ts`، بخش‌های legacy در `index.html` | پروتکلِ ordering پیچیده؛ frozen | LAW-015 |
-| 05 | [Session Audio Archive & Speaker Resolve](05-session-audio-archive-speaker-resolve.md) | `stt/sessionAudioArchive.ts`، `stt/speakerResolve.ts`، روت‌های admin | نگهداریِ صدا، تعارضِ رضایت، ffmpeg | LAW-005، LAW-009، LAW-010 |
+| 04 | [Legacy WS Proxy (P1)](04-legacy-ws-proxy-p1.md) | `server/src/ws/*`، `features/legacy-ws/soniox.ts`، بخش‌های legacy در `index.html` | پروتکلِ ordering پیچیده؛ frozen | LAW-015 |
+| 05 | [Session Audio Archive & Speaker Resolve](05-session-audio-archive-speaker-resolve.md) | `features/transcription/archive/`، `features/transcription/speakerResolve.ts`، روت‌های admin | نگهداریِ صدا، تعارضِ رضایت، ffmpeg | LAW-005، LAW-009، LAW-010 |
 
 | 06 | [Audio Upload Pipeline](06-audio-upload-pipeline.md) (2026-09-23) | `server/src/features/audio-upload/*`، `features/notifications/notify.ts`، `public/feelia-upload.js` | آپلودِ بزرگ رویِ شبکه‌ی ضعیف، jobِ پس‌زمینه‌ی DB-محور، exactly-onceِ متن، اعلان | LAW-004، LAW-008، LAW-009، LAW-010، LAW-013 |
 | 07 | [Final Transcript](07-final-transcript.md) (2026-09-27) | `server/src/features/final-transcript/*`، `index.html#renderFinalTranscript` | ارسالِ متن/صدا به Soniox و LLM، تغییرِ معنا توسطِ LLM، هزینه‌ی دوبرابر | LAW-001، LAW-008، LAW-009، LAW-013 |

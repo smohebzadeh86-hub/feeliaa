@@ -10,7 +10,7 @@
 | Node.js با پشتیبانیِ ESM و top-level await | `server/package.json` (`"type":"module"`)، `index.ts` | نسخه pin نشده (بدونِ `engines`)؛ dev: v24.19.0 |
 | pnpm (workspace) | `pnpm-workspace.yaml`، `pnpm-lock.yaml` | بدونِ `packageManager`؛ dev: 10.34.5 |
 | MySQL 8.0.16+ (از 2026-09-15؛ PostgreSQL فقط تاریخی) | `server/src/db/connection.ts` (`mysql2`)، `server/src/db/mysql/schema.sql` | production: MySQL رویِ همان سرور (`localhost`)؛ نسخه‌ی دقیق بررسی نشد |
-| ffmpeg در PATH یا `FFMPEG_PATH` | `stt/speakerResolve.ts`، remuxِ صدایِ جلسه | فقط برای resolve-speakers/remux؛ **رویِ production نصب نیست** (لاگِ `spawn ffmpeg ENOENT`، 2026-09-23 — fail-open) |
+| ffmpeg در PATH یا `FFMPEG_PATH` | `features/transcription/speakerResolve.ts`، remuxِ صدایِ جلسه | فقط برای resolve-speakers/remux؛ **رویِ production نصب نیست** (لاگِ `spawn ffmpeg ENOENT`، 2026-09-23 — fail-open) |
 | HTTPS جلوی اپ | الزامِ getUserMedia (هشدارِ `maybeShowHttpsHint`) | UNVERIFIED |
 | دسترسیِ خروجی به `api.soniox.com` (یا `PROXY_URL`) | `stt/*` | الزامی برای mint |
 
@@ -132,7 +132,7 @@ nginx باید WebSocket upgrade را برای `/ws/*` پشتیبانی کند (
 **چرا:** در رونویسیِ زنده مرورگر مستقیم به Soniox وصل است؛ سرور فقط mintِ کلید و ذخیره‌ی دوره‌ایِ صدا/متن را می‌بیند.
 پس «سرور بیکار به‌نظر می‌رسد» ≠ «کسی جلسه ندارد». restart وسطِ جلسه یا آپلود ریسکِ از دست رفتنِ تکه/وقفه دارد.
 سیگنال‌ها از schemaِ واقعی: `sessions.status/updated_at`، `session_audio.created_at`، `audio_uploads`، `audio_jobs`
-(migration 023)، `sessions.batch_status`، و رویدادِ `stt.mint_ok` در `obs_events` (`server/src/http/stt.ts`).
+(migration 023)، `sessions.batch_status`، و رویدادِ `stt.mint_ok` در `obs_events` (`server/src/features/transcription/stt.routes.ts`).
 
 **اجرا** (همان الگویِ اسکریپتِ یک‌بارِ §۴.۱؛ فقط `COUNT` — هیچ متنِ بالینی/شناسه‌ای چاپ نمی‌شود؛ اسکریپت در پایان حذف می‌شود):
 

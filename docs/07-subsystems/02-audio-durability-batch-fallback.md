@@ -4,9 +4,9 @@
 > `startDurable`، `stopDurableSegment`، `watchTrackEnded`/`handleMicLost`، `flushAllDurable`،
 > `uploadBatchSegments`، `drainQueuedAudioInBackground`، `archiveQueuedAudioOnly`،
 > `awaitBatchDrain`، `readNewVoiceNote`)، `public/index.html` (`sweepOrphanedAudioQueue`،
-> `beforeunload`، `openAdminClientSessions`)، `server/src/stt/batchqueue.ts`،
-> `server/src/stt/sessionAudioArchive.ts` (`getFullSessionAudio`)، `server/src/stt/asyncTranscribe.ts`،
-> روت‌های `batch-*` در `server/src/http/sessions.ts`، روت‌هایِ `audio*` در `server/src/http/admin.ts`،
+> `beforeunload`، `openAdminClientSessions`)، `server/src/features/transcription/batch/`،
+> `server/src/features/transcription/archive/` (`getFullSessionAudio`)، `server/src/features/transcription/soniox/restClient.ts`،
+> روت‌های `batch-*` در `server/src/features/sessions/`، روت‌هایِ `audio*` در `server/src/features/admin/`،
 > migration `017_session_audio_run_kind_sha.sql`.
 > ⚠️ متنِ رضایتِ UI با این subsystem تعارض دارد (LAW-009، C1) — هنوز حل‌نشده.
 > ❗ **این سند رویِ working-treeِ commitنشده‌ی audit صدا/۲۰۲۶-۰۹-۱۶ (بخش‌هایِ A تا F، هر شش
@@ -160,7 +160,7 @@ soniox-invalid-audio`) ثبت می‌شود و `batch_status` طبقِ باقی�
   غیرِآپلودی (`source <> 'upload'`) که `batch_status ∈ {queued, processing}` است، بیش از ۱ ساعت دست نخورده و هیچ
   فایلِ transcript/late در صف ندارد → `failed` + رویدادِ `batch.failed` (`reason: stale-no-audio`). ریشه: sweepِ ۲۴ساعته
   فایلِ صف را پاک می‌کرد ولی `batch_status` را نه — جلسه‌ی `cee2e5d2` (تستِ واقعیِ 2026-09-21) از آن روز `queued` ماند
-  (در production سه جلسه). جلسه‌هایِ آپلودی مالکِ جدا دارند (`jobRunner`).
+  (در production سه جلسه). جلسه‌هایِ آپلودی مالکِ جدا دارند (`audio-upload/worker.ts`).
 - `mergeBatchTranscript(sessionId, baseVersion, text, label?)`: همیشه `current + "\n\n" +
   (label ? label+"\n"+text : text)`، `transcript_version+1`، `realtime_reliable=false`،
   `batch_status='done'` (بدونِ CAS — [subsystem 03](03-transcript-integrity.md)).

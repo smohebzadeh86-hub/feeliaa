@@ -102,7 +102,7 @@
 | C1 | متنِ رضایت و privacy note در `index.html`: «صدا هیچ‌جا ذخیره نمی‌شود» | IndexedDB + آرشیوِ ۱۴روزه + پخشِ ادمین | LAW-009 (متن باید حقیقت بگوید) — کد وضعیتِ موجود است | تصمیمِ مالک: P0-1 در master plan |
 | C2 | `docs/admin-panel.md`: ادمین transcript نمی‌بیند | `buildTherapistExport` شاملِ `transcript` | کد (سند HISTORICAL شد) | ثبت در PRD ادمین |
 | C3 | `analytics-clarity.md`: prod با pm2 در `/root/feeliaa` | `diag-collect.sh`: `$HOME/server-deploy` | هیچ‌کدام تأییدشده نیست | تأیید از سرور (P1-3) |
-| C4 | هشدار/راهنمای ویرایشِ تاریخ: شمسی (`۱۴۰۳/۰۵/۱۲`) | پیش‌فرضِ `POST /api/sessions`: تاریخِ میلادی | کد | ✅ رفع در working tree (2026-09-14): مالک «شمسی» انتخاب کرد — migration 013 + `http/sessionDate.ts` |
+| C4 | هشدار/راهنمای ویرایشِ تاریخ: شمسی (`۱۴۰۳/۰۵/۱۲`) | پیش‌فرضِ `POST /api/sessions`: تاریخِ میلادی | کد | ✅ رفع در working tree (2026-09-14): مالک «شمسی» انتخاب کرد — migration 013 + `features/sessions/sessionDate.ts` |
 | C5 | کامنت‌های سربرگِ `feelia-rt.js` و `batchqueue.ts` درباره‌ی حذفِ صدا | `archiveQueuedAudioOnly`، `archiveAudioForAdmin` | کد | اصلاحِ کامنت همراهِ P0-1 |
 | C6 | ~~`SonioxDirect` با `enable_endpoint_detection:true` ↔ FeeliaRT/سرور با `false`~~ | — | — | **بسته‌شده 2026-09-14:** همه‌ی مسیرها اکنون `true` |
 | C7 | harness انتظارِ batch fallback بدونِ IndexedDB | `feelia-rt.js` فعلی با صفِ IndexedDB | کد؛ harness قدیمی است | به‌روزرسانیِ harness (P1-2) |

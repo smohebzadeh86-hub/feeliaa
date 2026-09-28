@@ -1,6 +1,6 @@
 # Subsystem 05 — Session Audio Archive & Speaker Resolve
 
-> **وضعیت:** ACTIVE-CANONICAL · کد: `server/src/stt/sessionAudioArchive.ts`، `server/src/stt/speakerResolve.ts`، `server/src/db/mysql/migrations/011_session_audio.sql`، `016_session_audio_duration.sql`، روت‌های `/api/admin/sessions/:id/audio`، `/api/admin/session-audio/:audioId/stream`، `/api/sessions/:id/resolve-speakers` · قوانین: LAW-005، LAW-009، LAW-010.
+> **وضعیت:** ACTIVE-CANONICAL · کد: `server/src/features/transcription/archive/`، `server/src/features/transcription/speakerResolve.ts`، `server/src/db/mysql/migrations/011_session_audio.sql`، `016_session_audio_duration.sql`، روت‌های `/api/admin/sessions/:id/audio`، `/api/admin/session-audio/:audioId/stream`، `/api/sessions/:id/resolve-speakers` · قوانین: LAW-005، LAW-009، LAW-010.
 
 ## ۱. هدف (از کامنتِ کد)
 نگهداریِ عمدیِ صدای جلسات «فقط برای بازبینیِ ادمین (دیباگِ باگ‌ها)» با نگهداریِ محدود (۱۴ روز «طبقِ تصمیمِ تیم»)، و استفاده‌ی مجدد از همان صدا برای یکدست‌کردنِ شماره‌ی گوینده‌ها.
@@ -24,7 +24,7 @@
 ### مشکلاتِ شناخته‌شده (هنوز باز)
 1. **تعارضِ رضایت (C1، بحرانی):** متنِ Setup: «صدا هیچ‌جا ذخیره نمی‌شود — فقط متنِ گفتگو در پرونده ثبت می‌گردد»؛ privacy note: «صدای خام هرگز ذخیره نمی‌شود». UI ادمین: «صدا فقط برایِ بازبینیِ فنی نگه داشته می‌شود — حداکثر ۱۴ روز».
 2. **seq در هر نسلِ durable؟** `durableSeq` در طولِ عمرِ یک `RTSession` افزایشی است؛ ولی اگر جلسه پس از reload با `RTSession` جدید ادامه یابد، seq از ۰ شروع می‌شود → `ON CONFLICT` صدای بخش‌های قبلی را **بازنویسی** می‌کند و فایل‌های `data/batch-queue` هم با seq تکراری ولی timestamp متفاوت‌اند (INFERRED از کد؛ تست نشده).
-3. ~~فایل‌های یتیم~~ **رفع شد (2026-09-22، LAW-010):** قبل از `DELETE` رویِ `sessions`/`clients`/`therapists`، شناسه‌ی جلسه‌هایِ مرتبط جمع‌آوری و بعدِ موفقیتِ حذفِ DB با `deleteSessionAudioDirs` (در `sessionAudioArchive.ts`) پوشه‌ی فیزیکیِ هرکدام هم پاک می‌شود — `server/src/http/sessions.ts` (حذفِ جلسه)، `clients.ts` (حذفِ مراجع)، `admin.ts` (حذفِ مراجع/تراپیستِ ادمین). fail-open: خطایِ حذفِ فایل فقط لاگ می‌شود.
+3. ~~فایل‌های یتیم~~ **رفع شد (2026-09-22، LAW-010):** قبل از `DELETE` رویِ `sessions`/`clients`/`therapists`، شناسه‌ی جلسه‌هایِ مرتبط جمع‌آوری و بعدِ موفقیتِ حذفِ DB با `deleteSessionAudioDirs` (در `sessionAudioArchive.ts`) پوشه‌ی فیزیکیِ هرکدام هم پاک می‌شود — `server/src/features/sessions/` (حذفِ جلسه)، `clients.ts` (حذفِ مراجع)، `admin.ts` (حذفِ مراجع/تراپیستِ ادمین). fail-open: خطایِ حذفِ فایل فقط لاگ می‌شود.
 4. **ترتیبِ UI:** «سگمنت N» = `seq+1`.
 5. `Range` بدونِ اعتبارسنجیِ `end < size`.
 

@@ -11,22 +11,22 @@
 |---|---|---|---|---|---|
 | `DATABASE_URL` | `db/connection.ts` | فرمتِ MySQL: `mysql://user:pass@host:port/db` (تا 2026-09-15 فرمتِ PostgreSQL بود؛ مهاجرت به MySQL به دستورِ صریحِ مالک — [PROJECT_STATUS](../../PROJECT_STATUS.md) §7) | عملاً بله | **بله** | اتصالِ mysql2 (قبلاً pg) |
 | `PORT` | `index.ts` | `3000` | خیر | خیر | پورتِ listen (همیشه `0.0.0.0`) |
-| `SONIOX_API_KEY` | `http/stt.ts`، `http/sessions.ts`، `stt/tempkey.ts`، `stt/asyncTranscribe.ts`، `stt/batchqueue.ts`، `ws/transcription.ts` | — | برای STT بله | **بله** | نبود → `no-key`؛ batch `failed` |
-| `SONIOX_API_BASE` | `stt/tempkey.ts`، `stt/asyncTranscribe.ts` | `https://api.soniox.com` | خیر | خیر | base REST |
-| `SONIOX_WS_URL` | `stt/tempkey.ts` | `wss://stt-rt.soniox.com/transcribe-websocket` | خیر | خیر | URLِ برگشتی به مرورگر؛ **`stt/soniox.ts` از آن استفاده نمی‌کند** (URL ثابت) |
-| `PROXY_URL` | `stt/tempkey.ts`، `stt/asyncTranscribe.ts`، `stt/soniox.ts` | — | خیر | ممکن است credential داشته باشد | egressِ سرور به Soniox |
-| `ADMIN_PHONE` | `http/auth.ts` | — | خیر | نیمه‌حساس | شماره‌ای که در register/login ادمین می‌شود |
-| `CLARITY_PROJECT_ID` | `http/clientConfig.ts` | — (خاموش) | خیر | خیر | باید `^[a-z0-9]{6,20}$`؛ فقط در production |
-| `FFMPEG_PATH` | `stt/speakerResolve.ts`، `stt/sessionAudioArchive.ts`، `features/audio-upload/media.ts` | `ffmpeg` | برایِ آپلودِ فایلِ صوتی عملاً بله | خیر | باینریِ ffmpeg؛ نبودش ⇒ jobِ آپلود با `no-ffmpeg` در backoff می‌ماند |
+| `SONIOX_API_KEY` | `features/transcription/stt.routes.ts`، `features/sessions/`، `features/transcription/soniox/tempKey.ts`، `features/transcription/soniox/restClient.ts`، `features/transcription/batch/`، `features/legacy-ws/transcription.routes.ts` | — | برای STT بله | **بله** | نبود → `no-key`؛ batch `failed` |
+| `SONIOX_API_BASE` | `features/transcription/soniox/tempKey.ts`، `features/transcription/soniox/restClient.ts` | `https://api.soniox.com` | خیر | خیر | base REST |
+| `SONIOX_WS_URL` | `features/transcription/soniox/tempKey.ts` | `wss://stt-rt.soniox.com/transcribe-websocket` | خیر | خیر | URLِ برگشتی به مرورگر؛ **`features/legacy-ws/soniox.ts` از آن استفاده نمی‌کند** (URL ثابت) |
+| `PROXY_URL` | `features/transcription/soniox/tempKey.ts`، `features/transcription/soniox/restClient.ts`، `features/legacy-ws/soniox.ts` | — | خیر | ممکن است credential داشته باشد | egressِ سرور به Soniox |
+| `ADMIN_PHONE` | `features/auth/auth.routes.ts` | — | خیر | نیمه‌حساس | شماره‌ای که در register/login ادمین می‌شود |
+| `CLARITY_PROJECT_ID` | `features/client-config/clientConfig.routes.ts` | — (خاموش) | خیر | خیر | باید `^[a-z0-9]{6,20}$`؛ فقط در production |
+| `FFMPEG_PATH` | `features/transcription/speakerResolve.ts`، `features/transcription/archive/`، `features/audio-upload/media.ts` | `ffmpeg` | برایِ آپلودِ فایلِ صوتی عملاً بله | خیر | باینریِ ffmpeg؛ نبودش ⇒ jobِ آپلود با `no-ffmpeg` در backoff می‌ماند |
 | `AUDIT_LOG_RETENTION_DAYS` | `obs/sweep.ts` | `730` (۲ سال) | تنظیم‌نشده | خیر | **جدید 2026-09-26 (A6، تصمیمِ مالک: «۲ سال»).** ردیف‌هایِ `audit_log` قدیمی‌تر از این در جاروبِ روزانه (startup + هر ۲۴ ساعت) حذف می‌شوند |
-| `SESSION_AUTO_CLOSE_IDLE_SECONDS` | `http/sessionAutoClose.ts` | `7200` (۲ ساعت؛ کف ۹۰۰) | تنظیم‌نشده | خیر | **جدید 2026-09-26 (A3).** جلسه‌ی زنده‌ی `in_progress`/`recovered` (غیرِ upload) که در این مدت نه `updated_at`، نه `session_audio`، نه `obs_events` داشته، هر ۱۵ دقیقه خودکار completed می‌شود (`auto_closed_at`) |
+| `SESSION_AUTO_CLOSE_IDLE_SECONDS` | `features/sessions/autoClose.ts` | `7200` (۲ ساعت؛ کف ۹۰۰) | تنظیم‌نشده | خیر | **جدید 2026-09-26 (A3).** جلسه‌ی زنده‌ی `in_progress`/`recovered` (غیرِ upload) که در این مدت نه `updated_at`، نه `session_audio`، نه `obs_events` داشته، هر ۱۵ دقیقه خودکار completed می‌شود (`auto_closed_at`) |
 | `SONIOX_CONTEXT_MAX_TERMS` / `SONIOX_CONTEXT_MAX_CHARS` | `features/treatment-unit/instance.ts` | `60` / `8000` | ست نشده | خیر | **جدید 2026-09-27.** سقفِ واژه‌هایِ رویکرد و طولِ JSONِ contextِ پویایِ Soniox |
 | `TU_CATALOG_TTL_MS` | `features/treatment-unit/instance.ts` | `60000` | ست نشده | خیر | **جدید 2026-09-27.** کشِ درون‌حافظه‌ایِ کاتالوگِ واحدِ درمان |
-| `PRE_NOTE_MAX_CHARS` | `http/sessions.ts` | `2000` | ست نشده | خیر | **جدید 2026-09-27.** سقفِ یادداشتِ پیش از جلسه |
-| `SONIOX_ORPHAN_SWEEP` | `features/audio-upload/jobRunner.ts` | خاموش | **رویِ production: `1`** (در `/root/feeliaa-mysql/.env` ست شد 2026-09-24؛ dry-run پیش از آن: ۱ transcription + ۱ فایلِ یتیمِ 2026-09-16) | خیر | **جدید 2026-09-23.** فقط `1` پاک‌سازیِ فایل/transcriptionِ یتیمِ فیلیا رویِ Soniox را فعال می‌کند. رویِ dev عمداً خاموش — کلیدِ Soniox بینِ dev و production مشترک است و DBِ dev از jobهایِ زنده‌ی production خبر ندارد |
-| `UPLOAD_DAILY_AUDIO_MINUTES` | `features/audio-upload/jobRunner.ts` (`quotaWaitMsForJob`) | `600` | ست نشده (پیش‌فرض ۶۰۰) | خیر | **جدید 2026-09-24 (رفعِ L6).** سقفِ دقیقه‌ی صدایِ رونویسی‌شده‌ی آپلودی برایِ هر تراپیست در ۲۴ ساعتِ غلتان. بیش از آن ⇒ job **صف می‌ماند** (`error_code='quota-wait'`، چکِ دوباره هر ۳۰ دقیقه) — هرگز رد/failed نمی‌شود؛ اولین job همیشه اجرا می‌شود؛ `0` ⇒ بدونِ سقف |
-| `TRANSCRIPT_UNCERTAIN_CONFIDENCE` | `stt/asyncTranscribe.ts` (`uncertainConfidence`) | `0.5` | خیر | خیر | **جدید 2026-09-28 (پلنِ B).** واژه‌ای که کمینه‌ی confidenceِ توکن‌هایش زیرِ این است در **ورودیِ «متنِ نهایی»** با `⟦…؟⟧` علامت می‌خورد (هرگز در `sessions.transcript`). بازه‌ی معتبر (0,1)؛ نامعتبر ⇒ پیش‌فرض |
-| `UPLOAD_LOW_CONF_RATIO` | `stt/asyncTranscribe.ts` (`lowConfidenceWarnRatio`) ⇒ `jobRunner.productionDeps` | `0.08` | خیر | خیر | **جدید 2026-09-28 (پلنِ B).** سهمِ توکن‌هایِ confidence<0.7 که بالاتر از آن jobِ آپلود `quality_warning=low_confidence` و اعلانِ `transcript_low_quality` می‌گیرد. مبنا: فاز ۰B (بی‌آسیب ≤ ۰٫۰۳۸، متنِ خراب ۰٫۱۲۲) — با دادهٔ واقعی بازتنظیم شود. در startup خوانده می‌شود |
+| `PRE_NOTE_MAX_CHARS` | `features/sessions/` | `2000` | ست نشده | خیر | **جدید 2026-09-27.** سقفِ یادداشتِ پیش از جلسه |
+| `SONIOX_ORPHAN_SWEEP` | `features/audio-upload/worker.ts` | خاموش | **رویِ production: `1`** (در `/root/feeliaa-mysql/.env` ست شد 2026-09-24؛ dry-run پیش از آن: ۱ transcription + ۱ فایلِ یتیمِ 2026-09-16) | خیر | **جدید 2026-09-23.** فقط `1` پاک‌سازیِ فایل/transcriptionِ یتیمِ فیلیا رویِ Soniox را فعال می‌کند. رویِ dev عمداً خاموش — کلیدِ Soniox بینِ dev و production مشترک است و DBِ dev از jobهایِ زنده‌ی production خبر ندارد |
+| `UPLOAD_DAILY_AUDIO_MINUTES` | `features/audio-upload/worker.ts` (`quotaWaitMsForJob`) | `600` | ست نشده (پیش‌فرض ۶۰۰) | خیر | **جدید 2026-09-24 (رفعِ L6).** سقفِ دقیقه‌ی صدایِ رونویسی‌شده‌ی آپلودی برایِ هر تراپیست در ۲۴ ساعتِ غلتان. بیش از آن ⇒ job **صف می‌ماند** (`error_code='quota-wait'`، چکِ دوباره هر ۳۰ دقیقه) — هرگز رد/failed نمی‌شود؛ اولین job همیشه اجرا می‌شود؛ `0` ⇒ بدونِ سقف |
+| `TRANSCRIPT_UNCERTAIN_CONFIDENCE` | `features/transcription/soniox/restClient.ts` (`uncertainConfidence`) | `0.5` | خیر | خیر | **جدید 2026-09-28 (پلنِ B).** واژه‌ای که کمینه‌ی confidenceِ توکن‌هایش زیرِ این است در **ورودیِ «متنِ نهایی»** با `⟦…؟⟧` علامت می‌خورد (هرگز در `sessions.transcript`). بازه‌ی معتبر (0,1)؛ نامعتبر ⇒ پیش‌فرض |
+| `UPLOAD_LOW_CONF_RATIO` | `features/transcription/soniox/restClient.ts` (`lowConfidenceWarnRatio`) ⇒ `worker.productionDeps` | `0.08` | خیر | خیر | **جدید 2026-09-28 (پلنِ B).** سهمِ توکن‌هایِ confidence<0.7 که بالاتر از آن jobِ آپلود `quality_warning=low_confidence` و اعلانِ `transcript_low_quality` می‌گیرد. مبنا: فاز ۰B (بی‌آسیب ≤ ۰٫۰۳۸، متنِ خراب ۰٫۱۲۲) — با دادهٔ واقعی بازتنظیم شود. در startup خوانده می‌شود |
 | `UPLOAD_CASE_FILE` | `features/audio-upload/jobMachine.ts#uploadCaseFileEnabled` | خاموش | خیر | خیر | **جدید 2026-09-24 (تصمیمِ مالک).** مسیرِ آپلودِ فایلِ صوتی برایِ مراجعِ فعال و غیرفعال با «ذخیره‌ی متن» تمام می‌شود (`audio_jobs.case_file_status='disabled'`)؛ فقط `1` مرحله‌ی پرونده را بعد از متن روشن می‌کند (UI هم ثابتِ `UPLOAD_SHOW_CASE_FILE_STEP` در `index.html` را دارد که باید هم‌زمان `true` شود). فقط مراجعِ غیرفعال را می‌خواهید؟ ⇒ `UPLOAD_CASE_FILE_INACTIVE` |
 | `UPLOAD_CASE_FILE_INACTIVE` | `features/audio-upload/jobMachine.ts#uploadCaseFileInactiveEnabled` | خاموش | خیر | خیر | **جدید 2026-09-25 (تصمیمِ مالک: «فعلاً متن»).** فقط `1` ⇒ آپلودِ مراجعِ **غیرفعال** بعد از متن پرونده را هم به‌روز می‌کند، به شرطِ `case_file_enabled` و `case_file_auto_generate=true` برایِ آن تراپیست (`uploadCaseFileAllowed`). مراجعِ فعال اثر نمی‌گیرد. UI خودکار از `case_file_planned` پیروی می‌کند. نیازمندِ ری‌استارت |
 | `CASE_FILE_AUTO_ACTIVE_CLIENTS` | `features/case-file/application/autoTrigger.ts` | خاموش | خیر | خیر | **جدید 2026-09-23 (پی‌ریزی، تصمیمِ مالک «الان نه»).** `1` ⇒ تولیدِ خودکارِ پرونده برایِ مراجعِ **فعال** هم (امروز فقط غیرفعال) |
@@ -57,8 +57,8 @@
 | `OBS_SLOW_MS` | `obs/httpHook.ts` | `1500` | خیر | خیر | آستانه‌ی «کند» برایِ ثبتِ `http.request` در DB (پایین‌ترش فقط در JSONL می‌ماند) |
 | `OBS_EVENTS_RETENTION_DAYS` | `obs/sweep.ts` | `180` | خیر | خیر | نگهداریِ `obs_events` |
 | `OBS_UI_RETENTION_DAYS` | `obs/sweep.ts` | `30` | خیر | خیر | نگهداریِ `obs_ui_events` |
-| `OBS_CLIENT_ENABLED` | `http/clientConfig.ts` | `true` (هر مقدارِ غیرِ `'false'`) | خیر | خیر | کلیدِ سراسریِ روشن/خاموشِ `FeeliaObs` (شاملِ ادمین) |
-| `OBS_CLIENT_SAMPLE` | `http/clientConfig.ts` | `1` | خیر | خیر | نرخِ نمونه‌برداریِ per-page-load (۰ تا ۱) |
+| `OBS_CLIENT_ENABLED` | `features/client-config/clientConfig.routes.ts` | `true` (هر مقدارِ غیرِ `'false'`) | خیر | خیر | کلیدِ سراسریِ روشن/خاموشِ `FeeliaObs` (شاملِ ادمین) |
+| `OBS_CLIENT_SAMPLE` | `features/client-config/clientConfig.routes.ts` | `1` | خیر | خیر | نرخِ نمونه‌برداریِ per-page-load (۰ تا ۱) |
 | `OBS_LOG_MAX_BYTES` | `obs/fileSink.ts` | `8388608` (۸MB) | خیر | خیر | **پیاده‌سازی‌شده 2026-09-23.** سقفِ حجمِ هر فایلِ `obs.jsonl`/`obs.jsonl.N` پیش از rotate؛ مقدارِ نامعتبر/۰/منفی/NaN → fallback به ۸MB. تعدادِ فایل‌ها (`KEEP=5`) ثابت است و از env نمی‌آید. |
 
 کلیدهای موجود در `server/.env` محلی ولی **بدونِ استفاده در کد:** `AUTH_PASSWORD` (C8). `PROXY_URL` در آن comment شده است.
@@ -70,36 +70,36 @@
 | `SESSION_COOKIE` / `SESSION_COOKIE_MAX_AGE` | `feelia_session` / ۳۰ روز | `auth/guard.ts` |
 | `SESSION_TTL_MS` | ۳۰ روز | `auth/session.ts` |
 | scrypt `KEY_LEN` | 64 | `auth/password.ts` |
-| mint rate limit | ۳۰/۶۰s per therapist | `http/stt.ts` |
-| `STT_DEFAULTS` | model `stt-rt-v5`، …، `enable_endpoint_detection:true` (از 2026-09-14؛ قبلاً false) | `http/stt.ts` |
-| `TEMP_KEY_EXPIRES_IN_SECONDS` / `TEMP_KEY_MAX_SESSION_SECONDS` / `MINT_TIMEOUT_MS` | 120 / 7200 / 10000 | `stt/tempkey.ts` |
-| `QUEUE_DIR` / `MAX_AUDIO_BYTES` / `RETENTION_MS` | `<cwd>/data/batch-queue` / 50MB / ۲۴h | `stt/batchqueue.ts` |
-| `ARCHIVE_DIR` / `RETENTION_MS` | `<cwd>/data/session-audio` / ۱۴ روز | `stt/sessionAudioArchive.ts` |
+| mint rate limit | ۳۰/۶۰s per therapist | `features/transcription/stt.routes.ts` |
+| `STT_DEFAULTS` | model `stt-rt-v5`، …، `enable_endpoint_detection:true` (از 2026-09-14؛ قبلاً false) | `features/transcription/stt.routes.ts` |
+| `TEMP_KEY_EXPIRES_IN_SECONDS` / `TEMP_KEY_MAX_SESSION_SECONDS` / `MINT_TIMEOUT_MS` | 120 / 7200 / 10000 | `features/transcription/soniox/tempKey.ts` |
+| `QUEUE_DIR` / `MAX_AUDIO_BYTES` / `RETENTION_MS` | `<cwd>/data/batch-queue` / 50MB / ۲۴h | `features/transcription/batch/` |
+| `ARCHIVE_DIR` / `RETENTION_MS` | `<cwd>/data/session-audio` / ۱۴ روز | `features/transcription/archive/` |
 | JSONLِ obs: `MAX_BYTES` / `KEEP` | 8MB / 5 (سقفِ دیسک ~۴۸MB، `<cwd>/data/logs/obs.jsonl[.1..5]`) | `obs/fileSink.ts` |
 | صفِ obs: `MAX_QUEUE` / `DRAIN_BATCH` / درین هر `2s` (یا `30s` وقتِ خرابیِ DB) | 2000 / 200 | `obs/eventLog.ts` |
-| obs rate-limit | ۲۰ درخواست + ۱۵۰۰ رویداد/دقیقه به‌ازایِ تراپیست | `http/obs.ts` |
+| obs rate-limit | ۲۰ درخواست + ۱۵۰۰ رویداد/دقیقه به‌ازایِ تراپیست | `obs/obs.routes.ts` |
 | `FeeliaObs`: `MAX_BUF` / `BATCH_MAX` / flush دوره‌ای | 200 / 50 / ۱۵ثانیه | `public/feelia-obs.js` |
 | `FeeliaObs` backoff | [5s, 15s, 60s, 300s]، reset روی هر 2xx | `public/feelia-obs.js` |
-| `POLL_INTERVAL_MS` / سقفِ poll / timeoutِ درخواست | 2000 / **۱۰ دقیقه + ۱ دقیقه به ازایِ هر MB** (`pollTimeoutForBytes`، رفعِ F2، 2026-09-23؛ قبلاً ثابتِ ۱۰ دقیقه) / 20000 (آپلودِ stream: 60000 idle) | `stt/asyncTranscribe.ts` |
+| `POLL_INTERVAL_MS` / سقفِ poll / timeoutِ درخواست | 2000 / **۱۰ دقیقه + ۱ دقیقه به ازایِ هر MB** (`pollTimeoutForBytes`، رفعِ F2، 2026-09-23؛ قبلاً ثابتِ ۱۰ دقیقه) / 20000 (آپلودِ stream: 60000 idle) | `features/transcription/soniox/restClient.ts` |
 | آپلودِ فایلِ صوتی: `CHUNK_SIZE` / `MAX_UPLOAD_BYTES` / `MAX_ACTIVE_UPLOADS_PER_THERAPIST` / نگهداریِ نیمه‌کاره | ۴MB / ۱GB (تصمیمِ مالک) / ۵ / ۷ روز | `features/audio-upload/uploadStore.ts` (2026-09-23) |
 | `MAX_DURATION_MS` | ۳۰۰ دقیقه (سقفِ Soniox؛ تصمیمِ مالک) | `features/audio-upload/media.ts` |
 | `QUALITY` (سنجشِ فایلِ آپلودی) | قاب ۵۰ms، پنجره ۳۰ث؛ `no_signal` p95<−85، `too_quiet` p95<**−60** (زنده: −45)، `clipping` سهمِ قابِ peak≥0.99 > ۰٫۰۲، `noisy` p10>−40 و p95−p10<12؛ flag وقتی ≥۳۰٪ پنجره‌ها (فایلِ زیرِ ۳ پنجره: کلِ فایل) | `features/audio-upload/quality.ts` |
 | نرمال‌سازی | Opus/Ogg mono 16kHz 32kbps (fallback AAC/M4A 48kbps)؛ timeout = max(۵ دقیقه، طولِ صدا/۱۰) | `media.ts` |
-| workerِ jobها: tick / هم‌زمانی / lease / heartbeat | ۳s / ۲ / ۲۰ دقیقه / ۶۰s | `features/audio-upload/jobRunner.ts` |
+| workerِ jobها: tick / هم‌زمانی / lease / heartbeat | ۳s / ۲ / ۲۰ دقیقه / ۶۰s | `features/audio-upload/worker.ts` |
 | `BACKOFF_MS` / `MAX_ATTEMPTS` / busyِ پرونده | [30s, 2m, 10m, 30m, 1h, 3h] / 6 / هر ۲ دقیقه تا ۱۵ بار | `features/audio-upload/jobMachine.ts` |
-| `CHEAP_RETRY_MS` / `CHEAP_MAX_ATTEMPTS` (2026-09-24) | 20s ثابت / 90 (~۳۰ دقیقه) — فقط وقتی transcription رویِ Soniox ساخته شده و poll/دریافتِ متن شکست خورده؛ در startupِ worker هم `next_attempt_at` ِ این jobها حداکثر NOW+20s می‌شود | `jobMachine.ts`، `jobRunner.ts#startAudioJobWorker` |
-| تکرارِ خطایِ شبکه‌ایِ درخواستِ Soniox (2026-09-24) | فقط GET/DELETE: ۳ تکرار با [1s, 2s, 4s] رویِ خطایِ سطحِ شبکه (TLS/socket/timeout/…)؛ POST هرگز | `stt/asyncTranscribe.ts#request` |
+| `CHEAP_RETRY_MS` / `CHEAP_MAX_ATTEMPTS` (2026-09-24) | 20s ثابت / 90 (~۳۰ دقیقه) — فقط وقتی transcription رویِ Soniox ساخته شده و poll/دریافتِ متن شکست خورده؛ در startupِ worker هم `next_attempt_at` ِ این jobها حداکثر NOW+20s می‌شود | `jobMachine.ts`، `worker.ts#startAudioJobWorker` |
+| تکرارِ خطایِ شبکه‌ایِ درخواستِ Soniox (2026-09-24) | فقط GET/DELETE: ۳ تکرار با [1s, 2s, 4s] رویِ خطایِ سطحِ شبکه (TLS/socket/timeout/…)؛ POST هرگز | `features/transcription/soniox/restClient.ts#request` |
 | مهلتِ یک transcription | ۳۰ دقیقه + طولِ صدا | `jobMachine.ts#transcriptionDeadlineMs` |
 | sweeps (2026-09-23) | آپلودهایِ رهاشده/یتیم: ساعتی + startup؛ اعلان‌ها: روزانه (نگهداری ۳۰ روز)؛ یتیم‌هایِ Soniox: startup + هر ۶ ساعت (فقط با `SONIOX_ORPHAN_SWEEP=1`، آستانه‌ی ۲۴ ساعت) | `index.ts` |
-| ffmpeg timeout / پاکسازیِ job | ۵ دقیقه / ۲ ساعت | `stt/speakerResolve.ts` |
-| موتورِ سرور: `RECONNECT_BASE_DELAY`، `MAX_RECONNECT`، `CONNECT_TIMEOUT`، `FINALIZE_TIMEOUT`، `MAX_BUFFER_CHUNKS` | 1000، 6، 8000، 8000، 200 | `stt/soniox.ts` |
-| `P1_PARAMS` | GRACE 60s، REORDER 2s، HANDOVER 5s، BUFFER_MAX 100، FORWARDED_SET_MAX 2000 | `ws/p1.ts` |
-| voice-note حجم | 100B–50MB | `http/sessions.ts` |
+| ffmpeg timeout / پاکسازیِ job | ۵ دقیقه / ۲ ساعت | `features/transcription/speakerResolve.ts` |
+| موتورِ سرور: `RECONNECT_BASE_DELAY`، `MAX_RECONNECT`، `CONNECT_TIMEOUT`، `FINALIZE_TIMEOUT`، `MAX_BUFFER_CHUNKS` | 1000، 6، 8000، 8000، 200 | `features/legacy-ws/soniox.ts` |
+| `P1_PARAMS` | GRACE 60s، REORDER 2s، HANDOVER 5s، BUFFER_MAX 100، FORWARDED_SET_MAX 2000 | `features/legacy-ws/p1.ts` |
+| voice-note حجم | 100B–50MB | `features/sessions/` |
 | slow query log | >100ms | `db/connection.ts` |
-| sweep intervals | ۲۴h (audio)، ۱h (resolve jobs)، **۱h (صفِ batch — `BATCH_SWEEP_INTERVAL_MS`، commitنشده 2026-09-23؛ قبلاً فقط startup)** | `index.ts`؛ ثابت در `stt/batchqueue.ts` |
+| sweep intervals | ۲۴h (audio)، ۱h (resolve jobs)، **۱h (صفِ batch — `BATCH_SWEEP_INTERVAL_MS`، commitنشده 2026-09-23؛ قبلاً فقط startup)** | `index.ts`؛ ثابت در `features/transcription/batch/` |
 | multipart `fileSize` | **commitنشده (audit صدا/۲۰۲۶-۰۹-۱۶): ۱۰MB صریح** (`register(multipart, { limits: { fileSize: 10*1024*1024 } })`) — قبلاً ۱MiB عملی (`bodyLimit` پیش‌فرضِ Fastify، تأییدشده در `@fastify/multipart@10.1.1`) که سگمنت‌هایِ صوتیِ بزرگ‌تر را با ۴۱۳ رد می‌کرد | `index.ts`؛ پیامد: [platform plan](../06-platform/implementation-plan.md) |
-| workerِ دوره‌ایِ retryِ صفِ batch | commitنشده — هر ۵ دقیقه (`setInterval`) + سرِ startup | `index.ts` → `stt/batchqueue.ts#retryQueuedBatches` |
-| `LATE_TRANSCRIPT_LABEL` | commitنشده — `[بخشِ ضبط‌شده در زمانِ قطعیِ اینترنت — بعداً رونویسی شد]` | `stt/batchqueue.ts` (export شده، در `mergeBatchTranscript` prepend می‌شود) |
+| workerِ دوره‌ایِ retryِ صفِ batch | commitنشده — هر ۵ دقیقه (`setInterval`) + سرِ startup | `index.ts` → `features/transcription/batch/#retryQueuedBatches` |
+| `LATE_TRANSCRIPT_LABEL` | commitنشده — `[بخشِ ضبط‌شده در زمانِ قطعیِ اینترنت — بعداً رونویسی شد]` | `features/transcription/batch/` (export شده، در `mergeBatchTranscript` prepend می‌شود) |
 
 ## ۳. ثابت‌های فرانت
 
@@ -134,7 +134,7 @@
 | live recorder timeslice / durable timeslice | 250ms / 1000ms |
 | getUserMedia (`feelia-rt.js`) | `echoCancellation`، `noiseSuppression`، `autoGainControl` = true (2026-09-26: خاموش‌کردنشان آزموده شد — اثری بر تفکیکِ گوینده نداشت؛ برگشت. [verification](../../verification/2026-09-26-speaker-diarization-3-speakers.md)) |
 | هشدارِ کیفیتِ ضبط (`QM_*` در `feelia-rt.js`) | پنجره 30000ms؛ تأیید ۲ پنجره (ضعیف/بی‌صدا/نویز)؛ `no_signal` p95<−85dBFS؛ `too_quiet` p95<−45؛ `noisy` p10>−40 و p95−p10<12dB؛ `clipping` >۲٪ فریم‌ها با peak≥0.99؛ حداقل ۲۰۰ فریم در پنجره |
-| contextِ Soniox | `server/src/stt/sessionContext.ts` → `stt_defaults.context` (realtime، به‌جز `purpose=note`) و `createTranscription` (async، به‌جز یادداشتِ صوتی) — متنِ ثابتِ «جلسه‌ی درمانی، ممکن است ۳+ گوینده» |
+| contextِ Soniox | `server/src/shared/sessionSttContext.ts` → `stt_defaults.context` (realtime، به‌جز `purpose=note`) و `createTranscription` (async، به‌جز یادداشتِ صوتی) — متنِ ثابتِ «جلسه‌ی درمانی، ممکن است ۳+ گوینده» |
 
 ### `public/index.html`
 | ثابت | مقدار |

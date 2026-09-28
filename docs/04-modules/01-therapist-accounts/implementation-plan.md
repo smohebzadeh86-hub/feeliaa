@@ -8,7 +8,7 @@
 ## Code Anchors
 | لایه | anchor |
 |---|---|
-| API | `server/src/http/auth.ts`: `normalizePhone`، `isValidEmail`، `publicTherapist`، `DUMMY_PASSWORD_HASH`، `ensureAdminFlag`، روت‌های register/login/logout/me |
+| API | `server/src/features/auth/auth.routes.ts`: `normalizePhone`، `isValidEmail`، `publicTherapist`، `DUMMY_PASSWORD_HASH`، `ensureAdminFlag`، روت‌های register/login/logout/me |
 | Core | `server/src/auth/password.ts` (scrypt)، `server/src/auth/session.ts` (`createSession`، `resolveSession`، `destroySession`)، `server/src/auth/guard.ts` |
 | DB | migrationهای 004، 005، 006، 010 |
 | UI | `public/index.html`: `#screenAuth`، `toggleAuthMode`، `submitAuth`، `logout`، `init`، `enterApp` |

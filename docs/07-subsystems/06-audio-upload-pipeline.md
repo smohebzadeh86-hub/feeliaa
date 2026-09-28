@@ -2,7 +2,7 @@
 
 > **وضعیت:** ACTIVE-CANONICAL (مالکِ جزئیاتِ این مسیر) · ایجاد 2026-09-23 · commit نشده · **deploy شد به production 2026-09-24** (migration 023 اعمال شد؛ `SONIOX_ORPHAN_SWEEP=1`). · **2026-09-25:** آپلودِ چندبخشی (§۲.۱، migration 025) — commit `45b0482`، **deploy شد به production** (migration 025 applied). · **2026-09-25 (بعدتر):** سیاستِ پرونده‌ی آپلود (`UPLOAD_CASE_FILE_INACTIVE`، خاموش) + `case_file_planned` — deploy شد؛ commit نشده.
 > **منشأ:** بازخوردِ تراپیست (اینترنتِ کلینیک ناپایدار است؛ باید بتوان صدایِ ضبط‌شده را بعداً وارد کرد) + دستورِ صریحِ مالک.
-> **کد:** `server/src/features/audio-upload/` (`uploads.routes.ts`، `uploadStore.ts`، `media.ts`، `jobMachine.ts`، `jobRunner.ts`)،
+> **کد:** `server/src/features/audio-upload/` (`uploads.routes.ts`، `uploadStore.ts`، `media.ts`، `jobMachine.ts`، `worker.ts` (+ `jobStore.sql.ts`))،
 > `server/src/features/notifications/notify.ts`، `server/src/features/case-file/application/autoTrigger.ts`، `public/feelia-upload.js`،
 > بخشِ «آپلودِ فایلِ صوتیِ جلسه + سینیِ پردازش» در `public/index.html`. Migration: `023_audio_upload_pipeline.sql`.
 
@@ -15,7 +15,7 @@
 > هنوز برایِ همه فقط متن است.** مسیرِ «مراجعِ غیرفعال ⇒ پرونده» پیاده و با E2Eِ واقعی تأیید شده ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است.
 > `jobMachine.ts#uploadCaseFileAllowed`: job بعد از ثبتِ متن به `case_file` می‌رود اگر `UPLOAD_CASE_FILE=1` **یا** (`UPLOAD_CASE_FILE_INACTIVE=1` +
 > مراجع `inactive` + `therapists.case_file_enabled` + `case_file_auto_generate=true`) — وضعیت لحظه‌ی ثبتِ متن خوانده می‌شود
-> (`jobRunner.ts#uploadCaseFileAllowedForJob`)؛ وگرنه `done/disabled`. UI (`jobHasCaseFileStep`) پیش از ثبتِ متن از `case_file_planned`ِ سرور
+> (`worker.ts#uploadCaseFileAllowedForJob`)؛ وگرنه `done/disabled`. UI (`jobHasCaseFileStep`) پیش از ثبتِ متن از `case_file_planned`ِ سرور
 > (همان تابع) می‌خواند ⇒ روشن‌کردن فقط با env است، بدونِ تغییرِ فرانت. «به‌روزرسانی»ِ دستیِ پرونده همیشه متنِ جلسه‌هایِ آپلودی را هم می‌خواند.
 > **خطایِ گذرایِ LLM در مرحله‌ی پرونده (2026-09-25):** `chatJson.ts#isTransientLlmError` (از 2026-09-28: `server/src/llm/jsonCall.ts`) (بدونِ status/قطعِ اتصال/timeout، یا 408/429/5xx) ⇒
 > `CaseFileGenerationError.transient`؛ `autoTrigger` با `retryTransient` ⇒ `'transient'` بدونِ اعلان؛ `stepCaseFile` ⇒ `waiting` + `error_code='case-file-retry'`،
@@ -96,7 +96,7 @@ queued → normalizing → transcribing → case_file → done
 - **مهلتِ transcription:** ۳۰ دقیقه + طولِ صدا؛ بیشتر ⇒ حذف رویِ Soniox و ساختِ دوباره (رفعِ الگویِ F2 برایِ این مسیر).
 - **سکوت:** متنِ خالی ⇒ `done` + اعلانِ `transcript_empty`، بدونِ پرونده.
 
-## ۵. Worker (`jobRunner.ts`)
+## ۵. Worker (`worker.ts` (+ `jobStore.sql.ts`))
 
 - داخلِ همان پروسه (LAW-013)، هر ۳ ثانیه، هم‌زمانی ۲. انتخاب: `stage` فعال و `next_attempt_at <= NOW()` و leaseِ آزاد.
 - **lease** (`locked_until`، ۲۰ دقیقه) + heartbeatِ هر ۶۰ ثانیه. در startup همه‌ی leaseها آزاد می‌شوند (تنها پروسه‌ی زنده خودِ ماییم) ⇒ ادامه‌ی فوری بعد از ری‌استارت/deploy.

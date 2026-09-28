@@ -6,10 +6,10 @@
 
 | # | نویسنده | فایل | CAS؟ | نسخه +1؟ | رفتار |
 |---|---|---|---|---|---|
-| W1 | `PUT /api/sessions/:id` با `transcript_version` | `http/sessions.ts` | بله (غیراتمیک) | بله | replace |
+| W1 | `PUT /api/sessions/:id` با `transcript_version` | `features/sessions/` | بله (غیراتمیک) | بله | replace |
 | W2 | `PUT /api/sessions/:id` بدونِ `transcript_version` | همان | **خیر** (سازگاریِ عقب‌رو) | بله | replace — مصرف‌کننده‌ها: `endDirectLive`، `saveDirectTranscript` (legacy) |
-| W3 | `mergeBatchTranscript` | `stt/batchqueue.ts` | خیر | بله | **append** |
-| W4 | `/ws/t` onPreview/onFinished | `ws/transcription.ts` | خیر (فقط guardِ طولِ یکنواخت در حافظه) | **خیر** | replace |
+| W3 | `mergeBatchTranscript` | `features/transcription/batch/` | خیر | بله | **append** |
+| W4 | `/ws/t` onPreview/onFinished | `features/legacy-ws/transcription.routes.ts` | خیر (فقط guardِ طولِ یکنواخت در حافظه) | **خیر** | replace |
 | W5 | `/ws/t` finalize بدونِ موتور | همان | خیر | خیر | بازنویسیِ همان مقدار |
 | W6 | `applyResolvedSpeakers` → W1 | `index.html` | بله | بله | replace کامل با متنِ resolve |
 
@@ -49,7 +49,7 @@
 1. هر نوشتنِ جدید از مسیرِ W1 با `transcript_version`.
 2. هرگز replace برای نتایجِ batch.
 3. T1، T2، T6، T10، T14 را اجرا کنید؛ سناریوی جدید را به harness اضافه کنید.
-4. ~~CAS اتمیک (پیشنهاد)~~ **پیاده شد (2026-09-22):** `server/src/http/sessions.ts`، `UPDATE … WHERE id=? AND transcript_version=?` (بدونِ `RETURNING` چون MySQL آن را ندارد؛ `affectedRows` جایگزین شد).
+4. ~~CAS اتمیک (پیشنهاد)~~ **پیاده شد (2026-09-22):** `server/src/features/sessions/`، `UPDATE … WHERE id=? AND transcript_version=?` (بدونِ `RETURNING` چون MySQL آن را ندارد؛ `affectedRows` جایگزین شد).
 
 ## رفعِ A1 (2026-09-26)
 - `persistConfirmed`: `baseVersion` از پاسخِ PUT (`session.transcript_version`) خوانده می‌شود، نه `++`ِ محلی. تست: `T44`.
@@ -66,7 +66,7 @@
 ## نشانگرِ علامتِ بدنی در متن (2026-09-27، درخواستِ مالک)
 - **قالب (یک قرارداد، سه جا):** `[علامت · <دقیقه:ثانیه با ارقامِ فارسی> — <نوعِ علامت>]` در یک پاراگرافِ جدا. زمان = `offset_ms`ِ همان علامت
   (تایمرِ جلسه) با قالبِ `formatTimer`. مالک‌هایِ کد: `signMarker` در `public/feelia-rt.js`، `formatTimer` در `public/index.html`،
-  `server/src/stt/signMarkers.ts`. هر تغییرِ قالب باید هر سه را با هم عوض کند (حذفِ علامت نشانگر را با همین قالب پیدا می‌کند).
+  `server/src/features/transcription/signMarkers.ts`. هر تغییرِ قالب باید هر سه را با هم عوض کند (حذفِ علامت نشانگر را با همین قالب پیدا می‌کند).
 - **درج (کلاینت):** کلیکِ چیپِ علامت ⇒ `rtSession.insertSignMarker` همان لحظه نشانگر را به `confirmed` اضافه می‌کند (مثلِ
   `noteDiscontinuity`)؛ `curSpeaker=null` تا گفته‌ی بعدی دوباره برچسبِ گوینده بگیرد. فقط در stateهایی که متن هنوز ذخیره می‌شود
   (ACTIVE/RECONNECTING/RECOVERED/FAILED/MANUAL_PAUSED/NETWORK_PAUSED)؛ STARTING/FINALIZING/COMPLETED/حالتِ `note` ⇒ درج نمی‌شود.

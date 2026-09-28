@@ -6,7 +6,7 @@
 ## Code Anchors
 | لایه | anchor |
 |---|---|
-| API | `server/src/http/clients.ts`: `generateClientCode`، `VALID_CATEGORIES`، `VALID_GENDERS`، روت‌های list/create/get/put/status/category/**pin**/delete |
+| API | `server/src/features/clients/clients.routes.ts`: `generateClientCode`، `VALID_CATEGORIES`، `VALID_GENDERS`، روت‌های list/create/get/put/status/category/**pin**/delete |
 | مالکیت | `server/src/db/ownership.ts#getOwnedClient` |
 | DB | migrations 001، 004، 008، 009، **015** (`server/src/db/mysql/migrations/`، فقط MySQL) |
 | UI | `index.html`: `#screenClients` (نمای امروز)، `#screenAllClients` (جدید)، `CATEGORY_LABELS`، `GENDER_OPTIONS`، `loadClients`، `switchClientTab`، `renderCategoryChips`، `renderCatFilterRow`، `filterClients`، `setSortMode`، `applyClientFilters`→`renderTodayClientsView`/`renderAllClientsView`، `renderClientGroups`، `buildClientCard`، `historyBucket`، `jalaliDayTehran`/`todayJalaliTehran`/`isTodayClient`/`isPinnedClient`، `togglePinClient`، `showAllClients`/`goBackToClientsToday`، `openDeactivateModal`/`confirmDeactivateClient`، `reactivateClient`، `openEditCategoryModal`/`confirmEditCategory`، `openEditAliasModal`/`confirmEditAlias`، `showDeleteClient`/`confirmDeleteClient`، `showNewClientModal`/`createNewClient`، `openClientDetail` |

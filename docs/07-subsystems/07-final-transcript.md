@@ -14,9 +14,9 @@
 ## Trigger (`enqueueFinalTranscript`، idempotent و بدونِ throw)
 | نقطه | فایل | ورودی |
 |---|---|---|
-| پایانِ جلسه (`PUT status=completed`، به‌جز جلسه‌ی دستی) | `http/sessions.ts` | `waiting_audio` |
-| بستنِ خودکارِ جلسه‌ی رهاشده | `http/sessionAutoClose.ts` | `waiting_audio` |
-| ثبتِ متنِ فایلِ آپلودی | `features/audio-upload/jobRunner.ts` (`applyTranscriptOnce`) | `polishing` با `source=async` و همان متن (بدونِ رونویسیِ دوباره) |
+| پایانِ جلسه (`PUT status=completed`، به‌جز جلسه‌ی دستی) | `features/sessions/` | `waiting_audio` |
+| بستنِ خودکارِ جلسه‌ی رهاشده | `features/sessions/autoClose.ts` | `waiting_audio` |
+| ثبتِ متنِ فایلِ آپلودی | `features/audio-upload/worker.ts` (`applyTranscriptOnce`) | `polishing` با `source=async` و همان متن (بدونِ رونویسیِ دوباره) |
 
 ردیفِ پایان‌یافته فقط وقتی دوباره در صف می‌رود که `sessions.transcript_version` از `source_version` بیشتر شده باشد (مثلاً جلسه ادامه پیدا کرده و دوباره پایان یافته است).
 

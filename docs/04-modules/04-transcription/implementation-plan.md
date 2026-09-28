@@ -8,13 +8,13 @@
 ## Code Anchors
 | لایه | anchor |
 |---|---|
-| mint | `server/src/http/stt.ts` (`mintRateLimited`، `STT_DEFAULTS`، `/api/stt/realtime-session`، `/api/stt/check`)، `server/src/stt/tempkey.ts#mintTemporaryKey` |
+| mint | `server/src/features/transcription/stt.routes.ts` (`mintRateLimited`، `STT_DEFAULTS`، `/api/stt/realtime-session`، `/api/stt/check`)، `server/src/features/transcription/soniox/tempKey.ts#mintTemporaryKey` |
 | engine | `public/feelia-rt.js` (`RTSession`، `AudioQueueDB`، `reqJson`) |
-| batch | `server/src/http/sessions.ts` (batch-audio/status/retry)، `server/src/stt/batchqueue.ts`، `server/src/stt/asyncTranscribe.ts` |
-| CAS | `server/src/http/sessions.ts` PUT |
-| resolve | `server/src/stt/speakerResolve.ts`، `sessions.ts` resolve-speakers، `index.html` `startResolveSpeakersUI`/`applyResolvedSpeakers` |
-| archive | `server/src/stt/sessionAudioArchive.ts` |
-| legacy | `server/src/ws/*`، `server/src/stt/soniox.ts`، `index.html` `SonioxDirect`/`connectWS` |
+| batch | `server/src/features/sessions/` (batch-audio/status/retry)، `server/src/features/transcription/batch/`، `server/src/features/transcription/soniox/restClient.ts` |
+| CAS | `server/src/features/sessions/` PUT |
+| resolve | `server/src/features/transcription/speakerResolve.ts`، `sessions.ts` resolve-speakers، `index.html` `startResolveSpeakersUI`/`applyResolvedSpeakers` |
+| archive | `server/src/features/transcription/archive/` |
+| legacy | `server/src/ws/*`، `server/src/features/legacy-ws/soniox.ts`، `index.html` `SonioxDirect`/`connectWS` |
 | glue | `index.html` `startNewRTSession`، `rtOnState`، `endNewRTSession`، `sweepOrphanedAudioQueue` |
 | test | `scripts/rt-harness.cjs` |
 

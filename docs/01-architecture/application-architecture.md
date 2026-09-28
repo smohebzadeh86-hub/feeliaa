@@ -1,57 +1,69 @@
 # Application Architecture
 
-> **وضعیت:** ACTIVE-CANONICAL · Snapshot 2026-09-13 (working tree). شماره‌خط‌ها snapshot هستند؛ به نامِ symbol اعتماد کنید.
+> **وضعیت:** ACTIVE-CANONICAL · Snapshot 2026-09-13 (working tree)؛ Backend به‌روزشده 2026-09-28 (بازسازیِ ماژولار). شماره‌خط‌ها snapshot هستند؛ به نامِ symbol اعتماد کنید.
 
 ## ۱. Backend (`server/`)
+
+> **بازسازیِ ماژولار (2026-09-28، شاخه‌ی `refactor/backend-modular-v2` — اجرایِ دوباره رویِ کدِ `65b264c`):** ساختارِ لایه‌ایِ قدیم (`http/`، `stt/`، `ws/`) به
+> featureها منتقل شد **بدونِ تغییرِ رفتار** (route snapshot، API contract harness، مجموعه‌ی رشته‌هایِ SQL و promptها
+> بایت‌به‌بایت یکسان؛ [verification](../../verification/2026-09-28-backend-modular-refactor-v2.md)). نقشه‌ی مسیرهایِ قدیم → جدید:
+> [repository-map](../02-reference/repository-map.md).
 
 ### 1.1 ساختار
 
 ```
 server/src/
-├── index.ts               entry: health، ثبتِ pluginها، static، migrate، sweepers، listen
-├── auth/
-│   ├── guard.ts           registerAuthContext (hook سراسری onRequest)، requireAuth، requireAdmin
-│   ├── session.ts         createSession / resolveSession / destroySession (هشِ SHA-256)
-│   └── password.ts        scrypt: hashPassword / verifyPassword
-├── db/
-│   ├── connection.ts      Pool (client_encoding=UTF8)، query() با لاگِ کوئریِ >100ms
-│   ├── migrate.ts         runMigrations: جدولِ _migrations + اجرای ترتیبیِ *.sql
-│   ├── ownership.ts       getOwnedClient / getOwnedSession
-│   └── migrations/        001..011
-├── http/
-│   ├── auth.ts            /api/auth/* (register, login, logout, me) + ensureAdminFlag
-│   ├── clients.ts         /api/clients*, /api/recovered
-│   ├── sessions.ts        /api/sessions*, /api/notes/:id, batch-*, resolve-speakers, voice-note
-│   ├── stt.ts             /api/stt/check, /api/stt/realtime-session
-│   ├── admin.ts           /api/admin/*
-│   └── clientConfig.ts    /api/client-config
-├── stt/
-│   ├── tempkey.ts         mintTemporaryKey (POST /v1/auth/temporary-api-key)
-│   ├── asyncTranscribe.ts upload → transcription → poll → tokens → delete
-│   ├── batchqueue.ts      صفِ فایلِ صدا، processBatchQueue، mergeBatchTranscript، sweep
-│   ├── sessionAudioArchive.ts  آرشیوِ ادمین + sweep ۱۴روزه
-│   ├── speakerResolve.ts  concat با ffmpeg + رونویسیِ async + job map
-│   └── soniox.ts          SonioxEngine (WS سمتِ سرور؛ فقط legacy)
-└── ws/
-    ├── transcription.ts   /ws/t/:sessionId (P1)، /ws/voice/:sessionId
-    └── p1.ts              state و پارامترهای ordering/grace
+├── index.ts                 entry: dotenv → buildApp → migrations → startBackgroundJobs → listen (+ SIGTERM/SIGINT)
+├── app.ts                   buildApp(): Fastify + multipart + auth context + obs hooks + route pluginها + static + /api/health
+├── jobs/backgroundJobs.ts   همه‌ی sweep/workerها با همان ترتیب/interval
+├── shared/                  primitiveهایِ بی‌دامنه: keyedLock، rateLimit، persianDigits، jalali، ffmpeg (FFMPEG_BIN)، httpRange،
+│                            sessionSttContext (contextِ ثابتِ Soniox — مشترکِ transcription و treatment-unit)
+├── llm/                     لایه‌ی LLMِ مستقل از provider: config · jsonCall · healthAlert (مصرف: case-file، final-transcript، jobs)
+├── db/  auth/  obs/         platform (obs/obs.routes.ts = POST /api/obs/events)
+└── features/
+    ├── auth/                auth.routes.ts · therapists.repository.ts
+    ├── clients/             clients.routes.ts · clients.repository.ts · consent.ts · index.ts
+    ├── sessions/            sessions.routes.ts (CRUD + tail؛ pluginهایِ فرزند را ثبت می‌کند) · notes.routes.ts · batch.routes.ts
+    │                        · voiceNote.legacy.ts (LAW-015) · sessions.repository.ts · sessionDate.ts · sessionNumber.ts · autoClose.ts · index.ts
+    ├── transcription/       stt.routes.ts · soniox/{config,restClient,tempKey}.ts · signMarkers.ts · speakerResolve.ts · index.ts
+    │   ├── batch/           queueFiles.ts · recoveryMerge.ts · processQueue.ts · sweep.ts
+    │   └── archive/         store.ts · ffmpegOps.ts · archiveWrite.ts · listing.ts · fullAudio.ts · sweep.ts
+    ├── session-media/       purge.ts (دُمِ مشترکِ حذفِ آبشاری: پوشه‌هایِ صدا + منابعِ Soniox) · index.ts
+    ├── admin/               admin.routes.ts (requireAdmin) → therapists/sessions/audio/export/obs .admin.ts
+    │                        · admin.repository.ts · diagnosis.ts (تابعِ خالص) · filters.ts
+    ├── audio-upload/        uploads.routes.ts · uploads.repository.ts · uploadSession.ts · groupFinalize.ts · uploadLocks.ts
+    │                        · jobMachine.ts · jobStore.sql.ts · worker.ts · quota.ts · sonioxRefs.ts · orphanSweep.ts
+    │                        · uploadStore.ts · media.ts · quality.ts · index.ts
+    ├── notifications/       notify.ts · notifications.routes.ts · index.ts
+    ├── case-file/           api/ · application/ (+ writeCaseFileWithCas) · domain/ · ports/ · adapters/ · prompts/ · composition.ts · index.ts
+    ├── treatment-unit/      واحدِ درمان (فردی/زوج/خانواده، اعضا، رویکردها) — index.ts routeها را هم export می‌کند
+    ├── final-transcript/    «متنِ نهایی» (worker + runner + api + adapters) — index.ts routeها و worker را export می‌کند
+    ├── client-config/       clientConfig.routes.ts
+    └── legacy-ws/           transcription.routes.ts (/ws/t، /ws/voice) · p1.ts · soniox.ts — محتوا frozen (LAW-015)
 ```
 
 ### 1.2 ترتیبِ بوت (`server/src/index.ts`)
-1. `dotenv/config` (`.env` از cwd).
-2. `Fastify({ logger: true })`؛ `GET /api/health` (بدونِ auth).
-3. `register(multipart)` → `registerAuthContext(app)` (کوکی + hook سراسری) → pluginهای `authRoutes`، `adminRoutes`، `clientRoutes`، `sessionRoutes`، `sttRoutes`، `clientConfigRoutes`، `transcriptionRoutes`.
-4. `fastifyStatic` روی `public/`.
-5. `start()`: `runMigrations()` → `sweepOldBatchFiles()` → `sweepOldSessionAudio()` + interval ۲۴h → interval ساعتیِ `sweepOldResolveJobs` → `listen(PORT, 0.0.0.0)`. هر خطا → `process.exit(1)`.
+1. `dotenv/config` (اولین import؛ `.env` از cwd).
+2. `buildApp()` (`app.ts`): Fastify با logger (redact کوکی/Authorization)؛ `GET /api/health`؛ `multipart` → `registerAuthContext` → `registerObsHooks`
+   → route pluginها به همان ترتیبِ قبلی (auth، admin، clients، sessions، stt، client-config، legacy-ws، case-file، treatment-unit، obs، یک scopeِ
+   encapsulated برایِ آپلود + اعلان‌ها با parserِ `application/octet-stream`، final-transcript) → `fastifyStatic` رویِ `public/` → hookِ `onClose` (flushِ obs).
+3. `start()`: `runMigrations()` → `startBackgroundJobs()` → `listen(PORT, 0.0.0.0)`. هر خطا → `process.exit(1)`.
 
 ### 1.3 الگوها و قراردادها
-- **Plugin per resource** با `app.addHook('preHandler', requireAuth|requireAdmin)` داخلِ plugin (encapsulated).
-- **SQL خام پارامتری** از طریقِ `query()`؛ لیستِ ستون‌های `SET` پویا فقط از نام‌های ثابت ساخته می‌شود.
+- **Plugin per feature** با `app.addHook('preHandler', requireAuth|requireAdmin)`؛ زیرماژول‌ها pluginِ فرزندند و گارد را به ارث می‌برند
+  (sessions: notes/batch/voice-note؛ admin: therapists/sessions/audio/export/obs).
+- **Repository:** SQLِ خامِ پارامتری در `*.repository.ts` (و تراکنش‌هایِ ساختِ جلسه در `sessions.repository.ts` / `audio-upload/uploadSession.ts`)؛
+  handler فقط validation، ترتیبِ عملیات، پاسخ، `logEvent` و ممیزی را دارد.
+- **مرزها (`pnpm test:arch`):** featureها فقط از `features/<x>/index.ts` یکدیگر import می‌کنند؛ `shared/`، `db/`، `auth/`، `obs/` هرگز از
+  features import نمی‌کنند؛ `app.ts`/`jobs/` فقط `index.ts` یا `*.routes.ts`؛ چرخه‌ی importِ استاتیک ممنوع؛ لایه‌بندیِ case-file.
+  `index.ts`ِ featureهایِ قدیمی‌تر routeها را export **نمی‌کند** (routeها را `app.ts` مستقیم import می‌کند) — همین از چرخه‌ی
+  audio-upload → sessions → session-media → audio-upload جلوگیری می‌کند. treatment-unit و final-transcript از ابتدا routeها را
+  از `index.ts` می‌دادند و همان‌طور ماندند (R3 هر دو شکل را می‌پذیرد).
+- **Import پویا (lazy):** batch → archive/Soniox/case-file/treatment-unit و archive → audio-upload عمداً پویا مانده‌اند (زمان‌بندیِ بارگذاری جزوِ رفتار است).
+- **state درون‌حافظه‌ای (LAW-013):** هر ماژول instanceِ خودش را از `createKeyedLock()`/`createRateLimiter()` می‌سازد.
 - **خطا:** `reply.code(n); return { error: '<فارسی>', code?: '<machine>' }` — [error-code-catalog](../02-reference/error-code-catalog.md).
 - **مالکیت:** قبل از هر عمل روی client/session؛ `UPDATE/DELETE` هم شرطِ `therapist_id` را تکرار می‌کنند (دفاع در عمق).
-- **پس‌زمینه:** `promise.catch(()=>{})` بدونِ صفِ مستقل؛ پایداری از طریقِ فایل روی دیسک.
-- **لاگ:** `console.log` با پیشوند (`[batch]`، `[stt-mint]`، `[p1]`، ...) + logger داخلیِ Fastify.
-- **هیچ لایه‌ی service/repository** مجزا نیست؛ handlerها مستقیم SQL اجرا می‌کنند.
+- **لاگ:** `console.log` با پیشوند (`[batch]`، `[stt-mint]`، `[p1]`، ...) + `logEvent`/`recordAudit` (obs).
 
 ## ۲. Frontend (`public/`)
 
@@ -90,19 +102,47 @@ server/src/
 
 ```mermaid
 flowchart LR
-  idx[index.ts] --> guard[auth/guard] --> sess[auth/session] --> conn[db/connection]
-  idx --> httpA[http/auth] --> pw[auth/password]
-  idx --> httpS[http/sessions] --> own[db/ownership]
-  httpS --> bq[stt/batchqueue] --> at[stt/asyncTranscribe]
-  bq --> arch[stt/sessionAudioArchive]
-  httpS --> sr[stt/speakerResolve] --> at
-  sr --> arch
-  idx --> httpT[http/stt] --> tk[stt/tempkey]
-  httpT --> eng[stt/soniox]
-  idx --> ws[ws/transcription] --> eng
-  ws --> p1[ws/p1]
-  idx --> httpAd[http/admin] --> arch
-  idx --> cc[http/clientConfig]
+  idx[index.ts] --> app[app.ts] --> guard[auth/guard]
+  idx --> jobs[jobs/backgroundJobs]
+  app --> R[features/*/*.routes.ts · treatment-unit · final-transcript]
+  subgraph features
+    sessions --> transcription
+    sessions --> sessionMedia[session-media]
+    sessions --> clients
+    sessions --> caseFile[case-file]
+    sessions --> tu[treatment-unit]
+    sessions --> ft[final-transcript]
+    admin --> transcription
+    admin --> sessionMedia
+    clients --> sessionMedia
+    clients --> tu
+    sessionMedia --> transcription
+    sessionMedia --> audioUpload[audio-upload]
+    audioUpload --> transcription
+    audioUpload --> sessions
+    audioUpload --> clients
+    audioUpload --> caseFile
+    audioUpload --> notifications
+    audioUpload --> tu
+    audioUpload --> ft
+    caseFile --> notifications
+    ft --> transcription
+    ft --> tu
+    ft --> notifications
+    transcription --> tu
+    transcription -. dynamic .-> caseFile
+    transcription -. dynamic .-> audioUpload
+  end
+  caseFile --> llm[llm/]
+  ft --> llm
+  jobs --> transcription
+  jobs --> audioUpload
+  jobs --> sessions
+  jobs --> notifications
+  jobs --> ft
+  jobs --> llm
+  features --> platform[shared / db / auth / obs]
 ```
 
-هیچ وابستگیِ چرخه‌ای دیده نشد (import پویا در `batchqueue.ts` برای `asyncTranscribe`/`sessionAudioArchive`).
+فلشِ هر feature به featureِ دیگر یعنی importِ `features/<x>/index.ts` (یا routeها از `app.ts`). `pnpm test:arch` نبودِ چرخه‌ی importِ
+استاتیک را در کلِ `server/src` بررسی می‌کند؛ فلش‌هایِ نقطه‌چین importِ پویا (lazy) هستند و در چرخه شمرده نمی‌شوند.

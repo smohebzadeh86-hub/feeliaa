@@ -7,7 +7,7 @@
 >
 > **وضعیتِ مستند (2026-09-13): ACTIVE-CANONICAL** برای allowlistِ رویدادها، screenها، فهرستِ mask، جریانِ consent و env ِ Clarity.
 > ماژول: [`docs/04-modules/07-ux-analytics/`](04-modules/07-ux-analytics/module-prd.md) · قانون: LAW-011 در [`project-laws`](00-governance/project-laws.md).
-> مسیرِ این فایل در `public/feelia-analytics.js` و `server/src/http/clientConfig.ts` ارجاع شده — جابه‌جا نشود.
+> مسیرِ این فایل در `public/feelia-analytics.js` و `server/src/features/client-config/clientConfig.routes.ts` ارجاع شده — جابه‌جا نشود.
 > ادعاهای بخشِ ۴ درباره‌ی production (pm2، `/root/feeliaa`) از داخلِ repo قابلِ‌تأیید نیستند — [deployment-operations](01-architecture/deployment-operations.md).
 
 وضعیت: پیاده‌سازی‌شده
@@ -19,7 +19,7 @@ Clarity **هرگز** محلِ جمع‌آوریِ داده‌ی بالینی ی�
 | فایل | نقش |
 |---|---|
 | `public/feelia-analytics.js` | کلِ integration: consent، لودِ یک‌باره‌ی اسکریپت، allowlistِ رویدادها و صفحه‌ها. `window.FeeliaAnalytics` |
-| `server/src/http/clientConfig.ts` | `GET /api/client-config` (پشتِ `requireAuth`) — Project ID را از env می‌دهد؛ برای ادمین همیشه `null` |
+| `server/src/features/client-config/clientConfig.routes.ts` | `GET /api/client-config` (پشتِ `requireAuth`) — Project ID را از env می‌دهد؛ برای ادمین همیشه `null` |
 | `public/index.html` | `data-clarity-mask` روی عناصرِ حساس، کارتِ رضایت، و فراخوانی‌های یک‌خطیِ `uxTrack()` / `FeeliaAnalytics.*` |
 
 هیچ npm package یا dependencyِ جدیدی اضافه نشده (فرانت bundler ندارد). اسکریپت همان تگِ رسمیِ

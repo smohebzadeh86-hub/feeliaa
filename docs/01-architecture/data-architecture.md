@@ -84,7 +84,7 @@ stateDiagram-v2
   in_progress --> [*]: لغو در UI = DELETE /api/sessions/:id
 ```
 - `PUT /api/sessions/:id` هر رشته‌ای را برای `status` می‌پذیرد (بدونِ اعتبارسنجی).
-- `recovered` فقط توسطِ `ws/transcription.ts` تولید می‌شود؛ مسیرِ FeeliaRT هیچ‌وقت آن را تنظیم نمی‌کند (**INFERRED** از grep).
+- `recovered` فقط توسطِ `features/legacy-ws/transcription.routes.ts` تولید می‌شود؛ مسیرِ FeeliaRT هیچ‌وقت آن را تنظیم نمی‌کند (**INFERRED** از grep).
 
 ### 4.2 متن (`transcript`, `transcript_version`)
 مالک: [subsystem 03](../07-subsystems/03-transcript-integrity.md).
@@ -127,7 +127,7 @@ flowchart LR
 |---|---|
 | فایل‌های یتیمِ صدا بعد از حذف | §4.4 |
 | نبودِ sweeper برای `auth_sessions` منقضی | `auth/session.ts` |
-| export ادمین فیلدهای `status/category/gender/specialty` و `stt_mode`… را ندارد | `buildTherapistExport` در `http/admin.ts` |
-| `date`/`start_time` به‌صورتِ TEXT — C4 (فرمتِ ناهمگون) رفع شد: شمسیِ `YYYY/MM/DD` و `HH:MM` با ارقامِ لاتین، نرمال‌سازی در `http/sessionDate.ts`، تبدیلِ داده‌ی قبلی با migration 013، `date` با 014 nullable (فقط `source=manual`) — همه commit شده در `54a17fd` (2026-09-15) | `002_sessions.sql`، `POST`/`PUT /api/sessions`، `013_session_date_jalali.sql`، `014_session_date_optional.sql` |
+| export ادمین فیلدهای `status/category/gender/specialty` و `stt_mode`… را ندارد | `buildTherapistExport` در `features/admin/` |
+| `date`/`start_time` به‌صورتِ TEXT — C4 (فرمتِ ناهمگون) رفع شد: شمسیِ `YYYY/MM/DD` و `HH:MM` با ارقامِ لاتین، نرمال‌سازی در `features/sessions/sessionDate.ts`، تبدیلِ داده‌ی قبلی با migration 013، `date` با 014 nullable (فقط `source=manual`) — همه commit شده در `54a17fd` (2026-09-15) | `002_sessions.sql`، `POST`/`PUT /api/sessions`، `013_session_date_jalali.sql`، `014_session_date_optional.sql` |
 | `offset_ms || null` مقدارِ 0 را null می‌کند | `POST /api/sessions/:id/notes` |
-| `/api/recovered` متنِ کاملِ جلسات را برمی‌گرداند در حالی که UI فقط متادیتا لازم دارد | `http/clients.ts` |
+| `/api/recovered` متنِ کاملِ جلسات را برمی‌گرداند در حالی که UI فقط متادیتا لازم دارد | `features/clients/clients.routes.ts` |

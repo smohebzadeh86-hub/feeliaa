@@ -47,7 +47,7 @@
 | `023_audio_upload_pipeline.sql` | **commitنشده**، فقط MySQL (2026-09-23) | سه جدولِ جدید `audio_uploads`، `audio_jobs`، `notifications` ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))؛ `session_audio.transcribed_at` (رفعِ F1)؛ `client_case_file.content_version` (رفعِ F6)؛ CHECKِ `sessions_source_check` حالا `live\|manual\|upload` (DROP + ADD — errno 3821 در `migrate.ts` قابلِ چشم‌پوشی شد). افزودنی؛ هیچ ردیفِ موجودی تغییر نمی‌کند. ✅ رویِ MySQLِ لوکالِ dev با startِ سرور اعمال شد و با `information_schema` تأیید شد (جدول‌ها، ستون‌ها، CHECKها) |
 | `024_client_recording_consent.sql` | commitنشده، فقط MySQL (2026-09-24)؛ **رویِ production اعمال شد 2026-09-25** (backupِ DB پیش از آن) | `clients.recording_consent_at DATETIME NULL` — رضایتِ یک‌باره برایِ هر مراجع (دستورِ مالک). افزودنی، بدونِ backfill (رضایتِ «همان جلسه»ی قدیمی دائمی تفسیر نمی‌شود). ✅ رویِ MySQLِ dev اعمال و با E2E تأیید شد |
 | `025_upload_multi_part.sql` | commitنشده، فقط MySQL (2026-09-25)؛ ✅ **رویِ MySQLِ dev اعمال شد** (E2E، با `information_schema` تأیید)؛ ✅ **رویِ production اعمال شد 2026-09-25** (deployِ `45b0482`، backupِ DB `feelia-pre-025-*` پیش از آن) | آپلودِ چندبخشی برایِ یک جلسه: `audio_uploads.group_id CHAR(36)`، `part_index INT`، `parts_total INT`، `duration_ms INT` (همه NULL‌پذیر) + index `idx_audio_uploads_group (therapist_id, group_id)`؛ `audio_jobs.source_parts TEXT` (JSONِ `[{uploadId, path}]`). افزودنی، بدونِ backfill؛ آپلودِ تک‌فایلی بدونِ تغییر (همه NULL) |
-| `026_session_auto_close.sql` | commitنشده، فقط MySQL (2026-09-26)؛ ✅ **رویِ MySQLِ dev اعمال شد** (E2E، با `information_schema` تأیید)؛ ❌ رویِ production اعمال نشده | `sessions.auto_closed_at DATETIME NULL` — زمانِ بستنِ خودکارِ جلسه‌ی زنده‌ی رهاشده توسطِ `http/sessionAutoClose.ts` (A3)؛ بازگشایی با PUT `status=in_progress` یا mintِ رونویسی آن را NULL می‌کند. افزودنی، بدونِ backfill |
+| `026_session_auto_close.sql` | commitنشده، فقط MySQL (2026-09-26)؛ ✅ **رویِ MySQLِ dev اعمال شد** (E2E، با `information_schema` تأیید)؛ ❌ رویِ production اعمال نشده | `sessions.auto_closed_at DATETIME NULL` — زمانِ بستنِ خودکارِ جلسه‌ی زنده‌ی رهاشده توسطِ `features/sessions/autoClose.ts` (A3)؛ بازگشایی با PUT `status=in_progress` یا mintِ رونویسی آن را NULL می‌کند. افزودنی، بدونِ backfill |
 | `027_session_audio_client_seq.sql` | commitنشده، فقط MySQL (2026-09-26)؛ ✅ **رویِ MySQLِ dev اعمال شد** (E2E)؛ ❌ رویِ production اعمال نشده | `session_audio.client_seq INT NULL` — شماره‌ی سگمنت در همان run (از کلاینت). ترتیبِ پخش/concat = (زمانِ شروعِ run از `run_id`، `client_seq`) — `sortByRecordingOrder` در `sessionAudioArchive.ts` (A2). NULL = ردیفِ قدیمی/آپلود ⇒ `seq`. افزودنی، بدونِ backfill |
 | `028_audit_log.sql` | commitنشده، فقط MySQL (2026-09-26)؛ ✅ **رویِ MySQLِ dev اعمال شد** (E2E)؛ ❌ رویِ production اعمال نشده | جدولِ `audit_log` (`id, ts DATETIME(3), actor_id, actor_is_admin, action, target_type, target_id, detail JSON`) — ممیزیِ کنش‌هایِ حساس (A6): export، تغییر/حذفِ تراپیست، حذفِ مراجع/جلسه، مشاهده‌ی متن و پخش/دانلودِ صدا توسطِ ادمین، ثبت/لغوِ رضایت، بستنِ خودکار، ادمین‌شدنِ خودکار. بدونِ FK (ردِ حسابرسی بعد از حذف می‌ماند)؛ detail فقط از `sanitizeDetail`؛ helper: `server/src/obs/audit.ts` (`recordAudit`). **نگهداری: ۲ سال** (تصمیمِ مالک 2026-09-26؛ `AUDIT_LOG_RETENTION_DAYS`=۷۳۰، جاروبِ روزانه‌ی `sweepOldObsEvents` در `obs/sweep.ts`) — کامنتِ داخلِ خودِ migration («فعلاً بدونِ انقضا») عمداً ویرایش نشد (LAW-007: migrationِ اعمال‌شده دست نمی‌خورد) |
 
@@ -105,7 +105,7 @@
 | id | UUID | no | gen_random_uuid() | PK |
 | client_id | UUID | no | | FK → clients CASCADE |
 | session_num | INTEGER | no | | UNIQUE(client_id, session_num)؛ `MAX+1` (غیراتمیک) |
-| date | TEXT | **yes** (014) | | شمسیِ `YYYY/MM/DD` با ارقامِ لاتین (نرمال‌سازی و اعتبارسنجی در `http/sessionDate.ts`؛ داده‌ی قبلی با 013)؛ `NULL` فقط برایِ `source=manual` بدونِ تاریخِ ورودی («بدونِ تاریخ»)؛ جلسه‌ی `live` همیشه مقدار دارد (fallback به وقتِ ایران)؛ `MAX(date)` = آخرین جلسه (NULLها نادیده گرفته می‌شوند) |
+| date | TEXT | **yes** (014) | | شمسیِ `YYYY/MM/DD` با ارقامِ لاتین (نرمال‌سازی و اعتبارسنجی در `features/sessions/sessionDate.ts`؛ داده‌ی قبلی با 013)؛ `NULL` فقط برایِ `source=manual` بدونِ تاریخِ ورودی («بدونِ تاریخ»)؛ جلسه‌ی `live` همیشه مقدار دارد (fallback به وقتِ ایران)؛ `MAX(date)` = آخرین جلسه (NULLها نادیده گرفته می‌شوند) |
 | start_time | TEXT | no | | `HH:MM` با ارقامِ لاتین |
 | consent | BOOLEAN | no | false | جلسه‌ی زنده همیشه `true`؛ جلسه‌ی `source=manual` (بدونِ ضبط) `false` |
 | duration_ms | INTEGER | yes | | هر ۱۰s از UI |
@@ -207,14 +207,14 @@
 
 | فیلد | مقادیر | نویسنده‌ها |
 |---|---|---|
-| `sessions.status` | `in_progress`، `recovered`، `completed`، `canceled` | `POST /api/sessions`، `PUT` (آزاد)، `ws/transcription.ts` |
-| `sessions.batch_status` | `queued`، `processing`، `done`، `failed`، null | `stt/batchqueue.ts` |
+| `sessions.status` | `in_progress`، `recovered`، `completed`، `canceled` | `POST /api/sessions`، `PUT` (آزاد)، `features/legacy-ws/transcription.routes.ts` |
+| `sessions.batch_status` | `queued`، `processing`، `done`، `failed`، null | `features/transcription/batch/` |
 | `sessions.stt_mode` | `realtime`، `batch`، `batch-pending`، `realtime-unreliable-noaudio`، null | `feelia-rt.js`، `batchqueue.ts` |
 | `session_notes.type` | `note_during`، `note_after`، `sign`، `voice` | UI، batch/voice-note |
 | `session_notes.sign_type` | `گریان`، `لرزش`، `تنش عضلانی`، `سکوت طولانی`، `خشم`، `پرخاشگری`، `اتصال چشمی گریزان`، `خواب‌آلودگی`، `بی‌قراری` | `.sign-chip[data-sign]` |
 | `clients.status_reason` (UI) | `ناتوانی مالی`، `ظرفیت روحی/زمانی`، `روند تکمیل شد`، `سایر` + متنِ آزاد؛ «نامشخص» → null (فقط در ساختِ مراجع از تبِ غیرفعال)؛ سرور trim و حداکثر ۲۰۰ کاراکتر | `deactivateClientModal`، `newClientModal` |
 | `sessions.source` | `live`، `manual`، `upload` (023) | `POST /api/sessions` (`mode`)؛ `POST /api/uploads/:id/complete` |
-| `sessions.stt_mode` (افزوده) | `upload` (023) | `jobRunner.ts` |
+| `sessions.stt_mode` (افزوده) | `upload` (023) | `worker.ts` (+ `jobStore.sql.ts`) |
 | `session_audio.source` | `durable`، `upload` (023) (و `offline` در type) | `sessionAudioArchive.ts` |
 | `client_case_file.status` | `ready`، `generating`، `error`، `stale` | `features/case-file/adapters/repository/caseFileRepository.sql.ts` |
 

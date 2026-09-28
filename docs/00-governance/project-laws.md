@@ -12,7 +12,7 @@
 موارد زیر **داده‌ی حساس**اند: متنِ رونویسی، یادداشت‌ها، علائم، صدا (هر شکلی)، کد/نام مستعار/دسته/جنسیتِ مراجع، دلیلِ غیرفعال‌شدن، شماره/ایمیل/نامِ تراپیست، کوکی/توکن.
 - در **لاگ**، analytics، URL/query string، پیامِ commit، مستندات، fixtureهای تست، یا خروجیِ ابزارها قرار نمی‌گیرند.
 - شناسه‌های UUID و طولِ داده (مثل `key_len`، `bytes`) در لاگ مجازند.
-- **Violation فعلی:** `server/src/http/sessions.ts` — لاگ‌های `[diag-transcript]` با برچسبِ `DIAG-TEMP` دُمِ ۸۰ کاراکتریِ متنِ جلسه را چاپ می‌کنند (نگاه کنید به LAW-023).
+- **Violation فعلی:** `server/src/features/sessions/` — لاگ‌های `[diag-transcript]` با برچسبِ `DIAG-TEMP` دُمِ ۸۰ کاراکتریِ متنِ جلسه را چاپ می‌کنند (نگاه کنید به LAW-023).
 
 ### LAW-002 — secretها و داده هرگز وارد git نمی‌شوند
 `.env`، `data/` (صف و آرشیوِ صدا)، dump دیتابیس، فایل‌های صوتی، snapshotهای tar، و هر خروجیِ export هرگز commit نمی‌شوند. `.gitignore` فعلی `.env` و `data/` را پوشش می‌دهد؛ `feelia-f9b0a9c.tar` و `server-deploy/` untracked هستند و نباید اضافه شوند.
@@ -93,7 +93,7 @@
 شکست یا کندیِ Soniox/mint/شبکه هرگز نباید شروع یا ادامه‌ی جلسه را بلاک کند. رفتارِ مجاز: ضبطِ durable + batch بعدی + پیامِ صادقانه. `GET /api/stt/check` gate نیست.
 
 ### LAW-013 — runtime تک‌پروسه‌ای
-state in-memory (`ws/p1.ts` records، `mintHits` در `http/stt.ts`، `jobs` در `stt/speakerResolve.ts`) یعنی سرور فقط در **یک** instance درست کار می‌کند. cluster/چند replica/serverless بدونِ بازطراحی ممنوع.
+state in-memory (`features/legacy-ws/p1.ts` records، `mintHits` در `features/transcription/stt.routes.ts`، `jobs` در `features/transcription/speakerResolve.ts`) یعنی سرور فقط در **یک** instance درست کار می‌کند. cluster/چند replica/serverless بدونِ بازطراحی ممنوع.
 
 ### LAW-021 — فارسی و UTF-8
 `client_encoding=UTF8` در `db/connection.ts` حذف نشود. پیام‌های کاربرپسند فارسی‌اند؛ `code`های ماشینی انگلیسی و پایدار.

@@ -1,24 +1,24 @@
 # Integration Architecture
 
-> **وضعیت:** ACTIVE-CANONICAL · منابع: `server/src/stt/*`، `public/feelia-rt.js`، `public/feelia-analytics.js`، `server/src/http/clientConfig.ts`.
+> **وضعیت:** ACTIVE-CANONICAL · منابع: `server/src/stt/*`، `public/feelia-rt.js`، `public/feelia-analytics.js`، `server/src/features/client-config/clientConfig.routes.ts`.
 
 ## ۱. فهرستِ یکپارچه‌سازی‌ها
 
 | سیستم | جهت | پروتکل | از کجا | احراز | حساسیت داده | در صورتِ خرابی |
 |---|---|---|---|---|---|---|
 | Soniox Realtime `wss://stt-rt.soniox.com/transcribe-websocket` | Browser → | WebSocket | `feelia-rt.js` (`openDirectWS`) | temp key در پیامِ اول | صدای زنده + متن | reconnect → FAILED → durable/batch |
-| Soniox Temp Key `POST {SONIOX_API_BASE}/v1/auth/temporary-api-key` | Server → | HTTPS | `stt/tempkey.ts` | `Bearer SONIOX_API_KEY` | شناسه‌ی `feelia:<therapistId>:<sessionId>` | 503/502 → کلاینت durable-only |
-| Soniox Files/Transcriptions (`/v1/files`, `/v1/transcriptions`) | Server → | HTTPS | `stt/asyncTranscribe.ts` | Bearer master | فایلِ صدا | فایل در صف می‌ماند؛ `batch_status=queued` |
-| Soniox Realtime (سمتِ سرور) | Server → | WebSocket (`ws`) | `stt/soniox.ts` | master key در پیامِ اول | صدا | فقط legacy (`/ws/t`، `/ws/voice`)؛ probeِ `/api/stt/check` حذف شد 2026-09-24 |
+| Soniox Temp Key `POST {SONIOX_API_BASE}/v1/auth/temporary-api-key` | Server → | HTTPS | `features/transcription/soniox/tempKey.ts` | `Bearer SONIOX_API_KEY` | شناسه‌ی `feelia:<therapistId>:<sessionId>` | 503/502 → کلاینت durable-only |
+| Soniox Files/Transcriptions (`/v1/files`, `/v1/transcriptions`) | Server → | HTTPS | `features/transcription/soniox/restClient.ts` | Bearer master | فایلِ صدا | فایل در صف می‌ماند؛ `batch_status=queued` |
+| Soniox Realtime (سمتِ سرور) | Server → | WebSocket (`ws`) | `features/legacy-ws/soniox.ts` | master key در پیامِ اول | صدا | فقط legacy (`/ws/t`، `/ws/voice`)؛ probeِ `/api/stt/check` حذف شد 2026-09-24 |
 | Microsoft Clarity `https://www.clarity.ms/tag/<id>` | Browser → | script + collect | `feelia-analytics.js` | Project ID عمومی | رفتارِ UI (masked) | خاموشیِ بی‌صدا |
 | Google Fonts (Vazirmatn) | Browser → | CSS/فونت | `index.html` `<link>` | — | IP کاربر | fallback فونت |
-| ffmpeg | Server (پروسه‌ی محلی) | `execFile` | `stt/speakerResolve.ts` | — | صدا | resolve-speakers خطا |
+| ffmpeg | Server (پروسه‌ی محلی) | `execFile` | `features/transcription/speakerResolve.ts` | — | صدا | resolve-speakers خطا |
 | PostgreSQL | Server → | TCP | `db/connection.ts` | `DATABASE_URL` | همه | health=degraded؛ startup fail |
 
 ## ۲. Soniox — جزئیاتِ قرارداد
 
 ### 2.1 کلیدِ موقت
-- پارامترها (`stt/tempkey.ts`): `usage_type:"transcribe_websocket"`، `expires_in_seconds:120`، `single_use:true`، `max_session_duration_seconds:7200`، `client_reference_id`.
+- پارامترها (`features/transcription/soniox/tempKey.ts`): `usage_type:"transcribe_websocket"`، `expires_in_seconds:120`، `single_use:true`، `max_session_duration_seconds:7200`، `client_reference_id`.
 - timeoutِ mint: ۱۰ ثانیه. خطاها → `TempKeyError` با `code` ∈ `no-key | mint-transport | mint-timeout | mint-rejected`.
 - سرور rate-limit: ۳۰ mint/دقیقه برای هر تراپیست (in-memory).
 - هر اتصالِ جدید (شروع، reconnect، resume) mint تازه می‌گیرد. خطای `temp_api_key_session_expired` از Soniox → reconnect با mint جدید.
@@ -29,7 +29,7 @@
   "enable_language_identification": true, "enable_speaker_diarization": true,
   "enable_endpoint_detection": true }
 ```
-**به‌روزشده 2026-09-14:** `enable_endpoint_detection` در همه‌ی مسیرها (`feelia-rt.js`، `STT_DEFAULTS` در `http/stt.ts`، `stt/soniox.ts`، و `SonioxDirect` در `index.html`) `true` است — هم در working tree و هم در production (`8bcdf0e`). طبقِ Event Log، نشستِ دیگری آن را پس از گزارشِ کندیِ finalize توسطِ کاربر از `false` به `true` برگرداند (معاوضه‌ی سرعتِ کپشن در برابرِ دقتِ diarization). تعارضِ C6 دیگر وجود ندارد.
+**به‌روزشده 2026-09-14:** `enable_endpoint_detection` در همه‌ی مسیرها (`feelia-rt.js`، `STT_DEFAULTS` در `features/transcription/stt.routes.ts`، `features/legacy-ws/soniox.ts`، و `SonioxDirect` در `index.html`) `true` است — هم در working tree و هم در production (`8bcdf0e`). طبقِ Event Log، نشستِ دیگری آن را پس از گزارشِ کندیِ finalize توسطِ کاربر از `false` به `true` برگرداند (معاوضه‌ی سرعتِ کپشن در برابرِ دقتِ diarization). تعارضِ C6 دیگر وجود ندارد.
 صدا: `MediaRecorder` با mime از `audio/webm;codecs=opus` → `audio/webm` → `audio/ogg;codecs=opus` → `audio/ogg`، `timeslice=250ms`. پایان: `{"type":"finalize"}` سپس رشته‌ی خالی.
 توقفِ دستی (FeeliaRT، از 2026-09-14): `{"type":"finalize"}` بدونِ رشته‌ی خالی، سپس `{"type":"keepalive"}` هر ۵s تا ادامه یا پایان؛ اتصال باز می‌ماند.
 

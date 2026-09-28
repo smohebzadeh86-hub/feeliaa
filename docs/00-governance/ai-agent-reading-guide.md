@@ -28,11 +28,11 @@
 | `public/index.html` بخشِ Live/Setup | module 03، 04؛ subsystem 01 | کدام مسیر فعال است (FeeliaRT / SonioxDirect / proxy) — `startSession` |
 | هر متن/کانتینرِ نمایشِ داده در UI | LAW-011، `docs/analytics-clarity.md` §7 | `data-clarity-mask` |
 | متنِ رضایت/privacy یا هر چیزی درباره‌ی صدا | LAW-009، LAW-010، subsystem 05 | هم‌خوانیِ متن با رفتار |
-| `server/src/http/sessions.ts` | module 03، 04، 05؛ api-catalog | مالکیت (LAW-004)، CAS |
+| `server/src/features/sessions/` | module 03، 04، 05؛ api-catalog | مالکیت (LAW-004)، CAS |
 | `server/src/stt/*` | subsystems 02، 05؛ integration-architecture | LAW-003، egress `PROXY_URL` |
 | `server/src/ws/*` | subsystem 04 | LAW-015 (frozen) |
-| `server/src/http/admin.ts` | module 06 | LAW-005 |
-| `server/src/auth/*`، `http/auth.ts` | module 01، platform | کوکی، `active`، `ADMIN_PHONE` |
+| `server/src/features/admin/` | module 06 | LAW-005 |
+| `server/src/auth/*`، `features/auth/auth.routes.ts` | module 01، platform | کوکی، `active`، `ADMIN_PHONE` |
 | migration | data-architecture، database-catalog | LAW-007 |
 | env var | configuration-catalog | `.env` در cwd پروسه خوانده می‌شود |
 | deploy | deployment-operations | LAW-006؛ بخش‌های UNVERIFIED |

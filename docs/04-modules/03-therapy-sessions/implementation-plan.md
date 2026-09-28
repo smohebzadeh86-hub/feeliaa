@@ -1,12 +1,12 @@
 # Module 03 — Therapy Sessions · Implementation Plan
 
 ## Current State
-کامل؛ بنرهای ادامه، durable-only، timer در pause، resolve-speakers در پرونده — commit شده در `2763414`. ثبتِ دستیِ جلسه‌ی گذشته (`mode:"manual"`)، تاریخِ شمسیِ اختیاری (`http/sessionDate.ts`، migration 012–014)، و صفحه‌ی مستقلِ SessionDetail — commit شده در `54a17fd` (2026-09-15). `DIAG-TEMP` هنوز در `PUT /api/sessions/:id` است (R2، رفع‌نشده).
+کامل؛ بنرهای ادامه، durable-only، timer در pause، resolve-speakers در پرونده — commit شده در `2763414`. ثبتِ دستیِ جلسه‌ی گذشته (`mode:"manual"`)، تاریخِ شمسیِ اختیاری (`features/sessions/sessionDate.ts`، migration 012–014)، و صفحه‌ی مستقلِ SessionDetail — commit شده در `54a17fd` (2026-09-15). `DIAG-TEMP` هنوز در `PUT /api/sessions/:id` است (R2، رفع‌نشده).
 
 ## Code Anchors
 | لایه | anchor |
 |---|---|
-| API | `server/src/http/sessions.ts`: POST/GET/PUT/DELETE `/api/sessions`؛ `server/src/http/clients.ts`: `/api/recovered` |
+| API | `server/src/features/sessions/`: POST/GET/PUT/DELETE `/api/sessions`؛ `server/src/features/clients/clients.routes.ts`: `/api/recovered` |
 | مالکیت | `db/ownership.ts#getOwnedSession` |
 | DB | migrations 002، 007 |
 | UI Setup | `setupNewSession`، `runPreflight`، `setConsent`، `declineConsentAndExit`، `updateStartButtonState`، `maybeShowWebViewHint`، `maybeShowHttpsHint`، `describeMicError` |

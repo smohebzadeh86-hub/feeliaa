@@ -26,7 +26,7 @@
 | Epoch | `connEpoch`، `pauseEpoch` | شمارنده‌ی ابطالِ کارهای در-flight (نتیجه‌ی دیررس نادیده گرفته شود) |
 | Unreliable | `self.unreliable` | پرچمِ یک‌طرفه: متنِ realtime ممکن است گپ داشته باشد → batch |
 | Durable recording / سگمنت | `durableRec`، `AudioQueueDB` | ضبطِ موازیِ ۲۴kbps، هر ۶۰s یک فایلِ مستقل در IndexedDB |
-| Batch fallback | `stt/batchqueue.ts` | رونویسیِ صدای ذخیره‌شده با API async بعد از شکستِ realtime |
+| Batch fallback | `features/transcription/batch/` | رونویسیِ صدای ذخیره‌شده با API async بعد از شکستِ realtime |
 | Purpose | `transcript` / `note` / `archive` | مقصدِ یک سگمنتِ آپلودشده |
 | Archive (صدا) | `session_audio`، `data/session-audio` | نگهداریِ ۱۴روزه‌ی صدا برای بازبینیِ ادمین |
 | CAS | `transcript_version` | Compare-and-swap؛ نوشتنِ متن فقط با نسخه‌ی پایه‌ی صحیح |
@@ -36,7 +36,7 @@
 | Resolve speakers | `speakerResolve.ts` | رونویسیِ دوباره‌ی کلِ صدای آرشیو برای یکدست‌کردنِ گوینده‌ها (پیش‌نمایش + تأیید) |
 | Recovered | `status='recovered'` | جلسه‌ای که در مسیرِ legacy بعد از ۶۰s قطعی رها شده |
 | P1 / P3 | کامنت‌ها | «Priority 1» پروتکلِ ordering/ACK مسیرِ legacy؛ «P3» ادامه‌ی جلسه بعد از reload |
-| ACK / seq / reorder buffer | `ws/p1.ts` | ترتیب‌دهیِ chunkهای صدا در مسیرِ legacy |
+| ACK / seq / reorder buffer | `features/legacy-ws/p1.ts` | ترتیب‌دهیِ chunkهای صدا در مسیرِ legacy |
 | Grace timeout | `GRACE_TIMEOUT_MS` | ۶۰s انتظار قبل از `recovered` |
 | Legacy proxy | `/ws/t`، `/ws/voice` | مسیرِ قدیمیِ ارسالِ صدا از طریقِ سرور |
 | SonioxDirect | `index.html` | نسخه‌ی قدیمیِ اتصالِ مستقیم (قبل از FeeliaRT) |

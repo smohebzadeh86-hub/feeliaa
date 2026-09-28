@@ -19,7 +19,7 @@
 
 1. **فقط دیتایِ مجاز و ثبت‌شده.** `aggregateClientCorpus` فقط از دو جدولِ رسمی می‌خواند؛
    بدونِ فیلترِ `consent` (آن فیلد فقط «رضایتِ ضبطِ زنده»ست، نه «مجازبودنِ متن» —
-   [sessions.ts](../../../server/src/http/sessions.ts) خطِ ۵۷). فراخوانیِ LLM بدونِ
+   [sessions.ts](../../../server/src/features/sessions/) خطِ ۵۷). فراخوانیِ LLM بدونِ
    tools/functions — نمی‌تواند از دانشِ عمومی/اینترنت چیزی اضافه کند.
 2. **خروجیِ AI = پیشنهاد.** هر فیلد `{value, source, reviewedByTherapist, suggestedUpdate,
    pending}` دارد. Regeneration فیلدِ `reviewedByTherapist=true` را overwrite نمی‌کند — پیش‌نویسِ
