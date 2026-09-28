@@ -53,7 +53,7 @@ pnpm --filter server start
 
 **LLM در production (2026-09-28):** تا این تاریخ `.env`ِ زنده هیچ کلیدِ LLMی نداشت (تولیدِ پرونده هرگز کار نکرده بود). از deployِ `d0cbab7`: `LLM_PROVIDER=openrouter`، `OPENROUTER_API_KEY` (همان کلیدِ dev — اعتبارِ مشترک، مثلِ Soniox)، `OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash`. سقفِ توکن در کد (`FINAL_TRANSCRIPT_MAX_TOKENS`/`CASE_FILE_MAX_TOKENS`) است. بدونِ آن، OpenRouter با اعتبارِ کم 402 می‌دهد.
 
-**سوییچِ providerِ LLM (از کدِ 2026-09-28، `server/src/llm/`) — هنوز deploy نشده:**
+**سوییچِ providerِ LLM (از کدِ 2026-09-28، `server/src/llm/`) — اجرا شد 2026-09-28 (`233016e`): production = `LLM_PROVIDER=metis`، `METIS_MODEL=deepseek-v4-flash`؛ `FINAL_TRANSCRIPT_REASONING_EFFORT=off`ِ قبلی به `OPENROUTER_FINAL_TRANSCRIPT_REASONING_EFFORT=off` تغییرِ نام داد (فقط برایِ برگشت به Dots3ِ OpenRouter). backup: `/root/backups/code-pre-llm-layer-20260928T113646Z.tar.gz` و `env-pre-metis-20260928T113646Z`. روال:**
 1. probeِ دسترسی از VPS: `curl -s -o /dev/null -w '%{http_code}' https://api.metisai.ir/deepseek/v1/models` ⇒ انتظار 401 (بدونِ کلید).
 2. افزودن به `/root/feeliaa-mysql/.env` (کلید از stdinِ SSH، هرگز چاپ نشود): `METIS_API_KEY`، `METIS_MODEL=deepseek-v4-flash`، سپس `LLM_PROVIDER=metis`. کلید/مدلِ OpenRouter **بمانند** (برایِ rollback).
 3. `FINAL_TRANSCRIPT_MODEL` و `FINAL_TRANSCRIPT_FALLBACK_MODELS`ِ فعلی مالِ OpenRouter‌اند و با متیس خودکار نادیده گرفته می‌شوند (هشدار در لاگِ شروع)؛ حذفشان لازم نیست.
