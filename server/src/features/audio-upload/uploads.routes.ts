@@ -18,29 +18,33 @@
 // مالکیت (LAW-004): همه با therapist_id؛ منبعِ غیرمالک ⇒ 404.
 import { randomUUID, createHash } from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
-import { query, pool } from '../../db/connection.js';
 import { requireAuth } from '../../auth/guard.js';
 import { getOwnedClient, getOwnedSession } from '../../db/ownership.js';
 import { normalizeSessionDate, nowInTehran, INVALID_DATE_ERROR } from '../sessions/sessionDate.js';
 import { logEvent } from '../../obs/eventLog.js';
 import {
   CHUNK_SIZE, MAX_UPLOAD_BYTES, MAX_ACTIVE_UPLOADS_PER_THERAPIST, MAX_PARTS_PER_SESSION,
-  expectedChunkBytes, writeChunk, receivedChunks, assembleUpload, assembledPath, removeUploadDir, ensureUploadDir, freeBytes,
+  expectedChunkBytes, writeChunk, receivedChunks, assembleUpload, removeUploadDir, ensureUploadDir, freeBytes,
 } from './uploadStore.js';
 import { ACCEPTED_EXTENSIONS, MAX_DURATION_MS, extensionOf, probeMedia, sniffObviouslyNotAudio } from './media.js';
-import { wakeAudioJobWorker, parseSourceParts } from './jobRunner.js';
+import { wakeAudioJobWorker } from './worker.js';
+import { parseSourceParts } from './jobStore.sql.js';
 import { parseAudioQuality } from './quality.js';
 import { uploadCaseFileEnabled, uploadCaseFileAllowed } from './jobMachine.js';
 import { existsSync } from 'node:fs';
 import { hasStoredConsent, recordClientConsent } from '../clients/consent.js';
-import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../sessions/sessionNumber.js';
-import { createKeyedLock } from '../../shared/keyedLock.js';
+import { withUploadLock as withLock } from './uploadLocks.js';
+import { finalizeGroup } from './groupFinalize.js';
+import { createSessionAndJobForUpload } from './uploadSession.js';
+import {
+  getOwnedUploadRow, getUploadRow, latestJobRowForSession, jobRowForUpload, jobRowById, ownedJobRow, listJobRows, getJobByUpload,
+  getOwnedJob, requeueFailedJobRow, markSessionBatchQueued, deleteProcessingFailedNotification, listIdleUploadIds,
+  expireUploadingUpload, countUploadingUploads, countDeadGroupParts, findGroupPart, findSingleUploadByFingerprint, insertUpload,
+  touchUpload, failUpload, markGroupPartComplete, cancelUploadByUser, listCancelableGroupPartIds, cancelGroupPart,
+} from './uploads.repository.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const FP_RE = /^[a-f0-9]{32,128}$/;
-
-// قفلِ per-upload برایِ complete (تک‌پروسه — LAW-013): دو کلیک/دو تبِ هم‌زمان دو بار الحاق نمی‌کنند.
-const withLock = createKeyedLock();
 
 function sanitizeName(name: string): string {
   // فقط برایِ نمایش به خودِ تراپیست؛ هرگز در مسیرِ فایل استفاده نمی‌شود.
@@ -49,8 +53,7 @@ function sanitizeName(name: string): string {
 
 async function getOwnedUpload(id: string, therapistId: string) {
   if (!UUID_RE.test(id)) return null;
-  const r = await query('SELECT * FROM audio_uploads WHERE id = ? AND therapist_id = ?', [id, therapistId]);
-  return r.rows[0] ?? null;
+  return getOwnedUploadRow(id, therapistId);
 }
 
 function uploadView(u: any, received?: number[]) {
@@ -70,17 +73,6 @@ function uploadView(u: any, received?: number[]) {
     parts_total: u.parts_total ?? null,
   };
 }
-
-const JOB_SELECT = `SELECT j.id, j.stage, j.attempts, j.error_code, j.duration_ms, j.case_file_status,
-    j.transcript_applied_at, j.transcript_chars, j.created_at, j.updated_at, j.finished_at, j.next_attempt_at,
-    j.audio_quality, j.quality_warning,
-    j.session_id, j.client_id, j.upload_id, s.session_num, c.code AS client_code, c.alias AS client_alias, c.status AS client_status,
-    u.original_name, u.parts_total, t.case_file_enabled AS t_case_file_enabled, t.case_file_auto_generate AS t_case_file_auto_generate
-  FROM audio_jobs j
-  JOIN sessions s ON s.id = j.session_id
-  JOIN clients c ON c.id = j.client_id
-  JOIN therapists t ON t.id = j.therapist_id
-  JOIN audio_uploads u ON u.id = j.upload_id`;
 
 function jobView(j: any) {
   return {
@@ -142,16 +134,11 @@ function failedJobRetryability(job: any): { ok: true; stage: string } | { ok: fa
 
 // jobِ failed ⇒ دوباره در صف (بدونِ آپلودِ دوباره). false یعنی هم‌زمان کسِ دیگری زودتر این کار را کرده.
 async function requeueFailedJob(job: any, stage: string, therapistId: string): Promise<boolean> {
-  const r = await query(
-    `UPDATE audio_jobs SET stage = ?, attempts = 0, error_code = NULL, finished_at = NULL, next_attempt_at = NOW(),
-       locked_until = NULL WHERE id = ? AND stage = 'failed'`,
-    [stage, job.id]
-  );
-  if (r.rowCount !== 1) return false;
-  await query(`UPDATE sessions SET batch_status = 'queued' WHERE id = ?`, [job.session_id]);
+  if ((await requeueFailedJobRow(job.id, stage)) !== 1) return false;
+  await markSessionBatchQueued(job.session_id);
   // اعلانِ شکستِ قبلی دیگر معتبر نیست؛ حذفش لازم است چون UNIQUE(job_id,kind) وگرنه اعلانِ شکستِ
   // احتمالیِ بعدی را (INSERT IGNORE) بی‌صدا نادیده می‌گرفت.
-  await query(`DELETE FROM notifications WHERE job_id = ? AND kind = 'processing_failed'`, [job.id]);
+  await deleteProcessingFailedNotification(job.id);
   logEvent({ event: 'audio_job.retry', sessionId: job.session_id, therapistId, detail: { stage } });
   wakeAudioJobWorker();
   return true;
@@ -163,107 +150,9 @@ async function requeueFailedJob(job: any, stage: string, therapistId: string): P
 const IDLE_UPLOAD_RELEASE_SECONDS = 24 * 60 * 60;
 
 async function releaseIdleUploads(therapistId: string): Promise<void> {
-  const idle = await query(
-    `SELECT id FROM audio_uploads WHERE therapist_id = ? AND status = 'uploading' AND updated_at < (NOW() - INTERVAL ? SECOND)`,
-    [therapistId, IDLE_UPLOAD_RELEASE_SECONDS]
-  );
-  for (const row of idle.rows) {
-    const r = await query(
-      `UPDATE audio_uploads SET status = 'canceled', error_code = 'expired' WHERE id = ? AND status = 'uploading'`, [row.id]);
-    if (r.rowCount === 1) removeUploadDir(row.id);
+  for (const id of await listIdleUploadIds(therapistId, IDLE_UPLOAD_RELEASE_SECONDS)) {
+    if ((await expireUploadingUpload(id)) === 1) removeUploadDir(id);
   }
-}
-
-// ————— چندبخشی (migration 025) —————
-// وقتی همه‌ی بخش‌هایِ یک گروه رسیده و بررسی شده‌اند ⇒ یک جلسه + یک job (اتمیک). تا آن موقع ⇒ part_done.
-// همیشه زیرِ قفلِ درون‌پروسه‌ایِ گروه صدا زده می‌شود (LAW-013) + FOR UPDATE رویِ ردیف‌ها در تراکنش.
-type GroupResult =
-  | { kind: 'waiting'; received: number; total: number }
-  | { kind: 'created'; jobId: string; sessionId: string }
-  | { kind: 'already'; sessionId: string }
-  | { kind: 'rejected'; status: number; code: string; error: string };
-
-async function finalizeGroup(groupId: string, therapistId: string): Promise<GroupResult> {
-  const r = await query(
-    `SELECT * FROM audio_uploads WHERE therapist_id = ? AND group_id = ? AND status = 'complete' ORDER BY part_index ASC, completed_at ASC`,
-    [therapistId, groupId]
-  );
-  const rows = r.rows as any[];
-  if (!rows.length) return { kind: 'waiting', received: 0, total: 0 };
-  const done = rows.find((x) => x.session_id);
-  if (done) return { kind: 'already', sessionId: done.session_id };
-  const total = Number(rows[0].parts_total);
-  const byIndex = new Map<number, any>();
-  for (const x of rows) if (!byIndex.has(x.part_index)) byIndex.set(x.part_index, x);
-  if (byIndex.size < total) return { kind: 'waiting', received: byIndex.size, total };
-  const parts = Array.from({ length: total }, (_, i) => byIndex.get(i)).filter(Boolean);
-  if (parts.length !== total) return { kind: 'waiting', received: parts.length, total };
-
-  const known = parts.every((p) => p.duration_ms !== null && p.duration_ms !== undefined);
-  const totalMs = known ? parts.reduce((s, p) => s + Number(p.duration_ms), 0) : null;
-  if (totalMs !== null && totalMs > MAX_DURATION_MS) {
-    for (const p of parts) {
-      await query(`UPDATE audio_uploads SET status = 'failed', error_code = 'too-long' WHERE id = ? AND session_id IS NULL`, [p.id]);
-      removeUploadDir(p.id);
-    }
-    logEvent({ event: 'upload.rejected', therapistId, clientId: parts[0].client_id, code: 'too-long', severity: 'warn' });
-    return { kind: 'rejected', status: 422, code: 'too-long', error: 'مجموعِ بخش‌ها بیش از ۵ ساعت است' };
-  }
-
-  const first = parts[0];
-  const sourceParts = parts.map((p) => ({ uploadId: p.id, path: assembledPath(p.id, extensionOf(p.original_name)) }));
-  const sessionId = randomUUID();
-  const jobId = randomUUID();
-  const now = nowInTehran();
-  for (let attempt = 0; ; attempt++) {
-    const conn = await pool.getConnection();
-    try {
-      await conn.beginTransaction();
-      const [lockRows] = await conn.query(
-        `SELECT id, status, session_id FROM audio_uploads WHERE id IN (${parts.map(() => '?').join(',')}) FOR UPDATE`, parts.map((p) => p.id));
-      const locked = lockRows as any[];
-      if (locked.length !== parts.length || locked.some((x) => x.status !== 'complete' || x.session_id)) {
-        await conn.rollback();
-        const s = locked.find((x) => x.session_id);
-        return s ? { kind: 'already', sessionId: s.session_id } : { kind: 'rejected', status: 409, code: 'group-closed', error: 'این مجموعه‌ی فایل دیگر باز نیست' };
-      }
-      const [numRows] = await conn.query(
-        'SELECT COALESCE(MAX(session_num), 0) + 1 AS next FROM sessions WHERE client_id = ? FOR UPDATE', [first.client_id]);
-      const sessionNum = (numRows as any[])[0].next;
-      // consent=true: تراپیست پیش از آپلود صریحاً تأیید کرد که مراجع به ضبط رضایت داده است (LAW-009).
-      await conn.query(
-        `INSERT INTO sessions (id, client_id, session_num, date, start_time, consent, status, source, stt_mode, batch_status, duration_ms)
-         VALUES (?, ?, ?, ?, ?, true, 'completed', 'upload', 'upload', 'queued', ?)`,
-        [sessionId, first.client_id, sessionNum, first.session_date || null, now.time, totalMs]
-      );
-      await conn.query(
-        `INSERT INTO audio_jobs (id, upload_id, therapist_id, client_id, session_id, stage, source_path, source_parts, duration_ms)
-         VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?)`,
-        [jobId, first.id, therapistId, first.client_id, sessionId, sourceParts[0].path, JSON.stringify(sourceParts), totalMs]
-      );
-      await conn.query(
-        `UPDATE audio_uploads SET session_id = ? WHERE id IN (${parts.map(() => '?').join(',')})`, [sessionId, ...parts.map((p) => p.id)]);
-      await conn.commit();
-      break;
-    } catch (e) {
-      try { await conn.rollback(); } catch {}
-      if (isSessionNumConflict(e) && attempt < SESSION_NUM_MAX_RETRIES) { await sessionNumRetryPause(attempt); continue; }
-      throw e;
-    } finally {
-      conn.release();
-    }
-  }
-  logEvent({ event: 'upload.completed', therapistId, clientId: first.client_id, sessionId, detail: { count: total, duration_ms: totalMs } });
-  logEvent({ event: 'session.created', sessionId, clientId: first.client_id, therapistId, detail: { mode: 'upload' } });
-  wakeAudioJobWorker();
-  return { kind: 'created', jobId, sessionId };
-}
-
-// (A1.3) برایِ sweepStaleUploads: گروهی که همه‌ی بخش‌هایش رسیده ولی جلسه ندارد finalize می‌شود، نه حذف.
-// true ⇒ جلسه ساخته شد یا از قبل بود.
-export async function tryFinalizeGroup(groupId: string, therapistId: string): Promise<boolean> {
-  const g = await withLock('group:' + groupId, () => finalizeGroup(groupId, therapistId));
-  return g.kind === 'created' || g.kind === 'already';
 }
 
 // تکه‌ها بایتِ خام‌اند — parser فقط در scopeِ encapsulatedِ آپلود ثبت می‌شود (app.ts: همان scope که اعلان‌ها هم
@@ -340,13 +229,7 @@ export async function audioUploadRoutes(app: FastifyInstance) {
 
     if (grouped) {
       // گروهی که بخشی از آن رد/لغو شده دیگر جلسه نمی‌سازد (بخشِ expired با آپلودِ تازه جایگزین‌پذیر است).
-      const dead = await query(
-        `SELECT COUNT(*) AS n FROM audio_uploads WHERE therapist_id = ? AND group_id = ?
-           AND (client_id <> ? OR parts_total <> ? OR status = 'failed'
-                OR (status = 'canceled' AND error_code IN ('user-canceled','group-canceled')))`,
-        [therapistId, groupId, b.client_id, partsTotal]
-      );
-      if (Number(dead.rows[0]?.n || 0) > 0) {
+      if ((await countDeadGroupParts(therapistId, groupId, b.client_id, partsTotal)) > 0) {
         reply.code(409);
         return { error: 'این مجموعه‌ی فایل لغو یا رد شده است — دوباره انتخاب کنید', code: 'group-closed' };
       }
@@ -357,12 +240,7 @@ export async function audioUploadRoutes(app: FastifyInstance) {
 
     if (grouped) {
       // ادامه‌ی همان بخش (بعد از رفرش/قطعی) — کلید: گروه + شماره‌ی بخش، نه fingerprint (یک فایل ممکن است دو بار انتخاب شود).
-      const pp = await query(
-        `SELECT * FROM audio_uploads WHERE therapist_id = ? AND group_id = ? AND part_index = ?
-           AND status IN ('uploading','complete') ORDER BY created_at DESC LIMIT 1`,
-        [therapistId, groupId, partIndex]
-      );
-      const u = pp.rows[0];
+      const u = await findGroupPart(therapistId, groupId, partIndex);
       if (u) {
         if (u.fingerprint !== fingerprint) {
           reply.code(409);
@@ -376,26 +254,22 @@ export async function audioUploadRoutes(app: FastifyInstance) {
           const g = await withLock('group:' + groupId, () => finalizeGroup(groupId!, therapistId));
           if (g.kind === 'rejected') { reply.code(g.status); return { error: g.error, code: g.code }; }
           if (g.kind === 'waiting') return { upload: uploadView(u), part_done: true, parts_received: g.received, parts_total: g.total };
-          const gj = await query(`${JOB_SELECT} WHERE j.session_id = ? ORDER BY j.created_at DESC LIMIT 1`, [g.sessionId]);
-          return { upload: { ...uploadView(u), session_id: g.sessionId }, duplicate: true, requeued: false, job: gj.rows[0] ? jobView(gj.rows[0]) : null };
+          const gj = await latestJobRowForSession(g.sessionId);
+          return { upload: { ...uploadView(u), session_id: g.sessionId }, duplicate: true, requeued: false, job: gj ? jobView(gj) : null };
         }
-        const j = await query(`${JOB_SELECT} WHERE j.session_id = ? ORDER BY j.created_at DESC LIMIT 1`, [u.session_id]);
-        return { upload: uploadView(u), duplicate: true, requeued: false, job: j.rows[0] ? jobView(j.rows[0]) : null };
+        const j = await latestJobRowForSession(u.session_id);
+        return { upload: uploadView(u), duplicate: true, requeued: false, job: j ? jobView(j) : null };
       }
     }
 
     // ادامه/تکراری: همان فایل (fingerprint) برایِ همان مراجع (فقط آپلودهایِ تک‌فایلی)
-    const prev = grouped ? { rows: [] as any[] } : await query(
-      `SELECT * FROM audio_uploads WHERE therapist_id = ? AND client_id = ? AND fingerprint = ? AND group_id IS NULL
-         AND status IN ('uploading','complete') ORDER BY created_at DESC LIMIT 1`,
-      [therapistId, b.client_id, fingerprint]
-    );
-    if (prev.rows[0]) {
-      const u = prev.rows[0];
+    const prev = grouped ? undefined : await findSingleUploadByFingerprint(therapistId, b.client_id, fingerprint);
+    if (prev) {
+      const u = prev;
       if (u.status === 'uploading') {
         return { upload: uploadView(u, receivedChunks(u.id, Number(u.size_bytes), u.chunk_size)), resumed: true };
       }
-      const pj = (await query('SELECT * FROM audio_jobs WHERE upload_id = ?', [u.id])).rows[0];
+      const pj = await getJobByUpload(u.id);
       // ⭐ رفعِ B2 (audit 2026-09-24): آپلودِ complete هرگز از حالتِ complete خارج نمی‌شد، حتی وقتی jobش
       // دائماً شکست خورده بود ⇒ UI می‌گفت «دوباره آپلود کنید» و همان فایل «تکراری» رد می‌شد (بن‌بست).
       //  - jobِ شکست‌خورده‌ی قابلِ ادامه ⇒ همان job دوباره در صف (آپلودِ دوباره لازم نیست، جلسه‌ی تکراری ساخته نمی‌شود).
@@ -408,13 +282,12 @@ export async function audioUploadRoutes(app: FastifyInstance) {
         else if (rt.code !== 'not-failed') dead = true;
       }
       if (!dead) {
-        const j = await query(`${JOB_SELECT} WHERE j.upload_id = ?`, [u.id]);
-        return { upload: uploadView(u), duplicate: true, requeued, job: j.rows[0] ? jobView(j.rows[0]) : null };
+        const j = await jobRowForUpload(u.id);
+        return { upload: uploadView(u), duplicate: true, requeued, job: j ? jobView(j) : null };
       }
     }
 
-    const countActive = async () => Number(
-      (await query(`SELECT COUNT(*) AS n FROM audio_uploads WHERE therapist_id = ? AND status = 'uploading'`, [therapistId])).rows[0]?.n || 0);
+    const countActive = () => countUploadingUploads(therapistId);
     let activeCount = await countActive();
     if (activeCount >= MAX_ACTIVE_UPLOADS_PER_THERAPIST) {
       await releaseIdleUploads(therapistId);
@@ -432,18 +305,15 @@ export async function audioUploadRoutes(app: FastifyInstance) {
 
     const id = randomUUID();
     const chunksTotal = Math.ceil(size / CHUNK_SIZE);
-    await query(
-      `INSERT INTO audio_uploads (id, therapist_id, client_id, fingerprint, original_name, mime, size_bytes, chunk_size, chunks_total, session_date,
-         group_id, part_index, parts_total)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, therapistId, b.client_id, fingerprint, sanitizeName(b.file_name || ''), String(b.mime || '').slice(0, 100) || null,
-        size, CHUNK_SIZE, chunksTotal, sessionDate, groupId, partIndex, partsTotal]
-    );
+    await insertUpload({
+      id, therapistId, clientId: b.client_id, fingerprint, originalName: sanitizeName(b.file_name || ''),
+      mime: String(b.mime || '').slice(0, 100) || null, size, chunkSize: CHUNK_SIZE, chunksTotal, sessionDate, groupId, partIndex, partsTotal,
+    });
     ensureUploadDir(id);
     logEvent({ event: 'upload.created', therapistId, clientId: b.client_id, detail: { bytes: size, chunks: chunksTotal, ext, ...(grouped ? { seq: partIndex, count: partsTotal } : {}) } });
-    const r = await query('SELECT * FROM audio_uploads WHERE id = ?', [id]);
+    const created = await getUploadRow(id);
     reply.code(201);
-    return { upload: uploadView(r.rows[0], []) };
+    return { upload: uploadView(created, []) };
   });
 
   app.get('/api/uploads/:id', async (request, reply) => {
@@ -451,8 +321,8 @@ export async function audioUploadRoutes(app: FastifyInstance) {
     const u = await getOwnedUpload(id, request.therapistId!);
     if (!u) { reply.code(404); return { error: 'آپلود یافت نشد' }; }
     const received = u.status === 'uploading' ? receivedChunks(u.id, Number(u.size_bytes), u.chunk_size) : [];
-    const j = u.status === 'complete' ? await query(`${JOB_SELECT} WHERE j.upload_id = ?`, [u.id]) : { rows: [] as any[] };
-    return { upload: uploadView(u, received), job: j.rows[0] ? jobView(j.rows[0]) : null };
+    const j = u.status === 'complete' ? await jobRowForUpload(u.id) : undefined;
+    return { upload: uploadView(u, received), job: j ? jobView(j) : null };
   });
 
   app.put('/api/uploads/:id/chunks/:n', { bodyLimit: CHUNK_SIZE + 1024 }, async (request, reply) => {
@@ -478,7 +348,7 @@ export async function audioUploadRoutes(app: FastifyInstance) {
       if (actual !== claimed) { reply.code(422); return { error: 'تکه در مسیر خراب شد — دوباره ارسال می‌شود', code: 'chunk-corrupt' }; }
     }
     writeChunk(u.id, n, body);
-    await query('UPDATE audio_uploads SET updated_at = NOW() WHERE id = ?', [u.id]);
+    await touchUpload(u.id);
     return { ok: true, n };
   });
 
@@ -494,14 +364,14 @@ export async function audioUploadRoutes(app: FastifyInstance) {
         const up = { ...uploadView(row), status: 'complete' };
         if (g.kind === 'waiting') return { upload: up, part_done: true, parts_received: g.received, parts_total: g.total };
         if (g.kind === 'rejected') { reply.code(g.status); return { error: g.error, code: g.code }; }
-        const j = await query(`${JOB_SELECT} WHERE j.session_id = ? ORDER BY j.created_at DESC LIMIT 1`, [g.sessionId]);
+        const j = await latestJobRowForSession(g.sessionId);
         if (g.kind === 'created') reply.code(201);
-        return { upload: { ...up, session_id: g.sessionId }, job: j.rows[0] ? jobView(j.rows[0]) : null };
+        return { upload: { ...up, session_id: g.sessionId }, job: j ? jobView(j) : null };
       });
       if (u.status === 'complete' && u.group_id) return groupReply(u);
       if (u.status === 'complete') {
-        const j = await query(`${JOB_SELECT} WHERE j.upload_id = ?`, [u.id]);
-        return { upload: uploadView(u), job: j.rows[0] ? jobView(j.rows[0]) : null };
+        const j = await jobRowForUpload(u.id);
+        return { upload: uploadView(u), job: j ? jobView(j) : null };
       }
       if (u.status !== 'uploading') {
         reply.code(409);
@@ -519,7 +389,7 @@ export async function audioUploadRoutes(app: FastifyInstance) {
       }
 
       const reject = async (code: string, message: string, status = 422) => {
-        await query(`UPDATE audio_uploads SET status = 'failed', error_code = ? WHERE id = ?`, [code, u.id]);
+        await failUpload(u.id, code);
         removeUploadDir(u.id);
         logEvent({ event: 'upload.rejected', therapistId, clientId: u.client_id, code, severity: 'warn' });
         reply.code(status);
@@ -547,11 +417,7 @@ export async function audioUploadRoutes(app: FastifyInstance) {
 
       if (u.group_id) {
         // بخشی از آپلودِ چندبخشی: فایل بررسی و نگه داشته می‌شود؛ جلسه فقط با رسیدنِ همه‌ی بخش‌ها ساخته می‌شود.
-        const mark = await query(
-          `UPDATE audio_uploads SET status = 'complete', completed_at = NOW(), duration_ms = ? WHERE id = ? AND status = 'uploading'`,
-          [probe.durationMs, u.id]
-        );
-        if (mark.rowCount !== 1) {
+        if ((await markGroupPartComplete(u.id, probe.durationMs)) !== 1) {
           reply.code(409);
           return { error: 'این آپلود دیگر باز نیست', code: 'upload-closed' };
         }
@@ -566,48 +432,16 @@ export async function audioUploadRoutes(app: FastifyInstance) {
       const jobId = randomUUID();
       const now = nowInTehran();
       // رفعِ M7: تداخلِ شماره‌ی جلسه/deadlock با ساختِ هم‌زمانِ جلسه‌ی دیگرِ همان مراجع ⇒ کلِ تراکنش دوباره (اتمیک است).
-      for (let attempt = 0; ; attempt++) {
-        const conn = await pool.getConnection();
-        try {
-          await conn.beginTransaction();
-          const [lockRows] = await conn.query('SELECT status FROM audio_uploads WHERE id = ? FOR UPDATE', [u.id]);
-          if ((lockRows as any[])[0]?.status !== 'uploading') {
-            await conn.rollback();
-            reply.code(409);
-            return { error: 'این آپلود دیگر باز نیست', code: 'upload-closed' };
-          }
-          const [numRows] = await conn.query(
-            'SELECT COALESCE(MAX(session_num), 0) + 1 AS next FROM sessions WHERE client_id = ? FOR UPDATE', [u.client_id]);
-          const sessionNum = (numRows as any[])[0].next;
-          // consent=true: تراپیست پیش از آپلود صریحاً تأیید کرد که مراجع به ضبط رضایت داده است (LAW-009).
-          await conn.query(
-            `INSERT INTO sessions (id, client_id, session_num, date, start_time, consent, status, source, stt_mode, batch_status, duration_ms)
-             VALUES (?, ?, ?, ?, ?, true, 'completed', 'upload', 'upload', 'queued', ?)`,
-            [sessionId, u.client_id, sessionNum, u.session_date || null, now.time, probe.durationMs]
-          );
-          await conn.query(
-            `INSERT INTO audio_jobs (id, upload_id, therapist_id, client_id, session_id, stage, source_path, duration_ms)
-             VALUES (?, ?, ?, ?, ?, 'queued', ?, ?)`,
-            [jobId, u.id, therapistId, u.client_id, sessionId, sourcePath, probe.durationMs]
-          );
-          await conn.query(
-            `UPDATE audio_uploads SET status = 'complete', session_id = ?, completed_at = NOW() WHERE id = ?`, [sessionId, u.id]);
-          await conn.commit();
-          break;
-        } catch (e) {
-          try { await conn.rollback(); } catch {}
-          if (isSessionNumConflict(e) && attempt < SESSION_NUM_MAX_RETRIES) { await sessionNumRetryPause(attempt); continue; }
-          throw e;
-        } finally {
-          conn.release();
-        }
+      if ((await createSessionAndJobForUpload(u, therapistId, sessionId, jobId, now, probe, sourcePath)) === 'closed') {
+        reply.code(409);
+        return { error: 'این آپلود دیگر باز نیست', code: 'upload-closed' };
       }
       logEvent({ event: 'upload.completed', therapistId, clientId: u.client_id, sessionId, detail: { bytes: size, duration_ms: probe.durationMs } });
       logEvent({ event: 'session.created', sessionId, clientId: u.client_id, therapistId, detail: { mode: 'upload' } });
       wakeAudioJobWorker();
-      const j = await query(`${JOB_SELECT} WHERE j.id = ?`, [jobId]);
+      const j = await jobRowById(jobId);
       reply.code(201);
-      return { upload: { ...uploadView(u), status: 'complete', session_id: sessionId }, job: jobView(j.rows[0]) };
+      return { upload: { ...uploadView(u), status: 'complete', session_id: sessionId }, job: jobView(j) };
     });
   });
 
@@ -619,7 +453,7 @@ export async function audioUploadRoutes(app: FastifyInstance) {
       reply.code(409);
       return { error: 'فقط آپلودِ نیمه‌کاره قابلِ لغو است', code: 'upload-closed' };
     }
-    await query(`UPDATE audio_uploads SET status = 'canceled', error_code = 'user-canceled' WHERE id = ? AND status = 'uploading'`, [u.id]);
+    await cancelUploadByUser(u.id);
     removeUploadDir(u.id);
     return { canceled: u.id };
   });
@@ -631,17 +465,9 @@ export async function audioUploadRoutes(app: FastifyInstance) {
     const therapistId = request.therapistId!;
     if (!UUID_RE.test(groupId)) return { canceled: 0 };
     return withLock('group:' + groupId, async () => {
-      const r = await query(
-        `SELECT id FROM audio_uploads WHERE therapist_id = ? AND group_id = ?
-           AND (status = 'uploading' OR (status = 'complete' AND session_id IS NULL))`,
-        [therapistId, groupId]
-      );
       let n = 0;
-      for (const row of r.rows) {
-        const x = await query(
-          `UPDATE audio_uploads SET status = 'canceled', error_code = 'group-canceled'
-           WHERE id = ? AND (status = 'uploading' OR (status = 'complete' AND session_id IS NULL))`, [row.id]);
-        if (x.rowCount === 1) { removeUploadDir(row.id); n++; }
+      for (const partId of await listCancelableGroupPartIds(therapistId, groupId)) {
+        if ((await cancelGroupPart(partId)) === 1) { removeUploadDir(partId); n++; }
       }
       return { canceled: n };
     });
@@ -653,23 +479,21 @@ export async function audioUploadRoutes(app: FastifyInstance) {
     const where = scope === 'active'
       ? `j.therapist_id = ? AND (j.stage NOT IN ('done','failed') OR j.finished_at > (NOW() - INTERVAL 10 MINUTE))`
       : `j.therapist_id = ? AND j.created_at > (NOW() - INTERVAL 14 DAY)`;
-    const r = await query(`${JOB_SELECT} WHERE ${where} ORDER BY j.created_at DESC LIMIT 30`, [request.therapistId]);
-    return { jobs: r.rows.map(jobView) };
+    return { jobs: (await listJobRows(where, request.therapistId)).map(jobView) };
   });
 
   app.get('/api/audio-jobs/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
     if (!UUID_RE.test(id)) { reply.code(404); return { error: 'یافت نشد' }; }
-    const r = await query(`${JOB_SELECT} WHERE j.id = ? AND j.therapist_id = ?`, [id, request.therapistId]);
-    if (!r.rows[0]) { reply.code(404); return { error: 'یافت نشد' }; }
-    return { job: jobView(r.rows[0]) };
+    const row = await ownedJobRow(id, request.therapistId);
+    if (!row) { reply.code(404); return { error: 'یافت نشد' }; }
+    return { job: jobView(row) };
   });
 
   app.post('/api/audio-jobs/:id/retry', async (request, reply) => {
     const { id } = request.params as { id: string };
     if (!UUID_RE.test(id)) { reply.code(404); return { error: 'یافت نشد' }; }
-    const r = await query('SELECT * FROM audio_jobs WHERE id = ? AND therapist_id = ?', [id, request.therapistId]);
-    const job = r.rows[0];
+    const job = await getOwnedJob(id, request.therapistId);
     if (!job) { reply.code(404); return { error: 'یافت نشد' }; }
     if (job.stage !== 'failed') {
       reply.code(409);
@@ -682,15 +506,15 @@ export async function audioUploadRoutes(app: FastifyInstance) {
       return { error: rt.error, code: rt.code };
     }
     await requeueFailedJob(job, rt.stage, request.therapistId!);
-    const v = await query(`${JOB_SELECT} WHERE j.id = ?`, [id]);
-    return { job: jobView(v.rows[0]) };
+    const v = await jobRowById(id);
+    return { job: jobView(v) };
   });
 
   app.get('/api/sessions/:id/audio-job', async (request, reply) => {
     const { id } = request.params as { id: string };
     const owned = await getOwnedSession(id, request.therapistId!);
     if (!owned) { reply.code(404); return { error: 'جلسه یافت نشد' }; }
-    const r = await query(`${JOB_SELECT} WHERE j.session_id = ? ORDER BY j.created_at DESC LIMIT 1`, [id]);
-    return { job: r.rows[0] ? jobView(r.rows[0]) : null };
+    const r = await latestJobRowForSession(id);
+    return { job: r ? jobView(r) : null };
   });
 }

@@ -461,9 +461,9 @@ await t('B3 نگهبانِ نقش: نقشِ بیرون از فهرستِ حاض�
   assert.equal(r2.report.role_fixes, 0);
 });
 
-await t('B4 برچسبِ بخشِ آپلودی: با «\\n» چسبیده به نوبت ⇒ نشانگرِ دست‌نخورده + نوبت با گوینده‌اش؛ برابر با ثابتِ jobRunner', async () => {
+await t('B4 برچسبِ بخشِ آپلودی: با «\\n» چسبیده به نوبت ⇒ نشانگرِ دست‌نخورده + نوبت با گوینده‌اش؛ برابر با ثابتِ jobStore.sql', async () => {
   const { readFileSync } = await import('node:fs');
-  const src = readFileSync(new URL('../server/src/features/audio-upload/jobRunner.ts', import.meta.url), 'utf8');
+  const src = readFileSync(new URL('../server/src/features/audio-upload/jobStore.sql.ts', import.meta.url), 'utf8');
   const m = /UPLOAD_TRANSCRIPT_LABEL_PREFIX = '([^']+)'/.exec(src);
   assert.equal(m?.[1], UPLOAD_LABEL);
   const turns = parseTurns('گوینده ۱: سلام\n\n' + UPLOAD_LABEL + '\nگوینده ۱: ادامه‌ی جلسه');
