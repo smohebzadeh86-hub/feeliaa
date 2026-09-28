@@ -35,18 +35,13 @@ import { uploadCaseFileEnabled, uploadCaseFileAllowed } from './jobMachine.js';
 import { existsSync } from 'node:fs';
 import { hasStoredConsent, recordClientConsent } from '../../http/clientConsent.js';
 import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../../http/sessions.js';
+import { createKeyedLock } from '../../shared/keyedLock.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const FP_RE = /^[a-f0-9]{32,128}$/;
 
 // قفلِ per-upload برایِ complete (تک‌پروسه — LAW-013): دو کلیک/دو تبِ هم‌زمان دو بار الحاق نمی‌کنند.
-const completeLocks = new Map<string, Promise<unknown>>();
-function withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const prev = completeLocks.get(key) || Promise.resolve();
-  const run = prev.catch(() => {}).then(fn);
-  completeLocks.set(key, run.catch(() => {}));
-  return run;
-}
+const withLock = createKeyedLock();
 
 function sanitizeName(name: string): string {
   // فقط برایِ نمایش به خودِ تراپیست؛ هرگز در مسیرِ فایل استفاده نمی‌شود.

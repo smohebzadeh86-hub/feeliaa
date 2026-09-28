@@ -10,12 +10,10 @@
 // media-plane (ساعت‌ها استریم) هرگز از VPS عبور نمی‌کند. mint از PROXY_URL
 // (اگر ست باشد) عبور می‌کند تا control-plane هم قابل نجات باشد.
 import https from 'node:https';
-import { HttpsProxyAgent } from 'https-proxy-agent';
+import { SONIOX_API_BASE, createProxyAgent } from '../features/transcription/soniox/config.js';
 
 export const SONIOX_WS_URL =
   process.env.SONIOX_WS_URL || 'wss://stt-rt.soniox.com/transcribe-websocket';
-export const SONIOX_API_BASE =
-  process.env.SONIOX_API_BASE || 'https://api.soniox.com';
 
 // سقف‌های امنیتی پیش‌فرض برای کلید موقت جلسه زنده
 export const TEMP_KEY_EXPIRES_IN_SECONDS = 120; // فرصت باز کردن استریم
@@ -47,8 +45,7 @@ export class TempKeyError extends Error {
 function postJson(url: string, headers: Record<string, string>, body: unknown, timeoutMs: number): Promise<{ status: number; json: any }> {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
-    const proxyUrl = process.env.PROXY_URL;
-    const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
+    const agent = createProxyAgent();
     const payload = JSON.stringify(body);
     const req = https.request(
       {

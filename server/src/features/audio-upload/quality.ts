@@ -10,6 +10,7 @@
 // fail-open: هر خطایی ⇒ null و jobِ آپلود بی‌تغییر ادامه می‌دهد.
 import { spawn } from 'node:child_process';
 import { FORMAT_WHITELIST } from './media.js';
+import { FFMPEG_BIN } from '../../shared/ffmpeg.js';
 
 export type QualityFlag = 'no_signal' | 'too_quiet' | 'clipping' | 'noisy';
 
@@ -141,7 +142,6 @@ export function parseAudioQuality(raw: unknown): AudioQuality | null {
 }
 
 // ——————————————— adapterِ ffmpeg ———————————————
-const FFMPEG_BIN = process.env.FFMPEG_PATH || 'ffmpeg';
 
 export function measureAudioQuality(filePath: string, durationMs: number | null = null): Promise<AudioQuality | null> {
   // decodeِ opusِ ۱۶kHz بسیار سریع‌تر از real-time است؛ سقف مثلِ normalizeAudio متناسب با طول.

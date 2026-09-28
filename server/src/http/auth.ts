@@ -7,6 +7,7 @@ import { createSession, destroySession } from '../auth/session.js';
 import { SESSION_COOKIE, SESSION_COOKIE_MAX_AGE } from '../auth/guard.js';
 import { logEvent } from '../obs/eventLog.js';
 import { recordAudit } from '../obs/audit.js';
+import { toLatinDigits } from '../shared/persianDigits.js';
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -15,12 +16,7 @@ function isValidEmail(email: string): boolean {
 // شماره‌ی موبایلِ ایران: ورودی رو نرمال می‌کنه به فرمتِ ۰۹XXXXXXXXX
 // قبول می‌کنه: 09123456789 / +989123456789 / 00989123456789 / با فاصله یا خط‌تیره
 // ⭐ باگِ واقعی (UI-03): ارقامِ فارسی/عربی (۰۹۱۲…, ٠٩١٢…) رد می‌شدن — دقیقاً همون
-// چیزی که placeholderِ فیلدِ موبایل نشون می‌ده. قبل از حذفِ غیررقمی به لاتین تبدیل می‌شن.
-function toLatinDigits(s: string): string {
-  return s
-    .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 1776)) // فارسی: U+06F0..U+06F9
-    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632)); // عربی: U+0660..U+0669
-}
+// چیزی که placeholderِ فیلدِ موبایل نشون می‌ده. قبل از حذفِ غیررقمی به لاتین تبدیل می‌شن (shared/persianDigits).
 function normalizePhone(raw: string): string | null {
   const digits = toLatinDigits(raw).replace(/[^\d+]/g, '');
   let d = digits;

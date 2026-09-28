@@ -9,11 +9,12 @@ import path from 'node:path';
 import { query } from '../db/connection.js';
 import { extForMime, mimeForExt, allQueueFilesFor, queueFilesWithSession, removeAudioFile, runStartMs } from './batchqueue.js';
 import { logEvent } from '../obs/eventLog.js';
+import { createKeyedLock } from '../shared/keyedLock.js';
+import { FFMPEG_BIN } from '../shared/ffmpeg.js';
 
 const ARCHIVE_DIR = path.join(process.cwd(), 'data', 'session-audio');
 const RETENTION_MS = 14 * 24 * 60 * 60 * 1000; // ۱۴ روز — طبقِ تصمیمِ تیم
 export const SESSION_AUDIO_RETENTION_MS = RETENTION_MS; // برایِ «روزهایِ باقی‌مانده» در آرشیوِ ادمین (B2)
-const FFMPEG_BIN = process.env.FFMPEG_PATH || 'ffmpeg';
 
 function ensureArchiveDir() {
   if (!existsSync(ARCHIVE_DIR)) mkdirSync(ARCHIVE_DIR, { recursive: true });
@@ -81,13 +82,7 @@ export type AudioKind = 'session' | 'note';
 // قفلِ per-session: بدونِ این، دو archiveAudioForAdmin هم‌زمان رویِ یک جلسه ممکنه
 // هر دو همون MAX(seq) قدیمی رو ببینن و با seqِ یکسان تصادم/بازنویسی کنن (LAW-013:
 // runtime تک‌پروسه‌ایه، پس این قفلِ in-memory برایِ همین سرور کافیه).
-const sessionLocks = new Map<string, Promise<unknown>>();
-function withSessionLock<T>(sessionId: string, fn: () => Promise<T>): Promise<T> {
-  const prev = sessionLocks.get(sessionId) || Promise.resolve();
-  const run = prev.catch(() => {}).then(fn);
-  sessionLocks.set(sessionId, run.catch(() => {}));
-  return run;
-}
+const withSessionLock = createKeyedLock();
 
 // بعدِ رونویسیِ موفقِ یک سگمنت، به‌جایِ پاک‌کردنِ صدا، یه نسخه این‌جا نگه داشته می‌شه.
 // باگِ بحرانیِ قبلی: seq از کلاینت می‌اومد و ON DUPLICATE KEY UPDATE می‌کرد — دو

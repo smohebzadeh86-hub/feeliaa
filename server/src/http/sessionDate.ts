@@ -3,20 +3,13 @@
 // (`clients.ts`، `admin.ts`) و فرمتِ ثابتِ صفرپُرشده به ترتیبِ زمانی sort می‌شود.
 // ⚠️ الگوریتمِ `gregorianToJalali` عیناً در migration `013_session_date_jalali.sql` تکرار شده — هر تغییر در هر دو.
 
-const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
-const ARABIC_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+import { toLatinDigits } from '../shared/persianDigits.js';
 
 export const INVALID_DATE_ERROR = 'تاریخ نامعتبر است (مثال: ۱۴۰۵/۰۶/۲۳)';
 export const INVALID_TIME_ERROR = 'ساعت نامعتبر است (مثال: ۱۰:۳۰)';
 
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
-}
-
-export function toLatinDigits(s: string): string {
-  return s
-    .replace(/[۰-۹]/g, (d) => String(PERSIAN_DIGITS.indexOf(d)))
-    .replace(/[٠-٩]/g, (d) => String(ARABIC_DIGITS.indexOf(d)));
 }
 
 // الگوریتمِ حسابیِ متداولِ جلالی (چرخه‌ی ۳۳ساله). روز‌به‌روز برای ۱۹۵۰–۲۱۰۰ با Intl (ICU persian،

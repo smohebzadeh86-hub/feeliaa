@@ -15,8 +15,7 @@ import { getFullSessionAudio } from './sessionAudioArchive.js';
 import { transcribeFileAsync } from './asyncTranscribe.js';
 import { treatmentUnits } from '../features/treatment-unit/index.js';
 import type { SignMark } from './signMarkers.js';
-
-const FFMPEG_BIN = process.env.FFMPEG_PATH || 'ffmpeg';
+import { FFMPEG_BIN } from '../shared/ffmpeg.js';
 
 function run(cmd: string, args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {

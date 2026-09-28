@@ -7,6 +7,7 @@ import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } f
 import path from 'node:path';
 import { query, pool } from '../db/connection.js';
 import { logEvent } from '../obs/eventLog.js';
+import { createKeyedLock } from '../shared/keyedLock.js';
 
 export type BatchStatus = 'queued' | 'processing' | 'done' | 'failed';
 
@@ -371,13 +372,7 @@ async function segmentAlreadyApplied(sessionId: string, sha256: string): Promise
 // قفلِ per-session:queue تا دو فراخوانیِ هم‌زمانِ processBatchQueue (مثلاً یه
 // retryِ دستی درست وسطِ workerِ دوره‌ای) رویِ یک sessionId، متنِ یکسان رو دوبار
 // merge نکنن یا هر دو یه فایل رو هم‌زمان بخونن/حذف کنن.
-const queueLocks = new Map<string, Promise<unknown>>();
-function withQueueLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const prev = queueLocks.get(key) || Promise.resolve();
-  const run = prev.catch(() => {}).then(fn);
-  queueLocks.set(key, run.catch(() => {}));
-  return run;
-}
+const withQueueLock = createKeyedLock();
 
 export async function processBatchQueue(sessionId: string, purpose: BatchPurpose = 'transcript'): Promise<void> {
   return withQueueLock(`${sessionId}:${purpose}`, () => processBatchQueueInner(sessionId, purpose));

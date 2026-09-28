@@ -8,11 +8,10 @@
 import https from 'node:https';
 import { randomBytes } from 'node:crypto';
 import { createReadStream, statSync } from 'node:fs';
-import { HttpsProxyAgent } from 'https-proxy-agent';
 import { SESSION_TRANSCRIPTION_CONTEXT } from './sessionContext.js';
 import { formatSignTime, signMarker, sortedSigns, type SignMark } from './signMarkers.js';
+import { SONIOX_API_BASE as API_BASE, createProxyAgent as proxyAgent } from '../features/transcription/soniox/config.js';
 
-const API_BASE = process.env.SONIOX_API_BASE || 'https://api.soniox.com';
 const POLL_INTERVAL_MS = 2000;
 // ⭐ رفعِ F2 (audit آپلود، 2026-09-23): سقفِ ثابتِ ۱۰ دقیقه برایِ فایلِ بزرگ همیشه timeout می‌شد،
 // transcription پاک و هر ۵ دقیقه از نو ساخته می‌شد (حلقه‌ی بی‌پایانِ هزینه). حالا سقف با حجم بزرگ
@@ -20,11 +19,6 @@ const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_BASE_MS = 10 * 60 * 1000;
 export function pollTimeoutForBytes(bytes: number): number {
   return POLL_TIMEOUT_BASE_MS + Math.ceil(Math.max(0, bytes) / (1024 * 1024)) * 60 * 1000;
-}
-
-function proxyAgent(): HttpsProxyAgent<string> | undefined {
-  const proxyUrl = process.env.PROXY_URL;
-  return proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
 }
 
 function authHeader(): string {

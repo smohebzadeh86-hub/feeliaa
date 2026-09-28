@@ -17,20 +17,10 @@ import {
 } from '../stt/tempkey.js';
 import { SESSION_TRANSCRIPTION_CONTEXT } from '../stt/sessionContext.js';
 import { treatmentUnits } from '../features/treatment-unit/index.js';
+import { createRateLimiter } from '../shared/rateLimit.js';
 
 // rate-limit ساده درون‌حافظه‌ای: هر تراپیست حداکثر ۳۰ mint در دقیقه
-const mintHits = new Map<string, number[]>();
-function mintRateLimited(therapistId: string): boolean {
-  const now = Date.now();
-  const arr = (mintHits.get(therapistId) ?? []).filter((t) => now - t < 60_000);
-  if (arr.length >= 30) {
-    mintHits.set(therapistId, arr);
-    return true;
-  }
-  arr.push(now);
-  mintHits.set(therapistId, arr);
-  return false;
-}
+const mintRateLimited = createRateLimiter(30);
 
 // enable_endpoint_detection:true — برگردوندم به مقدارِ قبلی: خاموش‌کردنش (طبقِ
 // توصیه‌ی docsِ Soniox برایِ دقتِ diarization) در عمل با صدایِ واقعی تاخیرِ محسوس و

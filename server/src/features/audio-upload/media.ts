@@ -10,8 +10,7 @@
 // ffmpeg را به خواندنِ مسیر/URLِ دیگر وادار کند رد می‌شود. همه‌ی آرگومان‌ها آرایه‌اند (execFile، بدونِ shell).
 import { execFile } from 'node:child_process';
 import { openSync, readSync, closeSync } from 'node:fs';
-
-const FFMPEG_BIN = process.env.FFMPEG_PATH || 'ffmpeg';
+import { FFMPEG_BIN } from '../../shared/ffmpeg.js';
 
 // نام‌هایِ demuxer در ffmpeg (mov یک demuxer با چند نام است: mov,mp4,m4a,3gp,3g2,mj2).
 export const FORMAT_WHITELIST = [

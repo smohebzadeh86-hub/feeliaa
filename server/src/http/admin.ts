@@ -1,6 +1,6 @@
 // پنل ادمین — فقط is_admin=true. هیچ‌جا متنِ رونویسی‌شده‌ی جلسات نمایش داده نمی‌شود.
 import { FastifyInstance } from 'fastify';
-import { createReadStream, existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../db/connection.js';
 import { requireAdmin } from '../auth/guard.js';
@@ -9,25 +9,7 @@ import { collectUploadSonioxRefs, releaseSonioxRefs } from '../features/audio-up
 import { pendingAudiosFor } from '../stt/batchqueue.js';
 import { logEvent, obsQueueStats } from '../obs/eventLog.js';
 import { recordAudit } from '../obs/audit.js';
-
-// پارسِ امنِ Range: bytes=start-end با clamp به اندازه‌ی واقعیِ فایل.
-// خروجی null یعنی range غیرقابلِ‌ارضا (باید 416 برگردد) — قبلاً start فراتر از
-// stat.size منجر به Content-Length منفی و پاسخِ خراب می‌شد.
-function parseRange(rangeHeader: string, size: number): { start: number; end: number } | null {
-  const m = /bytes=(\d*)-(\d*)/.exec(rangeHeader);
-  if (!m || (!m[1] && !m[2])) return null;
-  let start = m[1] ? parseInt(m[1], 10) : 0;
-  let end = m[2] ? parseInt(m[2], 10) : size - 1;
-  if (Number.isNaN(start) || Number.isNaN(end)) return null;
-  if (!m[1] && m[2]) {
-    // فرمِ suffix: bytes=-N یعنی N بایتِ آخر
-    start = Math.max(0, size - end);
-    end = size - 1;
-  }
-  if (start > end || start < 0 || start >= size) return null;
-  if (end >= size) end = size - 1;
-  return { start, end };
-}
+import { sendFileWithRange } from '../shared/httpRange.js';
 
 // ————— فیلترهایِ مشترکِ آرشیوِ صدا / یادداشت‌هایِ صوتی (B2/B3، 2026-09-26) —————
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -286,26 +268,7 @@ export async function adminRoutes(app: FastifyInstance) {
     if (!result.complete) {
       reply.header('X-Audio-Missing-Segments', result.missingSegments.join(','));
     }
-    const range = request.headers.range;
-    if (range) {
-      const parsed = parseRange(range, stat.size);
-      if (!parsed) {
-        reply.code(416);
-        reply.header('Content-Range', `bytes */${stat.size}`);
-        return reply.send();
-      }
-      const { start, end } = parsed;
-      reply.code(206);
-      reply.header('Content-Range', `bytes ${start}-${end}/${stat.size}`);
-      reply.header('Accept-Ranges', 'bytes');
-      reply.header('Content-Length', end - start + 1);
-      reply.header('Content-Type', result.mime);
-      return reply.send(createReadStream(result.path, { start, end }));
-    }
-    reply.header('Accept-Ranges', 'bytes');
-    reply.header('Content-Length', stat.size);
-    reply.header('Content-Type', result.mime);
-    return reply.send(createReadStream(result.path));
+    return sendFileWithRange(reply, request.headers.range, result.path, stat.size, result.mime);
   });
 
   // GET /api/admin/session-audio/:audioId/stream — پخشِ خودِ فایلِ صدا (با Range،
@@ -333,27 +296,8 @@ export async function adminRoutes(app: FastifyInstance) {
       const ext = (row.mime && row.mime.includes('ogg')) ? 'ogg' : 'webm';
       reply.header('Content-Disposition', `attachment; filename="segment-${String(row.seq).padStart(6, '0')}.${ext}"`);
     }
-    const range = request.headers.range;
     const contentType = row.mime || 'audio/webm';
-    if (range) {
-      const parsed = parseRange(range, stat.size);
-      if (!parsed) {
-        reply.code(416);
-        reply.header('Content-Range', `bytes */${stat.size}`);
-        return reply.send();
-      }
-      const { start, end } = parsed;
-      reply.code(206);
-      reply.header('Content-Range', `bytes ${start}-${end}/${stat.size}`);
-      reply.header('Accept-Ranges', 'bytes');
-      reply.header('Content-Length', end - start + 1);
-      reply.header('Content-Type', contentType);
-      return reply.send(createReadStream(row.path, { start, end }));
-    }
-    reply.header('Accept-Ranges', 'bytes');
-    reply.header('Content-Length', stat.size);
-    reply.header('Content-Type', contentType);
-    return reply.send(createReadStream(row.path));
+    return sendFileWithRange(reply, request.headers.range, row.path, stat.size, contentType);
   });
 
   // ⭐ خروج دیتا از پلتفرم فقط از همین دو مسیر ممکنه — هر دو پشتِ requireAdmin.

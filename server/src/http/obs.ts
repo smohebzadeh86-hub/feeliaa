@@ -8,6 +8,7 @@ import { logEvent, logUiEvents } from '../obs/eventLog.js';
 import { isSafeToken, sanitizeDetail } from '../obs/redact.js';
 import { OBS_CLIENT_EVENTS } from '../obs/types.js';
 import type { ObsUiEventInput, ObsUiKind } from '../obs/types.js';
+import { createRateLimiter } from '../shared/rateLimit.js';
 
 const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 const VALID_KINDS = new Set<string>(['click', 'nav', 'visibility', 'net', 'lifecycle', 'error']);
@@ -18,20 +19,9 @@ const CLIENT_EVENT_NAMES = new Set<string>(OBS_CLIENT_EVENTS);
 const MAX_EVENTS_PER_BATCH = 200;
 const CLIENT_TS_WINDOW_MS = 24 * 60 * 60 * 1000; // ±۲۴ ساعت
 
-// rate-limit درون‌حافظه‌ای — همان الگویِ mintRateLimited در stt.ts.
-const reqHits = new Map<string, number[]>();
-const eventHits = new Map<string, number[]>();
-function limited(map: Map<string, number[]>, key: string, max: number, weight = 1): boolean {
-  const now = Date.now();
-  const arr = (map.get(key) ?? []).filter((t) => now - t < 60_000);
-  if (arr.length >= max) {
-    map.set(key, arr);
-    return true;
-  }
-  for (let i = 0; i < weight; i++) arr.push(now);
-  map.set(key, arr);
-  return false;
-}
+// rate-limit درون‌حافظه‌ای — همان الگویِ mintRateLimited در stt.ts: ۲۰ درخواست و ۱۵۰۰ رویداد در دقیقه برایِ هر تراپیست.
+const requestLimited = createRateLimiter(20);
+const eventsLimited = createRateLimiter(1500);
 
 interface RawObsEvent {
   nav_id?: unknown;
@@ -147,7 +137,7 @@ export async function obsRoutes(app: FastifyInstance) {
       { bodyLimit: 64 * 1024 },
       async (request, reply) => {
         const therapistId = request.therapistId!;
-        if (limited(reqHits, therapistId, 20)) {
+        if (requestLimited(therapistId)) {
           reply.code(429);
           return { error: 'درخواست زیاد؛ کمی صبر کنید', code: 'obs-rate-limited' };
         }
@@ -159,7 +149,7 @@ export async function obsRoutes(app: FastifyInstance) {
           return { error: 'بدنه‌ی نامعتبر است', code: 'obs-bad-payload' };
         }
 
-        if (limited(eventHits, therapistId, 1500, rawEvents.length)) {
+        if (eventsLimited(therapistId, rawEvents.length)) {
           reply.code(429);
           return { error: 'درخواست زیاد؛ کمی صبر کنید', code: 'obs-rate-limited' };
         }
