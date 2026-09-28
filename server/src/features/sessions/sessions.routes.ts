@@ -18,14 +18,15 @@ import {
   validateAudioBuffer,
 } from '../transcription/batch/batchQueue.js';
 import { getResolveJob, startResolveSpeakers } from '../transcription/speakerResolve.js';
-import { listSessionAudio, deleteSessionAudioDirs } from '../transcription/archive/sessionAudioArchive.js';
-import { collectUploadSonioxRefs, releaseSonioxRefs } from '../audio-upload/jobRunner.js';
+import { listSessionAudio } from '../transcription/archive/sessionAudioArchive.js';
+import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/purge.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { hasStoredConsent, recordClientConsent } from '../clients/consent.js';
 // خودکارسازیِ تولیدِ پرونده بعدِ پایانِ کاملِ جلسه (فازِ ۲ِ Module 08) — سیاستِ مرکزی حالا در
 // features/case-file/application/autoTrigger.ts است (jobِ آپلودِ صدا هم از همان استفاده می‌کند).
 import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
 import { recordAudit } from '../../obs/audit.js';
+import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from './sessionNumber.js';
 import { enqueueFinalTranscript } from '../final-transcript/index.js';
 import { treatmentUnits, TreatmentUnitValidationError } from '../treatment-unit/index.js';
 
@@ -72,18 +73,6 @@ async function processVoiceNoteInBackground(
   } catch (err) {
     console.log('[voice-note] background error:', String(err));
   }
-}
-
-// تداخلِ شماره‌ی جلسه (UNIQUE uq_sessions_client_num) یا deadlockِ کوتاهِ InnoDB بینِ دو ساختِ هم‌زمان ⇒ قابلِ تکرار.
-// تا ۱۵ بار با فاصله‌ی تصادفیِ کوتاهِ رو‌به‌افزایش (هر دور فقط یکی از رقبا برنده می‌شود؛ jitter هم‌زمانیِ دوباره را می‌شکند).
-export const SESSION_NUM_MAX_RETRIES = 15;
-export function sessionNumRetryPause(attempt: number): Promise<void> {
-  return new Promise((r) => setTimeout(r, 5 + Math.floor(Math.random() * 20 * (attempt + 1))));
-}
-export function isSessionNumConflict(err: unknown): boolean {
-  const e = err as { code?: string; errno?: number; message?: string };
-  if (e?.code === 'ER_LOCK_DEADLOCK' || e?.errno === 1213) return true;
-  return e?.code === 'ER_DUP_ENTRY' && /uq_sessions_client_num|session_num/.test(String(e?.message || ''));
 }
 
 export async function sessionRoutes(app: FastifyInstance) {
@@ -476,7 +465,7 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'جلسه یافت نشد' };
     }
 
-    const sonioxRefs = await collectUploadSonioxRefs([id]);
+    const media = await prepareSessionMediaPurge([id]);
     const del = await query(
       `DELETE FROM sessions
        WHERE id = ? AND client_id IN (SELECT id FROM clients WHERE therapist_id = ?)`,
@@ -490,8 +479,7 @@ export async function sessionRoutes(app: FastifyInstance) {
 
     // LAW-010: بعدِ حذفِ موفقِ ردیفِ DB، فایل‌هایِ آرشیوشده‌ی همین جلسه رویِ دیسک را هم پاک کن
     // (وگرنه یتیم می‌مانند — cascadeِ DB فقط ردیف را می‌بیند، نه فایل).
-    deleteSessionAudioDirs([id]);
-    releaseSonioxRefs(sonioxRefs);
+    purgeSessionMedia(media);
     logEvent({ event: 'session.deleted', sessionId: id, therapistId: request.therapistId });
     await recordAudit({ actorId: request.therapistId, action: 'therapist.session_delete', targetType: 'session', targetId: id });
 

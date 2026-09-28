@@ -3,12 +3,9 @@
 // fire-and-forget: هرگز پاسخِ HTTPِ اصلی را بلاک یا fail نمی‌کند.
 import { query } from '../../../db/connection.js';
 import { generateCaseFile } from './generateCaseFile.js';
-import { SqlCaseFileRepository } from '../adapters/repository/caseFileRepository.sql.js';
-import { resolveLLMProvider } from '../adapters/llm/registry.js';
+import { caseFileRepo, llmProvider } from '../composition.js';
 import { CaseFileGenerationError } from '../domain/errors.js';
 import { createNotification } from '../../notifications/notify.js';
-
-const repo = new SqlCaseFileRepository();
 
 // ⭐ پی‌ریزی برایِ مراجعینِ فعال (تصمیمِ مالک 2026-09-23: «الان نه ولی پی‌ریزی انجام بشه»):
 // امروز تولیدِ خودکار فقط برایِ مراجعِ غیرفعال است (همان رفتارِ قبلی). روشن‌کردنِ آن برایِ فعال‌ها
@@ -48,11 +45,11 @@ export async function maybeAutoGenerateCaseFile(
     if (!client) return 'not_applicable';
     if (client.status !== 'inactive' && !autoGenerateAllowedForActiveClients()) return 'not_applicable';
 
-    const llmProvider = resolveLLMProvider();
+    const provider = llmProvider();
     const { skipped } = await generateCaseFile(
       clientId,
       { category: client.category ?? null, gender: client.gender ?? null, alias: client.alias ?? null },
-      { llmProvider, caseFileRepo: repo },
+      { llmProvider: provider, caseFileRepo },
       { therapistId }
     );
     if (!skipped && opts.notify) {

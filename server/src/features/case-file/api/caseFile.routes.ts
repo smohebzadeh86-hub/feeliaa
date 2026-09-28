@@ -7,33 +7,10 @@ import { generateCaseFile } from '../application/generateCaseFile.js';
 import { computeTreatmentRhythm } from '../application/computeTreatmentRhythm.js';
 import { applyFieldPatch, addCaseFileItem, removeCaseFileItem, dropGhostMedication, migrateAnsweredQuestions, type FieldPatchAction, type AddableKind } from '../application/applyFieldPatch.js';
 import { upgradeLegacyContent } from '../application/upgradeLegacyContent.js';
-import { SqlCaseFileRepository } from '../adapters/repository/caseFileRepository.sql.js';
-import type { CaseFileRecord } from '../ports/caseFileRepo.port.js';
-import { resolveLLMProvider } from '../adapters/llm/registry.js';
+import { writeCaseFileWithCas } from '../application/writeCaseFileWithCas.js';
+import { caseFileRepo, llmProvider } from '../composition.js';
 import { CaseFileGenerationError, CaseFileValidationError } from '../domain/errors.js';
 
-const caseFileRepo = new SqlCaseFileRepository();
-
-// ⭐ رفعِ F6: هر ویرایشِ تراپیست read→modify→write است؛ با CAS رویِ content_version نوشته می‌شود تا
-// نه دو ویرایشِ هم‌زمان هم‌دیگر را پاک کنند، نه پایانِ یک تولیدِ پس‌زمینه ویرایش را. در تعارض
-// (نسخه بینِ خواندن و نوشتن عوض شد) همان تغییر رویِ آخرین نسخه دوباره اعمال می‌شود.
-type Mutate = (content: CaseFileRecord['content']) => CaseFileRecord['content'];
-async function writeWithCas(
-  clientId: string,
-  mutate: Mutate,
-  extra: { therapistEditedAt?: Date } = {},
-  prepare: (content: CaseFileRecord['content']) => void = (c) => { dropGhostMedication(c); migrateAnsweredQuestions(c); }
-): Promise<CaseFileRecord | 'not-found' | 'conflict'> {
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const record = await caseFileRepo.get(clientId);
-    if (!record) return 'not-found';
-    prepare(record.content);
-    const nextContent = mutate(record.content);
-    const updated = await caseFileRepo.upsert(clientId, { content: nextContent, ...extra }, record.contentVersion);
-    if (updated) return updated;
-  }
-  return 'conflict';
-}
 const CONFLICT_BODY = { error: 'پرونده هم‌زمان تغییر کرد — دوباره تلاش کنید', code: 'version-conflict' };
 
 export async function caseFileRoutes(app: FastifyInstance) {
@@ -71,11 +48,11 @@ export async function caseFileRoutes(app: FastifyInstance) {
     }
 
     try {
-      const llmProvider = resolveLLMProvider();
+      const provider = llmProvider();
       const { record, skipped } = await generateCaseFile(
         id,
         { category: client.category ?? null, gender: client.gender ?? null, alias: client.alias ?? null },
-        { llmProvider, caseFileRepo },
+        { llmProvider: provider, caseFileRepo },
         { force: !!force, therapistId: request.therapistId ?? undefined }
       );
       const treatment_rhythm = await computeTreatmentRhythm(id);
@@ -105,7 +82,7 @@ export async function caseFileRoutes(app: FastifyInstance) {
     }
 
     try {
-      const updated = await writeWithCas(id, (c) => applyFieldPatch(c, fieldId, action, value), { therapistEditedAt: new Date() });
+      const updated = await writeCaseFileWithCas(caseFileRepo, id, (c) => applyFieldPatch(c, fieldId, action, value), { therapistEditedAt: new Date() });
       if (updated === 'not-found') {
         reply.code(404);
         return { error: 'پرونده هنوز ساخته نشده — ابتدا آن را تولید کنید' };
@@ -144,7 +121,7 @@ export async function caseFileRoutes(app: FastifyInstance) {
     const client = await getOwnedClient(id, request.therapistId!);
     if (!client) { reply.code(404); return { error: 'مراجع یافت نشد' }; }
     try {
-      const updated = await writeWithCas(id, (c) => addCaseFileItem(c, kind as AddableKind, input), { therapistEditedAt: new Date() }, (c) => dropGhostMedication(c));
+      const updated = await writeCaseFileWithCas(caseFileRepo, id, (c) => addCaseFileItem(c, kind as AddableKind, input), { therapistEditedAt: new Date() }, (c) => dropGhostMedication(c));
       if (updated === 'not-found') { reply.code(404); return { error: 'پرونده هنوز ساخته نشده — ابتدا آن را تولید کنید' }; }
       if (updated === 'conflict') { reply.code(409); return CONFLICT_BODY; }
       return { case_file: updated };
@@ -160,7 +137,7 @@ export async function caseFileRoutes(app: FastifyInstance) {
     const client = await getOwnedClient(id, request.therapistId!);
     if (!client) { reply.code(404); return { error: 'مراجع یافت نشد' }; }
     try {
-      const updated = await writeWithCas(id, (c) => removeCaseFileItem(c, kind, itemId), { therapistEditedAt: new Date() }, (c) => dropGhostMedication(c));
+      const updated = await writeCaseFileWithCas(caseFileRepo, id, (c) => removeCaseFileItem(c, kind, itemId), { therapistEditedAt: new Date() }, (c) => dropGhostMedication(c));
       if (updated === 'not-found') { reply.code(404); return { error: 'پرونده هنوز ساخته نشده' }; }
       if (updated === 'conflict') { reply.code(409); return CONFLICT_BODY; }
       return { case_file: updated };

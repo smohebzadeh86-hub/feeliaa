@@ -2,7 +2,7 @@
 // دیگری اینجا نیست. تنها مسیرِ نوشتن: caseFileRepo (یک‌طرفه، هرگز sessions/session_notes
 // را تغییر نمی‌دهد — پرونده‌ی سنتزشده از دیتایِ خام کاملاً جدا است).
 import { aggregateClientCorpus } from './aggregateClientCorpus.js';
-import { buildCaseFilePrompt, buildAnsweredQuestionsBlock } from './buildCaseFilePrompt.js';
+import { buildCaseFilePrompt, buildAnsweredQuestionsBlock } from '../prompts/userPrompts.js';
 import { mergeCaseFileDraft } from './mergeTherapistEdits.js';
 import { digestWithRepair, composeWithRepair } from './repairLoop.js';
 import { enforceCaseFileRules } from '../domain/validate.js';

@@ -6,7 +6,8 @@ import type { LLMProvider, CaseFilePromptInput } from '../../ports/llmProvider.p
 import type { RawCaseFileDraft, CaseFileDigest } from '../../domain/types.js';
 import { CaseFileGenerationError } from '../../domain/errors.js';
 import { validateCaseFileDraft } from '../../domain/validate.js';
-import { CASE_FILE_SYSTEM_PROMPT, CASE_FILE_DIGEST_SYSTEM_PROMPT, describeClientMeta } from '../../application/buildCaseFilePrompt.js';
+import { CASE_FILE_SYSTEM_PROMPT, CASE_FILE_DIGEST_SYSTEM_PROMPT } from '../../prompts/systemPrompts.js';
+import { digestUserPrompt, composeUserPrompt } from '../../prompts/userPrompts.js';
 import { CASE_FILE_JSON_SCHEMA } from './caseFileJsonSchema.js';
 import { CASE_FILE_DIGEST_JSON_SCHEMA } from './caseFileDigestSchema.js';
 import type { JsonCaller, JsonCallOptions } from '../../../../llm/jsonCall.js';
@@ -20,18 +21,12 @@ export class ChatLlmAdapter implements LLMProvider {
   }
 
   async digestCorpus(input: CaseFilePromptInput): Promise<CaseFileDigest> {
-    const userPrompt = `${describeClientMeta(input.clientMeta)}
-
-متن خام جلسات ثبت‌شده:
-${input.corpusText}`;
+    const userPrompt = digestUserPrompt(input);
     return this.call<CaseFileDigest>('digest', CASE_FILE_DIGEST_SYSTEM_PROMPT, userPrompt, CASE_FILE_DIGEST_JSON_SCHEMA);
   }
 
   async generateCaseFile(input: CaseFilePromptInput): Promise<RawCaseFileDraft> {
-    const userPrompt = `${describeClientMeta(input.clientMeta)}
-
-خلاصه‌ی تصحیح‌شده‌ی جلسات ثبت‌شده:
-${input.corpusText}`;
+    const userPrompt = composeUserPrompt(input);
     // بدونِ schemaِ strict (مثلاً DeepSeek) ساختارِ عمیق تضمین نیست ⇒ همان validateCaseFileDraft ِ repairLoop اینجا هم
     // اجرا می‌شود تا خروجیِ بدساختار یک بار دوباره پرسیده شود، نه اینکه کلِ تولید fail شود.
     return this.call<RawCaseFileDraft>('compose', CASE_FILE_SYSTEM_PROMPT, userPrompt, CASE_FILE_JSON_SCHEMA, { validate: validateCaseFileDraft });

@@ -4,10 +4,9 @@ import { FastifyInstance } from 'fastify';
 import { query } from '../../db/connection.js';
 import { requireAuth } from '../../auth/guard.js';
 import { getOwnedClient } from '../../db/ownership.js';
-import { deleteSessionAudioDirs } from '../transcription/archive/sessionAudioArchive.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
-import { collectUploadSonioxRefs, releaseSonioxRefs } from '../audio-upload/jobRunner.js';
+import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/purge.js';
 import { treatmentUnits, TreatmentUnitValidationError } from '../treatment-unit/index.js';
 
 const VALID_CATEGORIES = ['child', 'teen', 'adult'];
@@ -319,7 +318,7 @@ export async function clientRoutes(app: FastifyInstance) {
     // بدونِ این لیست یتیم می‌مانند.
     const sessionIdsResult = await query('SELECT id FROM sessions WHERE client_id = ?', [id]);
     const sessionIds = sessionIdsResult.rows.map((r: { id: string }) => r.id);
-    const sonioxRefs = await collectUploadSonioxRefs(sessionIds);
+    const media = await prepareSessionMediaPurge(sessionIds);
 
     const del = await query(
       'DELETE FROM clients WHERE id = ? AND therapist_id = ?',
@@ -331,8 +330,7 @@ export async function clientRoutes(app: FastifyInstance) {
       return { error: 'مراجع یافت نشد' };
     }
 
-    deleteSessionAudioDirs(sessionIds);
-    releaseSonioxRefs(sonioxRefs);
+    purgeSessionMedia(media);
     await recordAudit({ actorId: request.therapistId, action: 'therapist.client_delete', targetType: 'client', targetId: id, detail: { count: sessionIds.length } });
 
     return {

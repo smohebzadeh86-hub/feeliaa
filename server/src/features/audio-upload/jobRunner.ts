@@ -20,6 +20,7 @@ import { measureAudioQuality, parseAudioQuality } from './quality.js';
 import { uploadDir, removeUploadDir } from './uploadStore.js';
 import { stepJob, giveUpJob, uploadCaseFileEnabled, uploadCaseFileAllowed, type AudioJob, type JobDeps, type JobPatch, type JobStore, type CaseFileJobStatus, type SourcePart } from './jobMachine.js';
 import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
+import { deleteSonioxRefs } from './sonioxRefs.js';
 import { enqueueFinalTranscript, appendUploadForPolish } from '../final-transcript/index.js';
 
 export const UPLOAD_TRANSCRIPT_LABEL_PREFIX = '[متنِ فایلِ صوتیِ آپلودشده]';
@@ -399,53 +400,6 @@ export async function startAudioJobWorker(customDeps?: JobDeps): Promise<void> {
 
 export function wakeAudioJobWorker(): void {
   setImmediate(() => { void tick(); });
-}
-
-// ————— رفعِ M3: حذفِ جلسه/مراجع/تراپیست وسطِ پردازش ⇒ پاک‌سازیِ منابعِ Soniox —————
-// cascadeِ DB ردیفِ job (و شناسه‌هایِ Soniox) را پاک می‌کند؛ بدونِ این، صدا/متنِ بالینی رویِ Soniox می‌ماند و
-// فقط sweepSonioxOrphans (وابسته به SONIOX_ORPHAN_SWEEP=1) آن را برمی‌داشت. استفاده در هر ۴ مسیرِ حذف:
-//   const refs = await collectUploadSonioxRefs(sessionIds);  ← پیش از DELETE
-//   releaseSonioxRefs(refs);                                  ← بعد از DELETEِ موفق
-export interface SonioxRef { fileId: string | null; transcriptionId: string | null; }
-
-export async function collectUploadSonioxRefs(sessionIds: string[]): Promise<SonioxRef[]> {
-  if (!sessionIds.length) return [];
-  try {
-    const out: SonioxRef[] = [];
-    for (let i = 0; i < sessionIds.length; i += 500) {
-      const part = sessionIds.slice(i, i + 500);
-      const r = await query(
-        `SELECT soniox_file_id, soniox_transcription_id FROM audio_jobs
-         WHERE session_id IN (${part.map(() => '?').join(',')})
-           AND (soniox_file_id IS NOT NULL OR soniox_transcription_id IS NOT NULL)`,
-        part
-      );
-      for (const row of r.rows) out.push({ fileId: row.soniox_file_id, transcriptionId: row.soniox_transcription_id });
-      // «متنِ نهایی» (migration 031) هم فایل/transcriptionِ کلِ صدایِ جلسه رویِ Soniox دارد
-      const f = await query(
-        `SELECT soniox_file_id, soniox_transcription_id FROM final_transcripts
-         WHERE session_id IN (${part.map(() => '?').join(',')})
-           AND (soniox_file_id IS NOT NULL OR soniox_transcription_id IS NOT NULL)`,
-        part
-      );
-      for (const row of f.rows) out.push({ fileId: row.soniox_file_id, transcriptionId: row.soniox_transcription_id });
-    }
-    return out;
-  } catch (e) {
-    console.log('[audio-job] collect soniox refs failed:', String(e).slice(0, 160));
-    return [];
-  }
-}
-
-async function deleteSonioxRefs(refs: SonioxRef[]): Promise<void> {
-  for (const ref of refs) {
-    if (ref.transcriptionId) await deleteTranscription(ref.transcriptionId).catch(() => {});
-    if (ref.fileId) await deleteFile(ref.fileId).catch(() => {});
-  }
-}
-
-export function releaseSonioxRefs(refs: SonioxRef[]): void {
-  if (refs.length) void deleteSonioxRefs(refs);
 }
 
 // ————— رفعِ F3: پاک‌سازیِ فایل/transcriptionِ یتیمِ Feelia رویِ Soniox —————

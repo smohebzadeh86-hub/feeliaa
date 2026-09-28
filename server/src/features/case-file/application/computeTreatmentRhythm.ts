@@ -2,7 +2,7 @@
 // مستقیماً از sessions.date (که در `content` ذخیره نمی‌شود) گرفته می‌شود، پس همیشه
 // زنده است، حتی بدونِ regenerate کردنِ پرونده.
 import { query } from '../../../db/connection.js';
-import { jalaliToTimestampMs } from '../../sessions/sessionDate.js';
+import { jalaliToTimestampMs } from '../../../shared/jalali.js';
 
 export interface TreatmentRhythm {
   sessionCount: number;

@@ -14,7 +14,8 @@ import { composeWithRepair, digestWithRepair } from '../server/src/features/case
 import { resolveLlmConfig } from '../server/src/llm/config.js';
 import { FINDING_ROLES, FINDING_ROLE_LABEL } from '../server/src/features/case-file/domain/types.js';
 import { CASE_FILE_JSON_SCHEMA } from '../server/src/features/case-file/adapters/llm/caseFileJsonSchema.js';
-import { CASE_FILE_SYSTEM_PROMPT as SYSTEM_PROMPT, buildAnsweredQuestionsBlock } from '../server/src/features/case-file/application/buildCaseFilePrompt.js';
+import { CASE_FILE_SYSTEM_PROMPT as SYSTEM_PROMPT } from '../server/src/features/case-file/prompts/systemPrompts.js';
+import { buildAnsweredQuestionsBlock } from '../server/src/features/case-file/prompts/userPrompts.js';
 import type { CaseFileDigest, RawCaseFileDraft, RawFinding, RawAxis, RawAxisFinding } from '../server/src/features/case-file/domain/types.js';
 
 let pass = 0, fail = 0;

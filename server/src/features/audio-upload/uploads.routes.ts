@@ -33,7 +33,7 @@ import { parseAudioQuality } from './quality.js';
 import { uploadCaseFileEnabled, uploadCaseFileAllowed } from './jobMachine.js';
 import { existsSync } from 'node:fs';
 import { hasStoredConsent, recordClientConsent } from '../clients/consent.js';
-import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../sessions/sessions.routes.js';
+import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../sessions/sessionNumber.js';
 import { createKeyedLock } from '../../shared/keyedLock.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { query } from '../../db/connection.js';
 import { requireAdmin } from '../../auth/guard.js';
 import { listSessionAudio, getSessionAudioRow, getFullSessionAudio, deleteSessionAudioDirs, deriveSessionStatus, checkSeqContiguous, SESSION_AUDIO_RETENTION_MS } from '../transcription/archive/sessionAudioArchive.js';
-import { collectUploadSonioxRefs, releaseSonioxRefs } from '../audio-upload/jobRunner.js';
+import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/purge.js';
 import { pendingAudiosFor } from '../transcription/batch/batchQueue.js';
 import { logEvent, obsQueueStats } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
@@ -402,10 +402,9 @@ export async function adminRoutes(app: FastifyInstance) {
       [id]
     );
     const sessionIds = sessionIdsResult.rows.map((r: { id: string }) => r.id);
-    const sonioxRefs = await collectUploadSonioxRefs(sessionIds);
+    const media = await prepareSessionMediaPurge(sessionIds);
     await query('DELETE FROM therapists WHERE id = ?', [id]);
-    deleteSessionAudioDirs(sessionIds);
-    releaseSonioxRefs(sonioxRefs);
+    purgeSessionMedia(media);
     logEvent({ event: 'admin.delete', therapistId: request.therapistId, detail: { kind: 'therapist' } });
     await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.therapist_delete', targetType: 'therapist', targetId: id, detail: { count: sessionIds.length } });
 
@@ -424,10 +423,9 @@ export async function adminRoutes(app: FastifyInstance) {
     // LAW-010: همان دلیلِ بالا — قبل از cascade شناسه‌ی جلسه‌ها را نگه می‌داریم.
     const sessionIdsResult = await query('SELECT id FROM sessions WHERE client_id = ?', [id]);
     const sessionIds = sessionIdsResult.rows.map((r: { id: string }) => r.id);
-    const sonioxRefs = await collectUploadSonioxRefs(sessionIds);
+    const media = await prepareSessionMediaPurge(sessionIds);
     await query('DELETE FROM clients WHERE id = ?', [id]);
-    deleteSessionAudioDirs(sessionIds);
-    releaseSonioxRefs(sonioxRefs);
+    purgeSessionMedia(media);
     logEvent({ event: 'admin.delete', therapistId: request.therapistId, detail: { kind: 'client' } });
     await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.client_delete', targetType: 'client', targetId: id, detail: { count: sessionIds.length } });
 
