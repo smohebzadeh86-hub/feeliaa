@@ -120,7 +120,7 @@ export async function adminRoutes(app: FastifyInstance) {
 
     const result = await query(`
       SELECT
-        t.id, t.phone, t.email, t.name, t.specialty, t.is_admin, t.active, t.created_at,
+        t.id, t.phone, t.email, t.name, t.specialty, t.is_admin, t.active, t.created_at, t.final_transcript_enabled,
         COUNT(DISTINCT c.id) as client_count,
         COUNT(DISTINCT s.id) as session_count,
         MAX(s.created_at) as last_session_at
@@ -389,10 +389,10 @@ export async function adminRoutes(app: FastifyInstance) {
     return { exported_at: new Date().toISOString(), therapists: all };
   });
 
-  // PATCH /api/admin/therapists/:id — { active?, is_admin? }
+  // PATCH /api/admin/therapists/:id — { active?, is_admin?, final_transcript_enabled? }
   app.patch('/api/admin/therapists/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
-    const { active, is_admin } = request.body as { active?: boolean; is_admin?: boolean };
+    const { active, is_admin, final_transcript_enabled } = request.body as { active?: boolean; is_admin?: boolean; final_transcript_enabled?: boolean };
 
     if (id === request.therapistId) {
       if (active === false) {
@@ -412,6 +412,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const values: unknown[] = [];
     if (typeof active === 'boolean') { updates.push(`active = ?`); values.push(active); }
     if (typeof is_admin === 'boolean') { updates.push(`is_admin = ?`); values.push(is_admin); }
+    if (typeof final_transcript_enabled === 'boolean') { updates.push(`final_transcript_enabled = ?`); values.push(final_transcript_enabled); }
     if (updates.length === 0) {
       reply.code(400);
       return { error: 'چیزی برای به‌روزرسانی نیست' };
@@ -428,9 +429,9 @@ export async function adminRoutes(app: FastifyInstance) {
     }
 
     await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.therapist_update', targetType: 'therapist', targetId: id,
-      detail: { ...(typeof active === 'boolean' ? { state: active ? 'active' : 'inactive' } : {}), ...(typeof is_admin === 'boolean' ? { mode: is_admin ? 'admin' : 'not_admin' } : {}) } });
+      detail: { ...(typeof active === 'boolean' ? { state: active ? 'active' : 'inactive' } : {}), ...(typeof is_admin === 'boolean' ? { mode: is_admin ? 'admin' : 'not_admin' } : {}), ...(typeof final_transcript_enabled === 'boolean' ? { purpose: final_transcript_enabled ? 'final_transcript_on' : 'final_transcript_off' } : {}) } });
     const result = await query(
-      'SELECT id, phone, email, name, is_admin, active, created_at FROM therapists WHERE id = ?',
+      'SELECT id, phone, email, name, is_admin, active, created_at, final_transcript_enabled FROM therapists WHERE id = ?',
       [id]
     );
     return { therapist: result.rows[0] };

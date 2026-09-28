@@ -82,6 +82,28 @@ export class TreatmentUnitService {
     return clean;
   }
 
+  // حاضرینِ جلسه برایِ نقش‌گذاریِ «متنِ نهایی» (برچسبِ نمایشی + واژه‌هایِ رویکرد). fail-open: null.
+  async sessionSpeakerRoster(sessionId: string): Promise<{ unitLabel: string; speakers: string[]; terms: string[] } | null> {
+    try {
+      const src = await this.repo.getSessionContextSource(sessionId);
+      if (!src) return null;
+      const catalog = await this.catalog();
+      const unit = await this.getUnit(src.clientId);
+      if (!unit) return null;
+      const profile = speakerProfile(catalog, unit, src.attendees);
+      if (!profile) return null;
+      const mods = catalog.modalities.filter((m) => src.therapistModalities.includes(m.code));
+      return {
+        unitLabel: profile.unitType.labelFa,
+        speakers: profile.speakers.map((s) => s.label),
+        terms: Array.from(new Set(mods.flatMap((m) => m.terms))).slice(0, this.cfg.context.maxTerms),
+      };
+    } catch (e) {
+      console.log(`[treatment-unit] roster fallback session=${sessionId} err=${(e as Error)?.name || 'error'}`);
+      return null;
+    }
+  }
+
   // contextِ Soniox برایِ یک جلسه. هرگز پرتاب نمی‌کند (LAW-012 fail-open): در هر خطا contextِ پایه.
   async sessionSttContext(sessionId: string): Promise<SonioxContext> {
     try {

@@ -10,7 +10,8 @@ export type NotificationKind =
   | 'transcript_empty'
   | 'processing_failed'
   | 'case_file_updated'
-  | 'case_file_failed';
+  | 'case_file_failed'
+  | 'final_transcript_ready';
 
 export interface NewNotification {
   therapistId: string;

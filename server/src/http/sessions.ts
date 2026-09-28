@@ -26,6 +26,7 @@ import { hasStoredConsent, recordClientConsent } from './clientConsent.js';
 // features/case-file/application/autoTrigger.ts است (jobِ آپلودِ صدا هم از همان استفاده می‌کند).
 import { maybeAutoGenerateCaseFile } from '../features/case-file/application/autoTrigger.js';
 import { recordAudit } from '../obs/audit.js';
+import { enqueueFinalTranscript } from '../features/final-transcript/index.js';
 import { treatmentUnits, TreatmentUnitValidationError } from '../features/treatment-unit/index.js';
 
 // سقفِ یادداشتِ «پیش از جلسه» (configuration-catalog)
@@ -459,6 +460,8 @@ export async function sessionRoutes(app: FastifyInstance) {
       // fire-and-forget — پایانِ کاملِ جلسه (زنده یا دستی) یکی از دو نقطه‌ی تریگرِ
       // auto-generate است؛ نقطه‌ی دیگر ساختِ جلسه‌ی دستی در بالاست.
       void maybeAutoGenerateCaseFile(owned.client_id, request.therapistId!);
+      // «متنِ نهایی» (فقط اگر درمانگر روشن کرده) — idempotent، هرگز پرتاب نمی‌کند. جلسه‌ی دستی متنِ رونویسی ندارد.
+      if (owned.source !== 'manual') void enqueueFinalTranscript(id);
     }
     return { session: result.rows[0] };
   });

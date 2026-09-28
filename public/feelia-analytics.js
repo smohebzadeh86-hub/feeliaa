@@ -32,7 +32,8 @@
     'session_canceled', 'session_saved', 'session_exit_without_save',
     'session_live_resume_clicked', 'session_interrupted_resume_clicked',
     'live_text_toggled', 'sign_added', 'quick_note_added', 'text_note_added',
-    'voice_note_started', 'voice_note_stop_clicked'
+    'voice_note_started', 'voice_note_stop_clicked',
+    'final_transcript_viewed_raw', 'final_transcript_retry'
   ]);
   // نامِ screen در index.html → نامِ امن. Auth و Admin* عمداً اینجا نیستند.
   var SCREENS = {

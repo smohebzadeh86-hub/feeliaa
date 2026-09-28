@@ -24,6 +24,10 @@ export const ALLOWED_DETAIL_KEYS = new Set([
   'kind', 'purpose', 'mode', 'ok',
   'dropped', 'queued', 'retries',
   'model', 'screen', 'run_id', 'source',
+  // «متنِ نهایی» (2026-09-27): فقط شمارنده — تعدادِ تکه‌ها، تکه‌هایِ برگشته به خام، علامت‌هایِ نامطمئن
+  'chunks', 'fallback_chunks', 'uncertain',
+  // پلنِ B (2026-09-28): نقشِ اصلاح‌شده توسطِ نگهبانِ نقش — فقط شمارنده
+  'role_fixes', 'role_reverts',
 ]);
 
 function isFiniteNumber(v: unknown): v is number {

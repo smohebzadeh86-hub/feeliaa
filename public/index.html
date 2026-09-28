@@ -740,6 +740,10 @@ input::-ms-reveal{display:none}
 .session-status.processing{background:var(--gold-soft);color:var(--gold-deep)}
 .session-status.failed{background:var(--clay-soft);color:var(--clay-deep)}
 #uploadJobPanel{margin-bottom:14px}
+.ft-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;border-radius:10px;background:var(--gold-soft);font-size:12.5px;color:var(--gold-deep)}
+.ft-bar.quiet{background:transparent;padding:0 0 4px;color:var(--muted)}
+.ft-bar .ft-actions{display:flex;gap:6px;flex-wrap:wrap}
+.ft-unsure{background:var(--gold-soft);color:var(--gold-deep);border-bottom:1px dashed var(--gold-deep);border-radius:3px;padding:0 2px;cursor:help}
 
 /* ===== پوسته‌ی پنلِ ادمین (B1، 2026-09-26): sidebarِ راست رویِ دسکتاپ، tab barِ بالا رویِ موبایل؛ فقط توکن‌هایِ موجود ===== */
 body.admin-mode .wrap{max-width:1120px;display:grid;grid-template-columns:224px minmax(0,1fr);column-gap:20px;align-items:start}
@@ -1310,6 +1314,8 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <div id="resolveSpeakersStatus" hidden style="margin-bottom:8px;font-size:12.5px;color:var(--muted)"></div>
       <!-- وضعیتِ پردازشِ فایلِ صوتیِ آپلودشده (فقط جلسه‌ی source=upload) -->
       <div id="uploadJobPanel" hidden></div>
+      <!-- «متنِ نهایی» (migration 031): وضعیت، خام/نهایی، تلاشِ دوباره، روشن/خاموشِ قابلیت -->
+      <div id="finalTranscriptBar" class="ft-bar" hidden></div>
       <div class="transcript-box" id="transcriptBox"></div>
       <div class="transcript-notes" id="transcriptNotes" hidden></div>
       <!-- ⭐ فقط برایِ جلسه‌ی ثبت‌شده‌ی دستی (source=manual): افزودنِ یادداشتِ متنی/صوتی —
@@ -3472,6 +3478,22 @@ function renderAdminTherapists(list){
     adminToggleLabel.appendChild(adminToggleInput);
     adminToggleLabel.appendChild(document.createTextNode('ادمین'));
     row.appendChild(adminToggleLabel);
+
+    // «متنِ نهایی» (migration 031) — برایِ هر درمانگر جدا، پیش‌فرض خاموش. خودِ درمانگر هم از صفحه‌ی جلسه روشن/خاموش می‌کند.
+    const ftToggleLabel=document.createElement('label');
+    ftToggleLabel.className='toggle-row';
+    ftToggleLabel.style.cssText='margin:0;font-size:12px';
+    const ftToggleInput=document.createElement('input');
+    ftToggleInput.type='checkbox';
+    ftToggleInput.checked=!!t.final_transcript_enabled;
+    ftToggleInput.addEventListener('change',function(){
+      const next=ftToggleInput.checked;
+      api('/api/admin/therapists/'+t.id,{method:'PATCH',body:{final_transcript_enabled:next}})
+        .catch(function(e){ftToggleInput.checked=!next;showBanner('error',e.message);});
+    });
+    ftToggleLabel.appendChild(ftToggleInput);
+    ftToggleLabel.appendChild(document.createTextNode('متنِ نهایی'));
+    row.appendChild(ftToggleLabel);
     div.appendChild(row);
 
     const actions=document.createElement('div');
@@ -6005,6 +6027,7 @@ async function doViewTranscript(sessionId){
       :isUploadSession
         ?('فایلِ صوتیِ آپلودشده · '+(data.session.date?toFa(data.session.date):'بدونِ تاریخ')+(data.session.duration_ms?' · '+fmtDurationFa(data.session.duration_ms):''))
         :(sessionStatusFa(data.session)+' · '+toFa(data.session.date)+' · '+toFa(data.session.start_time)+(data.session.duration_ms?' · '+fmtDurationFa(data.session.duration_ms):''));
+    delete $('transcriptBox').dataset.ft;
     $('transcriptBox').textContent=data.session.transcript||(isManualSession?'جلسه‌ی ثبت‌شده‌ی دستی — بدونِ رونویسی.':'(متنی ثبت نشده)');
     $('transcriptBox').hidden=isManualSession||(isUploadSession&&!hasTranscript);
     // (2026-09-26) طولِ متن + «نمایشِ کامل» (متنِ بلند در جعبه‌ی ۴۰۰پیکسلی ناقص به نظر می‌رسید) + وضعیتِ بازیابیِ متن
@@ -6027,6 +6050,7 @@ async function doViewTranscript(sessionId){
     $('archiveTextNoteInput').value='';
     $('resolveSpeakersStatus').hidden=true;
     if(resolveSpeakersPollTimer){clearInterval(resolveSpeakersPollTimer);resolveSpeakersPollTimer=null;}
+    loadFinalTranscript(sessionId,isManualSession);
     const nb=$('transcriptNotes');
     if(isManualSession){
       // ⭐ برایِ جلسه‌ی دستی، یادداشت‌ها محتوایِ اصلی‌اند — با کارتِ `.note-item`ِ Wrapup
@@ -6083,6 +6107,130 @@ function doBackToClientDetailFromSession(){
 // ===== بازسازیِ اختیاریِ شماره‌گذاریِ گوینده‌ها =====
 // چرا اختیاریه: رونویسیِ دوباره‌ی کلِ صدا چند دقیقه طول می‌کشه و هزینه داره — خیلی
 // از جلسات (مثلاً تک‌گوینده، یا بدونِ توقف/reconnect) اصلاً نیازش نیست.
+// ——— «متنِ نهایی» (migration 031): رونویسیِ دوباره‌ی کلِ صدا + مرتب‌سازی با LLM، بعد از پایانِ جلسه ———
+// فقط ادمین روشن/خاموش می‌کند (پنلِ ادمین). UIِ درمانگر هیچ توضیحی درباره‌ی نحوه‌ی ساخت نشان نمی‌دهد (تصمیمِ مالک 2026-09-28).
+// متنِ خام (sessions.transcript) هرگز عوض نمی‌شود؛ این‌جا فقط نمایش بینِ خام و نهایی جابه‌جا می‌شود.
+let ftState=null;         // پاسخِ GET /final-transcript برایِ currentViewSession
+let ftShowRaw=false;
+let ftPollTimer=null;
+let ftSessionId=null;
+// (تصمیمِ مالک 2026-09-28) پیام‌ها به هیچ سرویسِ بیرونی/ارسالِ صدا یا متن اشاره نمی‌کنند — فقط وضعیت.
+const FT_ERR={
+  'llm-not-configured':'این قابلیت رویِ سرور آماده نیست',
+  'llm-unavailable':'فعلاً ممکن نشد، کمی بعد دوباره امتحان کنید',
+  'llm-failed':'فعلاً ممکن نشد، کمی بعد دوباره امتحان کنید',
+  'soniox-unavailable':'فعلاً ممکن نشد، کمی بعد دوباره امتحان کنید',
+  'soniox-timeout':'بیش از حد طول کشید',
+  'soniox-error':'فعلاً ممکن نشد، کمی بعد دوباره امتحان کنید',
+  'internal-error':'خطایِ داخلیِ سرور',
+};
+function ftStopPoll(){if(ftPollTimer){clearTimeout(ftPollTimer);ftPollTimer=null;}}
+function ftBusy(s){return !!s&&(s.stage==='waiting_audio'||s.stage==='transcribing'||s.stage==='polishing');}
+async function loadFinalTranscript(sessionId,isManual){
+  ftStopPoll();
+  ftSessionId=sessionId;ftState=null;ftShowRaw=false;
+  const bar=$('finalTranscriptBar');bar.hidden=true;bar.innerHTML='';
+  if(isManual)return;
+  try{
+    const s=await api('/api/sessions/'+sessionId+'/final-transcript');
+    if(ftSessionId!==sessionId||!currentViewSession||currentViewSession.id!==sessionId)return;
+    ftState=s;
+  }catch(e){return;}
+  renderFinalTranscript();
+  if(ftBusy(ftState))ftPollTimer=setTimeout(function(){loadFinalTranscriptKeepView(sessionId);},10000);
+}
+// poll: همان نما (خام/نهایی) حفظ می‌شود و صفحه‌ی دیگر را دست نمی‌زند
+async function loadFinalTranscriptKeepView(sessionId){
+  ftPollTimer=null;
+  if(!currentViewSession||currentViewSession.id!==sessionId||$('screenSessionDetail').hidden)return;
+  try{
+    const s=await api('/api/sessions/'+sessionId+'/final-transcript');
+    if(!currentViewSession||currentViewSession.id!==sessionId)return;
+    const wasBusy=ftBusy(ftState);
+    ftState=s;
+    if(wasBusy&&s.stage==='done')ftShowRaw=false;
+  }catch(e){}
+  renderFinalTranscript();
+  if(ftBusy(ftState))ftPollTimer=setTimeout(function(){loadFinalTranscriptKeepView(sessionId);},10000);
+}
+// متنِ نهایی با textContent؛ ⟦…؟⟧ به span ِ «نامطمئن» (بدونِ innerHTML — متن داده‌ی بالینی است)
+function ftFillBox(box,text){
+  box.textContent='';
+  const parts=String(text).split(/(⟦[^⟧]*⟧)/);
+  parts.forEach(function(p){
+    if(!p)return;
+    if(p.charAt(0)==='⟦'&&p.charAt(p.length-1)==='⟧'){
+      const sp=document.createElement('span');sp.className='ft-unsure';sp.title='نامطمئن — همان چیزی که شنیده شد';
+      // «؟»ِ پایانیِ نشانگر فقط قراردادِ علامت‌گذاری است (asyncTranscribe.markUncertainTokens) — نمایشش در متنِ بالینی
+      // شبیهِ سؤال خوانده می‌شد (E2Eِ UI 2026-09-28)؛ رنگ و tooltipِ span نامطمئن‌بودن را نشان می‌دهند.
+      sp.textContent=p.slice(1,-1).replace(/؟$/,'');box.appendChild(sp);
+    }else box.appendChild(document.createTextNode(p));
+  });
+}
+function ftButton(label,fn,cls){
+  const b=document.createElement('button');b.className='btn btn-sm '+(cls||'btn-ghost');b.textContent=label;
+  b.addEventListener('click',fn);return b;
+}
+function renderFinalTranscript(){
+  const bar=$('finalTranscriptBar');
+  const s=currentViewSession,st=ftState;
+  bar.innerHTML='';bar.className='ft-bar';bar.hidden=true;
+  if(!s||!st)return;
+  const box=$('transcriptBox');
+  const raw=s.transcript||'';
+  const showFinal=st.stage==='done'&&!!st.clean_text&&!ftShowRaw;
+  // جعبه‌ی متن
+  if(showFinal){
+    box.hidden=false;
+    ftFillBox(box,st.clean_text);
+    box.dataset.ft='1';
+    attachTranscriptExpander(box,st.clean_text,s.duration_ms,'');
+  }else if(box.dataset.ft==='1'){
+    // از نهایی به خام (دکمه، یا «ساختِ دوباره» که متنِ نهایی را کنار گذاشت)
+    box.textContent=raw||'(متنی ثبت نشده)';
+    delete box.dataset.ft;
+    attachTranscriptExpander(box,raw,s.duration_ms,transcriptProgressNote(s));
+  }
+  // «بازسازیِ شماره‌گذاریِ گوینده‌ها» کارش را متنِ نهایی پوشش می‌دهد
+  if(st.stage==='done')$('resolveSpeakersBtn').hidden=true;
+
+  const label=document.createElement('span');
+  const actions=document.createElement('div');actions.className='ft-actions';
+  const retry=function(text){return ftButton(text||'تلاشِ دوباره',retryFinalTranscript,'btn-ghost');};
+  if(st.stage==='done'){
+    const rep=st.report||{};
+    let t=showFinal?'متنِ نهایی':'متنِ خامِ رونویسی';
+    if(showFinal&&rep.fallback_chunks)t+=' · '+toFa(rep.fallback_chunks)+' بخش بدونِ ویرایش ماند';
+    if(st.stale)t+=' · متنِ جلسه بعد از آماده‌سازی تغییر کرده';
+    label.textContent=t;
+    actions.appendChild(ftButton(showFinal?'نمایشِ متنِ خام':'نمایشِ متنِ نهایی',function(){
+      ftShowRaw=!ftShowRaw;if(ftShowRaw)uxTrack('final_transcript_viewed_raw');renderFinalTranscript();
+    }));
+    if(st.stale)actions.appendChild(retry('ساختِ دوباره'));
+  }else if(ftBusy(st)){
+    label.textContent='در حالِ آماده‌سازیِ متنِ نهایی…';
+  }else if(st.stage==='failed'){
+    label.textContent='آماده‌سازیِ متنِ نهایی انجام نشد'+(FT_ERR[st.error_code]?': '+FT_ERR[st.error_code]:'');
+    actions.appendChild(retry());
+  }else if(st.stage===null&&st.enabled&&s.status==='completed'&&s.source!=='manual'&&(s.transcript||'').trim()){
+    // جلسه‌ی پیش از روشن‌شدنِ قابلیت. قابلیت فقط از پنلِ ادمین روشن/خاموش می‌شود (تصمیمِ مالک 2026-09-28)،
+    // پس برایِ درمانگرِ خاموش هیچ نواری دیده نمی‌شود.
+    bar.className='ft-bar quiet';
+    label.textContent='متنِ نهایی برایِ این جلسه ساخته نشده';
+    actions.appendChild(retry('ساختِ متنِ نهایی'));
+  }else return;
+  bar.appendChild(label);bar.appendChild(actions);bar.hidden=false;
+}
+async function retryFinalTranscript(){
+  if(!currentViewSession)return;
+  const id=currentViewSession.id;
+  try{
+    await api('/api/sessions/'+id+'/final-transcript/retry',{method:'POST'});
+    uxTrack('final_transcript_retry');
+    ftShowRaw=false;
+    await loadFinalTranscript(id,false);
+  }catch(e){showBanner('error',e.message);}
+}
 let resolveSpeakersPollTimer=null;
 let resolveSpeakersLatestText=null;
 async function startResolveSpeakersUI(){
@@ -8430,6 +8578,7 @@ function notifText(n){
   if(n.kind==='processing_failed')return 'پردازشِ '+who+' انجام نشد: '+(PROC_ERR[n.error_code]||'خطایِ نامشخص');
   if(n.kind==='case_file_updated')return 'پرونده‌ی '+(n.client_alias||n.client_code||'')+' با اطلاعاتِ این جلسه به‌روز شد.';
   if(n.kind==='case_file_failed')return 'به‌روزرسانیِ خودکارِ پرونده‌ی '+(n.client_alias||n.client_code||'')+' ناموفق بود.';
+  if(n.kind==='final_transcript_ready')return 'متنِ نهاییِ '+who+' آماده شد.';
   return 'اعلانِ تازه';
 }
 function notifIsBad(n){return n.kind==='processing_failed'||n.kind==='case_file_failed'||n.kind==='transcript_empty';}
@@ -8438,6 +8587,7 @@ function notifOsText(n){
   if(n.kind==='transcript_ready')return ['متنِ جلسه آماده شد','ترنسکریپتِ فایلِ آپلودی آماده‌ی مرور است.'];
   if(n.kind==='case_file_updated')return ['پرونده به‌روز شد','پرونده‌ی مراجع با اطلاعاتِ جلسه‌ی تازه به‌روز شد.'];
   if(n.kind==='transcript_empty')return ['گفتاری پیدا نشد','در فایلِ آپلودی گفتاری تشخیص داده نشد.'];
+  if(n.kind==='final_transcript_ready')return ['متنِ نهایی آماده شد','متنِ مرتب‌شده‌ی جلسه آماده‌ی مرور است.'];
   return ['پردازش انجام نشد','برای جزئیات به فیلیا برگردید.'];
 }
 function notifTimeFa(ts){
@@ -8518,6 +8668,7 @@ function onFreshNotification(n){
   // نمایِ بازِ همان مراجع/جلسه تازه شود (بدونِ پراندنِ تراپیست از حالتِ ویرایش).
   try{
     if(n.kind.indexOf('case_file')===0&&currentClient&&currentClient.id===n.client_id&&!$('screenClientDetail').hidden&&!caseFileEditMode&&currentTherapist&&currentTherapist.case_file_enabled)loadCaseFile(n.client_id);
+    if(n.kind==='final_transcript_ready'&&currentViewSession&&currentViewSession.id===n.session_id&&!$('screenSessionDetail').hidden){ftStopPoll();loadFinalTranscriptKeepView(n.session_id);}
   }catch(e){}
 }
 function processingTick(){

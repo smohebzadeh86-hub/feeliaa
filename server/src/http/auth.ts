@@ -31,8 +31,8 @@ function normalizePhone(raw: string): string | null {
   return d;
 }
 
-function publicTherapist(row: { id: string; phone: string; email: string | null; name: string | null; specialty: string | null; is_admin: boolean; created_at: string; case_file_auto_generate: boolean | null; case_file_enabled: boolean }) {
-  return { id: row.id, phone: row.phone, email: row.email, name: row.name, specialty: row.specialty, is_admin: row.is_admin, created_at: row.created_at, case_file_auto_generate: row.case_file_auto_generate, case_file_enabled: row.case_file_enabled };
+function publicTherapist(row: { id: string; phone: string; email: string | null; name: string | null; specialty: string | null; is_admin: boolean; created_at: string; case_file_auto_generate: boolean | null; case_file_enabled: boolean; final_transcript_enabled?: boolean }) {
+  return { id: row.id, phone: row.phone, email: row.email, name: row.name, specialty: row.specialty, is_admin: row.is_admin, created_at: row.created_at, case_file_auto_generate: row.case_file_auto_generate, case_file_enabled: row.case_file_enabled, final_transcript_enabled: !!row.final_transcript_enabled };
 }
 
 // ⭐ هش ثابتِ ساختگی — وقتی شماره پیدا نشه هم scrypt اجرا میشه تا زمان پاسخ
@@ -102,7 +102,7 @@ export async function authRoutes(app: FastifyInstance) {
       [newId, normalizedPhone, normalizedEmail, hashPassword(password), trimmedName, trimmedSpecialty]
     );
     const inserted = await query(
-      'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate, case_file_enabled FROM therapists WHERE id = ?',
+      'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate, case_file_enabled, final_transcript_enabled FROM therapists WHERE id = ?',
       [newId]
     );
     const therapist = inserted.rows[0];
@@ -177,7 +177,7 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const result = await query(
-      'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate, case_file_enabled FROM therapists WHERE id = ?',
+      'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate, case_file_enabled, final_transcript_enabled FROM therapists WHERE id = ?',
       [request.therapistId]
     );
     if (result.rows.length === 0) {

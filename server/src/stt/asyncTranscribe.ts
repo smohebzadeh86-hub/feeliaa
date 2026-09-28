@@ -237,7 +237,76 @@ export function listSonioxTranscriptions(): Promise<SonioxTranscriptionInfo[]> {
   return listPaged<SonioxTranscriptionInfo>('/v1/transcriptions', 'transcriptions');
 }
 
-export interface AsyncToken { text: string; speaker?: number | string; start_ms?: number; }
+// confidence: Soniox برایِ هر توکن برمی‌گرداند (۰..۱)؛ اختیاری چون پاسخ/fixtureِ قدیمی ممکن است نداشته باشد.
+export interface AsyncToken { text: string; speaker?: number | string; start_ms?: number; confidence?: number; }
+
+// ————— اطمینانِ رونویسی (پلنِ B، فاز ۰B: verification/2026-09-28-upload-audio-quality-phase0b.md) —————
+// تنها سیگنالی که متنِ واقعاً خراب را پیش‌بینی کرد confidenceِ خودِ Soniox بود (سهمِ توکنِ زیرِ ۰٫۷: بی‌آسیب ≤ ۰٫۰۳۸،
+// همهمه‌یِ هم‌سطح با WER ۲۲٫۵٪ ⇒ ۰٫۱۲۲). طولِ متن سیگنال نیست: Soniox زیرِ خرابی واژه را عوض می‌کند، نه کم.
+const HAS_CONTENT = /[\p{L}\p{N}]/u;
+
+// سهمِ توکن‌هایِ دارایِ محتوا که confidence < threshold دارند. null ⇒ هیچ توکنی confidence نداشت (fail-open).
+export function lowConfidenceRatio(tokens: AsyncToken[], threshold = 0.7): number | null {
+  let n = 0;
+  let low = 0;
+  for (const t of tokens) {
+    if (!t.text || !HAS_CONTENT.test(t.text) || typeof t.confidence !== 'number') continue;
+    n++;
+    if (t.confidence < threshold) low++;
+  }
+  return n ? low / n : null;
+}
+
+// واژه‌هایِ کم‌اطمینان را به‌صورتِ قطعی (بدونِ LLM) با ⟦…؟⟧ علامت می‌زند — فقط برایِ ورودیِ «متنِ نهایی»؛ متنِ خامِ
+// ذخیره‌شده در sessions.transcript هرگز علامت نمی‌گیرد. فاز ۰B نشان داد LLM خودش هیچ جایی را نامطمئن علامت نمی‌زند.
+// واژه = توکن‌ها تا توکنِ بعدی که با فاصله شروع شود (یا تغییرِ گوینده)؛ اطمینانِ واژه = کمینه‌ی توکن‌هایِ محتوادار.
+// علامت فقط دورِ بخشِ محتوادار است (نقطه‌گذاریِ انتهایی بیرون می‌ماند). واژه‌هایِ کم‌اطمینانِ پشتِ‌سرِ‌هم در
+// markedTextFromTokens یک علامت می‌شوند.
+export function markUncertainTokens(tokens: AsyncToken[], threshold: number): AsyncToken[] {
+  const out = tokens.map((t) => ({ ...t }));
+  let start = -1;
+  let speaker: unknown = undefined;
+  const close = (end: number) => {
+    if (start < 0) return;
+    let minConf = Infinity;
+    let lastContent = -1;
+    for (let i = start; i < end; i++) {
+      const t = out[i];
+      if (!t.text || !HAS_CONTENT.test(t.text)) continue;
+      lastContent = i;
+      if (typeof t.confidence === 'number' && t.confidence < minConf) minConf = t.confidence;
+    }
+    if (lastContent >= 0 && minConf < threshold) {
+      let first = start;
+      while (first <= lastContent && !(out[first].text && HAS_CONTENT.test(out[first].text))) first++;
+      const lead = /^\s*/.exec(out[first].text)![0];
+      out[first].text = lead + '⟦' + out[first].text.slice(lead.length);
+      out[lastContent].text = out[lastContent].text + '؟⟧';
+    }
+    start = -1;
+  };
+  for (let i = 0; i < out.length; i++) {
+    const t = out[i];
+    if (!t.text) continue;
+    const newSpeaker = t.speaker != null && t.speaker !== speaker;
+    if (start < 0 || /^\s/.test(t.text) || newSpeaker) { close(i); start = i; }
+    if (t.speaker != null) speaker = t.speaker;
+  }
+  close(out.length);
+  return out;
+}
+
+export function markedTextFromTokens(tokens: AsyncToken[], signs: SignMark[] = [], threshold = uncertainConfidence()): string {
+  return buildTextFromAsyncTokens(markUncertainTokens(tokens, threshold), signs).replace(/؟⟧( +)⟦/g, '$1');
+}
+
+// آستانه‌ها از env (با دادهٔ واقعی بازتنظیم می‌شوند — configuration-catalog).
+function envRatio(name: string, def: number): number {
+  const n = Number(process.env[name]);
+  return Number.isFinite(n) && n > 0 && n < 1 ? n : def;
+}
+export function uncertainConfidence(): number { return envRatio('TRANSCRIPT_UNCERTAIN_CONFIDENCE', 0.5); }
+export function lowConfidenceWarnRatio(): number { return envRatio('UPLOAD_LOW_CONF_RATIO', 0.08); }
 
 export async function getTranscriptTokens(id: string): Promise<AsyncToken[]> {
   const res = await request('GET', `/v1/transcriptions/${id}/transcript`, { headers: { Authorization: authHeader() } });

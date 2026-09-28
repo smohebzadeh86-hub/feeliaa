@@ -29,6 +29,7 @@ import { autoCloseAbandonedSessions, AUTO_CLOSE_INTERVAL_MS } from './http/sessi
 import { startAudioJobWorker, sweepSonioxOrphans } from './features/audio-upload/jobRunner.js';
 import { sweepStaleUploads } from './features/audio-upload/uploadStore.js';
 import { sweepOldNotifications } from './features/notifications/notify.js';
+import { finalTranscriptRoutes, startFinalTranscriptWorker } from './features/final-transcript/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -80,6 +81,7 @@ await app.register(caseFileRoutes);
 await app.register(treatmentUnitRoutes);
 await app.register(obsRoutes);
 await app.register(audioUploadRoutes);
+await app.register(finalTranscriptRoutes);
 
 // Serve static (فرانت)
 const publicDir = path.join(__dirname, '..', '..', 'public');
@@ -134,6 +136,8 @@ const start = async () => {
     // آپلودِ فایلِ صوتیِ جلسه (migration 023): workerِ DB-محور (بعد از ری‌استارت فوراً ادامه می‌دهد)،
     // جاروبِ آپلودهایِ رهاشده/یتیم، اعلان‌هایِ قدیمی، و فایل/transcriptionِ یتیمِ رویِ Soniox (F3).
     await startAudioJobWorker();
+    // «متنِ نهایی» (migration 031): رونویسیِ دوباره + مرتب‌سازی با LLM بعد از پایانِ جلسه — فقط درمانگرِ فعال‌شده.
+    await startFinalTranscriptWorker();
     try { await sweepStaleUploads(tryFinalizeGroup); } catch {}
     setInterval(() => { sweepStaleUploads(tryFinalizeGroup).catch(() => {}); }, 60 * 60 * 1000);
     // (A6) در startup هم — سروری که کمتر از ۲۴ ساعت بالا می‌ماند هرگز اعلان‌هایِ قدیمی را پاک نمی‌کرد.

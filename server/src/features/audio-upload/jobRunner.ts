@@ -18,6 +18,7 @@ import { probeMedia, normalizeAudio } from './media.js';
 import { uploadDir, removeUploadDir } from './uploadStore.js';
 import { stepJob, giveUpJob, uploadCaseFileEnabled, uploadCaseFileAllowed, type AudioJob, type JobDeps, type JobPatch, type JobStore, type CaseFileJobStatus, type SourcePart } from './jobMachine.js';
 import { maybeAutoGenerateCaseFile } from '../case-file/application/autoTrigger.js';
+import { enqueueFinalTranscript, appendUploadForPolish } from '../final-transcript/index.js';
 
 export const UPLOAD_TRANSCRIPT_LABEL_PREFIX = '[متنِ فایلِ صوتیِ آپلودشده]';
 const LEASE_SECONDS = 20 * 60;
@@ -81,6 +82,7 @@ export const sqlJobStore: JobStore = {
 
   async applyTranscriptOnce(job: AudioJob, rawText: string, nextStage: 'case_file' | 'done') {
     const text = (rawText || '').trim();
+    let polishInput: string | null = null;
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
@@ -95,6 +97,9 @@ export const sqlJobStore: JobStore = {
         // LAW-008: متنِ موجود هرگز جایگزین نمی‌شود — فقط append (جلسه‌ی upload معمولاً خالی است).
         const cur: string = srow.transcript ?? '';
         const merged = cur.trim() ? cur + '\n\n' + UPLOAD_TRANSCRIPT_LABEL_PREFIX + '\n' + text : text;
+        // ورودیِ «متنِ نهایی»: اگر جلسه از قبل متن داشت، کلِ متن مرتب می‌شود (نه فقط بخشِ آپلودی — وگرنه متنِ نهایی
+        // بخشِ قبلی را پنهان می‌کرد) با شماره‌ی گوینده‌هایِ جدا برایِ بخشِ آپلودی (دو diarizationِ مستقل‌اند).
+        polishInput = cur.trim() ? appendUploadForPolish(cur, UPLOAD_TRANSCRIPT_LABEL_PREFIX, text) : text;
         await conn.query(
           `UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1, stt_mode = 'upload',
              batch_status = 'done', realtime_reliable = false, updated_at = NOW() WHERE id = ?`,
@@ -125,6 +130,8 @@ export const sqlJobStore: JobStore = {
         await createNotification({ therapistId: job.therapistId, kind: 'transcript_empty', clientId: job.clientId, sessionId: job.sessionId, jobId: job.id }, conn);
       }
       await conn.commit();
+      // «متنِ نهایی»: همین متنِ async (کلِ فایل) مبناست ⇒ بدونِ رونویسیِ دوباره مستقیم به مرتب‌سازی (اگر روشن باشد).
+      if (polishInput) void enqueueFinalTranscript(job.sessionId, { asyncText: polishInput });
       job.transcriptAppliedAt = new Date();
       job.stage = text && nextStage === 'case_file' ? 'case_file' : 'done';
       job.attempts = 0;
@@ -394,6 +401,14 @@ export async function collectUploadSonioxRefs(sessionIds: string[]): Promise<Son
         part
       );
       for (const row of r.rows) out.push({ fileId: row.soniox_file_id, transcriptionId: row.soniox_transcription_id });
+      // «متنِ نهایی» (migration 031) هم فایل/transcriptionِ کلِ صدایِ جلسه رویِ Soniox دارد
+      const f = await query(
+        `SELECT soniox_file_id, soniox_transcription_id FROM final_transcripts
+         WHERE session_id IN (${part.map(() => '?').join(',')})
+           AND (soniox_file_id IS NOT NULL OR soniox_transcription_id IS NOT NULL)`,
+        part
+      );
+      for (const row of f.rows) out.push({ fileId: row.soniox_file_id, transcriptionId: row.soniox_transcription_id });
     }
     return out;
   } catch (e) {
@@ -430,7 +445,10 @@ export async function sweepSonioxOrphans(): Promise<void> {
     // ⭐ (A4، 2026-09-26) فقط jobهایِ هنوز در جریان منابعشان را «زنده» نگه می‌دارند؛ قبلاً jobِ done/failed که
     // حذفِ منبعش شکست خورده بود شناسه را نگه می‌داشت و همان شناسه منبع را برایِ همیشه از sweep مصون می‌کرد.
     const refs = await query(`SELECT soniox_file_id, soniox_transcription_id FROM audio_jobs
-      WHERE stage NOT IN ('done','failed') AND (soniox_file_id IS NOT NULL OR soniox_transcription_id IS NOT NULL)`);
+      WHERE stage NOT IN ('done','failed') AND (soniox_file_id IS NOT NULL OR soniox_transcription_id IS NOT NULL)
+      UNION ALL
+      SELECT soniox_file_id, soniox_transcription_id FROM final_transcripts
+      WHERE stage IN ('waiting_audio','transcribing','polishing') AND (soniox_file_id IS NOT NULL OR soniox_transcription_id IS NOT NULL)`);
     const liveFiles = new Set(refs.rows.map((r: any) => r.soniox_file_id).filter(Boolean));
     const liveTr = new Set(refs.rows.map((r: any) => r.soniox_transcription_id).filter(Boolean));
     const cutoff = Date.now() - ORPHAN_AGE_MS;
