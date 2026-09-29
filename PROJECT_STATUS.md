@@ -2,7 +2,7 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-28 — آخرین رویداد: **deployِ `752ab22` (migration 034): اصلاحِ گوینده و نمایشِ ویرایش‌ها در «متنِ نهایی»، هشدارِ ادمین برایِ قطعیِ LLM، راهنمایِ ضبط؛ همه‌ی هارنس‌ها سبز.** قبل‌ترش: **deployِ لایه‌ی LLMِ مستقل از provider (`233016e`) به production و سوییچ به متیس/DeepSeek؛ smokeِ ساختگی: «متنِ نهایی» ۱۴ث و پرونده ۵۸ث OK.** قبل‌ترش: **لایه‌ی LLMِ مستقل از provider (`server/src/llm/`) + متیس/DeepSeek رویِ dev (سوییچ با `LLM_PROVIDER`)؛ هارنس‌ها سبز، `test:llm` 16/16؛ commit/deploy نشده.** قبل‌ترش: **deployِ «متنِ نهایی»ِ نوبت‌به‌نوبت به production (کد = `97f77e2`، ۱۴۲/۱۴۲، preflight GO، health ok)؛ اعتبارِ OpenRouter هنوز تمام است.** قبل‌ترش: **کیفیتِ «متنِ نهایی»: تنها ردیفِ prod کاملاً خام نمایش داده شده بود (ردِ کلِ تکه)؛ نگهبانِ نوبت‌به‌نوبت با `src` + تلاشِ دوباره + رفعِ دو ردِ کاذب (عدد/نیم‌فاصله) + پرامپتِ درست‌نویسی؛ رویِ متنِ ساختگی با DeepSeek ۰/۱۵ ⇒ ۱۳/۱۵ غلط اصلاح، ۰ نوبتِ خام؛ `test:ft` 52/52؛ commit/deploy نشده.** قبل‌ترش: **deploy به production: کد = `d0cbab7` (۱۴۱/۱۴۱)، migrationهایِ 029–033 applied، backupِ `pre-final-transcript-20260928T065927Z`، کلیدِ LLM (OpenRouter + DeepSeek، همان کلیدِ dev) اضافه شد و smoke ok؛ «متنِ نهایی» برایِ کسی روشن نیست.** قبل‌ترش: **ریشه‌ی 402ِ OpenRouter (نبودِ max_tokens ⇒ رزروِ ۱۳۱k توکن) رفع شد؛ نگهبانِ «نقشِ مجاز ولی غلط» (فقط async/تفکیکِ سالم، بی‌ضرر رویِ LLMِ واقعی)؛ E2Eِ UIِ واقعی با سرور/DB/Soniox ۱۰/۱۰؛ همه‌ی هارنس‌ها سبز؛ commit/deploy نه.** قبل‌ترش: **migration 033 رویِ dev اعمال شد + E2Eِ پلنِ B رویِ MySQLِ dev با Soniox/ffmpeg/LLMِ واقعی ۳۸/۴۰ (۲ FAILِ زمان‌بندیِ خودِ تست؛ پاک‌شدنِ Soniox با شواهد تأیید شد)؛ پاک‌سازی کامل؛ prod/commit نه.** قبل‌ترش: **پلنِ B پیاده شد (سنجشِ کیفیتِ فایل، هشدارِ کم‌اطمینان، ⟦…؟⟧ِ قطعی در متنِ نهایی، 402 ⇒ گذرا، رفعِ برچسبِ آپلود/متنِ الحاقی)؛ همه‌ی هارنس‌ها سبز؛ migration 033 هیچ‌جا اعمال نشده؛ E2Eِ DB انجام نشده؛ commit/deploy نشده.** قبل‌ترش: **فاز ۰Bِ «کیفیتِ فایلِ آپلودی»: هیچ فیلترِ صوتی gate را رد نکرد (B-۲ لغو شد)؛ confidenceِ Soniox تنها پیش‌بینی‌کننده‌ی متنِ خراب است؛ FINDING: اعتبارِ OpenRouter در dev تمام شده (402).** قبل‌ترش (2026-09-27): **deployِ «علائمِ بدنی با زمان داخلِ متنِ جلسه» (`9cee709`) به production؛ preflight GO، health ok، فایل‌هایِ سروشده = نسخه‌ی تست‌شده.** قبل‌ترش: **بازسازیِ ماژولارِ backend بدونِ تغییرِ رفتار (P0–P7) رویِ شاخه‌ی محلیِ `refactor/backend-modular` (worktree، ۱۳ commit، push/merge/deploy نشده)؛ `test:routes`/`test:api` (۳۲۱)/`test:arch` + `rt` 91/91، `cf` 110/110، `up` 41/41 سبز؛ ۱۲ FINDING (رفع نشد)؛ کارِ هم‌زمانِ commitنشده در `feat/clarity` پیش از merge باید منتقل شود.** قبل‌ترش: **E2Eِ واقعیِ علائم در متن PASS (Chrome + Soniox + MySQLِ dev)، رفعِ «گفته‌ی دو تکه» بعد از حذفِ علامت، commitِ جدا از کارِ هم‌زمانِ «واحدِ درمان».** قبل‌ترش: **علائمِ بدنی با زمانشان به ترتیبِ زمانی داخلِ متنِ ذخیره‌شده‌ی جلسه درج می‌شوند (+ حذف/بازسازیِ گوینده‌ها، زمان در کارتِ ادمین)؛ `test:rt` 98/98، `tsc` تمیز، UI رویِ mock PASS؛ commit/deploy نشده.** قبل‌ترش: **deployِ کلِ پلنِ رفعِ ذخیره‌سازی + پنلِ ادمین + رفعِ نمایش + A3ِ کلاینت به production (migrationهایِ 026–028 applied، backupِ `pre-storage-fixes-20260926T185248Z`، preflight GO، health ok؛ فایلِ کاملِ `e78df1a5` = ۲۶.۶ث، `a5617ab2` = ۶۸.۶ دقیقه، ۰ صدایِ یتیم، ۴ جلسه‌ی رهاشده خودکار بسته شد)؛ commit نشده.** قبل‌ترش: **کلِ پلنِ «رفعِ ذخیره‌سازی + ادمین فاز ۱» (A1–A6، B1–B3) پیاده و تست شد: `test:rt` 91/91، `test:cf` 110/110، `test:up` 41/41، E2Eِ DBِ dev 77/77، UI PASS؛ migrationهایِ 026–028 فقط رویِ dev؛ commit/deploy نشده (SSH از این محیط رد شد).** قبل‌ترش: **A1 از پلنِ رفعِ ذخیره‌سازی: ۹ مسیرِ از دست رفتنِ داده رفع شد (صفِ یادداشت، retryِ ذخیره‌ی نهایی، rebaseِ بی‌حذف، timeoutِ آپلود، …)؛ `test:rt` 87/87، `test:cf` 110/110، `test:up` 41/41؛ commit/deploy نشده.** قبل‌ترش: **deployِ `fd5c3f1` به production (شماره‌گذاریِ گوینده از ۱، contextِ چندنفره، هشدارِ کیفیتِ ضبط)؛ preflight GO؛ health ok.** قبل‌ترش: **هشدارِ کیفیتِ ضبط در جلسه‌ی زنده (بی‌صدا/ضعیف/نویز/خش)؛ `test:rt` 78/78؛ commit/deploy نشده.** قبل‌ترش: **deployِ `59ea786` با preflightِ کاربرِ فعال (GO)؛ health ok؛ production = `59ea786`؛ کارِ تفکیکِ گوینده deploy نشد.** قبل‌ترش: **تفکیکِ ۳ گوینده: آزمایشِ کنترل‌شده ثابت کرد کد/کانفیگ/مسیرِ ضبط ۳ نفر را درست جدا می‌کنند؛ صدایِ تستِ مالک حتی با async فقط ۲؛ constraintهایِ میکروفون به حالتِ قبل برگشت؛ شماره‌گذاری از ۱ + contextِ ثابت ماند؛ `test:rt` 72/72؛ commitنشده.** قبل‌ترش: **افزودنِ preflightِ اجباریِ «کاربرِ فعال» به رویه‌ی deploy (فقط سند؛ رویِ production اجرا نشده).** قبل‌ترش: **تستِ کامل + بک‌آپِ production + commitِ رفع‌هایِ تستِ واقعی (بدونِ deploy).** قبل‌ترش: **تفکیکِ بیش از دو گوینده: میکروفونِ خام (بدونِ NS/AGC/EC) + contextِ ثابتِ Soniox؛ `test:rt` 71/71؛ با Sonioxِ واقعی تست نشده؛ commitنشده.** قبل‌ترش: **رفعِ ریشه‌ایِ چالش‌هایِ تستِ واقعی (batch_statusِ گیرکرده، انتسابِ rt.*، آپلودِ تدریجیِ آرشیو، حذفِ جلسه→404، آپلود از Setup، یادداشتِ صوتیِ تکراری) — commitنشده.** قبل‌ترش: **deployِ `a20ccdb` (جلسه‌ی ۱ساعته + تایمرِ جلسه در قطعی) به production؛ health ok.** پیش از آن: **آماده‌سازیِ جلسه‌ی ۱ساعته (Wake Lock، رندرِ افزایشی، autosave، صف، timeoutِ آپلود/ffmpeg، retry از FAILED)؛ `test:rt` 62/62، `test:up` 41/41، `tsc` تمیز؛ commit/deploy نشده.** پیش از آن (2026-09-25): **تلاشِ دوباره‌ی خودکار برایِ خطایِ گذرایِ LLM در پرونده‌ی آپلود + E2Eِ کامل از UIِ واقعی (۵ سناریو PASS)؛ `test:up` 41/41؛ commitهای جدا.** پیش از آن: **رفعِ `MaxListenersExceededWarning` در `assembleUpload` (الحاقِ تکه‌هایِ آپلودِ ≥۱۰ تکه؛ بی‌ضرر برایِ داده)؛ `test:up` 38/38 با mutation-check؛ deploy شد به production (health ok)؛ commit نشده.** پیش از آن: **deploy به production: آپلود فعلاً برایِ همه فقط متن؛ مسیرِ «مراجعِ غیرفعال ⇒ پرونده» (E2Eِ واقعی PASS) رویِ سرور هست ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است؛ health ok؛ commit نشده.** پیش از آن: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — commit `45b0482` (push نشده) و deploy به production؛ migration 025 applied؛ health ok.** پیش از آن: `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16. قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
+> **آخرین به‌روزرسانی:** 2026-09-29 — آخرین رویداد: **تستِ کاملِ واقعی با کلیدِ جدیدِ Soniox رویِ کدِ `feat/clarity` (= production) سبز (جلسه‌ی زنده، آپلود، batch، ادمین، گوینده، پرونده، متنِ نهایی)؛ smokeِ production (mintِ کلیدِ موقت، Soniox، صفحه/API) OK؛ شاخه‌ها و worktreeهایِ بازسازی پاک شد؛ commit و push.** قبل‌ترش: **کلیدِ جدیدِ Soniox رویِ dev هم گذاشته شد (توسطِ مالک) و Soniox آن را می‌پذیرد؛ prod و dev یکسان (`1390bcfd`).** قبل‌ترش: **کلیدِ جدیدِ Soniox رویِ production گذاشته شد (توسطِ خودِ مالک، بدونِ نمایشِ مقدار) و Soniox آن را می‌پذیرد؛ restart با preflightِ GO، health ok، بدونِ 401؛ dev هنوز کلیدِ قدیمیِ ردشده را دارد.** قبل‌ترش: **deployِ `9130bb3` (بازسازیِ ماژولار) به production انجام شد (health ok، سایت/API سالم)؛ ⚠️ همزمان کشف شد کلیدِ Soniox از هر دو محیط (prod و dev، کدِ قدیم و جدید) 401 می‌گیرد ⇒ رونویسی تا رفعِ کلید/حساب کار نمی‌کند — ربطی به deploy ندارد.** قبل‌ترش: **deployِ `9130bb3` (بازسازیِ ماژولار) آماده شد ولی اجرا نشد: classifierِ permissionِ محیط دسترسیِ SSH به production را (حتی فقط-خواندنی) رد کرد؛ production دست‌نخورده (`752ab22`).** قبل‌ترش: **بازسازیِ ماژولارِ backend (v2) به `feat/clarity` merge شد (fast-forward، `65b264c → 9130bb3`، محلی؛ push/deploy نشده)؛ همه‌ی تست‌ها در checkoutِ اصلی سبز.** قبل‌ترش: **تستِ واقعیِ کاملِ شاخه‌ی `refactor/backend-modular-v2` کامل شد: جلسه‌ی زنده در Chromeِ واقعی با Sonioxِ realtime ۸/۸، بازسازیِ گوینده + پرونده با LLMِ واقعی ۴/۴ (به‌علاوه‌ی آپلود/batch/ادمین از دورِ قبل)؛ صفر خطا؛ fixtureها پاک.** قبل‌ترش: **تستِ واقعیِ شاخه‌ی `refactor/backend-modular-v2` (سرورِ واقعی + Soniox/LLMِ واقعی + DBِ dev با fixtureِ ساختگی): آپلود ۸/۸، batch fallback ۶/۶، ادمین/صدا/متنِ نهایی ۹/۹؛ جلسه‌ی زنده در مرورگر، بازسازیِ گوینده و تولیدِ پرونده با LLM اجرا نشد (permissionِ محیط ⇒ منتظرِ مالک).** قبل‌ترش: **بازسازیِ ماژولارِ backend از روی کدِ امروز دوباره اجرا شد (v2): شاخه‌ی محلیِ `refactor/backend-modular-v2` (worktree `bm2`، پایه `65b264c`، ۱۳ commit، push/merge/deploy نشده)؛ بدونِ تغییرِ رفتار — `test:api` ۳۴۹/۳۴۹، `test:routes` ۱۲۶، `test:arch`، SQL یکسان، rt/cf/up/tu/ft/llm سبز، boot smoke OK؛ `feat/clarity` از `65b264c` جلو نرفته ⇒ بدونِ drift قابلِ merge. شاخه‌ی v1 کهنه است.** قبل‌ترش: **deployِ `752ab22` (migration 034): اصلاحِ گوینده و نمایشِ ویرایش‌ها در «متنِ نهایی»، هشدارِ ادمین برایِ قطعیِ LLM، راهنمایِ ضبط؛ همه‌ی هارنس‌ها سبز.** قبل‌ترش: **deployِ لایه‌ی LLMِ مستقل از provider (`233016e`) به production و سوییچ به متیس/DeepSeek؛ smokeِ ساختگی: «متنِ نهایی» ۱۴ث و پرونده ۵۸ث OK.** قبل‌ترش: **لایه‌ی LLMِ مستقل از provider (`server/src/llm/`) + متیس/DeepSeek رویِ dev (سوییچ با `LLM_PROVIDER`)؛ هارنس‌ها سبز، `test:llm` 16/16؛ commit/deploy نشده.** قبل‌ترش: **deployِ «متنِ نهایی»ِ نوبت‌به‌نوبت به production (کد = `97f77e2`، ۱۴۲/۱۴۲، preflight GO، health ok)؛ اعتبارِ OpenRouter هنوز تمام است.** قبل‌ترش: **کیفیتِ «متنِ نهایی»: تنها ردیفِ prod کاملاً خام نمایش داده شده بود (ردِ کلِ تکه)؛ نگهبانِ نوبت‌به‌نوبت با `src` + تلاشِ دوباره + رفعِ دو ردِ کاذب (عدد/نیم‌فاصله) + پرامپتِ درست‌نویسی؛ رویِ متنِ ساختگی با DeepSeek ۰/۱۵ ⇒ ۱۳/۱۵ غلط اصلاح، ۰ نوبتِ خام؛ `test:ft` 52/52؛ commit/deploy نشده.** قبل‌ترش: **deploy به production: کد = `d0cbab7` (۱۴۱/۱۴۱)، migrationهایِ 029–033 applied، backupِ `pre-final-transcript-20260928T065927Z`، کلیدِ LLM (OpenRouter + DeepSeek، همان کلیدِ dev) اضافه شد و smoke ok؛ «متنِ نهایی» برایِ کسی روشن نیست.** قبل‌ترش: **ریشه‌ی 402ِ OpenRouter (نبودِ max_tokens ⇒ رزروِ ۱۳۱k توکن) رفع شد؛ نگهبانِ «نقشِ مجاز ولی غلط» (فقط async/تفکیکِ سالم، بی‌ضرر رویِ LLMِ واقعی)؛ E2Eِ UIِ واقعی با سرور/DB/Soniox ۱۰/۱۰؛ همه‌ی هارنس‌ها سبز؛ commit/deploy نه.** قبل‌ترش: **migration 033 رویِ dev اعمال شد + E2Eِ پلنِ B رویِ MySQLِ dev با Soniox/ffmpeg/LLMِ واقعی ۳۸/۴۰ (۲ FAILِ زمان‌بندیِ خودِ تست؛ پاک‌شدنِ Soniox با شواهد تأیید شد)؛ پاک‌سازی کامل؛ prod/commit نه.** قبل‌ترش: **پلنِ B پیاده شد (سنجشِ کیفیتِ فایل، هشدارِ کم‌اطمینان، ⟦…؟⟧ِ قطعی در متنِ نهایی، 402 ⇒ گذرا، رفعِ برچسبِ آپلود/متنِ الحاقی)؛ همه‌ی هارنس‌ها سبز؛ migration 033 هیچ‌جا اعمال نشده؛ E2Eِ DB انجام نشده؛ commit/deploy نشده.** قبل‌ترش: **فاز ۰Bِ «کیفیتِ فایلِ آپلودی»: هیچ فیلترِ صوتی gate را رد نکرد (B-۲ لغو شد)؛ confidenceِ Soniox تنها پیش‌بینی‌کننده‌ی متنِ خراب است؛ FINDING: اعتبارِ OpenRouter در dev تمام شده (402).** قبل‌ترش (2026-09-27): **deployِ «علائمِ بدنی با زمان داخلِ متنِ جلسه» (`9cee709`) به production؛ preflight GO، health ok، فایل‌هایِ سروشده = نسخه‌ی تست‌شده.** قبل‌ترش: **بازسازیِ ماژولارِ backend بدونِ تغییرِ رفتار (P0–P7) رویِ شاخه‌ی محلیِ `refactor/backend-modular` (worktree، ۱۳ commit، push/merge/deploy نشده)؛ `test:routes`/`test:api` (۳۲۱)/`test:arch` + `rt` 91/91، `cf` 110/110، `up` 41/41 سبز؛ ۱۲ FINDING (رفع نشد)؛ کارِ هم‌زمانِ commitنشده در `feat/clarity` پیش از merge باید منتقل شود.** قبل‌ترش: **E2Eِ واقعیِ علائم در متن PASS (Chrome + Soniox + MySQLِ dev)، رفعِ «گفته‌ی دو تکه» بعد از حذفِ علامت، commitِ جدا از کارِ هم‌زمانِ «واحدِ درمان».** قبل‌ترش: **علائمِ بدنی با زمانشان به ترتیبِ زمانی داخلِ متنِ ذخیره‌شده‌ی جلسه درج می‌شوند (+ حذف/بازسازیِ گوینده‌ها، زمان در کارتِ ادمین)؛ `test:rt` 98/98، `tsc` تمیز، UI رویِ mock PASS؛ commit/deploy نشده.** قبل‌ترش: **deployِ کلِ پلنِ رفعِ ذخیره‌سازی + پنلِ ادمین + رفعِ نمایش + A3ِ کلاینت به production (migrationهایِ 026–028 applied، backupِ `pre-storage-fixes-20260926T185248Z`، preflight GO، health ok؛ فایلِ کاملِ `e78df1a5` = ۲۶.۶ث، `a5617ab2` = ۶۸.۶ دقیقه، ۰ صدایِ یتیم، ۴ جلسه‌ی رهاشده خودکار بسته شد)؛ commit نشده.** قبل‌ترش: **کلِ پلنِ «رفعِ ذخیره‌سازی + ادمین فاز ۱» (A1–A6، B1–B3) پیاده و تست شد: `test:rt` 91/91، `test:cf` 110/110، `test:up` 41/41، E2Eِ DBِ dev 77/77، UI PASS؛ migrationهایِ 026–028 فقط رویِ dev؛ commit/deploy نشده (SSH از این محیط رد شد).** قبل‌ترش: **A1 از پلنِ رفعِ ذخیره‌سازی: ۹ مسیرِ از دست رفتنِ داده رفع شد (صفِ یادداشت، retryِ ذخیره‌ی نهایی، rebaseِ بی‌حذف، timeoutِ آپلود، …)؛ `test:rt` 87/87، `test:cf` 110/110، `test:up` 41/41؛ commit/deploy نشده.** قبل‌ترش: **deployِ `fd5c3f1` به production (شماره‌گذاریِ گوینده از ۱، contextِ چندنفره، هشدارِ کیفیتِ ضبط)؛ preflight GO؛ health ok.** قبل‌ترش: **هشدارِ کیفیتِ ضبط در جلسه‌ی زنده (بی‌صدا/ضعیف/نویز/خش)؛ `test:rt` 78/78؛ commit/deploy نشده.** قبل‌ترش: **deployِ `59ea786` با preflightِ کاربرِ فعال (GO)؛ health ok؛ production = `59ea786`؛ کارِ تفکیکِ گوینده deploy نشد.** قبل‌ترش: **تفکیکِ ۳ گوینده: آزمایشِ کنترل‌شده ثابت کرد کد/کانفیگ/مسیرِ ضبط ۳ نفر را درست جدا می‌کنند؛ صدایِ تستِ مالک حتی با async فقط ۲؛ constraintهایِ میکروفون به حالتِ قبل برگشت؛ شماره‌گذاری از ۱ + contextِ ثابت ماند؛ `test:rt` 72/72؛ commitنشده.** قبل‌ترش: **افزودنِ preflightِ اجباریِ «کاربرِ فعال» به رویه‌ی deploy (فقط سند؛ رویِ production اجرا نشده).** قبل‌ترش: **تستِ کامل + بک‌آپِ production + commitِ رفع‌هایِ تستِ واقعی (بدونِ deploy).** قبل‌ترش: **تفکیکِ بیش از دو گوینده: میکروفونِ خام (بدونِ NS/AGC/EC) + contextِ ثابتِ Soniox؛ `test:rt` 71/71؛ با Sonioxِ واقعی تست نشده؛ commitنشده.** قبل‌ترش: **رفعِ ریشه‌ایِ چالش‌هایِ تستِ واقعی (batch_statusِ گیرکرده، انتسابِ rt.*، آپلودِ تدریجیِ آرشیو، حذفِ جلسه→404، آپلود از Setup، یادداشتِ صوتیِ تکراری) — commitنشده.** قبل‌ترش: **deployِ `a20ccdb` (جلسه‌ی ۱ساعته + تایمرِ جلسه در قطعی) به production؛ health ok.** پیش از آن: **آماده‌سازیِ جلسه‌ی ۱ساعته (Wake Lock، رندرِ افزایشی، autosave، صف، timeoutِ آپلود/ffmpeg، retry از FAILED)؛ `test:rt` 62/62، `test:up` 41/41، `tsc` تمیز؛ commit/deploy نشده.** پیش از آن (2026-09-25): **تلاشِ دوباره‌ی خودکار برایِ خطایِ گذرایِ LLM در پرونده‌ی آپلود + E2Eِ کامل از UIِ واقعی (۵ سناریو PASS)؛ `test:up` 41/41؛ commitهای جدا.** پیش از آن: **رفعِ `MaxListenersExceededWarning` در `assembleUpload` (الحاقِ تکه‌هایِ آپلودِ ≥۱۰ تکه؛ بی‌ضرر برایِ داده)؛ `test:up` 38/38 با mutation-check؛ deploy شد به production (health ok)؛ commit نشده.** پیش از آن: **deploy به production: آپلود فعلاً برایِ همه فقط متن؛ مسیرِ «مراجعِ غیرفعال ⇒ پرونده» (E2Eِ واقعی PASS) رویِ سرور هست ولی پشتِ `UPLOAD_CASE_FILE_INACTIVE=1` خاموش است؛ health ok؛ commit نشده.** پیش از آن: **آپلودِ چند فایل برایِ یک جلسه (به ترتیب، یک رونویسی) + آیکونِ SVGِ حذف — commit `45b0482` (push نشده) و deploy به production؛ migration 025 applied؛ health ok.** پیش از آن: `test:up` 35/35 + تستِ UI + E2Eِ DBِ dev 16/16. قبل‌ترش: **رضایتِ یک‌باره برایِ هر مراجع (migration 024) — deploy شد به production (backupِ DB، migration applied، smoke OK).** قبل‌ترش: **حذفِ probeِ legacy از `/api/stt/check` (ریشه‌ی «No audio received»)، deploy و تستِ production.** قبل‌ترش: **رفعِ M5، M7، L2 و L6 (بدونِ از دست رفتنِ داده) و deployِ دوم؛ همه‌ی تست‌ها PASS.** قبل‌ترش: **فیچرِ آپلودِ صدا deploy شد به production (migration 023 applied،
 > health ok، `SONIOX_ORPHAN_SWEEP=1`، nginxِ زنده کافی بود و تغییری نکرد). پیش از آن: auditِ باگ و رفعِ B2، B3، M1–M4، M6 و L*؛
 > `test:up` 29/29 و E2Eِ DBِ dev 13/13. commit نشده.** قبل‌ترش: **مسیرِ آپلود (فعال و غیرفعال) فقط تا ذخیره‌ی متن؛ پرونده خاموش پشتِ
 > `UPLOAD_CASE_FILE`؛ `test:up` 26/26 + E2Eِ واقعی PASS.** قبل‌ترش: **تستِ کاملِ واقعیِ فیچرِ آپلود (Soniox/LLM/MySQL، فایلِ ۶۰دقیقه‌ای،
@@ -397,6 +397,174 @@
 ## ۷. Event Log
 
 > append-only · جدیدترین بالا · قالب در §0.
+
+### 2026-09-29 — DEPLOY — `33e16a0` (UTCِ اتصالِ DB) رویِ production ⇒ production = HEADِ `feat/clarity`
+- **درخواستِ مالک:** «اینم دیپلوی کن».
+- **گام‌ها:** build با `tsc --outDir` در scratchpad؛ `diagnosis.js`ِ build = prod (هم‌خوانیِ کامپایلر)؛ `src/db/connection.ts`ِ prod پس از حذفِ `\r` = `ad6ef35` (تفاوتِ hashِ خام فقط CRLFِ deployِ قبلی از worktreeِ ویندوزی بود). preflight **GO** (همه ۰؛ فقط یک تبِ بازِ بیکار در حالِ polling). backup: `/root/backups/code-pre-db-tz-20260929T163742Z.tar.gz`. جایگزینیِ `dist/db/connection.js` + `src/db/connection.ts` ⇒ `pm2 restart feelia-mysql --update-env` ⇒ health ok، online، بدونِ خطا در لاگ.
+- **تأیید:** با کدِ deployشده، ۳ اتصالِ موازی: `@@session.time_zone=+00:00`، `NOW()` = `UTC_TIMESTAMP()` (مثلِ قبل، چون MySQLِ prod از اول UTC بود ⇒ بدونِ تغییرِ رفتار).
+- **عامل:** این نشست.
+
+### 2026-09-29 — GIT + CODE + TEST + DOCS — push و رفعِ اختلافِ ساعتِ DBِ dev (`33e16a0`)
+- **درخواستِ مالک:** «پوش کن و مشکلِ ساعتِ dev رو هم درست کن».
+- **push:** `feat/clarity` ⇒ origin (`9130bb3 → ad6ef35 → 33e16a0`).
+- **ریشه:** درایور `timezone:'Z'` دارد ولی `NOW()`/`CURRENT_TIMESTAMP` با time_zoneِ سرورِ MySQL نوشته می‌شوند؛ MySQLِ dev = `SYSTEM` (تهران) ⇒ هر زمانِ SQL-ساخت ۳:۳۰ جلوتر خوانده می‌شد.
+- **رفع:** `server/src/db/connection.ts` — رویدادِ `connection`ِ poolِ core ⇒ `SET time_zone='+00:00'` (اولین فرمانِ صفِ هر اتصال). prod از قبل UTC است ⇒ بی‌اثر؛ **deploy نشد** (لازم نیست؛ prod = `ad6ef35` + این commitِ بی‌اثر عقب).
+- **تست:** `tsc` تمیز؛ ۵ اتصالِ موازی رویِ dev: `NOW()` = `UTC_TIMESTAMP()`، `@@session.time_zone=+00:00`. `test:api` (با goldenِ `9130bb3`): همان ۶ تفاوتِ شناخته‌شده؛ خروجی با اجرایِ پیش از این رفع **byte-identical** (پس از نرمال‌سازیِ نامِ پوشه‌ی موقت)؛ fixtureها پاک. up 52/0، ft 59/0، routes 126، arch OK.
+- **محدودیت:** ردیف‌هایِ قدیمیِ DBِ dev که با `NOW()` نوشته شده‌اند ۳:۳۰ جلوتر می‌مانند (اصلاحِ داده انجام نشد — نمی‌شود ستون‌هایِ نوشته‌شده با JS-Date را از SQL-ساخت جدا کرد). ردیف‌هایِ جدید درست‌اند. dev serverِ در حالِ اجرا با tsx watch خودش reload می‌شود.
+- **docs:** `configuration-catalog.md` (DATABASE_URL)، `07-final-transcript.md` (یادداشتِ منطقه‌ی زمانی).
+- **عامل:** این نشست.
+
+### 2026-09-29 — TEST + GIT + DEPLOY — تشخیصِ ادمین برایِ جلسه‌ی آپلودی رویِ production (`ad6ef35`)
+- **درخواستِ مالک:** «چالش‌هایِ موجود رو حل کن، درست که شد همه‌چی دیپلوی بشه». Soniox پیش‌تر (ورودی‌هایِ CONFIG پایین) رویِ dev و prod درست شده بود.
+- **تست:** rt (بدونِ FAIL)، cf 110/0، up 52/0، ft 59/0، llm 18/0، tu 17/0، routes 126، arch OK، `tsc` تمیز. **`test:api` با مجوزِ این پیام**: golden از worktreeِ تمیزِ `9130bb3` (موقت، حذف شد) ⇒ اجرایِ کدِ جدید: ۳۴۹ ورودی، ۶ تفاوت = ۲ عمدی (فیلدها/یافته‌هایِ جدیدِ diagnosis S1/S2) + ۴ مصنوعی (شماره‌ی پوشه‌ی موقت در `source_parts` ×۳، CRLFِ `index.html` در checkoutِ worktree). fixtureها پاک (`remaining fixture-phone therapists: 0`).
+- **git:** commitِ محلیِ `ad6ef35` رویِ `feat/clarity` (فقط ۳ فایلِ `features/admin` + `api-catalog.md`)؛ push نشده. `PROJECT_STATUS.md` commit نشد (تغییراتِ نشست‌هایِ دیگر در آن است).
+- **deploy (فقط ۶ فایل، بدونِ dependency/migration):** build با `tsc --outDir` در scratchpad (`server/dist` مشترک دست نخورد)؛ hashِ فایل‌هایِ دست‌نخورده (`filters.js`، `obs.admin.js`) = prod ⇒ خروجیِ کامپایلر یکسان؛ `src`ِ این ۳ فایل در prod = HEAD. preflight **GO** (همه ۰). backup: `/root/backups/code-pre-admin-diag-20260929T162859Z.tar.gz` (rollback = استخراج در `server/` + restart). استخراج ⇒ `pm2 restart feelia-mysql --update-env` ⇒ health ok، online، migrationها already applied، بدونِ خطا.
+- **تأییدِ پس از deploy (فقط‌خواندنی، کدِ deployشده):** `5dbb946c` (آپلودی) حالا: آپلود ۱۰:۱۵:۴۱–۱۰:۱۶:۵۳ (تهران) ۱۱۳.۲MB، مدت ۱:۰۱، رونویسی ۱۰:۱۹:۰۳ (۲ دقیقه بعد)، متنِ نهایی ۱۴:۱۲:۲۷. `082798e9` (زنده) مثلِ قبل.
+- **باز:** push؛ اختلافِ ساعتِ DBِ dev (فقط dev).
+- **عامل:** این نشست.
+
+### 2026-09-29 — TEST + GIT — تستِ کاملِ واقعی پس از کلیدِ جدیدِ Soniox؛ پاک‌سازیِ شاخه‌ها؛ push
+
+- **به درخواستِ مالک** («انجام بده موارد باقی مانده رو و تست هم بکن»).
+- **تست رویِ dev با کدِ checkoutِ اصلی (`feat/clarity` = `9130bb3` = production)** + `.env`ِ واقعی (کلیدِ جدیدِ Soniox، متیس) + fixtureِ canary:
+  آپلود ۸/۸؛ batch ۶/۶؛ ادمین/صدا/متنِ نهایی ۹/۹؛ بازسازیِ گوینده + پرونده با LLMِ واقعی ۴/۴؛ جلسه‌ی زنده در Chromeِ واقعی ۸/۸ — A7 در مهلتِ
+  ۶ دقیقه‌ایِ خودِ تست هنوز `polishing` بود چون متیس یک بار پس از ۱۳۳ث «پاسخِ خالی» داد؛ retryِ داخلیِ اپ موفق شد (۱۱۷ث) و متنِ نهایی `done`
+  (۲۱ نوبت) شد ⇒ رفتارِ درست، کندیِ سمتِ provider. لاگِ سرور صفر خطا؛ fixtureها و ارجاع‌هایِ Soniox صفر.
+- **production (فقط smoke، بدونِ ساختِ حساب):** `mintTemporaryKey` با کلیدِ جدید OK (کلیدِ موقتِ ۳۰ثانیه‌ای)، `GET /v1/transcriptions` OK؛
+  `/` و `/feelia-rt.js` 200، `/api/auth/me` 401، health 200؛ pm2 online (۲۴ دقیقه) بدونِ هیچ خطا از restart.
+- **پاک‌سازی:** worktreeهایِ `.claude/worktrees/{bm-golden,backend-modular,bm2}` حذف (`git worktree remove` + `rd /s /q \?\<path>`)؛ شاخه‌هایِ
+  `refactor/backend-modular-v2` (merge‌شده) و `refactor/backend-modular` (v1ِ کهنه، `a567649`) حذف شدند — به مجوزِ مالک.
+- **git:** push ِ `feat/clarity` (۱۲ commitِ بازسازی، `65b264c..9130bb3`) به `origin`. `PROJECT_STATUS.md` عمداً commit **نشد**: نشستِ دیگری هم‌زمان
+  در همین checkout تغییرِ commitنشده دارد (`features/admin/{diagnosis,sessions.admin,admin.repository}.ts`، `api-catalog.md` و رویدادهایِ خودش در همین فایل —
+  «تشخیصِ ادمین برایِ جلسه‌ی آپلودی») و commitِ این فایل رویدادهایِ آن را هم می‌برد. **توجه:** تستِ dev رویِ working tree بود و ممکن است آن تغییراتِ
+  commitنشده‌ی ادمین را هم شامل شده باشد؛ production از worktreeِ تمیزِ `bm2` build شده و آن‌ها را ندارد.
+- **باز (مالک):** چون کلیدِ Soniox در متنِ گفتگو آمده، در فرصتِ مناسب کلیدِ تازه + revokeِ این یکی (همان روشِ `read -rs`).
+
+### 2026-09-29 — CODE + TEST + DOCS — تشخیصِ ادمین برایِ جلسه‌ی آپلودی + وضعیتِ «متنِ نهایی»
+- **درخواستِ مالک:** «بله حلش کن» (پیشنهادِ ورودیِ AUDITِ پایین).
+- **تغییر (فقط backend، commit/deploy نشده):** `server/src/features/admin/diagnosis.ts` — شاخه‌ی `source==='upload'`: شروع/پایانِ آپلود + حجم، مدتِ فایل، زمانِ ذخیره‌ی رونویسی (و فاصله از پایانِ آپلود) / ناموفق با کد / «در حالِ پردازش» با مرحله، بدونِ گفتار، هشدارِ کیفیت؛ برایِ هر جلسه‌ای که ردیفِ `final_transcripts` دارد: آماده/ناموفق/در حالِ ساخت. منبع = `audio_jobs`+`audio_uploads`+`final_transcripts` (پایدار، نه `obs_events` که جارو می‌شود)؛ فقط زمان/مرحله/کد، بدونِ متن (LAW-001). `admin.repository.ts`: `listUploadJobsForDiagnosis`، `getFinalTranscriptForDiagnosis`. پاسخ: فیلدهایِ افزوده‌ی `created_at`، `upload_jobs`، `final_transcript` در `diagnosis`. فرانت تغییر نکرد (همان کارت، حالا برایِ آپلودی هم پر است).
+- **تست:** `tsc` تمیز؛ `test:arch` OK؛ `test:routes` OK (126). اجرایِ واقعیِ منطقِ جدید رویِ DBِ dev (فقط‌خواندنی) برایِ جلسه‌هایِ آپلودی/زنده: یافته‌ها درست. شاخه‌هایِ ناموفق/در حالِ پردازش/بدونِ گفتار/بدونِ job/دستی با دادهٔ ساختگی: درست. متادیتایِ `5dbb946c` در prod (فقط‌خواندنی): آپلود 06:45:41–06:46:53 UTC، ۱۱۳MB، ۶۱:۵۱، رونویسی 06:49:03، متنِ نهایی 10:42:27 ⇒ کارت همین‌ها را نشان خواهد داد. **`test:api` اجرا نشد** (مجوزِ مالک لازم)؛ goldenِ diagnosis به‌خاطرِ فیلدهایِ جدید تفاوت خواهد داشت (عمدی).
+- **FINDING (dev-only):** MySQLِ dev با ساعتِ محلیِ تهران کار می‌کند (`@@time_zone=SYSTEM`، IST) ولی درایور `timezone:'Z'` دارد ⇒ همه‌ی DATETIMEهایِ dev در نمایش ۳:۳۰ جلوترند (از قبل، نه این تغییر). prod: `system_time_zone=UTC` ⇒ درست.
+- **باز:** deploy (منتظرِ مالک؛ ضمناً کلیدِ Soniox در prod 401 است — ورودیِ DEPLOY پایین).
+- **عامل:** این نشست.
+
+### 2026-09-29 — CONFIG — کلیدِ جدیدِ Soniox رویِ dev
+
+- مالک خودش `server/.env`ِ dev را با Notepad به‌روز کرد (طول ۱۴۷، پیشوندِ `snx_proj_`). تأییدِ agent بدونِ خواندنِ مقدار: fingerprint = `1390bcfd`
+  (همان production)؛ `GET /v1/transcriptions` و `/v1/files` از dev ⇒ OK. موردِ «باز»ِ رویدادِ قبلی بسته شد.
+
+### 2026-09-29 — CONFIG + DEPLOY — کلیدِ جدیدِ Soniox رویِ production
+
+- **پیرو FINDINGِ 401:** مالک کلیدِ جدیدِ Soniox داد. agent وارد کردنِ کلید را خودش انجام نداد (قاعده‌ی ایمنی)؛ دستورِ گام‌به‌گام داده شد و
+  مالک خودش رویِ سرور اجرا کرد: backupِ `.env` در `/root/backups/env-pre-soniox-key-<ts>`، ورودِ کلید با `read -rs` (بدونِ نمایش/تاریخچه)،
+  جایگزینیِ خطِ `SONIOX_API_KEY` با `sed`، بررسی: ۱ خط، طولِ ۱۴۷، پیشوندِ `snx_proj_`.
+- **تأییدِ agent (بدونِ خواندنِ مقدار):** fingerprintِ sha256 از `168a0249` به `1390bcfd` عوض شد؛ `GET /v1/transcriptions` و `/v1/files` از
+  production ⇒ OK (قبلاً 401). preflight ⇒ GO ⇒ `pm2 restart feelia-mysql --update-env` ⇒ health ok، لاگِ پروسه‌ی جدید بدونِ خطا/401.
+- **باز:** `server/.env`ِ dev هنوز کلیدِ قدیمیِ ردشده (`168a0249`) را دارد ⇒ رونویسی/تستِ واقعی رویِ dev تا جایگزینی 401 می‌گیرد.
+  توصیه به مالک: چون کلید در متنِ گفتگو آمده، در فرصتِ مناسب کلیدِ تازه بسازد و این یکی را revoke کند.
+
+### 2026-09-29 — AUDIT (production, read-only) + FINDING — «اطلاعاتِ شروع/پایانِ جلسه در پنلِ ادمین نیست»
+- **مجوز:** مالک («برسی کن»). فقط شمارش/متادیتا/یافته‌هایِ تشخیص (بدونِ متن/صدا/نام)؛ دو اسکریپتِ موقت در `server/` اجرا و حذف شدند (تأیید با `ls`). هیچ نوشتنی رویِ production.
+- **زمینه:** production = `9130bb3` (ورودیِ DEPLOYِ نشستِ دیگر، پایین)؛ مشاهده‌ی این نشست: `dist/` 15:37 UTC، pm2 ری‌استارت 15:42 UTC. درخواست‌هایِ ادمینِ 15:38 وسطِ همین deploy بودند.
+- **شواهد:** nginx: همه‌ی درخواست‌هایِ `/api/admin/*`ِ امروز (15:37–15:39) **۲۰۰**. تشخیصِ همان ۳ جلسه‌ای که ادمین باز کرد با کدِ deployشده بازمحاسبه شد: دو جلسه‌ی **زنده** (`082798e9`، `319cd9de`) کامل — «دکمه‌ی پایان زده شد (ساعت…)»، «صدایِ کامل رسیده»، هشدارِ کیفیت؛ جلسه‌ی **آپلودی** `5dbb946c` (۲۰۲۶-۰۹-۲۸، فایلِ ۶۱:۵۱) **صفر یافته** ⇒ کارتِ «چه اتفاقی افتاد؟» اصلاً نمایش داده نمی‌شود، و «شروع HH:MM» هم برایِ آپلودی عمداً پنهان است (تصمیمِ 09-26). داده‌اش موجود است (۹ رویدادِ obs: `upload.completed`، `audio_job.stage`، `final_transcript.*`).
+- **نتیجه:** داده‌ای گم نشده و رگرسیونِ refactor نیست؛ `diagnoseSession` (`server/src/features/admin/diagnosis.ts`) فقط `source==='live'` را پوشش می‌دهد. جانبی: قدیمی‌ترین ردیفِ `obs_events`/`obs_ui_events` در prod = 2026-09-23 (جلساتِ ۰۹-۱۲ تا ۰۹-۲۲ تایم‌لاین/تشخیصِ رویدادی ندارند؛ retention ۱۸۰/۳۰ روز علتش نیست — احتمالاً همزمان با انتقال به MySQL؛ تأیید نشده).
+- **پیشنهاد (منتظرِ تصمیمِ مالک، پیاده نشده):** شاخه‌ی `upload` در تشخیص: زمانِ آپلود، مدتِ فایل، مراحل/زمانِ پردازش، وضعیتِ متنِ نهایی.
+- **عامل:** این نشست.
+
+### 2026-09-29 — DEPLOY + FINDING — production = `9130bb3` (بازسازیِ ماژولار)؛ کلیدِ Soniox رد می‌شود (401)
+
+- **مجوز:** مالک «خودت اجرا کن» (پس از ردِ اولیه‌ی classifier؛ این بار دسترسی داده شد).
+- **گام‌ها (طبقِ deployment-operations §۵):**
+  1. checksumِ `server/src`+`public`+lockfileِ production (۱۴۶ فایل) = `65b264c` دقیقاً ⇒ deploy فقط بازسازی را می‌برد.
+  2. preflight (§۵.۱): همه ۰ ⇒ **GO** (فقط یک تبِ باز در حالِ polling).
+  3. backupِ کد: `/root/backups/code-pre-modular-refactor-20260929T154129Z.tar.gz` (rollback = استخراجِ همین + restart).
+  4. `server/src` و `server/dist`ِ قدیمی حذف (تا `http/`/`stt/`/`ws/`ِ کهنه نماند) ⇒ استخراجِ `feelia-9130bb3.tar.gz` (buildِ worktreeِ تمیز)
+     ⇒ `pnpm install --frozen-lockfile` ⇒ `pm2 restart feelia-mysql --update-env`. `.env` و `data/` دست نخوردند؛ migrationِ جدید نبود.
+  5. health ok (`database: connected`)؛ `/` 200، `/feelia-rt.js` 200، `/api/auth/me` 401؛ لاگِ شروع: `[llm] … Metis` درست؛ pm2 online و پایدار.
+- **FINDING (مهم، مستقل از deploy):** sweepِ Soniox بعد از restart `401` گرفت. بررسی: همان فراخوانیِ فقط-خواندنی (`GET /v1/transcriptions`،
+  `/v1/files`) از production با **کدِ جدید** 401، با **کدِ قدیم از backup** هم 401، و از **dev** (همان کلید، از طریقِ proxy) هم 401.
+  کلید در `.env`ِ production از 2026-09-28T11:37Z عوض نشده (fingerprintِ sha256 = dev). یعنی Soniox خودِ کلید را رد می‌کند (revoke/غیرفعال/
+  مشکلِ حساب یا اعتبار) — عصرِ 2026-09-28 همین کلید در E2Eِ dev کار می‌کرد. **پیامد:** تا رفع، رونویسیِ زنده (mintِ کلیدِ موقت)،
+  batch، آپلودِ صدا و «متنِ نهایی» رویِ production کار نمی‌کنند. rollback کمکی نمی‌کند. اقدامِ مالک: بررسیِ کنسولِ Soniox / کلیدِ جدید.
+
+### 2026-09-29 — DEPLOY (متوقف) — deployِ بازسازیِ ماژولار (`9130bb3`) آماده شد، اجرا نشد
+
+- **درخواستِ مالک:** «اگه مطمئنی چیزی خراب نمیشه آره دیپلوی کن».
+- **انجام‌شده (لوکال):** build در worktreeِ تمیزِ `bm2` (= `9130bb3`، بدونِ تغییرِ دیگر) ⇒ `dist/` با ساختارِ جدید؛ تارِ
+  `server/ public/ package.json pnpm-lock.yaml pnpm-workspace.yaml` (۴۸۳ فایل، بدونِ `.env`/`node_modules`/`data`) در scratchpadِ نشست
+  (`feelia-9130bb3.tar.gz`). checksumِ پایه (`65b264c`؛ کدِ `server/src`/`public` با `752ab22` یکسان) محاسبه شد. migrationِ جدیدی در کار نیست (034 رویِ prod هست).
+- **متوقف شد در گامِ ۲ (مقایسه‌ی checksumِ production، فقط-خواندنی):** classifierِ permissionِ محیطِ Claude Code دستورِ SSH را با دلیلِ
+  «Production Reads» رد کرد. طبقِ قاعده دور زده نشد. **هیچ دستوری رویِ production اجرا نشد**؛ production همچنان `752ab22`.
+- **برایِ ادامه:** یا مالک یک Bash permission rule برایِ `ssh`/`scp` با کلیدِ `feelia_migration` اضافه کند، یا گام‌ها را خودش اجرا کند
+  (رویه: `deployment-operations.md` §۵ + §۵.۱). توصیه: پیش از استخراج `server/src` و `server/dist`ِ قدیمی (پس از backupِ کد) پاک شوند تا
+  فایل‌هایِ کهنه‌ی `http/`، `stt/`، `ws/` باقی نمانند (بی‌ضرر ولی گیج‌کننده).
+
+### 2026-09-29 — GIT — merge ِ بازسازیِ ماژولارِ backend (v2) به `feat/clarity`
+
+- **به درخواستِ مالک** («انجام بده اگه مطمئنی چیزی خراب نمیشه»). پیش‌شرط‌ها بررسی شد: `feat/clarity` از `65b264c` جلو نرفته بود ⇒
+  **fast-forward** بدونِ conflict (`git merge --ff-only refactor/backend-modular-v2`)؛ تنها تغییرِ commitنشده‌ی checkoutِ اصلی
+  (`PROJECT_STATUS.md`) جزوِ فایل‌هایِ merge نبود؛ هیچ سرورِ devی در حالِ اجرا نبود.
+- **نتیجه:** `feat/clarity` = `9130bb3` (۱۲ commitِ P1–P7). `server/src/http|stt|ws` حذف و به `features/*` + `shared/` + `app.ts`/`jobs/` منتقل شد
+  (نقشه: [repository-map](docs/02-reference/repository-map.md)).
+- **تست در خودِ checkoutِ اصلی بعد از merge:** tsc OK؛ `test:cf` 110/110، `up` 52/52، `tu` 17/17، `ft` 59/59، `llm` 18/18، `routes` ۱۲۶ OK،
+  `arch` OK، `test:rt` 100/100. خروجیِ build (`tsc` به پوشه‌ی موقت) ساختارِ `dist/`ِ درست دارد: `app.js` هم‌عمقِ `index.js`ِ قبلی (مسیرِ `public/` یکسان) و مسیرهایِ migration در `copy-assets.mjs` بدونِ تغییر.
+- **push/deploy نشده.** production همچنان `752ab22` (کدِ قدیمی) — deployِ بعدی کدِ جدید را می‌برد؛ ساختارِ deploy (`pnpm build`/`dist`) باید با
+  مسیرهایِ جدید بررسی شود. شاخه‌هایِ `refactor/backend-modular` (v1، کهنه) و `refactor/backend-modular-v2` و worktreeهایشان هنوز هستند.
+
+### 2026-09-29 — TEST — تستِ واقعیِ v2، بخشِ دوم: جلسه‌ی زنده در مرورگر، بازسازیِ گوینده، پرونده با LLM
+
+- **با مجوزِ صریحِ مالک** («تست کن»، بعد از ردِ اولیه‌ی permissionِ محیط). همان سرورِ v2 (`9130bb3`) رویِ 3100 با `.env`ِ واقعیِ dev؛
+  تراپیستِ canary دوباره ساخته شد؛ سرورِ devِ دیگری در حالِ اجرا نبود.
+- **A — جلسه‌ی زنده ۸/۸:** Chromeِ headlessِ واقعی + میکروفونِ جعلی (مکالمه‌ی TTSِ ساختگیِ سه‌نفره) رویِ `index.html`/`feelia-rt.js`ِ واقعی:
+  ورود با کوکیِ fixture ⇒ temp-key ⇒ Sonioxِ realtime `ACTIVE` ⇒ دو علامت (۳۵ث، ۷۰ث) ⇒ پایان در ۱۱۰ث ⇒ `finishSession`. سمتِ سرور: جلسه
+  `completed`، متن ۱۵۲۳ کاراکتر (version 21)، ۲ علامت در متن و در یادداشت‌ها، ۸ سگمنتِ صدا در آرشیو (کامل، بدونِ گم‌شده)، «متنِ نهایی»
+  `waiting_audio → polishing → done` (source=async، ۱۷ نوبت)؛ صفر خطایِ کنسولِ مرورگر.
+- **D (پولی) ۴/۴:** `resolve-speakers` (ffmpeg concat + Sonioxِ async) ⇒ `done`؛ `case-file/regenerate` با متیس ⇒ 200 و پرونده خواندنی.
+  (جلسه‌ی مبنا با تکرارِ سناریوی C ساخته شد: ۶/۶.)
+- **جمعِ تستِ واقعی (دو بخش):** آپلود ۸/۸، batch ۶/۶ (دو بار)، ادمین/متنِ نهایی ۹/۹، پولی ۴/۴، جلسه‌ی زنده ۸/۸؛ لاگِ سرور صفر خطا.
+- **پاک‌سازی:** jobهایِ فعال ۰، ارجاع‌هایِ Soniox ۰؛ تراپیستِ canary با cascade حذف (۰ باقی‌مانده)؛ سرور و Chromeِ تست بسته (۰ پروسه‌ی باقی‌مانده)؛
+  worktree تمیز. صدا/اسکرین‌شاتِ ساختگی فقط در scratchpad.
+
+### 2026-09-28 — TEST — تستِ واقعیِ بازسازیِ ماژولار (v2) با Soniox/LLMِ واقعی
+
+- **به درخواستِ مالک** («بله تست کن»). سرورِ شاخه‌ی `refactor/backend-modular-v2` (`9130bb3`) رویِ پورتِ 3100 با `.env`ِ واقعیِ dev
+  (Soniox از طریقِ `PROXY_URL`، LLM = متیس)، `SONIOX_ORPHAN_SWEEP` خاموش، سرورِ devِ دیگری در حالِ اجرا نبود. fixture: یک تراپیستِ canary
+  (`@example.invalid`، hashِ غیرقابلِ‌استفاده، توکن فقط در فایلِ scratchpad) + صدایِ مکالمه‌ی TTSِ ساختگیِ سه‌نفره (۱۲۷ث).
+- **B — آپلودِ فایل ۸/۸:** مراجع ⇒ آپلودِ mp3 ⇒ worker ⇒ Sonioxِ async ⇒ متن در جلسه (۱۶۹۵ کاراکتر، `stt_mode=upload`) ⇒ اعلانِ
+  `transcript_ready` ⇒ «متنِ نهایی» با LLMِ واقعی `done`.
+- **C — batch fallback ۶/۶:** جلسه‌ی زنده (+`pre_note`) ⇒ دو سگمنتِ webm به `batch-audio` ⇒ صف ⇒ Sonioxِ async ⇒ متن اعمال شد (version 2)
+  ⇒ `PUT completed` ⇒ «متنِ نهایی» صف شد.
+- **D — ۹/۹ (فقط خواندنی + پایشِ jobِ صف‌شده):** فهرستِ صدایِ آرشیو (۲ سگمنت)، صدایِ کامل با ffmpeg (۵۳۰KB) + Range ⇒ 206، diagnosis،
+  timeline، آرشیوِ صدا، فهرستِ تراپیست‌ها، جلسه‌هایِ اخیر؛ «متنِ نهاییِ» جلسه‌ی batch: `waiting_audio → transcribing → polishing → done`
+  (source=async، ۲۰ نوبت). دو FAILِ اولیه (D1، D8) خطایِ خودِ تست بود (پارامترِ اشتباه) و با پارامترِ درست PASS شد.
+- **اجرا نشد:** جلسه‌ی زنده در Chromeِ واقعی (Sonioxِ realtime)، `resolve-speakers` و `case-file/regenerate` با LLMِ واقعی — classifierِ
+  permissionِ محیط این فراخوانی‌هایِ پولیِ تازه را «Real-World Transactions» تشخیص داد و رد کرد؛ منتظرِ تصمیمِ مالک.
+- **پاک‌سازی:** همه‌ی jobها تمام و ارجاع‌هایِ Soniox صفر (منابعِ خودشان را پاک کردند)؛ تراپیستِ canary با cascade حذف شد (۰ باقی‌مانده)؛
+  سرور متوقف شد؛ لاگِ سرور بدونِ خطا. داده‌ی صوتیِ ساختگی فقط در scratchpad.
+
+### 2026-09-28 — CODE + TEST + GIT + DOCS + FINDING — بازسازیِ ماژولارِ backend، اجرایِ دوم (v2) از روی کدِ امروز
+
+- **چرا:** شاخه‌ی v1 (`refactor/backend-modular`، پایه `538b30f`) از `feat/clarity` عقب افتاده بود (llm/، final-transcript، treatment-unit،
+  کیفیتِ آپلود، signMarkers، متیس). تصمیمِ مالک: «گزینه الف، از روی کدِ امروز دوباره اجرا کن».
+- **چه شد:** شاخه‌ی محلیِ `refactor/backend-modular-v2` در worktree `.claude/worktrees/bm2`، پایه `65b264c`؛ ۱۳ commit
+  (`10d5761` P1 … `e0a65a4` P6، `9130bb3` P7 مستندات). همان پلنِ P0–P7؛ اسکریپت‌هایِ v1 بازپخش و با driftِ امروز تطبیق داده شدند.
+  تفاوتِ ساختاری با v1: `features/transcription/sessionContext.ts` ⇒ `shared/sessionSttContext.ts` (برایِ نبودِ چرخه با treatment-unit).
+- **گیت‌ها (بعد از هر commit سبز):** tsc؛ مجموعه‌ی SQL distinct یکسان (256)؛ `test:rt` 100/100، `cf` 110/110، `up` 52/52، `tu` 17/17، `ft` 59/59،
+  `llm` 18/18؛ `test:routes` ۱۲۶ یکسان؛ `test:api` ۳۴۹/۳۴۹ یکسان با golden؛ `test:arch` بدونِ چرخه (mutation-check)؛ boot smoke رویِ پورتِ 3999
+  با DBِ dev (پیش از آن شمارشِ همه‌ی ردیف‌هایِ مشمولِ sweep/workerِ startup = ۰؛ بدونِ کلیدِ Soniox/LLM) ⇒ `health ok`.
+- **DBِ dev:** migrationِ افزایشیِ `034_final_transcript_turns.sql` رویِ DBِ dev نبود (ساختِ golden شکست خورد) ⇒ با `runMigrations()`ِ خودِ اپ اعمال
+  شد. fixtureهایِ harness در پایانِ هر اجرا پاک شدند (۰ باقی‌مانده). production لمس نشد.
+- **FINDINGها (رفع نشد):** ۱۰ مورد در [verification](verification/2026-09-28-backend-modular-refactor-v2.md) (در شاخه‌ی v2). FINDING-2ِ v1
+  (legacy-ws بدونِ bumpِ version) در کدِ امروز دیگر معتبر نیست.
+- **وضعیت:** push/merge/deploy **نشده**. `feat/clarity` از `65b264c` جلو نرفته ⇒ merge بدونِ drift ممکن است. شاخه‌ی v1 کهنه است و فقط مرجع.
+  پوشه‌ی موقتِ `.claude/worktrees/bm-golden` (v1) هنوز باید دستی پاک شود (`git worktree remove --force .claude/worktrees/bm-golden`).
+
+### 2026-09-28 — FINDING — «متنِ نهایی» در آپلودهایِ پدرام (بررسیِ read-only رویِ production)
+
+- **دستورِ مالک:** «چک کن پدرام متنِ ادیت‌شده‌ی نهایی را بعد از آپلود ببیند».
+- **چه شد:** یک SELECTِ فقط‌خواندنی رویِ DBِ production (اسکریپتِ موقت، بعد از اجرا حذف شد؛ هیچ متنِ بالینی چاپ نشد).
+- **نتیجه:** تیکِ «متنِ نهایی» برایِ پدرام (`3cb546ef`) و ادمین «سحر» روشن است. آخرین آپلودِ پدرام (`5dbb946c`) متنِ نهایی با `stage=done` و `source=async` دارد (finished 10:42Z)، اما `clean_turns` خالی است، چون پیش از migration 034 / deployِ `752ab22` ساخته شده ⇒ متن نشان داده می‌شود ولی دکمه‌ی «نمایشِ ویرایش‌ها» و ویرایشِ گوینده نمی‌آید. سه آپلودِ قدیمی‌ترِ پدرام و هر سه آپلودِ سحر اصلاً ردیفِ `final_transcripts` ندارند (پیش از روشن‌شدنِ فیچر). از این به بعد آپلودهایِ جدید نوبت‌ها را هم خواهند داشت.
+- **تغییرِ کد/داده:** هیچ.
 
 ### 2026-09-28 — GIT — push ِ commitهایِ متیس و «متنِ نهایی» به `origin/feat/clarity`
 
