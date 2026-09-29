@@ -460,6 +460,17 @@ try {
   const s3 = (await call('session S3 manual + note', { method: 'POST', url: '/api/sessions', cookie: t1, json: { client_id: c3, mode: 'manual', date: '2026-09-20', start_time: '09:05', note: '  یادداشتِ پس از جلسه  ' } })).body.session.id;
   const s4 = (await call('session S4 manual no date', { method: 'POST', url: '/api/sessions', cookie: t1, json: { client_id: c3, mode: 'manual' } })).body.session.id;
   const s5 = (await call('session S5 live (for delete)', { method: 'POST', url: '/api/sessions', cookie: t1, json: { client_id: c2, consent: true, date: '1405/07/01', start_time: '18:45' } })).body.session.id;
+  // یادداشتِ پیش از جلسه (2026-09-29): pre_note ⇒ session_notes(note_before) در همان تراکنش؛ ستونِ sessions.pre_note نوشته نمی‌شود
+  await call('session pre_note too long', { method: 'POST', url: '/api/sessions', cookie: t1, json: { client_id: c2, consent: true, pre_note: 'ا'.repeat(2001) } });
+  const s6 = (await call('session S6 live with pre_note', { method: 'POST', url: '/api/sessions', cookie: t1, json: { client_id: c2, consent: true, date: '1405/07/02', start_time: '19:00', pre_note: '  توضیحِ پیش از جلسه  ' } })).body.session.id;
+  {
+    const r = (await query(`SELECT type, text, wall_clock FROM session_notes WHERE session_id = ?`, [s6])).rows as Array<{ type: string; text: string; wall_clock: string }>;
+    const col = (await query(`SELECT pre_note FROM sessions WHERE id = ?`, [s6])).rows[0].pre_note;
+    if (r.length !== 1 || r[0].type !== 'note_before' || r[0].text !== 'توضیحِ پیش از جلسه' || r[0].wall_clock !== '19:00' || col !== null) {
+      throw new Error('pre_note must become one trimmed note_before row and leave sessions.pre_note NULL: ' + JSON.stringify({ r, col }));
+    }
+  }
+  await call('session S6 delete', { method: 'DELETE', url: `/api/sessions/${s6}`, cookie: t1 });
   await call('session get', { method: 'GET', url: `/api/sessions/${s1}`, cookie: t1 });
   await call('session get unknown', { method: 'GET', url: '/api/sessions/00000000-0000-4000-8000-000000000000', cookie: t1 });
   await call('session get foreign', { method: 'GET', url: `/api/sessions/${s1}`, cookie: t2 });
@@ -488,12 +499,26 @@ try {
   // notes
   await call('note no type', { method: 'POST', url: `/api/sessions/${s1}/notes`, cookie: t1, json: { text: 'x' } });
   await call('note foreign', { method: 'POST', url: `/api/sessions/${s1}/notes`, cookie: t2, json: { type: 'sign' } });
-  await call('note sign', { method: 'POST', url: `/api/sessions/${s1}/notes`, cookie: t1, json: { type: 'sign', sign_type: 'اضطراب', offset_ms: 5000, wall_clock: '10:31' } });
+  const nSign = (await call('note sign', { method: 'POST', url: `/api/sessions/${s1}/notes`, cookie: t1, json: { type: 'sign', sign_type: 'اضطراب', offset_ms: 5000, wall_clock: '10:31' } })).body.note.id;
   const nDel = (await call('note during', { method: 'POST', url: `/api/sessions/${s1}/notes`, cookie: t1, json: { type: 'note_during', text: 'یادداشت حین جلسه', offset_ms: 2000 } })).body.note.id;
   await sleep(1100); // یادداشتِ بدونِ offset با یادداشتِ ساختِ S3 در یک ثانیه ⇒ ترتیبِ created_at قطعی نیست
   await call('note after (completed session)', { method: 'POST', url: `/api/sessions/${s3}/notes`, cookie: t1, json: { type: 'note_after', text: 'یادداشتِ بعد' } });
   await call('note delete', { method: 'DELETE', url: `/api/notes/${nDel}`, cookie: t1 });
   await call('note delete again', { method: 'DELETE', url: `/api/notes/${nDel}`, cookie: t1 });
+  // PATCH فقط برایِ note_before/voice_before و فقط مالک (غیرمالک/ناموجود ⇒ 404)
+  const nBefore = (await call('note before', { method: 'POST', url: `/api/sessions/${s1}/notes`, cookie: t1, json: { type: 'note_before', text: 'یادداشتِ پیش از جلسه', wall_clock: '10:00' } })).body.note.id;
+  await call('note patch no auth', { method: 'PATCH', url: `/api/notes/${nBefore}`, json: { text: 'x' } });
+  await call('note patch foreign', { method: 'PATCH', url: `/api/notes/${nBefore}`, cookie: t2, json: { text: 'x' } });
+  await call('note patch unknown', { method: 'PATCH', url: '/api/notes/00000000-0000-4000-8000-000000000000', cookie: t1, json: { text: 'x' } });
+  await call('note patch empty', { method: 'PATCH', url: `/api/notes/${nBefore}`, cookie: t1, json: { text: '   ' } });
+  await call('note patch not a string', { method: 'PATCH', url: `/api/notes/${nBefore}`, cookie: t1, json: { text: 5 } });
+  await call('note patch too long', { method: 'PATCH', url: `/api/notes/${nBefore}`, cookie: t1, json: { text: 'ا'.repeat(20001) } });
+  await call('note patch not editable (sign)', { method: 'PATCH', url: `/api/notes/${nSign}`, cookie: t1, json: { text: 'x' } });
+  await call('note patch ok (trimmed)', { method: 'PATCH', url: `/api/notes/${nBefore}`, cookie: t1, json: { text: '  متنِ ویرایش‌شده  ' } });
+  {
+    const t = (await query(`SELECT text FROM session_notes WHERE id = ?`, [nBefore])).rows[0].text;
+    if (t !== 'متنِ ویرایش‌شده') throw new Error('PATCH must store the trimmed text, got ' + JSON.stringify(t));
+  }
 
   // voice-note (legacy مسیر، Soniox mock)
   await call('voice-note no file', { method: 'POST', url: `/api/sessions/${s1}/voice-note`, cookie: t1, headers: { 'content-type': 'multipart/form-data; boundary=x' }, body: '--x--\r\n' });
@@ -522,6 +547,28 @@ try {
   await waitFor('archive dup', () => queueFilesFor(s1).length === 0);
   await call('batch note-archive', batch(s1, `?purpose=note-archive&seq=0&run=${RUN_B}`, NOTE));
   await waitFor('note-archive', () => queueFilesFor(s1).length === 0);
+  // (بایت‌هایِ SEG2، نه NOTE: آرشیو برایِ بایت‌هایِ یکسانِ یک جلسه idempotent است و NOTE پیش‌تر با note-archive آرشیو شده)
+  // pre-note: آرشیو kind='prenote' + رونویسیِ بدونِ تفکیکِ گوینده ⇒ session_notes(voice_before)؛ هرگز 'voice' و هرگز transcript
+  {
+    const dPre = mockCount(/^DELETE \/v1\/files/);
+    const voiceBefore = Number((await query(`SELECT COUNT(*) AS n FROM session_notes WHERE session_id = ? AND type = 'voice'`, [s1])).rows[0].n);
+    const trBefore = (await query(`SELECT transcript, transcript_version FROM sessions WHERE id = ?`, [s1])).rows[0];
+    await call('batch pre-note', batch(s1, '?purpose=pre-note&seq=0&run=pnHARNESS1', SEG2));
+    await waitFor('batch pre-note', async () => mockCount(/^DELETE \/v1\/files/) > dPre && queueFilesFor(s1).length === 0 &&
+      Number((await query(`SELECT COUNT(*) AS n FROM session_notes WHERE session_id = ? AND type = 'voice_before'`, [s1])).rows[0].n) === 1);
+    const preTr = mockLog.filter((l) => l.startsWith('POST /v1/transcriptions ')).pop() || '';
+    if (!preTr.includes('"enable_speaker_diarization":false')) throw new Error('pre-note must be transcribed without diarization: ' + preTr.slice(0, 220));
+    const kinds = (await query(`SELECT kind, seq FROM session_audio WHERE session_id = ? AND kind = 'prenote'`, [s1])).rows;
+    if (kinds.length !== 1) throw new Error('pre-note audio must be archived once with kind=prenote: ' + JSON.stringify(kinds));
+    const voiceAfter = Number((await query(`SELECT COUNT(*) AS n FROM session_notes WHERE session_id = ? AND type = 'voice'`, [s1])).rows[0].n);
+    const trAfter = (await query(`SELECT transcript, transcript_version FROM sessions WHERE id = ?`, [s1])).rows[0];
+    if (voiceAfter !== voiceBefore) throw new Error('pre-note must not create a type=voice note');
+    if (trAfter.transcript !== trBefore.transcript || trAfter.transcript_version !== trBefore.transcript_version) throw new Error('pre-note must never touch sessions.transcript');
+    // نامِ فایلِ آرشیو پیشوند دارد و با فایلِ kindهایِ دیگر برخورد نمی‌کند (رفعِ بازنویسیِ 000000.webm)
+    const paths = (await query(`SELECT path, kind FROM session_audio WHERE session_id = ?`, [s1])).rows as Array<{ path: string; kind: string }>;
+    if (new Set(paths.map((x) => x.path)).size !== paths.length) throw new Error('two audio rows share one file path: ' + JSON.stringify(paths.map((x) => path.basename(x.path) + ':' + x.kind)));
+    if (!paths.filter((x) => x.kind === 'prenote').every((x) => path.basename(x.path).startsWith('prenote-'))) throw new Error('prenote file must carry the kind prefix');
+  }
   // transcript با placeholderِ درجا (A2)
   await call('put placeholder S2', { method: 'PUT', url: `/api/sessions/${s2}`, cookie: t1, json: { transcript: `قبل\n\n[⏳ بازه‌ی قطعیِ اینترنت — متن در حالِ بازیابی · #${RUN_B}:3]\n\nبعد` } });
   let d0 = mockCount(/^DELETE \/v1\/files/);

@@ -18,6 +18,7 @@ import {
 import { FileQualityMeter, classifyWindow, measureAudioQuality, parseAudioQuality, QUALITY, type AudioQuality } from '../server/src/features/audio-upload/quality.js';
 import { parseProbe, probeMedia, normalizeAudio, sniffObviouslyNotAudio, extensionOf, ACCEPTED_EXTENSIONS, MAX_DURATION_MS } from '../server/src/features/audio-upload/media.js';
 import { expectedChunkBytes } from '../server/src/features/audio-upload/uploadStore.js';
+import { isPreNoteFile, isNoteFile, isArchiveFile, isNoteArchiveFile, isLateFile, seqFromFilename, runIdFromFilename, mimeFromFilename, sessionIdFromFilename } from '../server/src/features/transcription/batch/queueFiles.js';
 
 let pass = 0;
 let fail = 0;
@@ -877,6 +878,28 @@ async function main() {
       removeUploadDir(id);
       if (!hadData) rmSync(dataDir, { recursive: true, force: true });
     }
+  });
+
+  // ——— یادداشتِ صوتیِ پیش از جلسه (2026-09-29، REQ-066) ———
+  await t('H52 نامِ فایلِ صفِ pre-note: مارکرِ `.prenote.` فقط خودش را می‌شناسد و seq/run/mime/sessionId درست پارس می‌شود', () => {
+    const sid = '11111111-2222-3333-4444-555555555555';
+    const f = `${sid}-000000-pnabc123-1790703025765.prenote.webm`;
+    assert.ok(isPreNoteFile(f));
+    assert.ok(!isNoteFile(f) && !isArchiveFile(f) && !isNoteArchiveFile(f) && !isLateFile(f), 'با purposeهایِ دیگر اشتباه نمی‌شود');
+    for (const other of ['.note.', '.archive.', '.notearchive.', '.late.', '.']) {
+      assert.ok(!isPreNoteFile(`${sid}-000000-r1-1790703025765${other}webm`), other);
+    }
+    assert.equal(sessionIdFromFilename(f), sid);
+    assert.equal(seqFromFilename(f), 0);
+    assert.equal(runIdFromFilename(f), 'pnabc123');
+    assert.equal(mimeFromFilename(f), 'audio/webm');
+    assert.equal(mimeFromFilename(`${sid}-000002-pnx-1790703025765.prenote.ogg`), 'audio/ogg');
+  });
+  await t('H53 متنِ رونویسیِ بدونِ گوینده (diarize خاموش): بدونِ «گوینده N:»؛ با گوینده همان قراردادِ قبلی', () => {
+    const noSpeaker = [{ text: 'سلام' }, { text: ' امروز' }, { text: ' دیرتر' }, { text: ' می‌آید.' }] as AsyncToken[];
+    assert.equal(buildTextFromAsyncTokens(noSpeaker), 'سلام امروز دیرتر می‌آید.');
+    const withSpeaker = [{ text: 'سلام', speaker: 1 }, { text: ' خوبید؟', speaker: 1 }, { text: 'بله', speaker: 2 }] as AsyncToken[];
+    assert.equal(buildTextFromAsyncTokens(withSpeaker), 'گوینده ۱: سلام خوبید؟\n\nگوینده ۲: بله');
   });
 
   console.log(`\n${pass} PASS / ${fail} FAIL`);

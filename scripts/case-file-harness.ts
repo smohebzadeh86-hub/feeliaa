@@ -15,7 +15,7 @@ import { resolveLlmConfig } from '../server/src/llm/config.js';
 import { FINDING_ROLES, FINDING_ROLE_LABEL } from '../server/src/features/case-file/domain/types.js';
 import { CASE_FILE_JSON_SCHEMA } from '../server/src/features/case-file/adapters/llm/caseFileJsonSchema.js';
 import { CASE_FILE_SYSTEM_PROMPT as SYSTEM_PROMPT } from '../server/src/features/case-file/prompts/systemPrompts.js';
-import { buildAnsweredQuestionsBlock } from '../server/src/features/case-file/prompts/userPrompts.js';
+import { buildAnsweredQuestionsBlock, buildCaseFilePrompt } from '../server/src/features/case-file/prompts/userPrompts.js';
 import type { CaseFileDigest, RawCaseFileDraft, RawFinding, RawAxis, RawAxisFinding } from '../server/src/features/case-file/domain/types.js';
 
 let pass = 0, fail = 0;
@@ -1079,6 +1079,26 @@ const field = (r: ReturnType<typeof finalizeCouple>, key: string) => r.draft.cou
     const out = mergeCaseFileDraft(null, finalizeCouple(draft, null).draft, corpus, answered);
     assert.deepEqual(out.answeredQuestions, answered);
     assert.deepEqual(out.pendingQuestions.map(q => q.question), ['سوالِ تازه']);
+  });
+
+  await t('PN1 corpusِ پرونده: یادداشتِ پیش از جلسه (متنی/صوتی) برچسبِ فارسی می‌گیرد؛ نامِ فنیِ نوع نشت نمی‌کند؛ نوع‌هایِ دیگر مثلِ قبل', () => {
+    const corpus = {
+      clientId: 'c', latestSessionId: 's1', corpusSignature: 'x',
+      sessions: [{
+        id: 's1', sessionNum: 1, date: '1405/07/07', source: 'live', transcript: 'گوینده ۱: سلام',
+        notes: [
+          { type: 'note_before', text: 'مراجع دیرتر می‌آید', createdAt: '' },
+          { type: 'voice_before', text: 'پیش از جلسه توضیح صوتی', createdAt: '' },
+          { type: 'note_after', text: 'بعد از جلسه', createdAt: '' },
+          { type: 'voice', text: 'صوتی بعد از جلسه', createdAt: '' },
+        ],
+      }],
+    };
+    const txt = buildCaseFilePrompt(corpus as never, { category: 'adult', gender: null, alias: null }).corpusText;
+    assert.ok(txt.includes('یادداشت (یادداشتِ درمانگر پیش از شروعِ جلسه): مراجع دیرتر می‌آید'));
+    assert.ok(txt.includes('یادداشت (یادداشتِ صوتیِ درمانگر پیش از شروعِ جلسه): پیش از جلسه توضیح صوتی'));
+    assert.ok(!/یادداشت \((note_before|voice_before)\)/.test(txt), 'نامِ فنی نشت نکند');
+    assert.ok(txt.includes('یادداشت (note_after): بعد از جلسه') && txt.includes('یادداشت (voice): صوتی بعد از جلسه'), 'برچسبِ نوع‌هایِ قدیمی تغییر نکرده');
   });
 
   console.log(`\n${pass} PASS / ${fail} FAIL`);

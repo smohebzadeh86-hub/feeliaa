@@ -4426,6 +4426,11 @@ const PreDraft=(function(){
   };
 })();
 setTimeout(function(){PreDraft.purgeExpired();},5000);
+// کلیپ‌هایی که همین حالا در راهِ ارسال‌اند (جلسه‌ی زنده‌ی در حالِ ساخت / آپلودِ در جریان) — بازیابیِ پیش‌نویس آن‌ها را نادیده می‌گیرد
+// تا بازکردنِ دوباره‌ی صفحه‌ی شروعِ همان مراجع (بدونِ رفرش) یک کپیِ دومِ قابلِ‌ارسال نسازد. با پایانِ enqueuePreVoiceClips آزاد می‌شود
+// (در شکست، پیش‌نویس می‌ماند و در بازکردنِ بعدی بازیابی می‌شود). فقط حافظه: با رفرش خالی می‌شود، که همان بازیابیِ مطلوب است.
+const preDraftClaimed=new Set();
+function claimPreDrafts(clips){(clips||[]).forEach(function(c){if(c&&c.draftId)preDraftClaimed.add(c.draftId);});}
 function makePreVoice(prefix,scopeFn){
   const st={clips:[],rec:null,stream:null,chunks:[],t0:0,timer:null,discard:false,waiters:[],scope:null};
   const el=function(id){return document.getElementById(prefix+id);};
@@ -4526,7 +4531,7 @@ function makePreVoice(prefix,scopeFn){
 const preVoiceSetup=makePreVoice('setup',function(){return currentClient&&currentClient.id?String(currentClient.id):null;});
 // بازگردانیِ کلیپ‌هایِ پیش‌نویسِ همین مراجع (صفحه بسته/رفرش شده بود) — بعد از resetPresence
 async function restorePreVoiceDrafts(client){
-  const recs=await PreDraft.list(String(client.id));
+  const recs=(await PreDraft.list(String(client.id))).filter(function(r){return !preDraftClaimed.has(r.id);});
   if(!recs.length||!currentClient||currentClient.id!==client.id)return;
   preVoiceSetup.put(recs.map(function(r){return {blob:r.blob,mime:r.mime,durMs:r.durMs,draftId:r.id,url:URL.createObjectURL(r.blob)};}));
   $('preNoteArea').hidden=false;$('preNoteToggle').hidden=true;
@@ -4539,6 +4544,7 @@ const preVoiceSent={};
 function genPreNoteRunId(){return 'pn'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
 async function enqueuePreVoiceClips(sessionId,clips){
   if(!sessionId||!clips||!clips.length)return;
+  claimPreDrafts(clips);
   preVoiceSent[sessionId]=(preVoiceSent[sessionId]||0)+clips.length;
   const RT=window.FeeliaRT;
   for(const c of clips){
@@ -4563,6 +4569,7 @@ async function enqueuePreVoiceClips(sessionId,clips){
       }catch(e){}
     }
     try{URL.revokeObjectURL(c.url);}catch(e){}
+    if(c.draftId)preDraftClaimed.delete(c.draftId);
   }
 }
 async function hasLocalPreVoice(sessionId){
@@ -4686,7 +4693,7 @@ function flushUploadPreNotes(){
     }else if(!mine.length){
       // کار لغو/پاک شد ⇒ یادداشت‌ها جایی برایِ رفتن ندارند
       pendingUploadPreNotes.splice(i,1);
-      (pn.clips||[]).forEach(function(c){try{URL.revokeObjectURL(c.url);}catch(e){}PreDraft.del(c.draftId);});
+      (pn.clips||[]).forEach(function(c){try{URL.revokeObjectURL(c.url);}catch(e){}PreDraft.del(c.draftId);if(c.draftId)preDraftClaimed.delete(c.draftId);});
     }
   }
 }
@@ -8952,6 +8959,7 @@ async function startAudioUpload(){
   if(!audioUploadFiles.length||!audioUploadConsentOk()||!currentClient||!window.FeeliaUpload)return;
   if(preVoiceUpload.isRecording())await preVoiceUpload.stop();
   const pre={keys:null,text:$('upPreNoteInput').value.trim().slice(0,2000),clips:preVoiceUpload.take()};
+  claimPreDrafts(pre.clips);
   // رضایتِ تازه با همین آپلود رویِ سرور ثبت می‌شود (POST /api/uploads با consent:true) — دفعه‌ی بعد پرسیده نشود.
   if(!clientConsentDate(currentClient))markClientConsent(currentClient.id,new Date().toISOString());
   requestCaseFileNotificationPermission();
