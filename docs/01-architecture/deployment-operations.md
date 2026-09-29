@@ -181,7 +181,8 @@ DOTENV_CONFIG_PATH=/root/feeliaa-mysql/.env node server/_preflight.mjs; rm -f se
 **پنجره‌ی ۶ ساعته برایِ `batch_running`:** در اولین اجرا (2026-09-26) سه ردیفِ `batch_status='queued'` با عمرِ ۱۰۸ و ۳۳۹ ساعت پیدا شد —
 همان باگِ «batch_statusِ گیرکرده» که رفعش در working tree است ولی deploy نشده؛ jobِ واقعی نیستند و بدونِ این فیلتر preflight همیشه WAIT می‌داد.
 
-**وضعیت:** اولین اجرا رویِ production: 2026-09-26 — اسکریپت درست اجرا و حذف شد (Event Log).
+**وضعیت:** اولین اجرا رویِ production: 2026-09-26 — اسکریپت درست اجرا و حذف شد (Event Log). از dev باید با `ssh … 'bash -s' <<'REMOTE'` اجرا شود (تأیید دوباره 2026-09-29، deployِ `aba0783`).
+**نکته‌ی Git Bash (2026-09-29):** `tar -czf C:/…` در Git Bash `C:` را host تفسیر می‌کند («Cannot connect to C: resolve failed») — تار را با مسیرِ نسبی بسازید.
 
 **کشِ مرورگر:** فایل‌هایِ `public/` (بدونِ نسخه در URL) با `Cache-Control: no-cache` سرو می‌شوند (`server/src/index.ts`،
 از ۲۰۲۶-۰۹-۲۳) تا هر بارگذاری revalidate شود (ETag → 304). پیش از آن پیش‌فرضِ `public, max-age=0` باعث شد مرورگرِ مالک

@@ -157,7 +157,7 @@ soniox-invalid-audio`) ثبت می‌شود و `batch_status` طبقِ باقی�
   - پایان: `batch_status = queued` اگر فایلی مانده؛ **`failed` اگر هیچ سگمنتی اعمال نشد و دست‌کم یکی
     غیرقابلِ‌رونویسی بود (2026-09-26 — قبلاً در این حالت هم `done`)**؛ وگرنه `done`.
   - `note-archive` (2026-09-26): مثلِ `archive`، فقط آرشیو بدونِ Soniox، ولی با `kind='note'`؛ مارکرِ فایل `.notearchive.`.
-  - `pre-note` (2026-09-29): مثلِ `note` (آرشیو قبل از رونویسی، بدونِ contextِ جلسه) ولی آرشیو با `kind='prenote'` و نتیجه ⇒ `session_notes(type='voice_before')`؛ مارکرِ فایل `.prenote.`؛ رویِ جلسه‌ی completed هم پذیرفته می‌شود (مسیرِ آپلود)، رویِ canceled نه؛ متنِ غیرخالی رویِ جلسه‌ی completed پرونده‌ی خودکار را trigger می‌کند.
+  - `pre-note` (2026-09-29): مثلِ `note` (آرشیو قبل از رونویسی، بدونِ contextِ جلسه، **و بدونِ تفکیکِ گوینده — `diarize:false` ⇒ متنِ بدونِ «گوینده N:»**) ولی آرشیو با `kind='prenote'` و نتیجه ⇒ `session_notes(type='voice_before')`؛ مارکرِ فایل `.prenote.`؛ رویِ جلسه‌ی completed هم پذیرفته می‌شود (مسیرِ آپلود)، رویِ canceled نه؛ متنِ غیرخالی رویِ جلسه‌ی completed پرونده‌ی خودکار را trigger می‌کند.
 - **`reconcileStaleBatchStatuses`** (2026-09-26، انتهایِ هر `sweepOldBatchFiles` — startup + هر ساعت): جلسه‌ی
   غیرِآپلودی (`source <> 'upload'`) که `batch_status ∈ {queued, processing}` است، بیش از ۱ ساعت دست نخورده و هیچ
   فایلِ transcript/late در صف ندارد → `failed` + رویدادِ `batch.failed` (`reason: stale-no-audio`). ریشه: sweepِ ۲۴ساعته
