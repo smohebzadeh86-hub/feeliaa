@@ -28,6 +28,15 @@ const pool = mysql.createPool({
   },
 });
 
+// (2026-09-29) timezone:'Z' فقط سمتِ درایور است؛ NOW()/CURRENT_TIMESTAMP با time_zoneِ سرورِ MySQL نوشته می‌شوند.
+// MySQLِ dev رویِ ساعتِ تهران است ⇒ همه‌ی زمان‌هایِ SQL-ساخت ۳:۳۰ جلوتر خوانده می‌شدند. هر اتصال UTC می‌شود
+// (prod خودش UTC است ⇒ بی‌اثر). رویدادِ core قبل از تحویلِ اتصال emit می‌شود ⇒ SET اولین فرمانِ صفِ آن است.
+(pool as any).pool.on('connection', (conn: any) => {
+  conn.query("SET time_zone = '+00:00'", (err: Error | null) => {
+    if (err) console.error('[db] SET time_zone failed:', err.message);
+  });
+});
+
 export async function query(text: string, params?: unknown[]) {
   const start = Date.now();
   const [result] = await pool.query(text, params as unknown[]);

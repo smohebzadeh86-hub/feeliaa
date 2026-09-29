@@ -9,7 +9,7 @@
 
 | متغیر | استفاده | پیش‌فرض | الزامی | Secret | اثر |
 |---|---|---|---|---|---|
-| `DATABASE_URL` | `db/connection.ts` | فرمتِ MySQL: `mysql://user:pass@host:port/db` (تا 2026-09-15 فرمتِ PostgreSQL بود؛ مهاجرت به MySQL به دستورِ صریحِ مالک — [PROJECT_STATUS](../../PROJECT_STATUS.md) §7) | عملاً بله | **بله** | اتصالِ mysql2 (قبلاً pg) |
+| `DATABASE_URL` | `db/connection.ts` | فرمتِ MySQL: `mysql://user:pass@host:port/db` (تا 2026-09-15 فرمتِ PostgreSQL بود؛ مهاجرت به MySQL به دستورِ صریحِ مالک — [PROJECT_STATUS](../../PROJECT_STATUS.md) §7) | عملاً بله | **بله** | اتصالِ mysql2 (قبلاً pg)؛ درایور `timezone:'Z'` + هر اتصال `SET time_zone='+00:00'` (2026-09-29) ⇒ همه‌ی DATETIMEها UTC، مستقل از time_zoneِ سرورِ MySQL |
 | `PORT` | `index.ts` | `3000` | خیر | خیر | پورتِ listen (همیشه `0.0.0.0`) |
 | `SONIOX_API_KEY` | `features/transcription/stt.routes.ts`، `features/sessions/`، `features/transcription/soniox/tempKey.ts`، `features/transcription/soniox/restClient.ts`، `features/transcription/batch/`، `features/legacy-ws/transcription.routes.ts` | — | برای STT بله | **بله** | نبود → `no-key`؛ batch `failed` |
 | `SONIOX_API_BASE` | `features/transcription/soniox/tempKey.ts`، `features/transcription/soniox/restClient.ts` | `https://api.soniox.com` | خیر | خیر | base REST |

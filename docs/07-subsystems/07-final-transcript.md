@@ -31,7 +31,7 @@ waiting_audio ──(صدا کامل)──→ transcribing ──→ polishing 
   - `syncing` ⇒ هر ۳۰ثانیه دوباره بررسی می‌شود، تا سقفِ `FINAL_TRANSCRIPT_AUDIO_WAIT_MS` (۳۰ دقیقه).
   - در بقیه‌ی حالت‌ها ⇒ `source=realtime`.
   - batchِ در جریان هم «syncing» حساب می‌شود، ولی **فقط** وقتی `batch_status IN ('queued','processing')` باشد. `transcriptStatus='pending'`ِ جلسه‌ی `realtime_reliable=false` همیشه pending است و ملاک نیست (باگی که در E2E پیدا شد).
-  - ⚠️ **منطقه‌ی زمانی:** عمرِ ردیف (`queued_at`) با `TIMESTAMPDIFF(…, NOW())` در خودِ MySQL حساب می‌شود. `NOW()`ِ MySQL وقتِ محلی است ولی درایور (`timezone:'Z'`) آن را UTC می‌خواند. مقایسه با `Date.now()` ردیف را ۳٫۵ ساعت در مکثِ اولیه نگه می‌داشت (E2E 2026-09-28).
+  - ⚠️ **منطقه‌ی زمانی:** عمرِ ردیف (`queued_at`) با `TIMESTAMPDIFF(…, NOW())` در خودِ MySQL حساب می‌شود. `NOW()`ِ MySQL وقتِ محلی است ولی درایور (`timezone:'Z'`) آن را UTC می‌خواند. مقایسه با `Date.now()` ردیف را ۳٫۵ ساعت در مکثِ اولیه نگه می‌داشت (E2E 2026-09-28). **(2026-09-29)** ریشه رفع شد: `server/src/db/connection.ts` رویِ هر اتصالِ pool `SET time_zone='+00:00'` می‌زند ⇒ `NOW()`/`CURRENT_TIMESTAMP` هم UTC است (prod از قبل UTC بود). ردیف‌هایِ قدیمیِ DBِ dev که با `NOW()` نوشته شده‌اند همچنان ۳:۳۰ جلوترند.
 - **transcribing:**
   - `getFullSessionAudio` ⇒ صدایِ ناقص (سگمنتِ گمشده یا خراب) ⇒ realtime.
   - فایلِ کامل ⇒ `uploadFileFromPath` ⇒ `createTranscription` با contextِ واحدِ درمان ⇒ poll ⇒ `buildTextFromAsyncTokens` با علائمِ جلسه.
