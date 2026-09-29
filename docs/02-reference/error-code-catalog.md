@@ -28,6 +28,7 @@
 | `chunk-corrupt` | 422 | همان | sha256 نخورد | UP: همان تکه دوباره |
 | `upload-closed` | 409 | chunks/complete/DELETE | آپلود دیگر `uploading` نیست | UP: خطایِ دائمی |
 | `chunks-missing` | 409 | `complete` (+`missing[]`) | تکه‌ای نرسیده | UP: همان تکه‌ها و دوباره complete |
+| `note-not-editable`، `note-empty`، `note-too-long` | 400 | `PATCH /api/notes/:id` (2026-09-29) | فقط یادداشتِ پیش از جلسه ویرایش‌پذیر است / متنِ خالی / > ۲۰۰۰۰ نویسه | UI: بنرِ خطا؛ ویرایش باز می‌ماند |
 | `bad-part` | 400 | `POST /api/uploads` (چندبخشی، 2026-09-25) | `group_id`/`part_index`/`parts_total` نامعتبر (بیش از ۱۰ بخش، …) | UP: خطایِ دائمی، کلِ گروه لغو |
 | `part-mismatch` | 409 | همان | همان بخشِ همان گروه قبلاً با فایلِ دیگری شروع شده | همان |
 | `group-closed` | 409 | `POST /api/uploads`، `complete` | بخشی از گروه رد (`failed`) یا لغو شده است | همان — «فایل‌ها را دوباره انتخاب کنید» |

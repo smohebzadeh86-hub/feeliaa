@@ -32,7 +32,7 @@ export interface ClientCorpus {
 export async function aggregateClientCorpus(clientId: string): Promise<ClientCorpus> {
   // فقط جلساتِ پایان‌یافته/بازیابی‌شده — جلسه‌ی در جریان هنوز متنِ نهایی ندارد.
   const sessionsResult = await query(
-    `SELECT id, session_num, date, source, transcript
+    `SELECT id, session_num, date, source, transcript, pre_note
      FROM sessions
      WHERE client_id = ? AND status IN ('completed', 'recovered')
      ORDER BY session_num ASC`,
@@ -47,13 +47,18 @@ export async function aggregateClientCorpus(clientId: string): Promise<ClientCor
        ORDER BY created_at ASC`,
       [row.id]
     );
+    const notes: CorpusNote[] = notesResult.rows.map((n: any) => ({ type: n.type, text: n.text, createdAt: n.created_at }));
+    // ستونِ قدیمیِ sessions.pre_note (2026-09-27..29، پیش از انتقال به session_notes) — تصمیمِ مالک: واردِ پرونده شود.
+    if (typeof row.pre_note === 'string' && row.pre_note.trim()) {
+      notes.unshift({ type: 'note_before', text: row.pre_note.trim(), createdAt: '' });
+    }
     sessions.push({
       id: row.id,
       sessionNum: row.session_num,
       date: row.date,
       source: row.source,
       transcript: row.transcript,
-      notes: notesResult.rows.map((n: any) => ({ type: n.type, text: n.text, createdAt: n.created_at })),
+      notes,
     });
   }
 

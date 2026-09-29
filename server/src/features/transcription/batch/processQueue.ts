@@ -7,7 +7,7 @@ import { query, pool } from '../../../db/connection.js';
 import { logEvent } from '../../../obs/eventLog.js';
 import { createKeyedLock } from '../../../shared/keyedLock.js';
 import {
-  QUEUE_DIR, ensureDir, audioPathFor, looksLikeValidContainer, isNoteFile, isArchiveFile, isLateFile, isNoteArchiveFile,
+  QUEUE_DIR, ensureDir, audioPathFor, looksLikeValidContainer, isNoteFile, isArchiveFile, isLateFile, isNoteArchiveFile, isPreNoteFile,
   seqFromFilename, runIdFromFilename, extFromFilename, mimeFromFilename, sessionIdFromFilename, pendingAudiosFor, removeAudioFile,
   type BatchPurpose,
 } from './queueFiles.js';
@@ -91,11 +91,12 @@ export async function applyBatchSegmentOnce(
       await conn.commit();
       return false;
     }
-    if (purpose === 'note') {
+    if (purpose === 'note' || purpose === 'pre-note') {
       if (text) {
+        // pre-note (2026-09-29): یادداشتِ صوتیِ پیش از جلسه ⇒ type='voice_before'؛ مثلِ note هرگز transcript نه (LAW-008).
         await conn.query(
-          `INSERT INTO session_notes (id, session_id, type, text, wall_clock) VALUES (?, ?, 'voice', ?, ?)`,
-          [randomUUID(), sessionId, text, new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })]
+          `INSERT INTO session_notes (id, session_id, type, text, wall_clock) VALUES (?, ?, ?, ?, ?)`,
+          [randomUUID(), sessionId, purpose === 'pre-note' ? 'voice_before' : 'voice', text, new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })]
         );
       }
     } else {
@@ -202,7 +203,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       // قطع، سهمیه‌ی Soniox، …) صدا از قبل امن ذخیره شده. idempotent (sha256) —
       // retryِ همین فایل روی این خط فقط no-op می‌کنه، ردیفِ تکراری نمی‌سازه.
       try {
-        await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, mimeFromFilename(file), 'durable', runIdFromFilename(file), purpose === 'note' ? 'note' : 'session');
+        await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, mimeFromFilename(file), 'durable', runIdFromFilename(file), purpose === 'note' ? 'note' : purpose === 'pre-note' ? 'prenote' : 'session');
       } catch (e) {
         if ((e as { code?: string })?.code === 'session-gone') { removeAudioFile(file); continue; } // (A4) LAW-010
         console.log('[batch] archive-for-admin failed, kept queued:', String(e).slice(0, 160));
@@ -228,8 +229,9 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       let text = '';
       try {
         const { treatmentUnits } = await import('../../treatment-unit/index.js');
-        const context = purpose === 'note' ? undefined : await treatmentUnits.sessionSttContext(sessionId);
-        text = await transcribeFileAsync(buffer, `${sessionId}.webm`, `feelia:${sessionId}:${purpose}`, { sessionContext: purpose !== 'note', context });
+        const isNoteLike = purpose === 'note' || purpose === 'pre-note';
+        const context = isNoteLike ? undefined : await treatmentUnits.sessionSttContext(sessionId);
+        text = await transcribeFileAsync(buffer, `${sessionId}.webm`, `feelia:${sessionId}:${purpose}`, { sessionContext: !isNoteLike, context, diarize: purpose !== 'pre-note' });
       } catch (e) {
         if (isPermanentTranscribeError(e)) {
           dropUnrecoverable(sessionId, file, purpose, buffer.length, 'soniox-invalid-audio');
@@ -244,9 +246,10 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       const applied = await applyBatchSegmentOnce(
         sessionId, sha256, text || '', purpose,
         purpose === 'late-transcript' ? LATE_TRANSCRIPT_LABEL : undefined,
-        purpose === 'note' ? undefined : recoveryKey(runIdFromFilename(file), seqFromFilename(file))
+        purpose === 'note' || purpose === 'pre-note' ? undefined : recoveryKey(runIdFromFilename(file), seqFromFilename(file))
       );
       // (A5، 2026-09-26) هر متنِ تازه‌ای که به جلسه‌ی از‌قبل‌completed رسید (نه فقط late-transcript) پرونده را به‌روز کند.
+      // pre-note هم (2026-09-29، تصمیمِ مالک: واردِ پرونده شود) — مثلاً جلسه‌ی آپلودی که پیش از رسیدنِ این متن completed شده.
       if (applied && text && text.trim() && purpose !== 'note') appliedLate = true;
       appliedCount++;
       removeAudioFile(file);
@@ -287,7 +290,7 @@ export async function retryQueuedBatches(): Promise<void> {
     const seen = new Set<string>();
     for (const f of readdirSync(QUEUE_DIR)) {
       const purpose: BatchPurpose = isNoteFile(f) ? 'note' : isArchiveFile(f) ? 'archive' : isLateFile(f) ? 'late-transcript'
-        : isNoteArchiveFile(f) ? 'note-archive' : 'transcript';
+        : isNoteArchiveFile(f) ? 'note-archive' : isPreNoteFile(f) ? 'pre-note' : 'transcript';
       const sessionId = sessionIdFromFilename(path.join(QUEUE_DIR, f));
       if (sessionId === null) continue; // فرمتِ ناشناخته — sweepِ ۲۴ساعته خودش رسیدگی می‌کند
       const key = `${sessionId}:${purpose}`;

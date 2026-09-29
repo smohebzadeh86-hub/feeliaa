@@ -89,7 +89,8 @@ globalThis.fetch = async (url, opts = {}) => {
     // ⭐ archive فقط آرشیو می‌شود، هرگز رونویسی — قبلاً mock آن را هم در batchQueue می‌گذاشت و
     // سگمنتی که اشتباهاً archive گرفته بود (مثلاً آخرین سگمنتِ finish در FAILED) تست را سبز نگه می‌داشت.
     const archiveOnly = purpose === 'archive' || purpose === 'note-archive';
-    if (!archiveOnly) (purpose === 'note' ? noteQueue : batchQueue).push({ sessionId: m[1] });
+    // pre-note (2026-09-29): سرورِ واقعی آن را فقط به session_notes(voice_before) می‌برد — نه صفِ transcript.
+    if (!archiveOnly && purpose !== 'pre-note') (purpose === 'note' ? noteQueue : batchQueue).push({ sessionId: m[1] });
     return json(202, { status: archiveOnly ? 'archived' : 'queued', purpose });
   }
   m = url.match(/^\/api\/sessions\/([^/?]+)\/batch-status$/);
@@ -1005,6 +1006,30 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       r55 === 'گوینده ۱: الف\n\nگوینده ۲: ب' && RT.removeMarkerFromText('متن', '[علامت · ۰۱:۰۰ — خشم]') === null &&
       RT.removeMarkerFromText('[علامت · ۰۰:۰۰ — خشم]\n\nگوینده ۱: الف', '[علامت · ۰۰:۰۰ — خشم]') === 'گوینده ۱: الف', JSON.stringify(r55));
     ok('T53c marker text is sanitised (no brackets/newlines from input)', RT.signMarker('۰۱:۰۰', 'a]\nb[') === '[علامت · ۰۱:۰۰ — a b]', RT.signMarker('۰۱:۰۰', 'a]\nb['));
+  }
+
+  // T56 (2026-09-29): یادداشتِ صوتیِ پیش از جلسه (intent='pre-note') که index.html بعد از ساختِ جلسه در صف می‌گذارد:
+  // (الف) uploadQueuedSegment آن را با purpose=pre-note می‌فرستد؛ (ب) drainِ جلسه‌ی زنده‌ی همان sessionId هم آن را
+  // با intentِ خودش (نه transcript/archive) آپلود و از صف پاک می‌کند — هرگز واردِ متنِ جلسه نمی‌شود.
+  {
+    newSession('s56');
+    const before = fetchUrls.length;
+    const doneA = await RT.withAudioLock('s56', () => RT.uploadQueuedSegment('s56', { runId: 'pnA1', seq: 0, blob: new Blob(['p'.repeat(600)]), intent: 'pre-note' }));
+    const upA = fetchUrls.slice(before).filter((u) => u.includes('/sessions/s56/batch-audio'));
+    ok('T56a pre-note record uploads with purpose=pre-note', doneA === true && upA.length === 1 && upA[0].includes('purpose=pre-note') && upA[0].includes('run=pnA1'), upA.join(','));
+
+    newSession('s57');
+    const added = await RT.audioQueue.add('s57', 'pnB1', 0, new Blob(['q'.repeat(600)]), 'audio/webm', 'pre-note');
+    const before57 = fetchUrls.length;
+    const s57 = RT.createSession('s57', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p57 = s57.start(); await sleep(5); serverOpen(FakeWS.last); await p57;
+    await sleep(80);
+    const up57 = fetchUrls.slice(before57).filter((u) => u.includes('/sessions/s57/batch-audio') && u.includes('run=pnB1'));
+    const left57 = (await RT.audioQueue.listForSession('s57')).filter((r) => r.runId === 'pnB1');
+    ok('T56b live session drain uploads queued pre-note with its own purpose, never transcript',
+      added === true && up57.length === 1 && up57[0].includes('purpose=pre-note') && left57.length === 0 &&
+      !batchQueue.some((q) => q.sessionId === 's57'), up57.join(',') + ' left=' + left57.length);
+    await s57.finish(); RT.forget(s57);
   }
 
   console.log(results.map((r) => r[0]).join('\n'));

@@ -418,6 +418,27 @@ input::-ms-reveal{display:none}
 .presence-line{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--ink-2)}
 .presence-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .presence-box textarea{width:100%;margin-top:10px;min-height:64px;font-size:13px}
+/* یادداشتِ پیش از جلسه — متنی + صوتی (2026-09-29): Setup، مودالِ آپلود، Wrapup و صفحه‌ی جلسه */
+.pre-note-area textarea{width:100%;min-height:64px;font-size:13px}
+.pre-voice-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.pre-voice-list:empty{display:none}
+.pre-voice-item{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.pre-voice-item audio{flex:1;min-width:150px;height:32px}
+.pre-voice-rec{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px;font-size:13px;color:var(--clay-deep);font-weight:600}
+.pre-voice-rec span{white-space:nowrap}
+.pre-voice-rec .btn{flex:none}
+.pre-voice-dot{width:10px;height:10px;border-radius:50%;background:var(--clay-deep);animation:preRecBlink 1.2s ease-in-out infinite}
+@keyframes preRecBlink{50%{opacity:.25}}
+.pre-note-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;align-items:center}
+.pre-note-hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.8}
+.pre-notes-title{font-size:13px;font-weight:700;color:var(--ink-2);margin:0 0 8px}
+.pre-notes{margin-bottom:14px}
+.pre-notes .note-item textarea{width:100%;min-height:96px;font-size:13.5px;margin:0 0 8px}
+.pre-notes .note-pending{color:var(--muted);font-size:13px}
+.note-edit{margin-right:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;font-family:inherit;padding:4px 10px;border-radius:8px;display:inline-flex;align-items:center;gap:5px}
+.note-edit svg{width:13px;height:13px}
+.note-edit:hover{color:var(--sage-deep);background:var(--sage-mist)}
+.note-edit+.note-remove{margin-right:0}
 
 .transcript-box{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:400px;overflow-y:auto;font-size:13.5px;line-height:2.1;white-space:pre-wrap;color:var(--ink-2)}
 .transcript-notes{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:200px;overflow-y:auto;margin-top:12px}
@@ -1138,8 +1159,16 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
         <div class="presence-chips" id="presenceChips"></div>
         <button class="tu-link" style="margin-top:8px" onclick="openEditUnitModal('setup')">تغییرِ نوعِ جلسه / اعضا…</button>
       </div>
-      <div style="margin-top:8px"><button class="tu-link" id="preNoteToggle" onclick="togglePreNote()">+ یادداشتِ پیش از جلسه (اختیاری)</button></div>
-      <textarea id="preNoteInput" hidden maxlength="2000" placeholder="مثلاً: امروز فقط یکی از زوجین می‌آید و بخشی از جلسه فردی است…"></textarea>
+      <div style="margin-top:8px"><button class="tu-link" id="preNoteToggle" onclick="togglePreNote()">+ یادداشتِ پیش از جلسه — متنی یا صوتی (اختیاری)</button></div>
+      <div id="preNoteArea" class="pre-note-area" hidden>
+        <textarea id="preNoteInput" maxlength="2000" placeholder="مثلاً: امروز فقط یکی از زوجین می‌آید و بخشی از جلسه فردی است…"></textarea>
+        <div class="pre-voice-list" id="setupPreVoiceList"></div>
+        <div class="pre-voice-rec" id="setupPreVoiceRec" hidden><span class="pre-voice-dot"></span><span>در حال ضبط</span><span id="setupPreVoiceTimer">۰۰:۰۰</span>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="preVoiceSetup.cancel()">انصراف</button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="preVoiceSetup.stop()">پایان ضبط</button></div>
+        <div class="pre-note-actions"><button type="button" class="btn btn-secondary btn-sm" id="setupPreVoiceBtn" onclick="preVoiceSetup.start()">ضبطِ یادداشتِ صوتی</button></div>
+        <div class="pre-note-hint">صدا همان لحظه‌ی پایانِ ضبط در همین مرورگر ذخیره می‌شود (با بستنِ صفحه نمی‌رود؛ همان مراجع را دوباره باز کنید) و با «شروع جلسه» به متن تبدیل می‌شود. متنِ تایپ‌شده تا شروعِ جلسه ذخیره نمی‌شود. بعد از پایانِ جلسه می‌توانید متن‌ها را ویرایش کنید.</div>
+      </div>
     </div>
     <div class="consent-box" id="consentBox">
       <div class="consent-title">
@@ -1248,6 +1277,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <p id="wrapupInfo" data-clarity-mask="true"></p>
     </div>
     <div class="session-summary" id="wrapupChips" data-clarity-mask="true"></div>
+    <div id="wrapupPreNotes" class="pre-notes" data-clarity-mask="true" hidden></div>
     <div id="wrapupSignsLog" data-clarity-mask="true" style="margin-bottom:14px"></div>
     <div id="wrapupNotesLog" data-clarity-mask="true" style="margin-bottom:14px"></div>
     <div id="notesList" data-clarity-mask="true"></div>
@@ -1338,6 +1368,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <!-- وضعیتِ پردازشِ فایلِ صوتیِ آپلودشده (فقط جلسه‌ی source=upload) -->
       <div id="uploadJobPanel" hidden></div>
       <!-- «متنِ نهایی» (migration 031): وضعیت، خام/نهایی، تلاشِ دوباره، روشن/خاموشِ قابلیت -->
+      <div id="sessionPreNotes" class="pre-notes" data-clarity-mask="true" hidden></div>
       <div id="finalTranscriptBar" class="ft-bar" hidden></div>
       <div class="transcript-box" id="transcriptBox"></div>
       <div class="transcript-notes" id="transcriptNotes" hidden></div>
@@ -1443,6 +1474,16 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <div id="audioUploadDate"></div>
     <div id="audioUploadDateHint" style="font-size:12px;color:var(--muted);margin-top:6px" hidden></div>
     <div style="margin-bottom:14px"></div>
+    <label>یادداشتِ پیش از جلسه (اختیاری)</label>
+    <div class="pre-note-area" style="margin-bottom:14px" data-clarity-mask="true">
+      <textarea id="upPreNoteInput" maxlength="2000" placeholder="توضیحی درباره‌ی این جلسه، متنی یا صوتی…"></textarea>
+      <div class="pre-voice-list" id="upPreVoiceList"></div>
+      <div class="pre-voice-rec" id="upPreVoiceRec" hidden><span class="pre-voice-dot"></span><span>در حال ضبط</span><span id="upPreVoiceTimer">۰۰:۰۰</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="preVoiceUpload.cancel()">انصراف</button>
+        <button type="button" class="btn btn-danger btn-sm" onclick="preVoiceUpload.stop()">پایان ضبط</button></div>
+      <div class="pre-note-actions"><button type="button" class="btn btn-secondary btn-sm" id="upPreVoiceBtn" onclick="preVoiceUpload.start()">ضبطِ یادداشتِ صوتی</button></div>
+      <div class="pre-note-hint">یادداشت‌ها بعد از «دریافت شد» به همین جلسه اضافه می‌شوند. صدای ضبط‌شده در این مرورگر ذخیره می‌شود؛ ولی فایل‌هایِ انتخاب‌شده و متنِ تایپ‌شده نه — تا آن موقع صفحه را نبندید.</div>
+    </div>
     <label class="up-consent" id="audioUploadConsentLabel"><input type="checkbox" id="audioUploadConsent" onchange="updateAudioUploadButton()"> مراجع به ضبط و رونویسیِ این جلسه رضایت داده است.</label>
     <div class="up-note">بعد از شروع، آپلود در پس‌زمینه ادامه پیدا می‌کند و اگر اینترنت قطع شود از همان‌جا ادامه می‌دهد. وقتی «دریافت شد» را دیدید، دیگر لازم نیست صفحه باز بماند — تبدیل به متن رویِ سرور انجام می‌شود و خبرتان می‌کنیم.</div>
     <div class="modal-actions">
@@ -2505,6 +2546,8 @@ function showScreen(name){
   // صفحه‌ی «همه» تبِ غیرفعال را انتخاب کرده باشد و برگردد، clientTabِ سراسری هنوز
   // 'inactive' می‌ماند و دکمه‌ی «مراجع جدید»ِ همین صفحه (که از newClientTargetStatus
   // می‌خواند) بی‌صدا یک مراجعِ غیرفعال می‌سازد.
+  if(name!=='Setup'&&preVoiceSetup.isRecording())preVoiceSetup.stop();
+  if(name==='Wrapup')refreshWrapupPreNotes();else stopWrapupPreNotesPoll();
   if(name==='Clients'){clientsView='today';clientTab='active';}
   else if(name==='AllClients'){clientsView='all';}
   const inFlow=['Setup','Live','Wrapup'].includes(name);
@@ -3383,7 +3426,7 @@ function renderAdminVoiceNoteGroup(it){
     it.notes.forEach(function(n){
       const item=document.createElement('div');item.className='vn-item';
       const info=document.createElement('span');
-      info.textContent=(n.wall_clock?toFa(n.wall_clock)+' · ':'')+toFa(n.text_len)+' نویسه';
+      info.textContent=(n.pre_session?'پیش از جلسه · ':'')+(n.wall_clock?toFa(n.wall_clock)+' · ':'')+toFa(n.text_len)+' نویسه';
       item.appendChild(info);
       let shown=null;
       item.appendChild(adminBtn('نمایشِ متن','btn-ghost',async function(){
@@ -3402,7 +3445,7 @@ function renderAdminVoiceNoteGroup(it){
     it.audio.forEach(function(a){
       const item=document.createElement('div');item.className='vn-item';
       const info=document.createElement('span');
-      info.textContent=fmtDateTime(a.created_at)+(a.duration_ms?' · '+fmtDur(a.duration_ms):'')+' · '+fmtBytes(a.bytes);
+      info.textContent=(a.pre_session?'پیش از جلسه · ':'')+fmtDateTime(a.created_at)+(a.duration_ms?' · '+fmtDur(a.duration_ms):'')+' · '+fmtBytes(a.bytes);
       item.appendChild(info);
       let player=null;
       item.appendChild(adminBtn('پخش','btn-secondary',function(){
@@ -3699,7 +3742,7 @@ async function openAdminClientSessions(clientId,title){
         try{
           const audioData=await api('/api/admin/sessions/'+s.id+'/audio');
           const sessionRows=(audioData.audio||[]).filter(function(a){return a.kind!=='note';});
-          const noteRows=(audioData.audio||[]).filter(function(a){return a.kind==='note';});
+          const noteRows=(audioData.audio||[]).filter(function(a){return a.kind==='note'||a.kind==='prenote';});
           const pending=Number(audioData.pending_count||0);
           // ⭐ بخشِ ۱۲/۱۳ی audit «zero-loss recording» (2026-09-22): قبلاً فقط یک بنرِ
           // تجمیعیِ «N فایل در صف» بود — بینِ «صدا کامل ولی رونویسی هنوز پردازش می‌شود»
@@ -3758,7 +3801,7 @@ async function openAdminClientSessions(clientId,title){
             row.style.cssText='display:flex;align-items:center;gap:8px';
             const segLabel=document.createElement('span');
             segLabel.style.cssText='font-size:11px;color:var(--muted);flex:none;min-width:90px;white-space:nowrap';
-            segLabel.textContent='یادداشتِ صوتی';
+            segLabel.textContent=a.kind==='prenote'?'یادداشتِ صوتیِ پیش از جلسه':'یادداشتِ صوتی';
             row.appendChild(segLabel);
             const player=document.createElement('audio');
             player.controls=true;
@@ -3814,7 +3857,8 @@ async function openAdminSessionDetail(sessionId,clientTitle){
     renderAdminSessionDiagnosis(sessionId);
     const nb=$('adminSessionDetailNotes');
     nb.innerHTML='';
-    (data.notes||[]).forEach(function(n){
+    const adminNotes=withLegacyPreNote(s,data.notes||[]);
+    adminNotes.forEach(function(n){
       const div=document.createElement('div');
       div.className='note-item';
       if(n.type==='sign'){
@@ -3823,15 +3867,16 @@ async function openAdminSessionDetail(sessionId,clientTitle){
         div.querySelector('.note-time').textContent=' — '+formatTimer(n.offset_ms||0);
         div.querySelector('p').textContent=n.sign_type||'';
       }else{
-        const tag=n.type==='voice'?'صوتی':'متنی';
-        const ic=n.type==='voice'?IC_MIC:IC_PEN;
-        const cls=n.type==='voice'?'note-tag tag-voice':'note-tag tag-text';
+        const isV=n.type==='voice'||n.type==='voice_before';
+        const tag=(isV?'صوتی':'متنی')+(isPreSessionNote(n)?' · پیش از جلسه':'');
+        const ic=isV?IC_MIC:IC_PEN;
+        const cls=isV?'note-tag tag-voice':'note-tag tag-text';
         div.innerHTML='<div class="note-head"><span class="'+cls+'">'+ic+tag+'</span></div><p></p>';
         div.querySelector('p').textContent=n.text||'';
       }
       nb.appendChild(div);
     });
-    if(!(data.notes||[]).length){
+    if(!adminNotes.length){
       const empty=document.createElement('p');
       empty.style.cssText='color:var(--muted);font-size:13px';
       empty.textContent='یادداشت/علامتی برایِ این جلسه ثبت نشده.';
@@ -4230,8 +4275,10 @@ async function confirmEditUnit(){
     loadClients();
     if(editUnitFrom==='setup'){
       const note=$('preNoteInput').value;
+      const clips=preVoiceSetup.take(); // یادداشت‌هایِ صوتیِ ضبط‌شده با بازسازیِ کارت از دست نروند
       await loadPresenceForSetup(currentClient);
-      if(note){$('preNoteInput').value=note;$('preNoteInput').hidden=false;$('preNoteToggle').hidden=true;}
+      preVoiceSetup.put(clips);
+      if(note||clips.length){$('preNoteInput').value=note;$('preNoteArea').hidden=false;$('preNoteToggle').hidden=true;}
     }else openClientDetail(id);
   }catch(e){showBanner('error',e.message);}
   finally{btn.disabled=false;}
@@ -4272,8 +4319,9 @@ let presenceSelected=null;   // Set از idها؛ همه = پیش‌فرض
 function resetPresence(){
   presenceUnit=null;presenceSelected=null;
   $('presenceBox').hidden=true;$('presenceEdit').hidden=true;
-  $('preNoteInput').hidden=true;$('preNoteInput').value='';
+  $('preNoteArea').hidden=true;$('preNoteInput').value='';
   $('preNoteToggle').hidden=false;
+  preVoiceSetup.release(); // پیش‌نویسِ پایدار نگه داشته می‌شود
 }
 async function loadPresenceForSetup(client){
   resetPresence();
@@ -4291,6 +4339,7 @@ async function loadPresenceForSetup(client){
       renderPresence();
     }
   }catch(e){/* fail-open: بدونِ کارتِ حاضرین هم جلسه شروع می‌شود */}
+  restorePreVoiceDrafts(client).catch(function(){});
 }
 function renderPresence(){
   if(!presenceUnit)return;
@@ -4310,7 +4359,7 @@ function renderPresence(){
   });
 }
 function togglePresenceEdit(){$('presenceEdit').hidden=!$('presenceEdit').hidden;}
-function togglePreNote(){$('preNoteInput').hidden=false;$('preNoteToggle').hidden=true;$('preNoteInput').focus();}
+function togglePreNote(){$('preNoteArea').hidden=false;$('preNoteToggle').hidden=true;$('preNoteInput').focus();}
 function presenceBody(){
   const body={};
   if(presenceUnit&&presenceSelected&&presenceSelected.size<presenceUnit.members.length)body.attendees=Array.from(presenceSelected);
@@ -4318,6 +4367,330 @@ function presenceBody(){
   if(note)body.pre_note=note;
   return body;
 }
+
+// ===== یادداشتِ پیش از جلسه — متنی + صوتی (2026-09-29، درخواستِ مالک) =====
+// متن: همراهِ POST /api/sessions (pre_note) ⇒ سرور ردیفِ session_notes(type='note_before') می‌سازد.
+// صدا: تا ساختِ جلسه پیش‌نویسِ پایدار در IndexedDBِ مرورگر (PreDraft)؛ بعد با intent='pre-note' در صفِ پایدارِ FeeliaRT (IndexedDB) و آپلود ⇒
+// سرور آرشیو (kind='prenote'، شنیدنی در پنلِ ادمین، همان ۱۴ روز) و رونویسی ⇒ session_notes(type='voice_before').
+// ویرایش فقط بعد از پایانِ ضبط (Wrapup / صفحه‌ی جلسه) — PATCH /api/notes/:id. هیچ‌کدام واردِ متنِ جلسه نمی‌شوند.
+const PRE_VOICE_MAX_MS=5*60000;
+// پیش‌نویسِ پایدارِ صدا (2026-09-29): کلیپِ صفحه‌ی شروع همان لحظه‌ی پایانِ ضبط در IndexedDBِ جدا (feelia-predraft) نوشته می‌شود
+// تا بستن/رفرشِ صفحه پیش از «شروع جلسه» آن را از بین نبرد؛ با بازکردنِ دوباره‌ی همان مراجع برمی‌گردد.
+// پاک می‌شود: با «حذف»ِ کاربر، یا وقتی کلیپ به صفِ پایدارِ جلسه (FeeliaRT) رسید/آپلود شد. بیش از ۱۴ روز = منقضی.
+const PreDraft=(function(){
+  const DB='feelia-predraft',STORE='clips',MAX_AGE=14*86400000;
+  let dbp=null;
+  function open(){
+    if(dbp)return dbp;
+    dbp=new Promise(function(resolve,reject){
+      if(!window.indexedDB){reject(new Error('no-indexeddb'));return;}
+      const req=indexedDB.open(DB,1);
+      req.onupgradeneeded=function(){
+        const db=req.result;
+        if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE,{keyPath:'id'}).createIndex('scope','scope',{unique:false});
+      };
+      req.onsuccess=function(){resolve(req.result);};
+      req.onerror=function(){reject(req.error||new Error('open-failed'));};
+    });
+    return dbp;
+  }
+  function run(mode,fn){
+    return open().then(function(db){
+      return new Promise(function(resolve,reject){
+        const tx=db.transaction(STORE,mode);
+        let r;
+        try{r=fn(tx.objectStore(STORE));}catch(e){reject(e);return;}
+        tx.oncomplete=function(){resolve(r&&'result' in r?r.result:undefined);};
+        tx.onerror=tx.onabort=function(){reject(tx.error||new Error('tx-failed'));};
+      });
+    });
+  }
+  return {
+    put:function(rec){return run('readwrite',function(s){return s.put(rec);}).then(function(){return true;},function(){return false;});},
+    del:function(id){if(!id)return Promise.resolve();return run('readwrite',function(s){return s.delete(id);}).catch(function(){});},
+    list:function(scope){
+      return run('readonly',function(s){return s.index('scope').getAll(scope);}).then(function(all){
+        const now=Date.now(),fresh=[];
+        (all||[]).forEach(function(r){if(now-r.createdAt>MAX_AGE)PreDraft.del(r.id);else fresh.push(r);});
+        return fresh.sort(function(a,b){return a.createdAt-b.createdAt;});
+      }).catch(function(){return [];});
+    },
+    // (E2E 2026-09-29) list فقط پیش‌نویس‌هایِ مراجعی را منقضی می‌کند که دوباره باز شود — پیش‌نویسِ مراجعِ حذف‌شده/بازنشده
+    // برایِ همیشه در مرورگر می‌ماند. یک بار در هر بارگذاریِ صفحه همه‌ی پیش‌نویس‌هایِ کهنه‌تر از MAX_AGE پاک می‌شوند.
+    purgeExpired:function(){
+      return run('readonly',function(s){return s.getAll();}).then(function(all){
+        const now=Date.now();
+        return Promise.all((all||[]).filter(function(r){return !r.createdAt||now-r.createdAt>MAX_AGE;}).map(function(r){return PreDraft.del(r.id);}));
+      }).catch(function(){});
+    }
+  };
+})();
+setTimeout(function(){PreDraft.purgeExpired();},5000);
+function makePreVoice(prefix,scopeFn){
+  const st={clips:[],rec:null,stream:null,chunks:[],t0:0,timer:null,discard:false,waiters:[],scope:null};
+  const el=function(id){return document.getElementById(prefix+id);};
+  function render(){
+    const box=el('PreVoiceList');
+    if(box){
+      box.innerHTML='';
+      st.clips.forEach(function(c,i){
+        const row=document.createElement('div');row.className='pre-voice-item';
+        const tag=document.createElement('span');tag.className='note-tag tag-voice';
+        tag.innerHTML=IC_MIC;tag.appendChild(document.createTextNode('یادداشتِ صوتیِ '+toFa(i+1)+' · '+formatTimer(c.durMs)));
+        row.appendChild(tag);
+        const a=document.createElement('audio');a.controls=true;a.preload='metadata';a.src=c.url;row.appendChild(a);
+        const rm=document.createElement('button');rm.type='button';rm.className='note-remove';rm.innerHTML=IC_TRSH+'حذف';
+        rm.addEventListener('click',function(){try{URL.revokeObjectURL(c.url);}catch(e){}PreDraft.del(c.draftId);st.clips.splice(i,1);render();});
+        row.appendChild(rm);
+        box.appendChild(row);
+      });
+    }
+    const recOn=!!st.rec;
+    if(el('PreVoiceRec'))el('PreVoiceRec').hidden=!recOn;
+    if(el('PreVoiceBtn'))el('PreVoiceBtn').hidden=recOn;
+  }
+  function tick(){
+    const ms=Date.now()-st.t0;
+    if(el('PreVoiceTimer'))el('PreVoiceTimer').textContent=formatTimer(ms);
+    if(ms>=PRE_VOICE_MAX_MS)stop(); // سقفِ ۵ دقیقه
+  }
+  async function start(){
+    if(st.rec)return;
+    if(!window.MediaRecorder||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+      showBanner('error','ضبطِ صدا در این مرورگر ممکن نیست — لطفاً یادداشت را تایپ کنید.');return;
+    }
+    let stream;
+    try{stream=await Mic_requestStream(MicModule.LIVE_CONSTRAINTS);}
+    catch(e){showBanner('error','دسترسی به میکروفون ممکن نشد — لطفاً یادداشت را تایپ کنید.');return;}
+    if(st.rec){Mic_stopStream(stream);return;}
+    const mime=Mic_pickMimeType();
+    let rec;
+    try{rec=Mic_createRecorder(stream,mime);}
+    catch(e){Mic_stopStream(stream);showBanner('error','ضبطِ صدا شروع نشد — لطفاً یادداشت را تایپ کنید.');return;}
+    st.stream=stream;st.rec=rec;st.chunks=[];st.discard=false;st.t0=Date.now();
+    st.scope=scopeFn?scopeFn():null; // مراجعِ لحظه‌ی شروعِ ضبط (پیش‌نویسِ پایدار)
+    rec.ondataavailable=function(e){if(e.data&&e.data.size)st.chunks.push(e.data);};
+    rec.onstop=function(){
+      const durMs=Date.now()-st.t0;
+      Mic_stopStream(st.stream);st.stream=null;
+      if(st.timer){clearInterval(st.timer);st.timer=null;}
+      const type=rec.mimeType||mime||'audio/webm';
+      const blob=new Blob(st.chunks,{type:type});
+      st.chunks=[];st.rec=null;
+      if(!st.discard&&blob.size>1000){
+        const clip={blob:blob,mime:type,durMs:durMs,url:URL.createObjectURL(blob)};
+        st.clips.push(clip);
+        if(st.scope){
+          const id='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
+          // ذخیره‌ی ناموفق (بدونِ IndexedDB/سهمیه) ⇒ کلیپ فقط در حافظه می‌ماند (draftId ندارد)
+          clip.draftId=id; // خوش‌بینانه (تا «حذف»/«شروع» پیش از پایانِ نوشتن هم درست پاک کند)
+          PreDraft.put({id:id,scope:st.scope,blob:blob,mime:type,durMs:durMs,createdAt:Date.now()}).then(function(ok){if(!ok)delete clip.draftId;});
+        }
+      }
+      render();
+      const w=st.waiters;st.waiters=[];w.forEach(function(f){f();});
+    };
+    rec.start(1000);
+    if(el('PreVoiceTimer'))el('PreVoiceTimer').textContent=formatTimer(0);
+    st.timer=setInterval(tick,500);
+    render();
+  }
+  // Promise: تا onstop (کلیپ به فهرست اضافه شده) — برایِ «شروع جلسه»/آپلود وسطِ ضبط.
+  function stop(){
+    if(!st.rec)return Promise.resolve();
+    const p=new Promise(function(res){st.waiters.push(res);});
+    try{if(st.rec.state!=='inactive')st.rec.stop();}catch(e){}
+    return p;
+  }
+  function cancel(){st.discard=true;return stop();}
+  // release: فقط حافظه/صفحه را خالی می‌کند (پیش‌نویسِ پایدار می‌ماند)؛ clear: دورریختنِ واقعی (پیش‌نویس هم پاک می‌شود)
+  function release(){
+    if(st.rec)cancel();
+    st.clips.forEach(function(c){try{URL.revokeObjectURL(c.url);}catch(e){}});
+    st.clips=[];render();
+  }
+  function clear(){st.clips.forEach(function(c){PreDraft.del(c.draftId);});release();}
+  function take(){const c=st.clips;st.clips=[];render();return c;} // مالکیتِ کلیپ‌ها (و objectURLها) به caller می‌رسد
+  function put(clips){
+    // کلیپِ هم‌شناسه (مثلاً بازگردانی از پیش‌نویس هم‌زمان با put) دوباره اضافه نمی‌شود
+    const have={};st.clips.forEach(function(c){if(c.draftId)have[c.draftId]=1;});
+    (clips||[]).forEach(function(c){
+      if(c.draftId&&have[c.draftId]){try{URL.revokeObjectURL(c.url);}catch(e){}return;}
+      st.clips.push(c);
+    });
+    render();
+  }
+  return {start:start,stop:stop,cancel:cancel,clear:clear,release:release,take:take,put:put,
+    count:function(){return st.clips.length;},isRecording:function(){return !!st.rec;}};
+}
+const preVoiceSetup=makePreVoice('setup',function(){return currentClient&&currentClient.id?String(currentClient.id):null;});
+// بازگردانیِ کلیپ‌هایِ پیش‌نویسِ همین مراجع (صفحه بسته/رفرش شده بود) — بعد از resetPresence
+async function restorePreVoiceDrafts(client){
+  const recs=await PreDraft.list(String(client.id));
+  if(!recs.length||!currentClient||currentClient.id!==client.id)return;
+  preVoiceSetup.put(recs.map(function(r){return {blob:r.blob,mime:r.mime,durMs:r.durMs,draftId:r.id,url:URL.createObjectURL(r.blob)};}));
+  $('preNoteArea').hidden=false;$('preNoteToggle').hidden=true;
+  showBanner('info','یادداشتِ صوتیِ ذخیره‌شده‌ی پیش از جلسه بازیابی شد.');
+}
+const preVoiceUpload=makePreVoice('up',function(){return currentClient&&currentClient.id?String(currentClient.id):null;});
+// شمارِ یادداشت‌هایِ صوتیِ پیش از جلسه که همین تب برایِ هر جلسه فرستاده — برایِ «در حالِ آماده‌سازیِ متن…» در Wrapup.
+const preVoiceSent={};
+
+function genPreNoteRunId(){return 'pn'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);}
+async function enqueuePreVoiceClips(sessionId,clips){
+  if(!sessionId||!clips||!clips.length)return;
+  preVoiceSent[sessionId]=(preVoiceSent[sessionId]||0)+clips.length;
+  const RT=window.FeeliaRT;
+  for(const c of clips){
+    const run=genPreNoteRunId();
+    let queued=false;
+    try{if(RT&&RT.audioQueue)queued=await RT.audioQueue.add(sessionId,run,0,c.blob,c.mime,'pre-note');}catch(e){}
+    if(queued)await PreDraft.del(c.draftId); // از اینجا به بعد صفِ پایدارِ جلسه نگهبانِ صدا است
+    if(queued&&RT.withAudioLock&&RT.uploadQueuedSegment){
+      // آپلودِ فوری زیرِ همان قفلِ مشترکِ صف؛ اگر نشد در صف می‌ماند (drainِ جلسه‌ی زنده یا sweepِ دوره‌ای دوباره می‌فرستد).
+      try{
+        await RT.withAudioLock(sessionId,async function(){
+          const rows=(await RT.audioQueue.listForSession(sessionId)).filter(function(r){return r.runId===run;});
+          for(const r of rows){if(await RT.uploadQueuedSegment(sessionId,r))await RT.audioQueue.remove(r.id,r.bytes);}
+        });
+      }catch(e){}
+    }else if(!queued){
+      // بدونِ IndexedDB (یا صفِ پر): یک تلاشِ مستقیم — تنها حالتی که صدا ممکن است نرسد.
+      try{
+        const fd=new FormData();fd.append('file',c.blob,'pre-note');
+        const r=await fetch('/api/sessions/'+sessionId+'/batch-audio?purpose=pre-note&seq=0&run='+run,{method:'POST',body:fd});
+        if(r.ok)await PreDraft.del(c.draftId);
+      }catch(e){}
+    }
+    try{URL.revokeObjectURL(c.url);}catch(e){}
+  }
+}
+async function hasLocalPreVoice(sessionId){
+  try{
+    const q=window.FeeliaRT&&window.FeeliaRT.audioQueue;
+    if(!q)return false;
+    return (await q.listForSession(sessionId)).some(function(r){return r.intent==='pre-note';});
+  }catch(e){return false;}
+}
+
+function isPreSessionNote(n){return !!n&&(n.type==='note_before'||n.type==='voice_before');}
+// ستونِ قدیمیِ sessions.pre_note (2026-09-27..29) فقط‌خواندنی کنارِ بقیه نمایش داده می‌شود.
+function withLegacyPreNote(session,notes){
+  const out=(notes||[]).slice();
+  if(session&&typeof session.pre_note==='string'&&session.pre_note.trim())out.unshift({id:null,type:'note_before',text:session.pre_note.trim(),legacy:true});
+  return out;
+}
+// state: {session, notes} — notes همان آرایه‌ی کاملِ یادداشت‌هایِ جلسه (این تابع فقط پیش از جلسه‌ها را نشان/تغییر می‌دهد).
+function renderPreNotesEditor(box,state,opts){
+  opts=opts||{};
+  const items=withLegacyPreNote(state.session,state.notes).filter(isPreSessionNote);
+  const pending=opts.pendingVoice||0;
+  box.innerHTML='';
+  box.hidden=!items.length&&!pending;
+  if(box.hidden)return;
+  const rerender=function(){renderPreNotesEditor(box,state,opts);};
+  const title=document.createElement('div');title.className='pre-notes-title';title.textContent='یادداشت‌هایِ پیش از جلسه';
+  box.appendChild(title);
+  items.forEach(function(n){
+    const isV=n.type==='voice_before';
+    const div=document.createElement('div');div.className='note-item';
+    const head=document.createElement('div');head.className='note-head';
+    head.innerHTML='<span class="note-tag '+(isV?'tag-voice':'tag-text')+'">'+(isV?IC_MIC:IC_PEN)+(isV?'صوتی':'متنی')+'</span>';
+    const tm=document.createElement('span');tm.className='note-time';tm.textContent=n.wall_clock?toFa(n.wall_clock):'';head.appendChild(tm);
+    div.appendChild(head);
+    const p=document.createElement('p');p.textContent=n.text||'';div.appendChild(p);
+    if(!n.legacy&&n.id){
+      const ed=document.createElement('button');ed.type='button';ed.className='note-edit';ed.innerHTML=IC_PEN+'ویرایش';
+      const rm=document.createElement('button');rm.type='button';rm.className='note-remove';rm.innerHTML=IC_TRSH+'حذف';
+      head.appendChild(ed);head.appendChild(rm);
+      ed.addEventListener('click',function(){
+        const ta=document.createElement('textarea');ta.value=n.text||'';ta.maxLength=20000;
+        const row=document.createElement('div');row.className='btn-row';
+        const cancel=document.createElement('button');cancel.type='button';cancel.className='btn btn-ghost btn-sm';cancel.textContent='انصراف';
+        const save=document.createElement('button');save.type='button';save.className='btn btn-secondary btn-sm';save.textContent='ذخیره';
+        row.appendChild(cancel);row.appendChild(save);
+        p.replaceWith(ta);div.appendChild(row);ed.hidden=true;rm.hidden=true;ta.focus();
+        cancel.addEventListener('click',rerender);
+        save.addEventListener('click',async function(){
+          const text=ta.value.trim();
+          if(!text){showBanner('error','متنِ یادداشت خالی است — برایِ پاک‌کردن «حذف» را بزنید.');return;}
+          save.disabled=true;
+          try{
+            const d=await api('/api/notes/'+n.id,{method:'PATCH',body:{text:text}});
+            n.text=(d&&d.note&&d.note.text)||text;
+            rerender();
+          }catch(e){save.disabled=false;showBanner('error','ذخیره‌ی یادداشت ناموفق بود: '+escapeHtml(e.message||''));}
+        });
+      });
+      rm.addEventListener('click',function(){
+        showGenericConfirm({title:'حذفِ یادداشت؟',text:'این یادداشتِ پیش از جلسه پاک می‌شود.',okLabel:'حذف',onConfirm:async function(){
+          try{
+            await api('/api/notes/'+n.id,{method:'DELETE'});
+            const i=state.notes.indexOf(n);if(i>=0)state.notes.splice(i,1);
+            rerender();
+          }catch(e){showBanner('error','حذفِ یادداشت ناموفق بود.');}
+        }});
+      });
+    }
+    box.appendChild(div);
+  });
+  for(let i=0;i<pending;i++){
+    const div=document.createElement('div');div.className='note-item';
+    div.innerHTML='<div class="note-head"><span class="note-tag tag-voice">'+IC_MIC+'صوتی</span></div><p class="note-pending">در حالِ آماده‌سازیِ متنِ یادداشتِ صوتی…</p>';
+    box.appendChild(div);
+  }
+}
+
+// Wrapup: بارگذاری + poll تا متنِ یادداشت‌هایِ صوتیِ پیش از جلسه برسد (حداکثر ۵ دقیقه).
+let wrapupPreTimer=null;
+let wrapupPreState=null;
+function stopWrapupPreNotesPoll(){if(wrapupPreTimer){clearTimeout(wrapupPreTimer);wrapupPreTimer=null;}}
+async function refreshWrapupPreNotes(startedAt){
+  stopWrapupPreNotesPoll();
+  if(!currentSession)return;
+  const sid=currentSession.id;
+  startedAt=startedAt||Date.now();
+  let data=null,status=null;
+  try{data=await api('/api/sessions/'+sid,{timeoutMs:15000});}catch(e){return;}
+  try{status=await api('/api/sessions/'+sid+'/batch-status',{timeoutMs:15000});}catch(e){}
+  if(!currentSession||currentSession.id!==sid||$('screenWrapup').hidden)return;
+  // ویرایشِ در حالِ انجام را با رندرِ تازه دور نریز
+  if($('wrapupPreNotes').querySelector('textarea')){wrapupPreTimer=setTimeout(function(){refreshWrapupPreNotes(startedAt);},5000);return;}
+  const have=(data.notes||[]).filter(function(n){return n.type==='voice_before';}).length;
+  const inFlight=!!(status&&status.pre_note_audio_pending)||await hasLocalPreVoice(sid);
+  const pending=inFlight?Math.max(1,(preVoiceSent[sid]||0)-have):0;
+  wrapupPreState={session:data.session,notes:data.notes||[]};
+  renderPreNotesEditor($('wrapupPreNotes'),wrapupPreState,{pendingVoice:pending});
+  if(pending&&Date.now()-startedAt<5*60000){
+    wrapupPreTimer=setTimeout(function(){refreshWrapupPreNotes(startedAt);},5000);
+  }
+}
+
+// آپلودِ فایلِ صوتی: یادداشت‌هایِ پیش از جلسه وقتی اضافه می‌شوند که سرور جلسه را ساخت (taskِ done/duplicate با sessionId).
+const pendingUploadPreNotes=[];
+function flushUploadPreNotes(){
+  if(!pendingUploadPreNotes.length||!window.FeeliaUpload)return;
+  const list=window.FeeliaUpload.list();
+  for(let i=pendingUploadPreNotes.length-1;i>=0;i--){
+    const pn=pendingUploadPreNotes[i];
+    if(!pn.keys)continue; // هنوز کلیدِ task معلوم نیست
+    const mine=list.filter(function(t){return pn.keys.indexOf(t.key)>=0;});
+    const done=mine.filter(function(t){return t.sessionId&&(t.state==='done'||t.state==='duplicate');})[0];
+    if(done){
+      pendingUploadPreNotes.splice(i,1);
+      if(pn.text){
+        api('/api/sessions/'+done.sessionId+'/notes',{method:'POST',body:{type:'note_before',text:pn.text,wall_clock:nowClock()}})
+          .catch(function(){showBanner('error','یادداشتِ متنیِ پیش از جلسه‌ی آپلود ذخیره نشد.');});
+      }
+      enqueuePreVoiceClips(done.sessionId,pn.clips);
+    }else if(!mine.length){
+      // کار لغو/پاک شد ⇒ یادداشت‌ها جایی برایِ رفتن ندارند
+      pendingUploadPreNotes.splice(i,1);
+      (pn.clips||[]).forEach(function(c){try{URL.revokeObjectURL(c.url);}catch(e){}PreDraft.del(c.draftId);});
+    }
+  }
+}
+if(window.FeeliaUpload)window.FeeliaUpload.onChange(flushUploadPreNotes);
 
 async function loadClients(){
   try{
@@ -6076,15 +6449,17 @@ async function doViewTranscript(sessionId){
     $('resolveSpeakersStatus').hidden=true;
     if(resolveSpeakersPollTimer){clearInterval(resolveSpeakersPollTimer);resolveSpeakersPollTimer=null;}
     loadFinalTranscript(sessionId,isManualSession);
+    renderPreNotesEditor($('sessionPreNotes'),{session:data.session,notes:currentViewNotes},{});
+    const otherNotes=(data.notes||[]).filter(function(n){return !isPreSessionNote(n);});
     const nb=$('transcriptNotes');
     if(isManualSession){
       // ⭐ برایِ جلسه‌ی دستی، یادداشت‌ها محتوایِ اصلی‌اند — با کارتِ `.note-item`ِ Wrapup
       // (برچسبِ صوتی/متنی + حذف)، نه ردیفِ ریزِ inline که برایِ جلسه‌ی زنده طراحی شده بود.
-      renderArchiveNotesList(data.notes||[]);
-    }else if(data.notes&&data.notes.length){
+      renderArchiveNotesList(otherNotes);
+    }else if(otherNotes.length){
       nb.hidden=false;
       let html='';
-      data.notes.forEach(function(n){
+      otherNotes.forEach(function(n){
         if(n.type==='sign'){
           html+='<div class="inline-sign">'+IC_EYE+'<span></span><span style="color:var(--muted)">'+(n.offset_ms?formatTimer(n.offset_ms):'')+'</span></div>';
         }else{
@@ -6101,7 +6476,7 @@ async function doViewTranscript(sessionId){
       const sSpans=nb.querySelectorAll('.inline-sign span:first-of-type');
       const nSpans=nb.querySelectorAll('.inline-note span:first-of-type');
       let si=0,ni=0;
-      data.notes.forEach(function(n){
+      otherNotes.forEach(function(n){
         if(n.type==='sign'){
           if(sSpans[si])sSpans[si].textContent=n.sign_type;
           si++;
@@ -6665,6 +7040,7 @@ async function startSession(){
   if($('btnStartSession').disabled)return;
   $('btnStartSession').disabled=true;
   uxTrack('session_start_clicked');
+  if(preVoiceSetup.isRecording())await preVoiceSetup.stop();
   try{
     // ⭐ تاریخ/ساعت از همان ساعتِ دستگاه که صفحه‌ی Setup نشان داده (شمسی، ارقامِ لاتین) —
     // قبلاً سرور تاریخِ میلادیِ خودش را می‌گذاشت و با نمایش و ثبتِ دستی ناهمگون بود.
@@ -6673,6 +7049,8 @@ async function startSession(){
     currentSession=data.session;
     if(data.client&&data.client.recording_consent_at)markClientConsent(currentClient.id,data.client.recording_consent_at);
     uxTrack('session_started');
+    // یادداشت‌هایِ صوتیِ پیش از جلسه ⇒ صفِ پایدار + آپلود (fire-and-forget؛ شروعِ جلسه را بلاک نمی‌کند — LAW-012)
+    enqueuePreVoiceClips(currentSession.id,preVoiceSetup.take());
     // P3: session فعال را برای resume بعد از reload نگه دار
     try{localStorage.setItem('feelia_active_session',currentSession.id);}catch(e){}
     $('recChip').innerHTML=IC_MIC+'<span></span>';
@@ -7881,7 +8259,7 @@ function renderVoiceTimer(){$('voiceTimer').textContent=formatTimer(voiceElapsed
 // بدونِ صدازدنِ viewTranscript (که اسکرول می‌کند و ضبطِ فعال را cleanup می‌کند، B2).
 function renderArchiveNotesList(notes){
   const nb=$('transcriptNotes');
-  const items=(notes||[]).filter(function(n){return n.type!=='sign';});
+  const items=(notes||[]).filter(function(n){return n.type!=='sign'&&!isPreSessionNote(n);}); // پیش از جلسه‌ها در #sessionPreNotes
   if(!items.length){nb.hidden=true;nb.innerHTML='';return;}
   nb.hidden=false;
   nb.innerHTML='';
@@ -8429,6 +8807,10 @@ function openAudioUploadFromSetup(){
   if(!currentClient)return;
   openAudioUploadModal();
   audioUploadFromSetup=true;
+  // یادداشتِ پیش از جلسه‌ای که در صفحه‌ی شروع نوشته/ضبط شده همراهِ همین آپلود می‌رود
+  if(preVoiceSetup.isRecording())preVoiceSetup.stop().then(function(){preVoiceUpload.put(preVoiceSetup.take());});
+  else preVoiceUpload.put(preVoiceSetup.take());
+  $('upPreNoteInput').value=$('preNoteInput').value;
 }
 function openAudioUploadModal(){
   if(!currentClient)return;
@@ -8436,6 +8818,8 @@ function openAudioUploadModal(){
   audioUploadFiles=[];
   audioUploadDateVal='';
   audioUploadDateTouched=false;
+  preVoiceUpload.clear();
+  $('upPreNoteInput').value='';
   $('audioUploadFor').textContent='جلسه‌ی تازه برایِ '+currentClient.code+(currentClient.alias?' — '+currentClient.alias:'')+' ساخته می‌شود؛ متنِ فایل با تفکیکِ گوینده در آن ثبت می‌شود.';
   $('audioUploadErr').hidden=true;
   $('audioUploadConsent').checked=false;
@@ -8447,6 +8831,13 @@ function openAudioUploadModal(){
 }
 function closeAudioUploadModal(){
   $('audioUploadModal').classList.remove('open');
+  // انصراف از مودالی که از صفحه‌ی شروع باز شده بود ⇒ یادداشت‌ها به همان صفحه برمی‌گردند
+  if(audioUploadFromSetup){
+    const back=function(){preVoiceSetup.put(preVoiceUpload.take());};
+    if(preVoiceUpload.isRecording())preVoiceUpload.stop().then(back);else back();
+    $('preNoteInput').value=$('upPreNoteInput').value;
+  }else preVoiceUpload.clear();
+  $('upPreNoteInput').value='';
   audioUploadFromSetup=false;
   audioUploadFiles=[];
 }
@@ -8557,8 +8948,10 @@ function audioUploadConsentOk(){return !!clientConsentDate(currentClient)||$('au
 function updateAudioUploadButton(){
   $('audioUploadStartBtn').disabled=!(audioUploadFiles.length&&audioUploadConsentOk());
 }
-function startAudioUpload(){
+async function startAudioUpload(){
   if(!audioUploadFiles.length||!audioUploadConsentOk()||!currentClient||!window.FeeliaUpload)return;
+  if(preVoiceUpload.isRecording())await preVoiceUpload.stop();
+  const pre={keys:null,text:$('upPreNoteInput').value.trim().slice(0,2000),clips:preVoiceUpload.take()};
   // رضایتِ تازه با همین آپلود رویِ سرور ثبت می‌شود (POST /api/uploads با consent:true) — دفعه‌ی بعد پرسیده نشود.
   if(!clientConsentDate(currentClient))markClientConsent(currentClient.id,new Date().toISOString());
   requestCaseFileNotificationPermission();
@@ -8567,14 +8960,22 @@ function startAudioUpload(){
     clientLabel:currentClient.alias?(currentClient.alias+' ('+currentClient.code+')'):currentClient.code,
     sessionDate:audioUploadDateVal||'',
   };
+  let started;
   if(audioUploadFiles.length>1){
     opts.files=audioUploadFiles.map(function(x){return x.file;});
-    window.FeeliaUpload.startGroup(opts);
+    started=window.FeeliaUpload.startGroup(opts);
   }else{
     opts.file=audioUploadFiles[0].file;
-    window.FeeliaUpload.start(opts);
+    started=window.FeeliaUpload.start(opts);
+  }
+  if(pre.text||pre.clips.length){
+    pendingUploadPreNotes.push(pre);
+    Promise.resolve(started).then(function(t){pre.keys=[].concat(t||[]).map(function(x){return x&&x.key;}).filter(Boolean);flushUploadPreNotes();})
+      .catch(function(){pre.keys=[];flushUploadPreNotes();});
   }
   const fromSetup=audioUploadFromSetup;
+  audioUploadFromSetup=false; // یادداشت‌ها به آپلود رفتند — بستنِ مودال نباید آن‌ها را به صفحه‌ی شروع برگرداند
+  $('upPreNoteInput').value='';
   closeAudioUploadModal();
   if(fromSetup)openClientDetail(currentClient.id);
   procFastUntil=Date.now()+10*60000;

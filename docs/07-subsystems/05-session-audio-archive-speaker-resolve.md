@@ -10,7 +10,7 @@
 | جنبه | رفتار |
 |---|---|
 | ورود | `archiveAudioForAdmin(sessionId, seq, buffer, mime, source)` از `processBatchQueue` (همه‌ی purposeها پس از موفقیت، و archive بدونِ رونویسی) |
-| مسیر | `<cwd>/data/session-audio/<sessionId>/<seq6>.webm` (یا `.ogg` اگر mime شاملِ ogg) |
+| مسیر | `<cwd>/data/session-audio/<sessionId>/<seq6>.webm` (یا `.ogg` اگر mime شاملِ ogg)؛ **از 2026-09-29 kindِ غیرِ session پیشوند دارد: `note-<seq6>.webm`، `prenote-<seq6>.webm`** — seq برایِ هر kind جدا از ۰ است و قبلاً سگمنتِ ۰ِ یادداشتِ صوتی با سگمنتِ ۰ِ جلسه یک نام داشت و فایلِ دیگری را رویِ دیسک بازنویسی می‌کرد (ردیف‌هایِ قدیمی مسیرِ ثبت‌شده‌ی خودشان را دارند؛ backfill نشد) |
 | ری‌ماکس + duration **(جدید، 2026-09-16)** | بعدِ نوشتنِ فایلِ خام، `ffmpeg -c copy` (بدونِ ری‌اینکود) روی همان فایل اجرا می‌شود و سپس مدت‌زمانِ فایلِ نهایی probe می‌شود → `duration_ms`. اگر ffmpeg نصب نباشد یا ری‌ماکس خطا بدهد، فایلِ خامِ اصلی دست‌نخورده می‌ماند و `duration_ms = NULL` (fail-open — آرشیو هرگز شکست نمی‌خورد) |
 | DB | `INSERT … ON CONFLICT (session_id, seq) DO UPDATE` → **seqِ تکراری فایلِ قبلی را بازنویسی می‌کند** |
 | دسترسی | فقط ادمین: فهرست (شاملِ `duration_ms`) + stream با Range و `?download=1` اختیاری (`Content-Disposition: attachment`)؛ از static سرو نمی‌شود |

@@ -303,8 +303,10 @@
   function uploadQueuedSegment(sessionId, rec) {
     var intent = rec.intent || 'archive'; // legacy بدونِ intent → رفتارِ قبلی (فقط آرشیو)
     // 'note-archive': یادداشتِ صوتی‌ای که متنِ زنده‌اش را UI خودش ثبت کرده — فقط آرشیو، بدونِ رونویسیِ دوباره.
+    // 'pre-note' (2026-09-29): یادداشتِ صوتیِ پیش از جلسه (index.html پس از ساختِ جلسه در صف می‌گذارد) —
+    // سرور آرشیو (kind='prenote') و رونویسی می‌کند ⇒ session_notes(type='voice_before')، هرگز transcript.
     var purpose = intent === 'note' ? 'note' : intent === 'note-archive' ? 'note-archive' :
-      (intent === 'transcript' ? 'transcript' : 'archive');
+      intent === 'pre-note' ? 'pre-note' : (intent === 'transcript' ? 'transcript' : 'archive');
     var run = rec.runId || 'legacy';
     // ⭐ (A1.2، 2026-09-26) این آپلود زیرِ قفلِ سراسریِ صفِ همین جلسه اجرا می‌شود؛ fetchِ بی‌سقف رویِ شبکه‌ی
     // ناپایدار قفل را برایِ همیشه نگه می‌داشت (هیچ drain/sweep/finishِ بعدی جلو نمی‌رفت). در timeout رکورد

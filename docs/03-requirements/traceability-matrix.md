@@ -39,6 +39,7 @@
 | REQ-053 | 04 | `RTSession.finish` | T8 | harness PASS |
 | REQ-054 | 04 | `connEpoch`، `openDirectWS` | T13a, T13b | harness PASS |
 | REQ-060…062, 064 | [05](../04-modules/05-notes-and-signs/module-prd.md) / [plan](../04-modules/05-notes-and-signs/implementation-plan.md) | `index.html` signs/notes؛ `sessions.ts` notes | none | code-read |
+| REQ-066 | [05](../04-modules/05-notes-and-signs/module-prd.md) / [subsystem 02](../07-subsystems/02-audio-durability-batch-fallback.md) | `index.html` pre-note (Setup/آپلود/Wrapup/صفحه‌ی جلسه/ادمین)؛ `feelia-rt.js` intent `pre-note`؛ `features/sessions/notes.routes.ts`، `sessions.repository.ts`؛ `features/transcription/batch/*`؛ `features/admin/*`؛ `features/case-file/*` | T56a/b + UIِ mock | `test:rt` 102/102، `tsc`، `test:routes`/`arch`/`cf`/`up`/`tu`/`ft`/`llm` PASS 2026-09-29؛ E2Eِ واقعی PASS 2026-09-29 |
 | REQ-065 | [05](../04-modules/05-notes-and-signs/module-prd.md) / [subsystem 03](../07-subsystems/03-transcript-integrity.md) | `feelia-rt.js` signMarker؛ `index.html` sign chips/removeSign؛ `features/transcription/signMarkers.ts`، `asyncTranscribe.ts`، `speakerResolve.ts` | T50–T55 + E2Eِ واقعی | `test:rt` PASS 2026-09-27؛ E2E (Chrome + Soniox + MySQLِ dev) PASS |
 | REQ-063 | 05 | `startVoiceNoteDirect`، `stopVoiceNoteDirect`، `batchqueue.ts` note | T15 | **WT: 3 FAIL** (upload، retry، drain)؛ HEAD PASS |
 | REQ-070…078 | [06](../04-modules/06-admin-panel/module-prd.md) / [plan](../04-modules/06-admin-panel/implementation-plan.md) | `features/admin/`؛ `index.html` admin | none | code-read |

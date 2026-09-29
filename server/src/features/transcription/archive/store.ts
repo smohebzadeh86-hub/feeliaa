@@ -23,7 +23,8 @@ export function sessionDir(sessionId: string): string {
 }
 
 export type AudioSource = 'durable' | 'offline' | 'upload';
-export type AudioKind = 'session' | 'note';
+// 'prenote' (2026-09-29): صدایِ یادداشتِ صوتیِ پیش از جلسه (خودِ تراپیست) — مثلِ 'note' هرگز واردِ متنِ جلسه نمی‌شود.
+export type AudioKind = 'session' | 'note' | 'prenote';
 
 // قفلِ per-session: بدونِ این، دو archiveAudioForAdmin هم‌زمان رویِ یک جلسه ممکنه
 // هر دو همون MAX(seq) قدیمی رو ببینن و با seqِ یکسان تصادم/بازنویسی کنن (LAW-013:

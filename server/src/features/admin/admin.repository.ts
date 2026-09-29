@@ -128,7 +128,7 @@ export async function getSessionWithTranscript(id: string): Promise<any> {
   const session = await query(`
       SELECT s.id, s.client_id, s.session_num, s.date, s.start_time, s.duration_ms,
         s.status, s.source, s.consent, s.transcript, s.created_at,
-        s.updated_at, s.transcript_version, s.realtime_reliable, s.stt_mode, s.batch_status, s.auto_closed_at
+        s.updated_at, s.transcript_version, s.realtime_reliable, s.stt_mode, s.batch_status, s.auto_closed_at, s.pre_note
       FROM sessions s WHERE s.id = ?
     `, [id]);
   return session.rows[0];
@@ -293,8 +293,8 @@ export async function deleteSessionAudioRows(sessionId: string): Promise<void> {
 export async function listVoiceNoteSessionsPage(f: { sql: string; params: unknown[] }, limit: number, offset: number): Promise<any[]> {
   const r = await query(
     `SELECT x.session_id, MAX(x.ts) AS last_at FROM (
-          SELECT n.session_id, n.created_at AS ts FROM session_notes n WHERE n.type = 'voice'
-          UNION ALL SELECT a.session_id, a.created_at AS ts FROM session_audio a WHERE a.kind = 'note'
+          SELECT n.session_id, n.created_at AS ts FROM session_notes n WHERE n.type IN ('voice', 'voice_before')
+          UNION ALL SELECT a.session_id, a.created_at AS ts FROM session_audio a WHERE a.kind IN ('note', 'prenote')
         ) x JOIN sessions s ON s.id = x.session_id JOIN clients c ON c.id = s.client_id
         WHERE 1 = 1${f.sql}
         GROUP BY x.session_id ORDER BY last_at DESC LIMIT ? OFFSET ?`,
@@ -313,19 +313,19 @@ export async function listSessionsInfo(ph: string, ids: string[]): Promise<any[]
 // فقط طولِ متن — متنِ یادداشتِ صوتی فقط با کلیکِ صریح (تصمیمِ D2).
 export async function listVoiceNotesMeta(ph: string, ids: string[]): Promise<any[]> {
   const notes = await query(
-    `SELECT id, session_id, wall_clock, created_at, CHAR_LENGTH(COALESCE(text, '')) AS text_len FROM session_notes
-        WHERE type = 'voice' AND session_id IN (${ph}) ORDER BY created_at`, ids);
+    `SELECT id, session_id, type, wall_clock, created_at, CHAR_LENGTH(COALESCE(text, '')) AS text_len FROM session_notes
+        WHERE type IN ('voice', 'voice_before') AND session_id IN (${ph}) ORDER BY created_at`, ids);
   return notes.rows;
 }
 
 export async function listNoteAudio(ph: string, ids: string[]): Promise<any[]> {
   const audio = await query(
-    `SELECT id, session_id, bytes, duration_ms, created_at FROM session_audio WHERE kind = 'note' AND session_id IN (${ph}) ORDER BY created_at`, ids);
+    `SELECT id, session_id, kind, bytes, duration_ms, created_at FROM session_audio WHERE kind IN ('note', 'prenote') AND session_id IN (${ph}) ORDER BY created_at`, ids);
   return audio.rows;
 }
 
 export async function getVoiceNoteText(noteId: string): Promise<any> {
-  return (await query(`SELECT id, session_id, text FROM session_notes WHERE id = ? AND type = 'voice'`, [noteId])).rows[0];
+  return (await query(`SELECT id, session_id, text FROM session_notes WHERE id = ? AND type IN ('voice', 'voice_before')`, [noteId])).rows[0];
 }
 
 // ————— export —————

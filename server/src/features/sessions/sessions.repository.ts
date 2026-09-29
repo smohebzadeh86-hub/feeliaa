@@ -49,20 +49,51 @@ export async function createManualSession(s: {
 export async function createLiveSession(s: {
   sessionId: string; clientId: string; date: string | null; time: string; attendees: string | null; preNote: string | null;
 }): Promise<void> {
+  // (2026-09-29) یادداشتِ متنیِ پیش از جلسه دیگر در ستونِ sessions.pre_note نوشته نمی‌شود — یک ردیفِ
+  // session_notes(type='note_before') در همان تراکنش (کنارِ یادداشتِ صوتیِ پیش از جلسه، قابلِ ویرایش در Wrapup،
+  // و واردِ corpusِ پرونده). ستونِ pre_note فقط برایِ ردیف‌هایِ قدیمی (2026-09-27..29) خوانده می‌شود.
   for (let attempt = 0; ; attempt++) {
     const sessionNum = await nextSessionNum(s.clientId);
+    const conn = await pool.getConnection();
     try {
-      await query(
-        `INSERT INTO sessions (id, client_id, session_num, date, start_time, consent, status, attendees, pre_note)
-           VALUES (?, ?, ?, ?, ?, ?, 'in_progress', ?, ?)`,
-        [s.sessionId, s.clientId, sessionNum, s.date, s.time, true, s.attendees, s.preNote]
+      await conn.beginTransaction();
+      await conn.query(
+        `INSERT INTO sessions (id, client_id, session_num, date, start_time, consent, status, attendees)
+           VALUES (?, ?, ?, ?, ?, ?, 'in_progress', ?)`,
+        [s.sessionId, s.clientId, sessionNum, s.date, s.time, true, s.attendees]
       );
+      if (s.preNote !== null) {
+        await conn.query(
+          `INSERT INTO session_notes (id, session_id, type, text, wall_clock) VALUES (?, ?, 'note_before', ?, ?)`,
+          [randomUUID(), s.sessionId, s.preNote, s.time]
+        );
+      }
+      await conn.commit();
       break;
     } catch (err) {
+      await conn.rollback();
       if (isSessionNumConflict(err) && attempt < SESSION_NUM_MAX_RETRIES) { await sessionNumRetryPause(attempt); continue; }
       throw err;
+    } finally {
+      conn.release();
     }
   }
+}
+
+// PATCH /api/notes/:id — فقط متنِ یادداشت‌هایِ پیش از جلسه (تصمیمِ مالک 2026-09-29: ویرایش بعد از پایانِ ضبط).
+export const EDITABLE_NOTE_TYPES = ['note_before', 'voice_before'] as const;
+export async function getOwnedNoteType(id: string, therapistId: string | null): Promise<string | null> {
+  const r = await query(
+    `SELECT n.type FROM session_notes n
+       JOIN sessions s ON n.session_id = s.id
+       JOIN clients c ON s.client_id = c.id
+       WHERE n.id = ? AND c.therapist_id = ?`,
+    [id, therapistId]
+  );
+  return r.rows[0]?.type ?? null;
+}
+export async function updateNoteText(id: string, text: string): Promise<void> {
+  await query('UPDATE session_notes SET text = ? WHERE id = ?', [text, id]);
 }
 
 export async function getSessionRow(id: string): Promise<any> {

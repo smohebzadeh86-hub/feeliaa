@@ -33,6 +33,7 @@ export async function audioAdminRoutes(app: FastifyInstance) {
       pendingAudiosFor(id, 'transcript').length +
       pendingAudiosFor(id, 'late-transcript').length +
       pendingAudiosFor(id, 'note').length +
+      pendingAudiosFor(id, 'pre-note').length +
       pendingAudiosFor(id, 'archive').length;
     // بخشِ ۱۱/۱۳ی audit «zero-loss recording» (2026-09-22): قبلاً ادمین فقط یک بنرِ
     // تجمیعیِ «N فایل در صف» می‌دید — بینِ «صدا کامل ولی رونویسی پنding» و «سگمنتی از
@@ -180,7 +181,7 @@ export async function audioAdminRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
-    const pending = pendingAudiosFor(id, 'transcript').length + pendingAudiosFor(id, 'late-transcript').length + pendingAudiosFor(id, 'note').length;
+    const pending = pendingAudiosFor(id, 'transcript').length + pendingAudiosFor(id, 'late-transcript').length + pendingAudiosFor(id, 'note').length + pendingAudiosFor(id, 'pre-note').length;
     if (pending > 0) {
       reply.code(409);
       return { error: 'بخشی از صدایِ این جلسه هنوز در صفِ رونویسی است — بعد از پایانِ پردازش دوباره امتحان کنید', code: 'audio-pending', pending_count: pending };
@@ -217,8 +218,9 @@ export async function audioAdminRoutes(app: FastifyInstance) {
         session_id: p.session_id, session_num: s.session_num, date: s.date, status: s.status,
         client_id: s.client_id, client_code: s.client_code, therapist_id: s.therapist_id, therapist_name: s.therapist_name,
         last_at: p.last_at,
-        notes: notes.filter((n: any) => n.session_id === p.session_id).map((n: any) => ({ id: n.id, wall_clock: n.wall_clock, created_at: n.created_at, text_len: Number(n.text_len) })),
-        audio: audio.filter((a: any) => a.session_id === p.session_id).map((a: any) => ({ id: a.id, bytes: Number(a.bytes), duration_ms: a.duration_ms, created_at: a.created_at })),
+        // pre_session (2026-09-29): یادداشت/صدایِ پیش از جلسه (type='voice_before' / kind='prenote') — برچسبِ جدا در پنل.
+        notes: notes.filter((n: any) => n.session_id === p.session_id).map((n: any) => ({ id: n.id, wall_clock: n.wall_clock, created_at: n.created_at, text_len: Number(n.text_len), pre_session: n.type === 'voice_before' })),
+        audio: audio.filter((a: any) => a.session_id === p.session_id).map((a: any) => ({ id: a.id, bytes: Number(a.bytes), duration_ms: a.duration_ms, created_at: a.created_at, pre_session: a.kind === 'prenote' })),
       };
     });
     return { items, has_more: pageRows.length > limit };

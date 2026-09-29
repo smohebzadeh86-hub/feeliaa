@@ -69,6 +69,7 @@
 |---|---|---|
 | `SESSION_COOKIE` / `SESSION_COOKIE_MAX_AGE` | `feelia_session` / ۳۰ روز | `auth/guard.ts` |
 | `SESSION_TTL_MS` | ۳۰ روز | `auth/session.ts` |
+| `NOTE_EDIT_MAX_CHARS` | 20000 (2026-09-29) — سقفِ متنِ ویرایش‌شده‌ی یادداشتِ پیش از جلسه (`PATCH /api/notes/:id`) | `features/sessions/notes.routes.ts` |
 | scrypt `KEY_LEN` | 64 | `auth/password.ts` |
 | mint rate limit | ۳۰/۶۰s per therapist | `features/transcription/stt.routes.ts` |
 | `STT_DEFAULTS` | model `stt-rt-v5`، …، `enable_endpoint_detection:true` (از 2026-09-14؛ قبلاً false) | `features/transcription/stt.routes.ts` |
@@ -102,6 +103,12 @@
 | `LATE_TRANSCRIPT_LABEL` | commitنشده — `[بخشِ ضبط‌شده در زمانِ قطعیِ اینترنت — بعداً رونویسی شد]` | `features/transcription/batch/` (export شده، در `mergeBatchTranscript` prepend می‌شود) |
 
 ## ۳. ثابت‌های فرانت
+
+### `public/index.html` — یادداشتِ پیش از جلسه (2026-09-29)
+| ثابت | مقدار |
+|---|---|
+| `PRE_VOICE_MAX_MS` | ۵ دقیقه — سقفِ هر ضبطِ یادداشتِ صوتیِ پیش از جلسه (توقفِ خودکار) |
+| poll ِ Wrapup برایِ متنِ صوتیِ پیش از جلسه | هر ۵ ثانیه، حداکثر ۵ دقیقه |
 
 ### `public/feelia-rt.js`
 | ثابت | مقدار |

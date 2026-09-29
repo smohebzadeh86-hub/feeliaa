@@ -173,13 +173,15 @@ export async function createTranscription(
   // sessionContext (پیش‌فرض true): contextِ «جلسه‌ی چندنفره» برایِ دقتِ تفکیکِ گوینده؛ یادداشتِ صوتیِ
   // تک‌گوینده‌ی تراپیست آن را false می‌دهد تا مدل به شکستنِ بی‌جایِ یک صدا سوق داده نشود.
   // context: contextِ مخصوصِ جلسه (واحدِ درمان، 2026-09-27) — اگر داده شود جایگزینِ contextِ ثابت می‌شود.
-  opts: { languageHints?: string[]; clientReferenceId?: string; sessionContext?: boolean; context?: object } = {}
+  // diarize (پیش‌فرض true): false فقط برایِ یادداشتِ صوتیِ پیش از جلسه (2026-09-29، دستورِ مالک: «قبل از جلسه برچسب گوینده
+  // نمی‌خواد») ⇒ توکن‌ها speaker ندارند و buildTextFromAsyncTokens متنِ ساده، بدونِ «گوینده N:»، می‌سازد.
+  opts: { languageHints?: string[]; clientReferenceId?: string; sessionContext?: boolean; context?: object; diarize?: boolean } = {}
 ): Promise<string> {
   const payload = JSON.stringify({
     model: 'stt-async-v5',
     file_id: fileId,
     language_hints: opts.languageHints || ['fa'],
-    enable_speaker_diarization: true,
+    enable_speaker_diarization: opts.diarize !== false,
     enable_language_identification: true,
     ...(opts.sessionContext === false ? {} : { context: opts.context ?? SESSION_TRANSCRIPTION_CONTEXT }),
     client_reference_id: opts.clientReferenceId,
@@ -368,13 +370,13 @@ export async function transcribeFileAsync(
   buffer: Buffer,
   filenameHint: string,
   clientReferenceId?: string,
-  opts: { sessionContext?: boolean; context?: object; signs?: SignMark[] } = {}
+  opts: { sessionContext?: boolean; context?: object; signs?: SignMark[]; diarize?: boolean } = {}
 ): Promise<string> {
   // نامِ فایل با پیشوندِ feelia- تا sweepِ یتیم‌ها (sweepSonioxOrphans) فقط فایل‌هایِ خودِ ما را بشناسد.
   const fileId = await uploadFile(buffer, 'feelia-' + filenameHint, clientReferenceId);
   let transcriptionId: string | null = null;
   try {
-    transcriptionId = await createTranscription(fileId, { clientReferenceId, sessionContext: opts.sessionContext, context: opts.context });
+    transcriptionId = await createTranscription(fileId, { clientReferenceId, sessionContext: opts.sessionContext, context: opts.context, diarize: opts.diarize });
     const startedAt = Date.now();
     const timeoutMs = pollTimeoutForBytes(buffer.length);
     let status = 'queued';

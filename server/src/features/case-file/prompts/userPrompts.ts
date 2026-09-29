@@ -5,6 +5,10 @@ import type { CaseFileAnsweredQuestion } from '../domain/types.js';
 
 const CATEGORY_LABEL: Record<string, string> = { child: 'کودک', teen: 'نوجوان', adult: 'بزرگسال' };
 const GENDER_LABEL: Record<string, string> = { f: 'زن', m: 'مرد' };
+const PRE_SESSION_NOTE_LABEL: Record<string, string> = {
+  note_before: 'یادداشتِ درمانگر پیش از شروعِ جلسه',
+  voice_before: 'یادداشتِ صوتیِ درمانگر پیش از شروعِ جلسه',
+};
 
 export function buildCaseFilePrompt(
   corpus: ClientCorpus,
@@ -17,7 +21,10 @@ export function buildCaseFilePrompt(
       lines.push(`رونویسی:\n${s.transcript.trim()}`);
     }
     for (const n of s.notes) {
-      lines.push(`یادداشت (${n.type}): ${n.text}`);
+      // یادداشتِ پیش از جلسه (2026-09-29) برچسبِ فارسی می‌گیرد تا مدل بداند توضیحِ خودِ تراپیست پیش از شروع است؛
+      // برچسبِ بقیه‌ی نوع‌ها عمداً مثلِ قبل می‌ماند (ورودیِ پرونده‌هایِ موجود عوض نشود).
+      const label = PRE_SESSION_NOTE_LABEL[n.type] || n.type;
+      lines.push(`یادداشت (${label}): ${n.text}`);
     }
   }
 

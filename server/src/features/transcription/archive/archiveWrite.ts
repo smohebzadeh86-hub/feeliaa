@@ -45,7 +45,11 @@ export async function archiveAudioForAdmin(
     const nextSeq: number = (maxRow.rows[0]?.m ?? -1) + 1;
     // mimeِ واقعیِ کلاینت (audit صدا/۲۰۲۶-۰۹-۱۶، بخشِ E) — فایرفاکس ogg، سافاری mp4/aac می‌فرستد.
     const ext = extForMime(mime || '');
-    const filePath = path.join(dir, `${String(nextSeq).padStart(6, '0')}.${ext}`);
+    // ⭐ (2026-09-29) seq برایِ هر kind از ۰ شروع می‌شود؛ قبلاً نامِ فایل فقط seq بود و سگمنتِ ۰ِ یادداشت
+    // با سگمنتِ ۰ِ جلسه در همین پوشه یک نام داشتند ⇒ یکی رویِ دیگری نوشته می‌شد. kindِ غیرِ session پیشوند می‌گیرد
+    // (فایل‌هایِ جلسه همان نامِ قبلی را دارند؛ ردیف‌هایِ قدیمی مسیرِ خودشان را در DB دارند).
+    const prefix = kind === 'session' ? '' : `${kind}-`;
+    const filePath = path.join(dir, `${prefix}${String(nextSeq).padStart(6, '0')}.${ext}`);
     writeFileSync(filePath, buffer);
     try {
       const durationMs = await remuxAndGetDuration(filePath);

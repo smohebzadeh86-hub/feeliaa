@@ -14,6 +14,7 @@ export async function sessionBatchRoutes(app: FastifyInstance) {
   // ?purpose=transcript (پیش‌فرض) → merge در sessions.transcript
   // ?purpose=note → فقط session_notes(type='voice')، هرگز transcript (ISSUE 3)
   // ?purpose=archive → realtime موفق بود، متن دست‌نخورده می‌مونه، فقط صدا آرشیو می‌شه
+  // ?purpose=pre-note → یادداشتِ صوتیِ پیش از جلسه (2026-09-29): آرشیو (kind='prenote') + رونویسی ⇒ session_notes(type='voice_before')
   // ?purpose=late-transcript → صدایِ آفلاینی که *بعدِ* پایانِ جلسه رسیده (audit صدا/۲۰۲۶-۰۹-۱۶،
   //   تصمیمِ مالک) — رویِ جلسه‌ی completed هم مجاز است؛ رونویسی می‌شود و با برچسبِ صریح append.
   app.post('/api/sessions/:id/batch-audio', async (request, reply) => {
@@ -21,7 +22,7 @@ export async function sessionBatchRoutes(app: FastifyInstance) {
     const q = request.query as any;
     const purpose = (
       q?.purpose === 'note' ? 'note' : q?.purpose === 'archive' ? 'archive' :
-      q?.purpose === 'note-archive' ? 'note-archive' :
+      q?.purpose === 'note-archive' ? 'note-archive' : q?.purpose === 'pre-note' ? 'pre-note' :
       q?.purpose === 'late-transcript' ? 'late-transcript' : 'transcript'
     ) as BatchPurpose;
     // seq: ترتیبِ واقعیِ ضبطِ این سگمنت (از کلاینت) — برایِ اسمِ فایل و مرتب‌سازیِ درست،
@@ -54,7 +55,7 @@ export async function sessionBatchRoutes(app: FastifyInstance) {
     }
     // late-transcript روی completed مجاز است (دقیقاً همون دلیلِ وجودش)، ولی نه روی canceled —
     // جلسه‌ی لغوشده قرار نیست متنِ جدید بگیرد.
-    if (purpose === 'late-transcript' && owned.status === 'canceled') {
+    if ((purpose === 'late-transcript' || purpose === 'pre-note') && owned.status === 'canceled') {
       reply.code(400);
       return { error: 'جلسه لغو شده است' };
     }
@@ -93,6 +94,7 @@ export async function sessionBatchRoutes(app: FastifyInstance) {
     const hasAudio = !!pendingAudioFor(id, 'transcript');
     const hasNoteAudio = !!pendingAudioFor(id, 'note');
     const hasLateAudio = !!pendingAudioFor(id, 'late-transcript');
+    const hasPreNoteAudio = !!pendingAudioFor(id, 'pre-note');
     return {
       batch_status: owned.batch_status ?? null,
       stt_mode: owned.stt_mode ?? null,
@@ -101,6 +103,7 @@ export async function sessionBatchRoutes(app: FastifyInstance) {
       audio_pending: hasAudio,
       note_audio_pending: hasNoteAudio,
       late_transcript_pending: hasLateAudio,
+      pre_note_audio_pending: hasPreNoteAudio,
     };
   });
 
@@ -108,7 +111,7 @@ export async function sessionBatchRoutes(app: FastifyInstance) {
     const { id } = request.params as { id: string };
     const purposeRaw = (request.query as any)?.purpose;
     const purpose = (
-      purposeRaw === 'note' ? 'note' : purposeRaw === 'late-transcript' ? 'late-transcript' : 'transcript'
+      purposeRaw === 'note' ? 'note' : purposeRaw === 'pre-note' ? 'pre-note' : purposeRaw === 'late-transcript' ? 'late-transcript' : 'transcript'
     ) as BatchPurpose;
     const owned = await getOwnedSession(id, request.therapistId!);
     if (!owned) {

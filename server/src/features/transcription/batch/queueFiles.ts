@@ -26,7 +26,9 @@ export function ensureDir() {
 //   'note-archive' → صدایِ یادداشتِ صوتی‌ای که realtime‌اش موفق بود و UI متنش را خودش ثبت کرده
 //               (2026-09-26): فقط آرشیو با kind='note'. قبلاً با purpose=note دوباره رونویسی و یک
 //               یادداشتِ صوتیِ تکراری ساخته می‌شد.
-export type BatchPurpose = 'transcript' | 'late-transcript' | 'note' | 'archive' | 'note-archive';
+//   'pre-note' → صدایِ یادداشتِ صوتیِ پیش از جلسه (2026-09-29): آرشیو با kind='prenote' + رونویسی ⇒ فقط
+//               session_notes(type='voice_before')، هرگز transcript. رویِ جلسه‌ی completed هم مجاز (مسیرِ آپلود).
+export type BatchPurpose = 'transcript' | 'late-transcript' | 'note' | 'archive' | 'note-archive' | 'pre-note';
 
 // باگِ قبلی: فایل فقط با Date.now() نام‌گذاری می‌شد و آپلودها موازی می‌رفتن — یعنی
 // (۱) دو سگمنت در یک میلی‌ثانیه = یک اسمِ فایل = یکی رویِ دیگری می‌نوشت (صدا گم می‌شد)،
@@ -41,6 +43,7 @@ function markerFor(purpose: BatchPurpose): string {
   if (purpose === 'archive') return '.archive.';
   if (purpose === 'note-archive') return '.notearchive.';
   if (purpose === 'late-transcript') return '.late.';
+  if (purpose === 'pre-note') return '.prenote.';
   return '.';
 }
 
@@ -100,14 +103,17 @@ export function isLateFile(f: string): boolean {
 export function isNoteArchiveFile(f: string): boolean {
   return f.includes('.notearchive.');
 }
+export function isPreNoteFile(f: string): boolean {
+  return f.includes('.prenote.');
+}
 
 // seq/run/mime از اسمِ فایل استخراج می‌شه (فرمت:
-// <sessionId>-<seqِ ۶رقمی>-<runId>-<timestamp>[.note|.archive|.late].<webm|ogg|m4a>)
+// <sessionId>-<seqِ ۶رقمی>-<runId>-<timestamp>[.note|.archive|.late|.notearchive|.prenote].<webm|ogg|m4a>)
 // تا موقعِ آرشیوکردن برایِ ادمین، ترتیبِ واقعیِ سگمنت، runِ صاحبش، و mimeِ واقعی حفظ بمونه.
 const EXT_ALTERNATION = KNOWN_EXTS.join('|');
 // فایل‌هایِ خیلی قدیمی (پیش از migration 017، بخشِ runId هنوز نبود): <sessionId>-<seq>-<timestamp>.ext
 const LEGACY_NO_RUN_RE = new RegExp(`^(.+)-(\\d{6})-(\\d+)\\.(?:note\\.|archive\\.|late\\.|notearchive\\.)?(?:${EXT_ALTERNATION})$`);
-const WITH_RUN_RE = new RegExp(`^(.+)-(\\d{6})-([a-zA-Z0-9]+)-(\\d+)\\.(?:note\\.|archive\\.|late\\.|notearchive\\.)?(?:${EXT_ALTERNATION})$`);
+const WITH_RUN_RE = new RegExp(`^(.+)-(\\d{6})-([a-zA-Z0-9]+)-(\\d+)\\.(?:note\\.|archive\\.|late\\.|notearchive\\.|prenote\\.)?(?:${EXT_ALTERNATION})$`);
 
 // ⭐ فیکسِ باگِ واقعی (کشف‌شده در لاگِ deployِ ۲۰۲۶-۰۹-۲۳): برایِ فایلِ خیلی قدیمیِ بدونِ
 // runId، regexِ قبلی (که همیشه runId را الزامی می‌دانست) اصلاً match نمی‌شد؛
@@ -159,7 +165,8 @@ function filesFor(sessionId: string, purpose: BatchPurpose): string[] {
       if (purpose === 'archive') return isArchiveFile(f);
       if (purpose === 'late-transcript') return isLateFile(f);
       if (purpose === 'note-archive') return isNoteArchiveFile(f);
-      return !isNoteFile(f) && !isArchiveFile(f) && !isLateFile(f) && !isNoteArchiveFile(f);
+      if (purpose === 'pre-note') return isPreNoteFile(f);
+      return !isNoteFile(f) && !isArchiveFile(f) && !isLateFile(f) && !isNoteArchiveFile(f) && !isPreNoteFile(f);
     })
     .map((f) => path.join(QUEUE_DIR, f))
     // (A2) ترتیبِ ضبط: (زمانِ شروعِ run، seq) — قبلاً sortِ متنی بر اساسِ seq بود و seq=0ِ runِ بعدی جلوتر از seq=5ِ runِ قبلی می‌رفت.
