@@ -8,9 +8,21 @@ export interface DiagnosisInput {
   pendingCount: number;
   ev: any[];
   ui: any[];
+  uploadJobs?: any[];
+  finalTranscript?: any | null;
 }
 
-export function diagnoseSession({ s, audioRows, pendingCount, ev, ui }: DiagnosisInput) {
+const TZ = 'Asia/Tehran';
+const fmtAt = (v: unknown) => (v ? new Date(v as any).toLocaleString('fa-IR', { timeZone: TZ }) : '—');
+const fmtLen = (ms: number) => {
+  const t = Math.round(ms / 1000), h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60), s = t % 60;
+  return h ? `${h} ساعت و ${m} دقیقه` : m ? `${m} دقیقه و ${s} ثانیه` : `${s} ثانیه`;
+};
+const minsBetween = (a: unknown, b: unknown) => Math.max(0, Math.round((new Date(b as any).getTime() - new Date(a as any).getTime()) / 60000));
+const JOB_STAGE_FA: Record<string, string> = { queued: 'در صف', normalizing: 'آماده‌سازیِ فایل', transcribing: 'رونویسی', case_file: 'ساختِ پرونده' };
+const FT_STAGE_FA: Record<string, string> = { waiting_audio: 'منتظرِ صدا', transcribing: 'رونویسیِ دوباره', polishing: 'مرتب‌سازی' };
+
+export function diagnoseSession({ s, audioRows, pendingCount, ev, ui, uploadJobs = [], finalTranscript = null }: DiagnosisInput) {
   const audioMs = audioRows.reduce((a, r) => a + (Number(r.duration_ms) || 0), 0);
   const audioBytes = audioRows.reduce((a, r) => a + (Number(r.bytes) || 0), 0);
   const kbps = audioMs > 0 ? Math.round((audioBytes * 8) / audioMs * 10) / 10 : null;
@@ -71,6 +83,29 @@ export function diagnoseSession({ s, audioRows, pendingCount, ev, ui }: Diagnosi
     if (batchFailed || s.batch_status === 'failed') findings.push({ level: 'error', text: 'رونویسیِ صدایِ دوره‌ی قطعی ناموفق بود.' });
     if (audioMs > 60000 && text.length / (audioMs / 1000) < 2) findings.push({ level: 'error', text: `متن نسبت به طولِ صدا خیلی کم است (${text.length} نویسه برایِ ${sec(audioMs)}ث).` });
     if (paras.length >= 10 && shortParas / paras.length > 0.4) findings.push({ level: 'warn', text: `متن ${paras.length} بندِ گوینده دارد که ${shortParas} تایش ≤۳ کلمه است — تفکیکِ گوینده متن را تکه‌تکه نشان می‌دهد (داده گم نشده).` });
+  } else if (s.source === 'upload') {
+    // (2026-09-29، گزارشِ مالک) قبلاً برایِ جلسه‌ی آپلودی هیچ یافته‌ای نبود ⇒ کارت پنهان می‌ماند و ادمین نمی‌دید
+    // فایل کِی آمد و پردازش کِی تمام شد. منبع: audio_jobs/audio_uploads (پایدار؛ obs_events جارو می‌شود).
+    if (!uploadJobs.length) findings.push({ level: 'error', text: 'برایِ این جلسه‌ی آپلودی هیچ کارِ پردازشی ثبت نشده است.' });
+    for (const j of uploadJobs) {
+      const mb = j.size_bytes ? ` · ${Math.round(Number(j.size_bytes) / 1048576 * 10) / 10}MB` : '';
+      findings.push({ level: 'ok', text: `فایل آپلود شد: شروع ${fmtAt(j.upload_started_at)}، پایان ${fmtAt(j.upload_completed_at || j.created_at)}${mb}.` });
+      if (Number(j.duration_ms) > 0) findings.push({ level: 'ok', text: `مدتِ فایلِ صوتی: ${fmtLen(Number(j.duration_ms))}.` });
+      const doneAt = j.transcript_applied_at || j.finished_at;
+      if (j.stage === 'failed') findings.push({ level: 'error', text: `پردازشِ فایل ناموفق شد (${fmtAt(j.finished_at || j.created_at)}${j.error_code ? '، کد: ' + j.error_code : ''}).` });
+      else if (j.transcript_applied_at) {
+        findings.push({ level: 'ok', text: `رونویسی ذخیره شد: ${fmtAt(j.transcript_applied_at)} (${minsBetween(j.created_at, j.transcript_applied_at) || 'کمتر از ۱'} دقیقه پس از پایانِ آپلود).` });
+        if (Number(j.transcript_chars) === 0) findings.push({ level: 'warn', text: 'در فایل گفتاری تشخیص داده نشد — متنی ذخیره نشد.' });
+      } else if (!doneAt) findings.push({ level: 'warn', text: `فایل هنوز در حالِ پردازش است (مرحله: ${JOB_STAGE_FA[j.stage] || j.stage}، تلاشِ ${j.attempts || 0}).` });
+      if (j.quality_warning) findings.push({ level: 'warn', text: `هشدارِ کیفیتِ فایل: بخشی از متن کم‌اطمینان است (${j.quality_warning}).` });
+    }
+  }
+  // «متنِ نهایی» (هر نوع جلسه، اگر برایش صف شده باشد).
+  if (finalTranscript) {
+    const ft = finalTranscript;
+    if (ft.stage === 'done') findings.push({ level: 'ok', text: `متنِ نهایی آماده شد: ${fmtAt(ft.finished_at)}.` });
+    else if (ft.stage === 'failed') findings.push({ level: 'warn', text: `ساختِ متنِ نهایی ناموفق بود (${fmtAt(ft.finished_at)}${ft.error_code ? '، کد: ' + ft.error_code : ''}) — متنِ اصلی دست‌نخورده است.` });
+    else if (ft.stage !== 'skipped') findings.push({ level: 'warn', text: `متنِ نهایی در حالِ ساخت است (مرحله: ${FT_STAGE_FA[ft.stage] || ft.stage}، از ${fmtAt(ft.queued_at)}).` });
   }
   return {
     diagnosis: {
@@ -79,7 +114,10 @@ export function diagnoseSession({ s, audioRows, pendingCount, ev, ui }: Diagnosi
       reconnect_exhausted: exhausted, mint_failed: mintFailed, mic_lost: micLost, quality_warnings: quality,
       hidden_count: hiddenCount, hidden_ms: hiddenMs, end_clicked_at: endClick ? endClick.ts : null, completed_at: completedAt,
       transcript_chars: text.length, speaker_paragraphs: paras.length, short_paragraphs: shortParas,
-      updated_at: s.updated_at,
+      updated_at: s.updated_at, created_at: s.created_at,
+      upload_jobs: uploadJobs.map((j) => ({ stage: j.stage, duration_ms: j.duration_ms, error_code: j.error_code, upload_started_at: j.upload_started_at,
+        upload_completed_at: j.upload_completed_at, transcript_applied_at: j.transcript_applied_at, finished_at: j.finished_at })),
+      final_transcript: finalTranscript ? { stage: finalTranscript.stage, error_code: finalTranscript.error_code, finished_at: finalTranscript.finished_at } : null,
     },
     findings,
   };

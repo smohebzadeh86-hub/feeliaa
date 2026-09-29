@@ -184,6 +184,23 @@ export async function getSessionForDiagnosis(id: string): Promise<any> {
   return sres.rows[0];
 }
 
+// (2026-09-29) تشخیصِ جلسه‌ی آپلودی — فقط زمان‌ها/مرحله/کدِ خطا از جدول‌هایِ job (نه obs_events که جارو می‌شود)؛ بدونِ متن.
+export async function listUploadJobsForDiagnosis(sessionId: string): Promise<any[]> {
+  return (await query(
+    `SELECT j.stage, j.attempts, j.duration_ms, j.transcript_chars, j.error_code, j.quality_warning,
+            j.created_at, j.transcript_applied_at, j.finished_at,
+            u.size_bytes, u.created_at AS upload_started_at, u.completed_at AS upload_completed_at
+       FROM audio_jobs j LEFT JOIN audio_uploads u ON u.id = j.upload_id
+      WHERE j.session_id = ? ORDER BY j.created_at`, [sessionId]
+  )).rows;
+}
+
+export async function getFinalTranscriptForDiagnosis(sessionId: string): Promise<any> {
+  return (await query(
+    'SELECT stage, attempts, error_code, queued_at, finished_at FROM final_transcripts WHERE session_id = ?', [sessionId]
+  )).rows[0] || null;
+}
+
 export async function listSessionEventsBrief(sessionId: string): Promise<any[]> {
   return (await query('SELECT ts, event, detail FROM obs_events WHERE session_id = ? ORDER BY ts', [sessionId])).rows;
 }

@@ -6,7 +6,7 @@ import { recordAudit } from '../../obs/audit.js';
 import { diagnoseSession } from './diagnosis.js';
 import {
   getSessionWithTranscript, listSessionNotesForAdmin, listRecentSessions, getSessionForDiagnosis, listSessionEventsBrief,
-  listSessionUiEventsBrief, getSessionTimelineHead, listSessionEvents, listSessionUiEvents, listSessionNotesMeta,
+  listSessionUiEventsBrief, listUploadJobsForDiagnosis, getFinalTranscriptForDiagnosis, getSessionTimelineHead, listSessionEvents, listSessionUiEvents, listSessionNotesMeta,
 } from './admin.repository.js';
 
 export async function sessionsAdminRoutes(app: FastifyInstance) {
@@ -65,7 +65,9 @@ export async function sessionsAdminRoutes(app: FastifyInstance) {
     const pendingCount = pendingAudiosFor(id, 'transcript').length + pendingAudiosFor(id, 'late-transcript').length + pendingAudiosFor(id, 'archive').length;
     const ev = await listSessionEventsBrief(id);
     const ui = await listSessionUiEventsBrief(id);
-    return diagnoseSession({ s, audioRows, pendingCount, ev, ui });
+    const uploadJobs = s.source === 'upload' ? await listUploadJobsForDiagnosis(id) : [];
+    const finalTranscript = await getFinalTranscriptForDiagnosis(id);
+    return diagnoseSession({ s, audioRows, pendingCount, ev, ui, uploadJobs, finalTranscript });
   });
 
   // GET /api/admin/sessions/:id/timeline — همه‌ی رویدادهایِ مرتبط با یک جلسه، مرتب بر ts.
