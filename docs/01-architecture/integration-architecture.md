@@ -1,6 +1,6 @@
 # Integration Architecture
 
-> **وضعیت:** ACTIVE-CANONICAL · منابع: `server/src/stt/*`، `public/feelia-rt.js`، `public/feelia-analytics.js`، `server/src/features/client-config/clientConfig.routes.ts`.
+> **وضعیت:** ACTIVE-CANONICAL · last-verified: 2026-09-30 @ `17d6919` · منابع: `server/src/features/transcription/soniox/*`، `server/src/llm/*`، `public/feelia-rt.js`، `public/feelia-analytics.js`، `server/src/features/client-config/clientConfig.routes.ts`.
 
 ## ۱. فهرستِ یکپارچه‌سازی‌ها
 
@@ -13,7 +13,8 @@
 | Microsoft Clarity `https://www.clarity.ms/tag/<id>` | Browser → | script + collect | `feelia-analytics.js` | Project ID عمومی | رفتارِ UI (masked) | خاموشیِ بی‌صدا |
 | Google Fonts (Vazirmatn) | Browser → | CSS/فونت | `index.html` `<link>` | — | IP کاربر | fallback فونت |
 | ffmpeg | Server (پروسه‌ی محلی) | `execFile` | `features/transcription/speakerResolve.ts` | — | صدا | resolve-speakers خطا |
-| PostgreSQL | Server → | TCP | `db/connection.ts` | `DATABASE_URL` | همه | health=degraded؛ startup fail |
+| MySQL | Server → | TCP | `db/connection.ts` (`mysql2`) | `DATABASE_URL` | همه | health=degraded؛ startup fail |
+| **LLM provider** (OpenAI / OpenRouter / Metis→DeepSeek / DeepSeek / custom) | Server → | HTTPS (`openai` SDK؛ مستقیم — `PROXY_URL` در کدِ `llm/` استفاده نمی‌شود) | `server/src/llm/{config,jsonCall}.ts` (+ آداپتورِ `case-file/adapters/llm/`، `final-transcript/adapters/llmJson`) | کلیدِ providerِ فعال (`LLM_PROVIDER` + `<P>_API_KEY`) | **متنِ بالینیِ جلسه/یادداشت‌ها** (polishِ «متنِ نهایی» + پروندهٔ درمان) | polish ⇒ `error_code=llm-*`، `skipped`/failed؛ پرونده ⇒ `llm-failed` (502)؛ اعلانِ ادمین `llm_unavailable` |
 
 ## ۲. Soniox — جزئیاتِ قرارداد
 

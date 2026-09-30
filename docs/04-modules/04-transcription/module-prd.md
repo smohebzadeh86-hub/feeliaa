@@ -2,6 +2,31 @@
 
 > **وضعیت:** ACTIVE-CANONICAL · REQ-040…054 · جزئیاتِ فنی: [subsystem 01](../../07-subsystems/01-browser-realtime-engine.md)، [02](../../07-subsystems/02-audio-durability-batch-fallback.md)، [03](../../07-subsystems/03-transcript-integrity.md)، [04](../../07-subsystems/04-legacy-ws-proxy-p1.md)، [05](../../07-subsystems/05-session-audio-archive-speaker-resolve.md).
 
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../../02-reference/feature-index.md) (`transcription`) · قالب: [feature-doc-template](../../00-governance/feature-doc-template.md) (LAW-026)
+
+### چرا — تصمیم‌هایِ ثبت‌شده
+- (LAW-012) fail-open: شکستِ Soniox/mint/شبکه شروعِ جلسه را بلاک نمی‌کند؛ ضبطِ durable + batch بعدی.
+- (2026-09-14) `pause()/resume()` WS را نمی‌بندند (keepalive طبقِ مستنداتِ Soniox) ⇒ شماره‌گذاریِ گوینده ریست نمی‌شود.
+- (audit صدا، 2026-09-16) چرخشِ durable ۱۵ثانیه‌ای (کاهشِ پنجره‌ی صدایِ در-RAM)؛ (2026-09-26) آزمایشِ خاموش‌کردنِ NS/AGC/EC اثری بر تفکیکِ گوینده نداشت.
+- نتیجه‌ی batch فقط append/پرکردنِ placeholder است (LAW-008، A2 2026-09-26).
+- جزئیات و race‌هایِ رفع‌شده: [subsystem 01](../../07-subsystems/01-browser-realtime-engine.md)، [02](../../07-subsystems/02-audio-durability-batch-fallback.md)، [03](../../07-subsystems/03-transcript-integrity.md).
+
+### مرزها
+- `features/transcription/index.ts` API عمومیِ batch/archive/soniox/speakerResolve را می‌دهد؛ routeِ `stt.routes.ts` مستقیم از `app.ts` (R3). `legacy-ws` featureِ جدا است (LEGACY).
+- مصرف‌کننده‌هایِ بیرونی: `audio-upload` (`transcribeFileAsync`…)، `final-transcript`، `admin` (آرشیو)، `session-media`.
+
+### کد
+- Backend: `features/transcription/{stt.routes,speakerResolve,signMarkers}.ts`، `soniox/{tempKey,restClient,config}.ts`، `batch/*`، `archive/*`. Frontend: `public/feelia-rt.js` (`RTSession`، `AudioQueueDB`)؛ در `index.html`: `startNewRTSession`، `rtOnState`، `endNewRTSession` ([frontend-map](../../02-reference/frontend-map.md)).
+
+### داده
+- مالک: `session_audio`. می‌نویسد: `sessions.transcript/stt_mode/batch_status`، `session_notes` (batch note)، فایل‌هایِ `data/batch-queue` و `data/session-audio`. IndexedDB `feelia-audio`.
+
+### تست
+- `pnpm test:rt` (`scripts/rt-harness.cjs`، بدونِ شبکه/DB) — موتورِ realtime/durable؛ E2Eِ مرورگرِ واقعی با Soniox در verificationهایِ تاریخ‌دار؛ `test:api` مسیرهایِ HTTP.
+
+### ریسک و بدهی
+- یتیم‌شدنِ صدا/متن در مسیرِ legacy؛ نبودِ تست برایِ batch با DBِ واقعی به‌صورتِ خودکار؛ محدودیت‌هایِ Soniox در تفکیکِ چندگوینده (شماره‌ی گوینده در هر اتصال از صفر).
+
 ## Problem
 تراپیست نمی‌تواند حینِ جلسه یادداشت‌برداریِ کامل کند؛ رونویسیِ فارسیِ چندگوینده باید دقیق، ماندگار و بدونِ جعل/تکرار باشد، حتی روی اینترنتِ ناپایدار.
 

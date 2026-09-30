@@ -2,6 +2,13 @@
 
 > **وضعیت:** ACTIVE-CANONICAL برای کدِ **LEGACY** · قانون: LAW-015 (frozen — فقط bugfix) · کد: `server/src/features/legacy-ws/transcription.routes.ts`، `server/src/features/legacy-ws/p1.ts`، `server/src/features/legacy-ws/soniox.ts`، و در `public/index.html`: `SonioxDirect`، `startDirectLive`، `fallbackToProxy`، `endDirectLive`، `connectWS`، `attemptWSReconnect`، `startMic`، `p1ReplayUnacked`، `handleMsg`، `pauseSessionLive`/`resumeSessionLive`، `startVoiceNote` (شاخه‌ی `/ws/voice`).
 
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../02-reference/feature-index.md) (`legacy-ws`) · قالب: [feature-doc-template](../00-governance/feature-doc-template.md) (LAW-026) — «چرا»ی هر تصمیم در متنِ زیر و Event Log؛ ساختارِ استاندارد:
+
+- **مرزها:** `features/legacy-ws/` **`index.ts` ندارد** (allowlist LAW-025)؛ `app.ts` مستقیم `transcription.routes.ts`. LEGACY/frozen (LAW-015): فقط bugfix.
+- **داده:** state درون‌حافظه‌ای (`p1.ts` records) — LAW-013؛ می‌نویسد: `sessions` (recovered/canceled/transcript)، `session_notes(voice)`.
+- **تست:** harnessِ اختصاصی ندارد.
+- **ریسک و بدهی:** فرانتِ `SonioxDirect`/`connectWS` فقط با `feelia_direct`؛ حذفشان نیازمندِ تأییدِ مالک.
+
 ## ۱. کی اجرا می‌شود؟
 فقط اگر `FeeliaRT` در دسترس نباشد یا `start()` آن false برگرداند (عملاً: مرورگرِ بدونِ MediaRecorder/WebSocket/getUserMedia، یا خطای میکروفون). ترتیب: `SonioxDirect` (مگر `localStorage.feelia_direct==='0'`) → در هر خطا `fallbackToProxy` → `/ws/t`. پیامد: در استفاده‌ی عادی این کد اجرا نمی‌شود و **تست ندارد**.
 

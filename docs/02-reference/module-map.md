@@ -1,19 +1,20 @@
 # Module Map
 
-> **وضعیت:** ACTIVE-CANONICAL · نگاشتِ ماژول‌های محصول، پلتفرم و subsystemها به فایل‌های واقعی. Snapshot 2026-09-13؛ مسیرهایِ backend به‌روزشده 2026-09-28 (بازسازیِ ماژولار).
+> **وضعیت:** ACTIVE-CANONICAL · نگاشتِ ماژول‌های محصول، پلتفرم و subsystemها به فایل‌های واقعی. last-verified: 2026-09-30 @ `17d6919` · نگاشتِ فیچر↔سند↔تست: [feature-index](feature-index.md).
 
 ## ۱. ماژول‌های محصول
 
 | # | ماژول | Backend | Frontend (`public/index.html` مگر ذکر شود) | جداول | Subsystemها |
 |---|---|---|---|---|---|
 | 01 | [Therapist Accounts](../04-modules/01-therapist-accounts/module-prd.md) | `features/auth/auth.routes.ts`، `auth/password.ts`، `auth/session.ts` | `#screenAuth`، `toggleAuthMode`، `submitAuth`، `logout`، `init`، `enterApp` | `therapists`، `auth_sessions` | — (platform) |
-| 02 | [Client Management](../04-modules/02-client-management/module-prd.md) | `features/clients/clients.routes.ts` (بجز `/api/recovered`)، `db/ownership.ts` | `#screenClients`، `loadClients`، `switchClientTab`، `applyClientFilters`، `renderClients`، مدال‌های `newClientModal`/`deactivateClientModal`/`editCategoryModal`/`deleteClientModal`، `openClientDetail` | `clients` | — |
+| 02 | [Client Management](../04-modules/02-client-management/module-prd.md) | `features/clients/clients.routes.ts` (بجز `/api/recovered`)، `db/ownership.ts` | `#screenClients`، `loadClients`، `switchClientTab`، `applyClientFilters`، `renderTodayClientsView`، `renderAllClientsView`، مدال‌های `newClientModal`/`deactivateClientModal`/`editCategoryModal`/`deleteClientModal`، `openClientDetail` | `clients` | — |
 | 03 | [Therapy Sessions](../04-modules/03-therapy-sessions/module-prd.md) | `features/sessions/` (CRUD)، `features/clients/clients.routes.ts` (`/api/recovered`) | `#screenSetup`، `#screenLive`، `#screenWrapup`، `#screenClientDetail`؛ `setupNewSession`، `runPreflight`، `startSession`، `endSession`، `handleFinished`، `confirmCancelSession`، `finishSession`، `checkActiveSessionBanner`، `liveResumeSession`، `resumeSession`، `viewTranscript`، `saveSessionMeta`، timer، watchdog، `persistDuration` | `sessions` | 01، 03 |
-| 04 | [Transcription](../04-modules/04-transcription/module-prd.md) | `features/transcription/stt.routes.ts`، `features/sessions/` (batch-*، resolve-speakers)، `stt/*`، `ws/*` | `public/feelia-rt.js`؛ در index: `startNewRTSession`، `rtOnState`، `endNewRTSession`، `rtPauseLive`، `rtResumeLive`، `sweepOrphanedAudioQueue`، `startResolveSpeakersUI`، `applyResolvedSpeakers`، `SonioxDirect`، `connectWS`، `startMic` | `sessions` (ستون‌های متن/STT)، `session_audio` | 01، 02، 03، 04، 05 |
+| 04 | [Transcription](../04-modules/04-transcription/module-prd.md) | `features/transcription/stt.routes.ts`، `features/sessions/` (`batch.routes.ts`: batch-*، resolve-speakers)، `features/transcription/{soniox,batch,archive}/`، `features/legacy-ws/` (LEGACY) | `public/feelia-rt.js`؛ در index: `startNewRTSession`، `rtOnState`، `endNewRTSession`، `rtPauseLive`، `rtResumeLive`، `sweepOrphanedAudioQueue`، `startResolveSpeakersUI`، `applyResolvedSpeakers`، `SonioxDirect`، `connectWS`، `startMic` | `sessions` (ستون‌های متن/STT)، `session_audio` | 01، 02، 03، 04، 05 |
 | 05 | [Notes & Signs](../04-modules/05-notes-and-signs/module-prd.md) | `features/sessions/` (notes، voice-note)، `features/transcription/batch/` (purpose=note) | `.sign-chip` handlers، `renderSignsLog`، `addQuickNote`، `renderNotesLog`، `addTextNote`، `renderWrapupNotes`، `startVoiceNote`، `startVoiceNoteDirect`، `stopVoiceNoteDirect` | `session_notes` | 02 |
 | 06 | [Admin Panel](../04-modules/06-admin-panel/module-prd.md) | `features/admin/`، `features/transcription/archive/` (خواندن) | `#screenAdmin`، `#screenAdminTherapist`، `#screenAdminSessions`؛ `openAdminPanel` … `adminDownloadAll` | همه (خواندن)، `therapists` (نوشتن) | 05 |
 | 07 | [UX Analytics](../04-modules/07-ux-analytics/module-prd.md) | `features/client-config/clientConfig.routes.ts` | `public/feelia-analytics.js`؛ `uxTrack`، `data-clarity-mask`، `#uxConsentBox`، `#uxConsentToggle` | — | — |
 | 08 | [AI Case File](../04-modules/08-ai-case-file/module-prd.md) | `server/src/features/case-file/**` (ports/adapters؛ `adapters/llm/chatLlm.adapter.ts` تنها آداپتورِ LLM؛ انتخابِ provider در `server/src/llm/` — 2026-09-28) | `#caseFileSection` در `screenClientDetail`؛ `loadCaseFile`، `renderCaseFile`، `regenerateCaseFile`، `saveCaseFileEdits`، CSSِ اسکوپ‌شده‌ی `.case-file-doc` | `client_case_file` | — |
+| 09 | [Treatment Unit](../04-modules/09-treatment-unit/module-prd.md) | `server/src/features/treatment-unit/**` (domain/application/adapters/api؛ `instance.ts`؛ `index.ts` شاملِ routeها؛ `sessionSttContext` برایِ Soniox) | فرمِ مراجع/جلسه در `index.html` (کاتالوگ از `GET /api/catalog/treatment-units`) | `tu_*`، `client_members` (+ `clients.unit_type`، `sessions.attendees`، `therapists.modalities`) | — |
 
 ## ۲. پلتفرم (cross-cutting) — [06-platform](../06-platform/README.md)
 
@@ -27,6 +28,8 @@
 | egress | `PROXY_URL` در `features/transcription/soniox/config.ts` (`createProxyAgent` برایِ tempKey و restClient)، `features/legacy-ws/soniox.ts` |
 | primitiveهایِ مشترکِ بی‌دامنه | `server/src/shared/` (keyedLock، rateLimit، persianDigits، jalali، ffmpeg، httpRange، sessionSttContext) |
 | لایه‌ی LLMِ مستقل از provider | `server/src/llm/` (config، jsonCall، healthAlert) |
+| رصد/ممیزی | `server/src/obs/` — [observability-audit](../06-platform/observability-audit.md) |
+| اعلان‌ها | `server/src/features/notifications/` — [notifications](../06-platform/notifications.md) |
 | دُمِ مشترکِ حذفِ آبشاری (صدا + Soniox) | `server/src/features/session-media/purge.ts` |
 | مرزِ ماژول‌ها | `features/<x>/index.ts` (API عمومی)؛ `pnpm test:arch` (`scripts/check-backend-boundaries.mjs`) |
 | helperهای مشترکِ UI | `api()`، `showScreen()`، `showBanner()`، `toFa()`، `escapeHtml()`، `describeMicError()`، `MicModule`، `detectWebView()`، `checkSecureAudioEnv()` در `index.html` |

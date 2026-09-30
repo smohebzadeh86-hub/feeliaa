@@ -1,6 +1,6 @@
 # Error Code Catalog
 
-> **وضعیت:** ACTIVE-CANONICAL · منبع: `server/src/**`، `public/feelia-rt.js`، `public/index.html` · موارد استنباطی برچسب دارند.
+> **وضعیت:** ACTIVE-CANONICAL · منبع: `server/src/**`، `public/feelia-rt.js`، `public/index.html` · last-verified: 2026-09-30 @ `17d6919` · موارد استنباطی برچسب دارند.
 
 ## ۱. قرارداد
 
@@ -17,6 +17,15 @@
 | `forbidden` | 403 | `requireAdmin` | ادمین نیست | نمایشِ پیام |
 | `version-conflict` | 409 | `PUT /api/sessions/:id` (+ `current_version`) | CAS شکست خورد | `persistConfirmed`: GET → اگر سرور طولانی‌تر/برابر، سرور برنده؛ وگرنه یک PUT دیگر با نسخه‌ی تازه |
 | `client-inactive` | 409 | `POST /api/sessions` (mode زنده) | مراجع غیرفعال است؛ جلسه‌ی زنده‌ی جدید ساخته نمی‌شود (ادامه‌ی جلسه‌ی نیمه‌تمامِ قبلی و `mode:"manual"` آزادند) | UI: بنرِ خطا؛ در حالتِ عادی رخ نمی‌دهد چون کارت و پرونده برای مراجعِ غیرفعال دکمه‌ی شروع ندارند |
+| `invalid-status` | 400 | `PUT /api/sessions/:id` (A5، 2026-09-26) | `status` بیرون از `in_progress\|recovered\|completed\|canceled` | UI: بنرِ خطا |
+| `invalid-transition` | 409 | همان (+`status` فعلی) | از `completed`/`canceled` به وضعیتِ دیگر، جز جلسه‌ی خودکاربسته (`auto_closed_at`) | UI: «جلسه پایان یافته» |
+| `bad-tail` | 400 | `POST /api/sessions/:id/transcript-tail` | `base_version`/`tail` نامعتبر یا > ۶۰۰۰۰ نویسه | RT: به مسیرِ PUT برمی‌گردد |
+| `pre-note-too-long` | 400 | `POST /api/sessions` (زنده) | `pre_note` بلندتر از سقف | UI: بنرِ خطا |
+| `unit-type-invalid`، `members-invalid`، `members-count`، `member-role-invalid`، `member-category-invalid`، `member-gender-invalid`، `alias-too-long` | 400 | `POST /api/clients`، `PUT /api/clients/:id/unit` (treatment-unit، `VErr` در `domain/rules.ts`) | نوع/اعضایِ واحدِ درمان نامعتبر | UI: پیامِ خطا |
+| `attendees-invalid`، `attendees-empty`، `attendees-unknown` | 400 | `POST /api/sessions` (زنده) | فهرستِ حاضرین نامعتبر/خالی/ناشناخته | UI |
+| `modalities-invalid`، `modality-unknown` | 400 | `PUT /api/therapist/modalities` | رویکردِ درمانیِ نامعتبر | UI |
+| `audio-pending` | 409 | `DELETE /api/admin/sessions/:id/audio` (B2) | صدایِ transcript/late/note هنوز در صفِ batch است | UI ادمین |
+| `conflict` | 409 | `PATCH …/final-transcript/roles` | هم‌زمان دوباره ساخته شد | UI |
 | `no-key` | 500 (realtime-session) / 200 `ok:false` (check) | `stt.ts`، `tempkey.ts` | `SONIOX_API_KEY` تنظیم نیست | durable-only |
 | `version-conflict` (پرونده) | 409 | PATCH/items/DELETE/upgradeِ case-file (2026-09-23) | CASِ `content_version` بعد از ۵ تلاش | UI: پیامِ خطا؛ کاربر دوباره تلاش می‌کند |
 | `consent-required`، `file-too-small`، `bad-fingerprint` | 400 | `POST /api/uploads` (و `consent-required` از 2026-09-24 در `POST /api/sessions` زنده هم؛ فقط وقتی مراجع رضایتِ ثبت‌شده ندارد) | ورودیِ نامعتبر | UP: خطایِ دائمی (فایل رها می‌شود) |
@@ -37,13 +46,12 @@
 | `not-failed` | 409 | `POST /api/audio-jobs/:id/retry` | job در جریان/تمام‌شده | — |
 | `audio-expired` | 410 | همان (و `error_code`ِ job) | صدا دیگر رویِ سرور نیست (۱۴ روز) | UI: «دوباره آپلود کنید» |
 
-**`audio_jobs.error_code`** (در `notifications.error_code` هم): `soniox-unavailable`، `soniox-error`، `soniox-timeout`، `soniox-lost`، `soniox-unknown-status`، `no-ffmpeg`، `case-file-retry` (2026-09-25: **خطا نیست** — job در مرحله‌ی `case_file` با `case_file_status=waiting` منتظرِ تلاشِ دوباره بعد از خطایِ گذرایِ LLM؛ ۱، ۵، ۱۵ دقیقه، بعد `done/failed` + اعلانِ `case_file_failed`)، `normalize-failed` (گذرا — retryِ خودکار، بعد از ۳ شکست `failed` با همین کد و قابلِ «تلاشِ دوباره»؛ پیش از 2026-09-24 به `unreadable` تبدیل می‌شد)، `quota-wait` (2026-09-24، رفعِ L6: **خطا نیست** — job در `transcribing` منتظرِ آزادشدنِ سقفِ روزانه است؛ UI پیامِ «خودکار ادامه می‌یابد»)، `internal-error` (2026-09-24: ۵ خطایِ غیرمنتظره‌ی پشتِ‌سرِ‌همِ worker ⇒ `failed`، قابلِ «تلاشِ دوباره»)؛ `no-audio`، `unreadable`، `too-long`، `audio-missing`، `audio-expired` (دائمی). نگاشتِ فارسی: `PROC_ERR` در `index.html`.
 | `mint-transport` | 503 | `tempkey.ts` | DNS/TCP/TLS به Soniox | durable-only / reconnect |
 | `mint-timeout` | 503 | `tempkey.ts` | >10s | همان |
 | `mint-rejected` | 502 | `tempkey.ts` | Soniox رد کرد (کلید/سقف) | همان |
 | `mint-ok` | 200 | `/api/stt/check` | سالم | — |
 | ~~`proxy-unknown` / `proxy-transport` / `proxy-soniox-error`~~ | — | — | **حذف شد 2026-09-24** همراهِ probeِ legacyِ `/api/stt/check` | — |
-| `llm-failed` | 502 | `case-file/domain/errors.ts` (`CaseFileGenerationError`) | فراخوانیِ OpenAI ناموفق (شبکه/کلید/rate-limit) یا `OPENAI_API_KEY` تنظیم نشده | UI: پیامِ خطا + دکمه‌ی تلاشِ دوباره؛ `client_case_file.status='error'` |
+| `llm-failed` | 502 | `case-file/domain/errors.ts` (`CaseFileGenerationError`) | فراخوانیِ providerِ LLM ناموفق (شبکه/کلید/rate-limit/اعتبار) یا کلیدِ providerِ فعال تنظیم نشده ([llm-provider-layer](../06-platform/llm-provider-layer.md)) | UI: پیامِ خطا + دکمه‌ی تلاشِ دوباره؛ `client_case_file.status='error'` |
 | `llm-invalid-output` | 502 | همان | پاسخِ خالی یا JSONِ نامعتبر/ناسازگار با schema | همان |
 | `unknown` (case-file) | 502 | همان | خطایِ دیگر در `generateCaseFile` | همان |
 | `busy` / `fresh` (متنِ نهایی) | 409 | `POST /api/sessions/:id/final-transcript/retry` | در حالِ آماده‌سازی / متنِ نهاییِ به‌روز موجود است | UI: پیامِ خطا |
@@ -55,6 +63,8 @@
 | `obs-bad-payload` | 400 | `POST /api/obs/events` | بدنه/آرایه‌ی `events` نامعتبر (خالی، >۲۰۰ عضو، یا شکلِ اشتباه) | `feelia-obs.js`: این batch دور ریخته می‌شود (بدونِ retry فوری، منتظرِ flushِ بعدی) |
 | `obs-rate-limited` | 429 | `POST /api/obs/events` | >۲۰ درخواست یا >۱۵۰۰ رویداد/دقیقه به‌ازایِ تراپیست | `feelia-obs.js`: بافر خالی می‌شود + backoff |
 
+**`audio_jobs.error_code`** (در `notifications.error_code` هم): `soniox-unavailable`، `soniox-error`، `soniox-timeout`، `soniox-lost`، `soniox-unknown-status`، `no-ffmpeg`، `case-file-retry` (2026-09-25: **خطا نیست** — job در مرحله‌ی `case_file` با `case_file_status=waiting` منتظرِ تلاشِ دوباره بعد از خطایِ گذرایِ LLM؛ ۱، ۵، ۱۵ دقیقه، بعد `done/failed` + اعلانِ `case_file_failed`)، `normalize-failed` (گذرا — retryِ خودکار، بعد از ۳ شکست `failed` با همین کد و قابلِ «تلاشِ دوباره»؛ پیش از 2026-09-24 به `unreadable` تبدیل می‌شد)، `quota-wait` (2026-09-24، رفعِ L6: **خطا نیست** — job در `transcribing` منتظرِ آزادشدنِ سقفِ روزانه است؛ UI پیامِ «خودکار ادامه می‌یابد»)، `internal-error` (2026-09-24: ۵ خطایِ غیرمنتظره‌ی پشتِ‌سرِ‌همِ worker ⇒ `failed`، قابلِ «تلاشِ دوباره»)؛ `no-audio`، `unreadable`، `too-long`، `audio-missing`، `audio-expired` (دائمی). نگاشتِ فارسی: `PROC_ERR` در `index.html`.
+
 ## ۳. statusهای بدونِ code
 
 | status | کجا | معنا |
@@ -64,9 +74,9 @@
 | 403 | login حسابِ غیرفعال | «این حساب غیرفعال شده است» |
 | 404 | منبعِ غیرموجود **یا غیرمالک** (LAW-004)؛ GET resolve-speakers بدونِ job | — |
 | 409 | register شماره‌ی تکراری | — |
-| 413 | آپلودِ فایلی بزرگ‌تر از **1MiB**: `@fastify/multipart@10.1.1` پیش‌فرضِ `fileSize` را برابرِ `bodyLimit` فاستیفای می‌گذارد و `index.ts` هیچ‌کدام را تنظیم نکرده (تأییدشده از `node_modules`، 2026-09-13). بنابراین چکِ 50MB در `voice-note`/`batch-audio` عملاً دست‌نیافتنی است. کدِ دقیقِ پاسخ (413 از `RequestFileTooLargeError`) **INFERRED**؛ سقفِ nginx هم ممکن است زودتر اعمال شود | پیامِ غیرقراردادی؛ در `drainQueuedAudioInBackground` پاسخِ غیر-ok/غیر-400 یعنی سگمنت در صف می‌ماند |
+| 413 | حجمِ فایلِ multipart بیش از سقفِ `fileSize` در `server/src/app.ts` (مقدار: [configuration-catalog](configuration-catalog.md))؛ ادعایِ قدیمیِ «1MiB» (2026-09-13) با کدِ فعلی مطابق نیست. کدِ دقیقِ پاسخ **INFERRED**؛ سقفِ nginx جدا است ([deployment-operations](../01-architecture/deployment-operations.md)) |
 | 429 | `/api/stt/realtime-session` | >30 mint/دقیقه |
-| 500 | voice-note بدونِ کلید؛ خطای ناگرفته (مثلاً **INFERRED:** UUID نامعتبر در پارامتر → خطای pg `22P02`) | پاسخِ پیش‌فرضِ Fastify |
+| 500 | voice-note بدونِ کلید؛ خطای ناگرفته | پاسخِ پیش‌فرضِ Fastify |
 | 202 | voice-note، batch-audio، resolve-speakers POST | پذیرفته، پردازش در پس‌زمینه |
 
 ## ۴. خطاهای سمتِ کلاینت (FeeliaRT)

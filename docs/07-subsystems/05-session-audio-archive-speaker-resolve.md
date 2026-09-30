@@ -2,6 +2,13 @@
 
 > **وضعیت:** ACTIVE-CANONICAL · کد: `server/src/features/transcription/archive/`، `server/src/features/transcription/speakerResolve.ts`، `server/src/db/mysql/migrations/011_session_audio.sql`، `016_session_audio_duration.sql`، روت‌های `/api/admin/sessions/:id/audio`، `/api/admin/session-audio/:audioId/stream`، `/api/sessions/:id/resolve-speakers` · قوانین: LAW-005، LAW-009، LAW-010.
 
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../02-reference/feature-index.md) (`transcription`) · قالب: [feature-doc-template](../00-governance/feature-doc-template.md) (LAW-026) — «چرا»ی هر تصمیم در متنِ زیر و Event Log؛ ساختارِ استاندارد:
+
+- **مرزها:** `features/transcription/archive/*` + `speakerResolve.ts` (از `index.ts` صادر می‌شوند)؛ مسیرهایِ ادمین در `features/admin/audio.admin.ts`.
+- **داده:** مالک: `session_audio` (011، 016، 017، 023، 027)؛ فایل‌ها `data/session-audio/<sid>/`.
+- **تست:** `test:api` (ادمین صدا)، E2Eِ دستی؛ ffmpegِ واقعی فقط در تستِ دستی.
+- **ریسک و بدهی:** تعارضِ متنِ رضایت (LAW-009/C1، بحرانی)؛ نگهداریِ ۱۴روزه (LAW-010)؛ purge غیرِ تراکنشی ([session-media-purge](../06-platform/session-media-purge.md)).
+
 ## ۱. هدف (از کامنتِ کد)
 نگهداریِ عمدیِ صدای جلسات «فقط برای بازبینیِ ادمین (دیباگِ باگ‌ها)» با نگهداریِ محدود (۱۴ روز «طبقِ تصمیمِ تیم»)، و استفاده‌ی مجدد از همان صدا برای یکدست‌کردنِ شماره‌ی گوینده‌ها.
 
@@ -12,7 +19,7 @@
 | ورود | `archiveAudioForAdmin(sessionId, seq, buffer, mime, source)` از `processBatchQueue` (همه‌ی purposeها پس از موفقیت، و archive بدونِ رونویسی) |
 | مسیر | `<cwd>/data/session-audio/<sessionId>/<seq6>.webm` (یا `.ogg` اگر mime شاملِ ogg)؛ **از 2026-09-29 kindِ غیرِ session پیشوند دارد: `note-<seq6>.webm`، `prenote-<seq6>.webm`** — seq برایِ هر kind جدا از ۰ است و قبلاً سگمنتِ ۰ِ یادداشتِ صوتی با سگمنتِ ۰ِ جلسه یک نام داشت و فایلِ دیگری را رویِ دیسک بازنویسی می‌کرد (ردیف‌هایِ قدیمی مسیرِ ثبت‌شده‌ی خودشان را دارند؛ backfill نشد) |
 | ری‌ماکس + duration **(جدید، 2026-09-16)** | بعدِ نوشتنِ فایلِ خام، `ffmpeg -c copy` (بدونِ ری‌اینکود) روی همان فایل اجرا می‌شود و سپس مدت‌زمانِ فایلِ نهایی probe می‌شود → `duration_ms`. اگر ffmpeg نصب نباشد یا ری‌ماکس خطا بدهد، فایلِ خامِ اصلی دست‌نخورده می‌ماند و `duration_ms = NULL` (fail-open — آرشیو هرگز شکست نمی‌خورد) |
-| DB | `INSERT … ON CONFLICT (session_id, seq) DO UPDATE` → **seqِ تکراری فایلِ قبلی را بازنویسی می‌کند** |
+| DB | (از 017) seq را **سرور** زیرِ قفلِ per-session (`withSessionLock`) با `MAX(seq)+1` تعیین می‌کند؛ `sha256` تکراری ⇒ no-op (idempotent)؛ `UNIQUE(session_id, run_id, seq)` — هیچ archiveِ موفقی بازنویسی نمی‌شود |
 | دسترسی | فقط ادمین: فهرست (شاملِ `duration_ms`) + stream با Range و `?download=1` اختیاری (`Content-Disposition: attachment`)؛ از static سرو نمی‌شود |
 | sweep | startup + هر ۲۴h: ردیف‌های `created_at < now-14d` → حذفِ فایل و ردیف؛ پوشه‌های خالی حذف |
 
@@ -23,10 +30,10 @@
 
 ### مشکلاتِ شناخته‌شده (هنوز باز)
 1. **تعارضِ رضایت (C1، بحرانی):** متنِ Setup: «صدا هیچ‌جا ذخیره نمی‌شود — فقط متنِ گفتگو در پرونده ثبت می‌گردد»؛ privacy note: «صدای خام هرگز ذخیره نمی‌شود». UI ادمین: «صدا فقط برایِ بازبینیِ فنی نگه داشته می‌شود — حداکثر ۱۴ روز».
-2. **seq در هر نسلِ durable؟** `durableSeq` در طولِ عمرِ یک `RTSession` افزایشی است؛ ولی اگر جلسه پس از reload با `RTSession` جدید ادامه یابد، seq از ۰ شروع می‌شود → `ON CONFLICT` صدای بخش‌های قبلی را **بازنویسی** می‌کند و فایل‌های `data/batch-queue` هم با seq تکراری ولی timestamp متفاوت‌اند (INFERRED از کد؛ تست نشده).
-3. ~~فایل‌های یتیم~~ **رفع شد (2026-09-22، LAW-010):** قبل از `DELETE` رویِ `sessions`/`clients`/`therapists`، شناسه‌ی جلسه‌هایِ مرتبط جمع‌آوری و بعدِ موفقیتِ حذفِ DB با `deleteSessionAudioDirs` (در `sessionAudioArchive.ts`) پوشه‌ی فیزیکیِ هرکدام هم پاک می‌شود — `server/src/features/sessions/` (حذفِ جلسه)، `clients.ts` (حذفِ مراجع)، `admin.ts` (حذفِ مراجع/تراپیستِ ادمین). fail-open: خطایِ حذفِ فایل فقط لاگ می‌شود.
+2. ~~seq در هر نسلِ durable~~ **رفع شد (017، 2026-09-16):** seq از سرور می‌آید و `run_id` جدا می‌کند.
+3. ~~فایل‌های یتیم~~ **رفع شد (2026-09-22، LAW-010):** قبل از `DELETE` رویِ `sessions`/`clients`/`therapists` شناسه‌ی جلسه‌ها جمع و بعدِ موفقیتِ حذف پوشه‌هایِ صدا پاک می‌شود — `features/session-media/purge.ts` ([session-media-purge](../06-platform/session-media-purge.md)).
 4. **ترتیبِ UI:** «سگمنت N» = `seq+1`.
-5. `Range` بدونِ اعتبارسنجیِ `end < size`.
+5. ~~`Range` بدونِ اعتبارسنجی~~ **رفع شد (فازِ ۳ی پلنِ observability):** `parseRange` (`shared/httpRange.ts`) با clamp؛ رنجِ نامعتبر ⇒ 416.
 
 ## ۳. Speaker Resolve
 

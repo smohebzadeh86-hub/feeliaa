@@ -10,12 +10,12 @@
 3. Requirementهای APPROVED  (docs/03-requirements/requirement-catalog.md)
 4. معماریِ canonical  (docs/01-architecture/*, docs/07-subsystems/*, docs/06-platform/*)
 5. کد/schema/config فعلی در working tree شاخه‌ی فعال
-     - schema  = فایل‌های server/src/db/migrations/*.sql به ترتیب
-     - API     = server/src/http/*.ts + server/src/ws/*.ts
+     - schema  = فایل‌های server/src/db/mysql/migrations/*.sql|.mjs به ترتیب
+     - API     = server/src/features/*/*.routes.ts + server/src/obs/obs.routes.ts (قرارداد: scripts/route-snapshot.txt)
      - config  = process.env.* در server/src + ثابت‌های کد
-     - UI      = public/index.html, public/feelia-rt.js, public/feelia-analytics.js
-6. تست‌های فعلی  (scripts/rt-harness.cjs)
-7. Reference catalogs  (docs/02-reference/*) و docs/analytics-clarity.md
+     - UI      = public/index.html، public/feelia-{rt,upload,obs,analytics}.js
+6. تست‌های فعلی  (scripts/*harness*، route-snapshot، check-backend-boundaries، check-docs)
+7. Reference catalogs  (docs/02-reference/*، feature-index و frontend-map) و docs/analytics-clarity.md
 8. کامنت‌های داخلِ کد
 9. Evidence  (verification/*)
 10. HISTORICAL / DEPRECATED  (docs/admin-panel.md, session_assistant_v11 (3).html, server-deploy/)
@@ -30,9 +30,8 @@
 - وقتی مالک REQی را تأیید کرد، ستونِ Status آن `APPROVED` می‌شود و از آن به بعد در سطحِ ۳ قرار می‌گیرد.
 
 ### 2.2 working tree در برابرِ HEAD در برابرِ production
-- **وضعیتِ فعلیِ محصول در repo** = `HEAD` روی `feat/clarity` (`54a17fd`، 2026-09-15) — تقریباً همه‌ی کدِ برنامه commit و به `origin/feat/clarity` push شده؛ فقط بخشِ عمده‌ی خودِ `docs/`، `CLAUDE.md`، `PROJECT_MASTER_REFERENCE.md`، `.claude/` هنوز untracked‌اند (عمداً، دامنه‌ی commitهای اخیر UI/بک‌اند بوده، نه بازسازیِ مستندات).
-- **آخرین نسخه‌ی ثبت‌شده روی `origin/main`** = `8bcdf0e` — بدونِ merge از `feat/clarity` (فاصله‌ی زیاد، R3).
-- **وضعیتِ production** = نامعلومِ دقیق ولی طبقِ آخرین deploy روی `8bcdf0e` است ([PROJECT_STATUS.md](../../PROJECT_STATUS.md))، یعنی هیچ‌کدام از کارِ `2763414` تا `54a17fd` روی آن نیست. `server-deploy/` محلی و ادعاهای `docs/analytics-clarity.md` درباره‌ی pm2/nginx فقط evidence هستند. هر ادعا درباره‌ی production باید از خودِ سرور تأیید شود.
+- وضعیتِ محصول = کد + schema در working treeِ شاخه‌ی فعال؛ HEAD/commit/push/merge و **وضعیتِ production فقط در `PROJECT_STATUS.md`** (LAW-027) نگه‌داری می‌شود — هرگز از اسنادِ محتوا نتیجه نگیرید که چیزی deploy شده است.
+- `origin/main` و فاصله‌اش با `feat/clarity`، و اینکه production رویِ کدام commit است: `git branch -vv` و آخرین ورودیِ deploy در Event Log.
 
 ### 2.3 schema
 حقیقتِ schema = اجرای ترتیبیِ migrationها. اگر DBِ واقعی با آن فرق دارد (مثلاً migration دستی)، این drift است و باید گزارش شود؛ migration جدید آن را رفع می‌کند، نه ویرایشِ migration قبلی.
@@ -55,6 +54,10 @@
 | نوع fact | مالک |
 |---|---|
 | قانون/ممنوعیت | `docs/00-governance/project-laws.md` |
+| نگاشتِ feature ↔ کد ↔ سند ↔ تست ↔ جدول | `docs/02-reference/feature-index.md` |
+| «چرا»ی یک feature (تصمیم‌ها با تاریخ/مرجع) | بخشِ «چرا»ی سندِ مالکِ همان feature (قالب: `feature-doc-template.md`) |
+| مالکِ جدولِ DB | `docs/02-reference/database-catalog.md` §۰ |
+| نگاشتِ فرانت (صفحه/تابع/state) | `docs/02-reference/frontend-map.md` |
 | قاعده‌ی کسب‌وکار / رفتارِ محصول | `docs/03-requirements/requirement-catalog.md` (+ PRD برای روایت) |
 | تصمیمِ معماری / مرزها | `docs/01-architecture/*` |
 | state machine و جزئیاتِ فنیِ پرریسک | `docs/07-subsystems/*` |

@@ -1,7 +1,15 @@
 # Subsystem 07 — «متنِ نهاییِ جلسه» (رونویسیِ دوباره + مرتب‌سازی با AI)
 
-> وضعیت: پیاده‌سازی‌شده در working tree (2026-09-27). فاز ۰ (gate) و E2E رویِ DBِ dev با Soniox/LLMِ واقعی PASS (2026-09-28). **commit/deploy نشده**. پیش‌فرض برایِ همه خاموش است.
+> وضعیت: پیاده‌سازی‌شده (2026-09-27). فاز ۰ (gate) و E2E رویِ DBِ dev با Soniox/LLMِ واقعی PASS (2026-09-28). پیش‌فرض برایِ همه خاموش است (روشن/خاموش فقط از ادمین).
 > کد: `server/src/features/final-transcript/**`، migration `031_final_transcript.sql`، UI در `public/index.html` (`renderFinalTranscript`).
+
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../02-reference/feature-index.md) (`final-transcript`) · قالب: [feature-doc-template](../00-governance/feature-doc-template.md) (LAW-026) — «چرا»ی هر تصمیم در متنِ زیر و Event Log؛ ساختارِ استاندارد:
+
+- **کدِ فرانت:** `renderFinalTranscript`، `ftRenderTurns`، `ftApplyRole`، `ftToggleRoleMenu`، `ftStopPoll` و stateِ `ftState`/`ftShowRaw`/`ftShowEdits` ([frontend-map](../02-reference/frontend-map.md)).
+- **مرزها:** `features/final-transcript/index.ts` صادر می‌کند: `enqueueFinalTranscript`، `startFinalTranscriptWorker`، `wakeFinalTranscriptWorker`، `finalTranscriptRoutes`، `appendUploadForPolish`. لایه‌ها: domain/application/adapters/api (`runner.ts` سیم‌کشی). LLM از [llm-provider-layer](../06-platform/llm-provider-layer.md)؛ نقش‌ها از `treatment-unit`.
+- **داده:** مالک: `final_transcripts` (031، 034)؛ فقط می‌خواند: `sessions`، `session_audio`؛ `sessions.transcript` را هرگز تغییر نمی‌دهد.
+- **تست:** `pnpm test:ft` (`scripts/final-transcript-harness.ts`: ماشینِ حالت، نگهبان‌ها، polish با LLMِ جعلی؛ بدونِ DB/شبکه)؛ E2Eِ واقعی با DeepSeek/Soniox در verification.
+- **ریسک و بدهی:** R19/R21 (خروجِ متن/صدا به Soniox و LLM بدونِ ذکر در متنِ رضایت)؛ تغییرِ ظریفِ معنا فقط با اندازه‌گیری کنترل می‌شود؛ هزینه‌ی Soniox دو برابر.
 
 ## هدف
 بعد از پایانِ جلسه، متنی درست و خوانا تولید شود که گوینده‌ها در آن **نقش** دارند (درمانگر / خانم / آقا / مراجع …)، نه «گوینده ۳».

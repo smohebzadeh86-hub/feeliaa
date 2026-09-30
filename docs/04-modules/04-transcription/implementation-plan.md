@@ -1,7 +1,7 @@
 # Module 04 — Transcription · Implementation Plan
 
 ## Current State
-- مسیرِ اصلیِ Browser→Soniox از `f9b0a9c` در git؛ صفِ IndexedDB، آرشیو، async batch، resolve-speakers، discontinuity marker — همه commit شده (`2763414`، 2026-09-14). امروز (`54a17fd`) فقط یک لاگِ تشخیصیِ کوچک به `feelia-rt.js` اضافه شد (دلیلِ واقعیِ شکستِ mint/اتصال حالا لاگ می‌شود).
+- مسیرِ اصلیِ Browser→Soniox از `f9b0a9c` در git؛ صفِ IndexedDB، آرشیو، async batch، resolve-speakers، discontinuity marker — (2026-09-14). لاگِ تشخیصیِ دلیلِ شکستِ mint/اتصال به `feelia-rt.js` افزوده شد (2026-09-15).
 - harness (working tree = HEAD، دیگر واگرایی ندارند): **۲۹ PASS / ۶ FAIL** — baselineِ پایدار، بدونِ ربط به تغییراتِ اخیر ([verification 2026-09-15](../../../verification/2026-09-15-clients-tabs-ui.md)).
 - typecheck سرور تمیز.
 

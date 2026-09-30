@@ -1,7 +1,14 @@
 # Subsystem 01 — Browser Realtime Engine (FeeliaRT)
 
-> **وضعیت:** ACTIVE-CANONICAL · کد: `public/feelia-rt.js` (≈1280 خط، commit شده در `2763414`؛ یک لاگِ تشخیصیِ کوچک اضافه‌تر در `54a17fd`، 2026-09-15) · تست: `scripts/rt-harness.cjs` · **به‌روزشده 2026-09-14:** pause مبتنی بر keepalive (WS بسته نمی‌شود).
+> **وضعیت:** ACTIVE-CANONICAL · کد: `public/feelia-rt.js` · تست: `scripts/rt-harness.cjs` · **به‌روزشده 2026-09-14:** pause مبتنی بر keepalive (WS بسته نمی‌شود).
 > مرتبط: [02 audio](02-audio-durability-batch-fallback.md) · [03 integrity](03-transcript-integrity.md) · [ماژول 04](../04-modules/04-transcription/module-prd.md).
+
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../02-reference/feature-index.md) (`transcription`) · قالب: [feature-doc-template](../00-governance/feature-doc-template.md) (LAW-026) — «چرا»ی هر تصمیم در متنِ زیر و Event Log؛ ساختارِ استاندارد:
+
+- **مرزها:** فرانت‌محور (`public/feelia-rt.js`)؛ تماسِ سرور فقط از `POST /api/stt/realtime-session`، `PUT /api/sessions/:id`، `POST …/transcript-tail`، `POST …/batch-audio`، `POST /api/obs/events` (`client_event`). سمتِ سرور: `features/transcription/`.
+- **داده:** IndexedDB `feelia-audio/segments`؛ بدونِ جدولِ مالکِ اختصاصی ([database-catalog §۰](../02-reference/database-catalog.md)).
+- **تست:** `pnpm test:rt` (`scripts/rt-harness.cjs`، بدونِ شبکه/DB)؛ E2Eِ مرورگرِ واقعی + Soniox فقط دستی ([verification](../../verification/README.md)). **پوشش نمی‌دهد:** شبکه‌ی واقعی/iOS Safari.
+- **ریسک و بدهی:** پیچیدگیِ state machine و epoch؛ نبودِ نقشه‌ی بلوکی در `index.html` برایِ glue ([frontend-map](../02-reference/frontend-map.md)).
 
 ## ۱. مسئولیت
 یک `RTSession` برای هر جلسه (`mode:'live'`) یا یادداشتِ صوتی (`mode:'note'`): گرفتنِ میکروفون، mint، WS مستقیم به Soniox، ساختِ متنِ confirmed/interim، autosave با CAS، ضبطِ durable موازی، pause/resume، reconnect، finish و fallback، abort امن.

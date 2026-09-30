@@ -2,6 +2,13 @@
 
 > **وضعیت:** ACTIVE-CANONICAL · قانون: LAW-008 · مالکِ قواعدِ نوشتنِ `sessions.transcript`.
 
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../02-reference/feature-index.md) (`transcription`) · قالب: [feature-doc-template](../00-governance/feature-doc-template.md) (LAW-026) — «چرا»ی هر تصمیم در متنِ زیر و Event Log؛ ساختارِ استاندارد:
+
+- **مرزها:** بینِ‌featureای: نویسندگانِ `sessions.transcript`: `sessions` (PUT/tail)، `transcription/batch` و `speakerResolve`، `audio-upload` (آپلود)، `legacy-ws` (LEGACY) — همه باید LAW-008 را رعایت کنند؛ API واحدِ نوشتن در backlog است (LAW-025).
+- **داده:** `sessions.transcript`، `transcript_version` (CAS)؛ `session_notes` (یادداشتِ صوتی هرگز واردِ transcript نمی‌شود).
+- **تست:** `test:rt` (merge/placeholder/marker)، `test:up` (exactly-once با `transcript_applied_at`)؛ CAS/409 فقط در E2Eِ دستی (پوششِ `test:api` بازبینی نشده — UNKNOWN).
+- **ریسک و بدهی:** CAS در `PUT` اتمیک است (`AND transcript_version = ?`) ولی **اختیاری**: callerهایِ بدونِ `transcript_version` پذیرفته می‌شوند (سازگاریِ عقب‌رو)؛ مسیرِ legacy بدونِ CAS (LAW-015).
+
 ## ۱. همه‌ی نویسنده‌های `sessions.transcript`
 
 | # | نویسنده | فایل | CAS؟ | نسخه +1؟ | رفتار |

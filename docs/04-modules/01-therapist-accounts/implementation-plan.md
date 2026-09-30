@@ -3,7 +3,7 @@
 > Current State = ACTIVE-CANONICAL · Proposed = PROPOSED.
 
 ## Current State
-کامل و در HEAD موجود، همه commit شده (`specialty` migration 010 و `guard.ts` در `2763414`). بدونِ تستِ خودکار.
+کامل (`specialty` migration 010 و `guard.ts`). بدونِ تستِ خودکار.
 
 ## Code Anchors
 | لایه | anchor |

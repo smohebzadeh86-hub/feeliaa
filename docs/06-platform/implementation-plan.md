@@ -13,7 +13,7 @@
 | مالکیت | `server/src/db/ownership.ts` |
 | DB | `server/src/db/connection.ts` (`query`)، `migrate.ts` (`runMigrations`، `resolveMigrationsDir`) |
 | build | `server/scripts/copy-assets.mjs` |
-| sweeperها | `batchqueue.ts#sweepOldBatchFiles`، `sessionAudioArchive.ts#sweepOldSessionAudio`، `speakerResolve.ts#sweepOldResolveJobs` |
+| sweeperها | `features/transcription/batch/sweep.ts#sweepOldBatchFiles`، `features/transcription/archive/sweep.ts#sweepOldSessionAudio`، `features/transcription/speakerResolve.ts#sweepOldResolveJobs` |
 | لاگِ حساس | `server/src/features/sessions/` خطوطِ `[diag-transcript]` |
 
 ## Architecture Impact
@@ -25,7 +25,7 @@
 |---|---|---|---|---|---|---|
 | PL-1 | حذفِ لاگ‌های `DIAG-TEMP` یا حذفِ `tail` از آن‌ها | REQ-099، LAW-023 | — | `sessions.ts` | — | پایین |
 | PL-2 | تعیینِ صریحِ سقفِ multipart (`limits.fileSize`) متناسب با بیشترین سگمنت/voice-note (تصمیمِ عدد با مالک) و هماهنگی با nginx | REQ-100 | — | `index.ts` | — | پایین؛ باید nginx هم بررسی شود |
-| PL-3 | حذفِ فایل‌های صدا هنگامِ حذفِ جلسه/مراجع/تراپیست + sweepِ فایل‌های یتیمِ بدونِ ردیف | REQ-093، LAW-010 | — | `sessions.ts`، `clients.ts`، `admin.ts`، `sessionAudioArchive.ts` | — | متوسط (عملیاتِ حذف؛ LAW-006 برای اجرای روی prod) |
+| PL-3 | حذفِ فایل‌های صدا هنگامِ حذفِ جلسه/مراجع/تراپیست + sweepِ فایل‌های یتیمِ بدونِ ردیف | REQ-093، LAW-010 | — | `sessions.ts`، `clients.ts`، `admin.ts`، `features/transcription/archive/` | — | متوسط (عملیاتِ حذف؛ LAW-006 برای اجرای روی prod) |
 | PL-4 | `secure: true` روی کوکی در production (بر اساسِ env یا `trustProxy`) | P-3 | — | `features/auth/auth.routes.ts` | — | متوسط (dev روی http) |
 | PL-5 | rate-limit برای login/register (in-memory مثلِ `mintHits`) | P-3 | — | `features/auth/auth.routes.ts` | — | پایین |
 | PL-6 | security headers (حداقل `X-Content-Type-Options`، `Referrer-Policy`؛ CSP با allowlistِ Clarity/Fonts/Soniox) | P-3 | — | hook در `index.ts` یا nginx | ممکن است inline handlerها CSP سخت را بشکنند | متوسط |

@@ -1,7 +1,7 @@
 # Module 06 — Admin Panel · Implementation Plan
 
 ## Current State
-پایه و export در HEAD؛ مسیرهای `clients/:id/sessions`، `sessions/:id/audio`، `session-audio/:audioId/stream` و UIِ `#screenAdminSessions` commit شده در `2763414`. بدونِ تستِ خودکار؛ رندرِ دستیِ صفحاتِ ادمین (کارتِ تراپیست، سه‌دکمه‌ی `مشاهده/دانلود/حذف`) با داده‌ی canary در [verification 2026-09-15](../../../verification/2026-09-15-clients-tabs-ui.md).
+پایه و export در HEAD؛ مسیرهای `clients/:id/sessions`، `sessions/:id/audio`، `session-audio/:audioId/stream` و UIِ `#screenAdminSessions` (2026-09-14). بدونِ تستِ خودکار؛ رندرِ دستیِ صفحاتِ ادمین (کارتِ تراپیست، سه‌دکمه‌ی `مشاهده/دانلود/حذف`) با داده‌ی canary در [verification 2026-09-15](../../../verification/2026-09-15-clients-tabs-ui.md).
 
 ## Code Anchors
 | لایه | anchor |

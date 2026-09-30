@@ -1,7 +1,7 @@
 # Module 03 — Therapy Sessions · Implementation Plan
 
 ## Current State
-کامل؛ بنرهای ادامه، durable-only، timer در pause، resolve-speakers در پرونده — commit شده در `2763414`. ثبتِ دستیِ جلسه‌ی گذشته (`mode:"manual"`)، تاریخِ شمسیِ اختیاری (`features/sessions/sessionDate.ts`، migration 012–014)، و صفحه‌ی مستقلِ SessionDetail — commit شده در `54a17fd` (2026-09-15). `DIAG-TEMP` هنوز در `PUT /api/sessions/:id` است (R2، رفع‌نشده).
+کامل؛ بنرهای ادامه، durable-only، timer در pause، resolve-speakers در پرونده — (2026-09-14). ثبتِ دستیِ جلسه‌ی گذشته (`mode:"manual"`)، تاریخِ شمسیِ اختیاری (`features/sessions/sessionDate.ts`، migration 012–014)، و صفحه‌ی مستقلِ SessionDetail (2026-09-15). رضایتِ یک‌باره (024)، بستنِ خودکار (026)، اعتبارسنجیِ `status` (A5) و pre-note: [module-prd](module-prd.md). `DIAG-TEMP` هنوز در `PUT /api/sessions/:id` است (R2، رفع‌نشده).
 
 ## Code Anchors
 | لایه | anchor |

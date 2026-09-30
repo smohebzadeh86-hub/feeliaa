@@ -1,6 +1,6 @@
 # System Architecture
 
-> **وضعیت:** ACTIVE-CANONICAL · **Snapshot:** working tree، 2026-09-13 · ادعاهای production با UNVERIFIED مشخص‌اند.
+> **وضعیت:** ACTIVE-CANONICAL · last-verified: 2026-09-30 @ `17d6919` · ادعاهای production با UNVERIFIED مشخص‌اند.
 
 ## ۱. مرزهای سیستم
 
@@ -10,6 +10,8 @@ flowchart TB
     SPA["index.html (UI + glue)"]
     RT["feelia-rt.js (FeeliaRT)"]
     AN["feelia-analytics.js"]
+    OB["feelia-obs.js"]
+    UP["feelia-upload.js"]
     IDB[("IndexedDB feelia-audio")]
     LS[("localStorage / sessionStorage")]
   end
@@ -18,7 +20,8 @@ flowchart TB
     MEM["state in-memory<br/>P1 records · mintHits · resolve jobs"]
     BG["کارهای پس‌زمینه<br/>batch · voice-note · sweepers"]
   end
-  PG[("PostgreSQL")]
+  PG[("MySQL")]
+  LLM["LLM provider (OpenAI/OpenRouter/Metis/DeepSeek)"]
   DISK[("cwd/data: batch-queue, session-audio")]
   FF["ffmpeg (باینریِ محلی)"]
   SXR["Soniox realtime WSS"]
@@ -28,16 +31,19 @@ flowchart TB
 
   SPA --> RT
   SPA --> AN
+  SPA --> OB
+  SPA --> UP
   RT --> IDB
   SPA --> LS
   SPA -- "fetch cookie" --> F
   RT -- "fetch mint / PUT transcript / batch-audio" --> F
   RT -- "WSS audio + temp key" --> SXR
-  AN -. "consent-gated" .-> CL
+  AN -. "Clarity (LAW-011)" .-> CL
   SPA -.-> GF
   F --> PG
   F --> DISK
   BG --> SXA
+  BG -- "polish / case file" --> LLM
   F -- "mint (PROXY_URL?)" --> SXA
   BG --> FF
   F -. "legacy /ws/t proxy" .-> SXR
@@ -48,9 +54,10 @@ flowchart TB
 | Browser ↔ Feelia server | JSON، multipart صدا، WS legacy | کوکیِ httpOnly؛ `requireAuth`/`requireAdmin`؛ مالکیت |
 | Browser ↔ Soniox realtime | صدای WebM/Opus زنده، توکن‌های متن | کلیدِ موقتِ single-use (۱۲۰ ثانیه اعتبارِ شروع، سقفِ ۷۲۰۰ ثانیه) |
 | Server ↔ Soniox REST | کلیدِ اصلی (header)، فایلِ صدای fallback/آرشیو برای رونویسی | `SONIOX_API_KEY`؛ egress اختیاری با `PROXY_URL` |
-| Server ↔ PostgreSQL | همه‌ی داده‌ی ساختاریافته | `DATABASE_URL`؛ کوئری‌های پارامتری |
+| Server ↔ MySQL | همه‌ی داده‌ی ساختاریافته | `DATABASE_URL`؛ کوئری‌های پارامتری |
 | Server ↔ دیسک | فایل‌های صدا | مسیر نسبت به `process.cwd()`؛ retention |
-| Browser ↔ Clarity | رفتارِ UI (masked) | رضایتِ تراپیست + `CLARITY_PROJECT_ID` |
+| Server ↔ LLM provider | **متنِ بالینیِ جلسه** (polishِ «متنِ نهایی»، پروندهٔ درمان) | کلیدِ provider؛ [llm-provider-layer](../06-platform/llm-provider-layer.md)؛ [integration-architecture](integration-architecture.md) |
+| Browser ↔ Clarity | رفتارِ UI (masked) | `CLARITY_PROJECT_ID`؛ قواعدِ LAW-011 |
 
 ## ۲. اجزا
 
@@ -58,12 +65,13 @@ flowchart TB
 |---|---|---|
 | SPA shell | screenها، مدال‌ها، فراخوانیِ API، glueِ موتورها | `public/index.html` |
 | FeeliaRT | موتورِ اصلیِ realtime، ضبطِ durable، autosave، finish/fallback | `public/feelia-rt.js` |
-| FeeliaAnalytics | لودِ مشروطِ Clarity | `public/feelia-analytics.js` |
-| HTTP API | auth، clients، sessions، notes، STT، admin، client-config | `server/src/http/*.ts` |
+| FeeliaAnalytics | لودِ Clarity | `public/feelia-analytics.js` |
+| FeeliaObs / FeeliaUpload | تله‌متریِ UI / آپلودِ فایلِ صوتی | `public/feelia-obs.js` · `public/feelia-upload.js` |
+| Feature modules | auth، clients، sessions/notes، transcription، audio-upload، final-transcript، case-file، treatment-unit، admin، notifications، client-config، legacy-ws | `server/src/features/*` ([feature-index](../02-reference/feature-index.md)) |
 | Auth core | کوکی، resolveِ نشست، guardها، هش | `server/src/auth/*.ts` |
 | DB layer | pool، migrate، مالکیت | `server/src/db/*` |
-| STT server-side | mint، async transcribe، batch queue، archive، resolve | `server/src/stt/*.ts` |
-| Legacy WS | proxyِ `/ws/t` با ordering P1، `/ws/voice` | `server/src/ws/*.ts` |
+| Platform | رصد/ممیزی، لایه‌ی LLM، primitiveهایِ مشترک، jobهایِ پس‌زمینه | `server/src/{obs,llm,shared,jobs}/` |
+| Legacy WS | proxyِ `/ws/t` با ordering P1، `/ws/voice` | `server/src/features/legacy-ws/` |
 
 ## ۳. جریان‌های اصلیِ داده
 

@@ -1,5 +1,6 @@
 # Module PRD — ۰۸: پرونده‌ی روندِ درمان (AI Case File)
 
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../../02-reference/feature-index.md) (`case-file`) · قالب: [feature-doc-template](../../00-governance/feature-doc-template.md) · REQ-111…116 · مرزها/کد/داده/تست/ریسک: [implementation-plan](implementation-plan.md)
 > **وضعیت:** ACTIVE-CANONICAL · ایجاد شده 2026-09-17 · فازِ ۱ (دستی) + بخشِ اولِ فازِ ۲
 > (auto-trigger، 2026-09-18؛ همچنان فقط مراجعینِ غیرفعال).
 > این سند مالکِ رفتارِ محصولی/معماریِ این ماژول است. جزئیاتِ endpoint در
@@ -12,7 +13,7 @@
 
 تراپیست قبل از هر جلسه نیاز به بازیابیِ سریع (در حدِ چند ثانیه) از وضعیتِ مراجع دارد، بدونِ
 مرورِ دستیِ کامل رونویسی/یادداشت‌هایِ خام. این ماژول از رویِ داده‌ی خامِ ثبت‌شده
-(`sessions.transcript` + `session_notes.text`)، با یک LLM (OpenAI)، یک «پرونده‌ی روندِ درمان»
+(`sessions.transcript` + `session_notes.text`)، با یک LLM (providerِ قابلِ‌تعویض — [llm-provider-layer](../../06-platform/llm-provider-layer.md))، یک «پرونده‌ی روندِ درمان»
 ساختاریافته و روایی می‌سازد.
 
 ## اصولِ enforced (نه فقط توصیه)

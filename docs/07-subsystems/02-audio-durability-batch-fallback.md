@@ -9,13 +9,20 @@
 > روت‌های `batch-*` در `server/src/features/sessions/`، روت‌هایِ `audio*` در `server/src/features/admin/`،
 > migration `017_session_audio_run_kind_sha.sql`.
 > ⚠️ متنِ رضایتِ UI با این subsystem تعارض دارد (LAW-009، C1) — هنوز حل‌نشده.
-> ❗ **این سند رویِ working-treeِ commitنشده‌ی audit صدا/۲۰۲۶-۰۹-۱۶ (بخش‌هایِ A تا F، هر شش
+> ❗ **این سند رویِ audit صدا/۲۰۲۶-۰۹-۱۶ (بخش‌هایِ A تا F، هر شش
 > بخشِ پلن) نوشته شده — همه رویِ MySQLِ لوکالِ واقعی + Soniوxِ واقعی + ffmpegِ واقعی +
 > مرورگرِ واقعی تست شده‌اند (جزئیات: [stage1](../../verification/2026-09-16-audio-durability-stage1.md)،
 > [stage2-partD](../../verification/2026-09-16-audio-durability-stage2-partD.md)،
 > [stage3-partC](../../verification/2026-09-16-audio-durability-stage3-partC.md)،
-> [stage4-partsEF](../../verification/2026-09-16-audio-durability-stage4-partsEF.md))، ولی هنوز
-> commit/deploy نشده.**
+> [stage4-partsEF](../../verification/2026-09-16-audio-durability-stage4-partsEF.md))؛ در
+> تأیید شده.**
+
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../02-reference/feature-index.md) (`transcription`) · قالب: [feature-doc-template](../00-governance/feature-doc-template.md) (LAW-026) — «چرا»ی هر تصمیم در متنِ زیر و Event Log؛ ساختارِ استاندارد:
+
+- **مرزها:** `features/transcription/batch/` و `archive/` از `features/transcription/index.ts` صادر می‌شوند؛ مصرف‌کننده‌ها: `sessions/batch.routes.ts`، `audio-upload`، `admin`، `session-media`. importِ پویا بینِ batch↔archive/case-file/treatment-unit عمدی است ([application-architecture §1.3](../01-architecture/application-architecture.md)).
+- **داده:** مالک: `session_audio`؛ فایل‌ها: `data/batch-queue`، `data/session-audio`؛ می‌نویسد: `sessions.transcript/stt_mode/batch_status`، `session_notes`.
+- **تست:** `pnpm test:rt` (سمتِ مرورگر)؛ سمتِ سرور: `test:api` (فقط با مجوز) + E2Eِ دستیِ [stage1–4](../../verification/2026-09-16-audio-durability-stage1.md).
+- **ریسک و بدهی:** duplicate/گم‌شدنِ متن اگر purpose اشتباه انتخاب شود؛ حجمِ صدا؛ writerهایِ چندگانه‌ی `sessions.transcript` (LAW-025).
 
 ## ۱. لایه‌ها
 
@@ -53,11 +60,11 @@ flowchart TB
   `sha256 CHAR(64) NULL`. یونیکِ قدیمیِ `(session_id, seq)` حذف و با
   `(session_id, run_id, seq)` + `(session_id, sha256)` جایگزین شد.
 - `archiveAudioForAdmin` دیگر seqِ کلاینت را نمی‌پذیرد — زیرِ یک **قفلِ in-memory per-session**
-  (`sessionLocks` در `sessionAudioArchive.ts`؛ LAW-013 اجازه می‌دهد چون runtime تک‌پروسه‌ایه):
+  (`withSessionLock` در `features/transcription/archive/store.ts`؛ LAW-013 اجازه می‌دهد چون runtime تک‌پروسه‌ایه):
   اول sha256 چک می‌شود (اگر تکراریه → no-op، idempotent برایِ retry)، وگرنه
   `seq = MAX(seq)+1` همان جلسه محاسبه و فایل با آن نوشته می‌شود. **هیچ archiveِ موفقی دیگر
   هرگز بازنویسی نمی‌شود.**
-- `batchqueue.ts` هم همین قفل را برایِ خودِ `processBatchQueue` دارد (`queueLocks`، کلید
+- `features/transcription/batch/processQueue.ts` هم قفلِ مشابهی برایِ `processBatchQueue` دارد (`withQueueLock`؛ `shared/keyedLock.ts`، کلید
   `sessionId:purpose`) تا دو فراخوانیِ هم‌زمان (retryِ دستی وسطِ workerِ دوره‌ای) رویِ یک
   session/purpose race نکنند.
 
@@ -245,11 +252,11 @@ batch_status∈{done,failed}`؛ note → `!note_audio_pending`. سپس خوان�
    `pickMime()`ِ حدسی، برایِ پوششِ سافاری که هیچ‌کدام از `MIME_CANDIDATES` را پشتیبانی نمی‌کند)
    حالا تا انتها فوروارد می‌شود. چون فایلِ صفِ موقت فقط بایتِ خام است، mime با **پسوندِ خودِ
    فایل** (`webm`/`ogg`/`m4a`) بینِ enqueue و پردازشِ بعدی منتقل می‌شود
-   (`extForMime`/`mimeForExt`/`mimeFromFilename` در `batchqueue.ts`). با فایلِ واقعیِ
+   (`extForMime`/`mimeForExt`/`mimeFromFilename` در `features/transcription/batch/queueFiles.ts`). با فایلِ واقعیِ
    ogg (Vorbis) و m4a (AAC) رویِ MySQLِ واقعی تست شد — پسوند/`mime`/`duration_ms` هر سه درست
    ثبت شدند (جزئیاتِ کامل در verificationِ 2026-09-16).
 3. ~~بخشِ F~~ **پیاده و تست شد (2026-09-16؛ چکِ کاملیت اضافه شد 2026-09-22):** `GET /api/admin/sessions/:id/audio/full[?download=1]`
-   (`admin.ts` → `getFullSessionAudio` در `sessionAudioArchive.ts`) همه‌ی سگمنت‌هایِ `kind='session'`
+   (`admin.ts` → `getFullSessionAudio` در `features/transcription/archive/fullAudio.ts`) همه‌ی سگمنت‌هایِ `kind='session'`
    را با ffmpeg concat می‌کند و در `data/session-audio/<sid>/full.<ext>` کش می‌کند (invalidation
    با شمارشِ سگمنت‌ها، نه زمان). **از 2026-09-22:** قبل از concat (هم در مسیرِ کش‌شده، هم مسیرِ
    ساختِ تازه) `checkSeqContiguous` رویِ همین سگمنت‌ها اجرا می‌شود؛ نتیجه (`complete`/`missingSegments`)
@@ -282,7 +289,7 @@ batch_status∈{done,failed}`؛ note → `!note_audio_pending`. سپس خوان�
    `drainQueuedAudioInBackground()`ِ خودِ RTSession عمداً هم‌زمان شلیک شدند — سرور دقیقاً همان
    تعداد سگمنت را با `seq` پیوسته و بدونِ تکرار آرشیو کرد. جزئیات:
    [verification](../../verification/2026-09-16-audio-durability-stage5-crosscontextlock.md).
-7. migration 017 و کدِ این audit **هنوز commit نشده‌اند** — working tree.
+
 8. ~~onlineHandler فقط NETWORK_PAUSED~~ **پیاده و تست شد (2026-09-16، یافته‌ی #۱۶ی پلنِ اصلی):**
    با تستِ زنده‌ی قطعیِ **کاملِ** شبکه (نه فقط میکروفون) پیدا شد که بعدِ اتمامِ
    `MAX_RECONNECT_ATTEMPTS` (`state=FAILED`)، رویدادِ `online` قبلاً هیچ کاری نمی‌کرد —

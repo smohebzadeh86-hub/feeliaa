@@ -97,10 +97,10 @@
 | `P1_PARAMS` | GRACE 60s، REORDER 2s، HANDOVER 5s، BUFFER_MAX 100، FORWARDED_SET_MAX 2000 | `features/legacy-ws/p1.ts` |
 | voice-note حجم | 100B–50MB | `features/sessions/` |
 | slow query log | >100ms | `db/connection.ts` |
-| sweep intervals | ۲۴h (audio)، ۱h (resolve jobs)، **۱h (صفِ batch — `BATCH_SWEEP_INTERVAL_MS`، commitنشده 2026-09-23؛ قبلاً فقط startup)** | `index.ts`؛ ثابت در `features/transcription/batch/` |
-| multipart `fileSize` | **commitنشده (audit صدا/۲۰۲۶-۰۹-۱۶): ۱۰MB صریح** (`register(multipart, { limits: { fileSize: 10*1024*1024 } })`) — قبلاً ۱MiB عملی (`bodyLimit` پیش‌فرضِ Fastify، تأییدشده در `@fastify/multipart@10.1.1`) که سگمنت‌هایِ صوتیِ بزرگ‌تر را با ۴۱۳ رد می‌کرد | `index.ts`؛ پیامد: [platform plan](../06-platform/implementation-plan.md) |
-| workerِ دوره‌ایِ retryِ صفِ batch | commitنشده — هر ۵ دقیقه (`setInterval`) + سرِ startup | `index.ts` → `features/transcription/batch/#retryQueuedBatches` |
-| `LATE_TRANSCRIPT_LABEL` | commitنشده — `[بخشِ ضبط‌شده در زمانِ قطعیِ اینترنت — بعداً رونویسی شد]` | `features/transcription/batch/` (export شده، در `mergeBatchTranscript` prepend می‌شود) |
+| sweep intervals | ۲۴h (audio)، ۱h (resolve jobs)، ۱h (صفِ batch — `BATCH_SWEEP_INTERVAL_MS`؛ به‌علاوه‌ی startup) | `index.ts`؛ ثابت در `features/transcription/batch/` |
+| multipart `fileSize` | **۱۰MB صریح** (audit صدا، 2026-09-16) (`register(multipart, { limits: { fileSize: 10*1024*1024 } })`) — قبلاً ۱MiB عملی (`bodyLimit` پیش‌فرضِ Fastify، تأییدشده در `@fastify/multipart@10.1.1`) که سگمنت‌هایِ صوتیِ بزرگ‌تر را با ۴۱۳ رد می‌کرد | `index.ts`؛ پیامد: [platform plan](../06-platform/implementation-plan.md) |
+| workerِ دوره‌ایِ retryِ صفِ batch | هر ۵ دقیقه (`setInterval`) + سرِ startup | `index.ts` → `features/transcription/batch/#retryQueuedBatches` |
+| `LATE_TRANSCRIPT_LABEL` | `[بخشِ ضبط‌شده در زمانِ قطعیِ اینترنت — بعداً رونویسی شد]` | `features/transcription/batch/` (export شده، در `mergeBatchTranscript` prepend می‌شود) |
 
 ## ۳. ثابت‌های فرانت
 
@@ -127,8 +127,8 @@
 | Screen Wake Lock | `navigator.wakeLock.request('screen')` تا وقتی یک RTSession زنده است (شامل MANUAL_PAUSED)؛ بدونِ پشتیبانی بی‌صدا هیچ (2026-09-26) |
 | `BATCH_POLL_MS` / `BATCH_TIMEOUT_MS` | 5000 / ۱۵ دقیقه |
 | `MIME_CANDIDATES` | webm;opus، webm، ogg;opus، ogg |
-| `DURABLE_ROTATE_MS` / `DURABLE_BITRATE` | **commitنشده (audit صدا/۲۰۲۶-۰۹-۱۶): 15000** (قبلاً 60000 — تصمیمِ مالک، کاهشِ پنجره‌ی صدایِ در-RAM) / 24000 |
-| `DURABLE_FLUSH_GUARD_MS` | **commitنشده — جدید، 10000** (قبلاً hardcode `1500` در `stopDurableSegment`) — نگهبانی که اگه `onstop` هیچ‌وقت fire نشه، `finish()`/`pause()` را برایِ همیشه قفل نمی‌کند |
+| `DURABLE_ROTATE_MS` / `DURABLE_BITRATE` | **15000** (audit صدا، 2026-09-16) (قبلاً 60000 — تصمیمِ مالک، کاهشِ پنجره‌ی صدایِ در-RAM) / 24000 |
+| `DURABLE_FLUSH_GUARD_MS` | **10000** (قبلاً hardcode `1500` در `stopDurableSegment`) — نگهبانی که اگه `onstop` هیچ‌وقت fire نشه، `finish()`/`pause()` را برایِ همیشه قفل نمی‌کند |
 | `AUDIO_DB_NAME` / `AUDIO_DB_VERSION` / `AUDIO_STORE` | `feelia-audio` / 1 / `segments` |
 | `AUDIO_QUEUE_MAX_BYTES` | 300MB — جمعِ bytes یک بار با `getAll()` خوانده و در همان تب با add/remove نگه داشته می‌شود (2026-09-26) |
 
@@ -166,16 +166,20 @@
 | localStorage | `feelia_active_session` | UUID جلسه | `startSession`، `liveResumeSession` | پایان/لغو/خطای «یافت نشد» |
 | localStorage | `feelia_note_outbox` | آرایه‌ی `{qid, sessionId, body, ts}` — علامت/یادداشتِ سریع/متنِ یادداشتِ صوتی‌ای که POSTش گذرا شکست خورد (⚠️ شاملِ متنِ یادداشت تا ارسالِ موفق) | `postNoteReliably` (`index.html`) | ارسالِ موفق، خطایِ دائمی (400/404/413)، حذفِ آیتم توسطِ تراپیست؛ تلاشِ دوباره هر ۲۰ث + `online` + لودِ صفحه (A1.5، 2026-09-26) |
 | localStorage | `feelia_direct` | `'0'` = اجبارِ proxy | دستی (`setDirectMode`) | — |
-| localStorage | `feelia_ux_consent_v1:<therapistId>` | `granted`/`denied` | `FeeliaAnalytics.grant/deny` | — |
+| localStorage | `feelia_theme` | `light`/`dark` | تغییرِ تم در `index.html` | — |
+| localStorage | `feelia_pending_complete` | آرایه‌ی شناسه‌ی جلسه‌هایِ «پایان»ِ هنوز تأییدنشده (retry با backoff، A3) | `writePendingCompletes` | بعد از تأییدِ سرور (409 هم تأیید است) |
+| localStorage | `feelia-cf-open:<clientId>:<axisKey>` | `1`/`0` — باز/بسته‌بودنِ محورِ پرونده | `cfSaveOpen` | — |
 | sessionStorage | `p1c-<sessionId>` | clientId P1 | `startSession` | تب |
 | IndexedDB | `feelia-audio` / store `segments` (keyPath `id`=`<sessionId>_<seq>`، index `sessionId`) | `{sessionId, seq, blob, mime, bytes, createdAt}` | `startDurable` | آپلودِ موفق، abort، 400 |
+| IndexedDB | `feelia-uploads` / store `tasks` | فایلِ صوتیِ انتخاب‌شده تا پایانِ آپلود (`feelia-upload.js`) | آپلود | «دریافت شد»/لغو/خطای دائمی |
+| IndexedDB | `feelia-predraft` / store `clips` (keyPath `id`، index `scope`) | پیش‌نویسِ صوتیِ یادداشتِ پیش از جلسه (حداکثر ۱۴ روز) | `index.html` (pre-note) | ارسال/حذفِ کاربر/انقضا |
 | Cookie | `feelia_session` | توکن (httpOnly) | سرور | logout/انقضا |
 
 ## ۵. فایل‌های کانفیگ
 
 | فایل | نکته |
 |---|---|
-| `package.json` (root) | `dev`، `test:rt`، `test:cf` |
+| `package.json` (root) | scriptها: `dev`، `test:rt|cf|up|tu|ft|llm|api|routes|arch|docs` — فهرستِ شرح‌دار: `CLAUDE.md` §8 |
 | `pnpm-workspace.yaml` | `packages: server, packages/*` (`packages/` وجود ندارد)؛ `allowBuilds: esbuild: false` |
 | `server/package.json` | `dev`، `build`، `start`؛ وابستگی `global-agent` بدونِ استفاده |
 | `server/tsconfig.json` | ES2022، NodeNext، strict، `src → dist` |

@@ -1,64 +1,76 @@
 # Database Catalog
 
-> **وضعیت:** ACTIVE-CANONICAL (مالکِ جداول/ستون‌ها/enumها) · منبعِ ساختار برایِ MySQL (فعلاً
-> مرجعِ production، از 2026-09-16): `server/src/db/mysql/schema.sql` +
-> `server/src/db/mysql/migrations/001–015` · مدل و چرخه‌ی عمر: [data-architecture](../01-architecture/data-architecture.md).
-> 🔴 **Production الان MySQL است، نه Postgres** (Cutoverِ 2026-09-16، به دستورِ صریحِ مالک —
-> جزئیاتِ کاملِ عملیات در PROJECT_STATUS §7، رویدادِ «Cutoverِ واقعیِ production»). سرور:
-> `feelia.ir` / `185.110.191.126`، پروسه‌ی pm2ِ `feelia-mysql`، دیتابیسِ `feelia` روی MySQL
-> 8.4.11 (نصب‌شده با apt، سرویسِ systemd). دیتای واقعی کپی شد (۸ تراپیست/۱۲ مراجع/۱۸
-> جلسه/۲۴ یادداشت/۱۲ ردیفِ صدا/۱۱ auth_session — شمارش‌ها با Postgres دقیقاً یکی بود).
-> **مسیرِ Postgres (`server/src/db/migrations/001–014`، پایینِ همین فایل) کاملاً دست‌نخورده و
-> تاریخچه‌ی canonical باقی می‌ماند** — کدِ قدیمی (`/root/feeliaa` روی سرور) و خودِ دیتابیسِ
-> Postgres برایِ rollbackِ فوری نگه داشته شده‌اند (`pm2 stop feelia-mysql && pm2 start feelia`).
-> بک‌آپِ کاملِ Postgresِ production: `/root/backups/feelia-postgres-production-backup-2026-09-16.sql`
-> (روی خودِ سرور، هرگز به بیرون منتقل نشد — LAW-001/PII).
-> تصمیم‌های ترجمه‌ی دیالکت (UUID→CHAR(36)، TIMESTAMPTZ→DATETIME، JSONB→JSON، ایندکسِ جزئی
-> حذف‌شده، …) در `server/src/db/mysql/schema.sql` مستند است؛ جداول/ستون‌ها/enumهای زیر همچنان
-> مرجعِ منطقیِ صحیح‌اند (فقط نوعِ ستونِ فیزیکی فرق دارد).
+> **وضعیت:** ACTIVE-CANONICAL (مالکِ جداول/ستون‌ها/enumها) · last-verified: 2026-09-30 @ `17d6919`
+> **منبع:** `server/src/db/mysql/migrations/001–034` به ترتیبِ نام (اجرا در startup با `server/src/db/migrate.ts`؛ ثبت در `_migrations`).
+> مدل، مالکیت و چرخه‌ی عمر: [data-architecture](../01-architecture/data-architecture.md). انضباط: [LAW-007](../00-governance/project-laws.md).
+> DB زنده **MySQL** است (مهاجرت از Postgres در 2026-09-16، به دستورِ مالک — جزئیات در Event Log). وضعیتِ اعمالِ migrationها رویِ هر محیط فقط در `PROJECT_STATUS.md` نگه‌داری می‌شود (LAW-027).
+> `server/src/db/migrations/001–014` نسخه‌ی **Postgresِ متروک** است (هیچ runnerِ زنده‌ای آن را اجرا نمی‌کند)؛ `server/src/db/mysql/schema.sql` snapshotِ دیالکتِ MySQL و تصمیم‌هایِ ترجمه (UUID→`CHAR(36)`، `TIMESTAMPTZ`→`DATETIME`، `JSONB`→`JSON`، ایندکسِ جزئی حذف) را مستند می‌کند. جداول/ستون‌هایِ زیر با نوعِ **منطقی** نوشته شده‌اند؛ نوعِ فیزیکیِ MySQL را از migration بخوانید.
+
+## ۰. مالکِ هر جدول (LAW-025)
+
+«مالک» = featureای که ساختار و بیشترِ نوشتن را دارد. featureهایِ دیگر فقط طبقِ ستونِ «نوشتنِ خارج از مالک» می‌نویسند (بدهیِ ماژولاریتی؛ backlog: API واحد).
+
+| جدول | مالک | migration | نوشتنِ خارج از مالک | حساسیت |
+|---|---|---|---|---|
+| `_migrations` | platform `db` | (`migrate.ts`) | — | پایین |
+| `therapists` | `auth` | 004، 005، 006، 010، 020، 022، 029، 031 | `admin` (فعال/ادمین/فلگ‌ها)، `case-file` (`case_file_auto_generate`)، `treatment-unit` (`modalities`) | بسیار بالا (PII) |
+| `auth_sessions` | platform `auth/` | 004 | — | بالا |
+| `clients` | `clients` | 001، 004، 008، 009، 015، 024، 029 | `admin` (حذف/فعال)، `treatment-unit` (`unit_type`) | بسیار بالا |
+| `client_members` | `treatment-unit` | 029 | `clients` | بسیار بالا |
+| `sessions` | `sessions` | 002، 007، 012، 013، 014، 023(CHECK)، 026، 029 | ⚠️ `audio-upload` (`uploadSession.ts`، `jobStore.sql.ts`)، `transcription` (`stt.routes.ts`، `batch/`، `speakerResolve.ts`، `archive/`)، `legacy-ws`، `final-transcript`، `admin`، `treatment-unit`، `case-file`(خواندن) | بسیار بالا (متنِ جلسه) |
+| `session_notes` | `sessions` (`notes.routes.ts`) | 003 | `transcription` (`batch/processQueue.ts`، `speakerResolve.ts`)، `sessions/voiceNote.legacy.ts`، `legacy-ws` | بسیار بالا |
+| `session_audio` | `transcription` (`archive/`) | 011، 016، 017، 023، 027 | `admin` (حذف)، `sessions/autoClose.ts` | بسیار بالا (مسیرِ فایل) |
+| `client_case_file` | `case-file` | 018، 019، 023 | — | بسیار بالا |
+| `audio_uploads` | `audio-upload` | 023، 025 | `admin` (حذف) | بالا |
+| `audio_jobs` | `audio-upload` | 023، 025، 033 | `admin` | بالا |
+| `notifications` | `notifications` | 023 | `audio-upload` (ساخت از job) | متوسط (بدونِ متنِ بالینی) |
+| `final_transcripts` | `final-transcript` | 031، 034 | `audio-upload` (پاکسازیِ یتیم/ارجاعِ Soniox) | بسیار بالا (متن) |
+| `tu_unit_types`، `tu_member_roles`، `tu_modalities`، `tu_modality_terms` | `treatment-unit` | 029، 030، 032 | — | پایین (کاتالوگ) |
+| `obs_events`، `obs_ui_events` | platform `obs` | 021 | `admin` (خواندن/پاکسازی) | متوسط |
+| `audit_log` | platform `obs` (`audit.ts`) | 028 | — | بالا |
 
 ## ۱. Migrationها
 
-| فایل | git | خلاصه |
-|---|---|---|
-| `001_clients.sql` | tracked | `clients(id, code UNIQUE, alias, created_at)` |
-| `002_sessions.sql` | tracked | `sessions` + `idx_sessions_client` |
-| `003_notes.sql` | tracked | `session_notes` + `idx_notes_session` |
-| `004_therapists.sql` | tracked | `therapists`، `auth_sessions`، `clients.therapist_id` |
-| `005_therapist_phone.sql` | tracked | `therapists.phone` (unique جزئی)، email اختیاری |
-| `006_admin.sql` | tracked | `is_admin`، `active` |
-| `007_realtime.sql` | tracked | `transcript_version`، `realtime_reliable`، `stt_mode`، `batch_status` + index |
-| `008_client_status.sql` | tracked (`2763414`) | `clients.status`، `status_reason`، `category` + CHECKها + index |
-| `009_client_gender.sql` | tracked (`2763414`) | `clients.gender`؛ **تبدیلِ داده** `adult-f/m → adult`+gender؛ CHECKها |
-| `010_therapist_specialty.sql` | tracked (`2763414`) | `therapists.specialty` |
-| `011_session_audio.sql` | tracked (`2763414`) | جدولِ `session_audio` + indexها |
-| `012_session_source.sql` | tracked (`54a17fd`) | `sessions.source` (`live`/`manual`، پیش‌فرض `'live'`) + CHECK `sessions_source_check` — افزودنیِ خالص |
-| `013_session_date_jalali.sql` | tracked (`54a17fd`) | **تبدیلِ داده:** `sessions.date` → شمسیِ `YYYY/MM/DD` با ارقامِ لاتین (میلادی با سال ≥ ۱۷۰۰ تبدیل، شمسیِ نانرمال صفرپُر، الگوهای دیگر دست‌نخورده)؛ `DO` block، idempotent؛ تأییدِ مالک 2026-09-14 |
-| `014_session_date_optional.sql` | tracked (`54a17fd`) | `sessions.date DROP NOT NULL` — فقط جلسه‌ی `source=manual` بدونِ تاریخِ ورودی می‌تواند `NULL` بماند («بدونِ تاریخ»، تصمیمِ مالک)؛ افزودنیِ خالص، هیچ ردیفِ موجودی تغییر نمی‌کند |
-| `015_client_pinned.sql` | tracked، **فقط MySQL** (`server/src/db/mysql/migrations/`؛ سیستمِ زنده دیگر `server/src/db/migrations/`ِ Postgres را اجرا نمی‌کند) | `clients.pinned_at DATETIME NULL` — سنجاقِ مراجع به صفحه‌ی اول («نمای امروز»)؛ افزودنیِ خالص. روی MySQLِ لوکالِ واقعی اعمال و با `SHOW COLUMNS` تأیید شد (2026-09-16) |
-| `016_session_audio_duration.sql` | tracked، **فقط MySQL** | `session_audio.duration_ms INT NULL` — افزودنیِ خالص؛ رفعِ باگِ نمایشِ `0:00` در پخش‌کننده‌ی پنلِ ادمین (جزئیات: [subsystem ۰۵](../07-subsystems/05-session-audio-archive-speaker-resolve.md)). روی MySQLِ لوکالِ واقعی اعمال و با `DESCRIBE` تأیید شد (2026-09-16) |
-| `017_session_audio_run_kind_sha.sql` | **commitنشده**، فقط MySQL | `session_audio.run_id VARCHAR(64) DEFAULT 'legacy'`، `kind VARCHAR(8) DEFAULT 'session'`، `sha256 CHAR(64) NULL`؛ `UNIQUE(session_id, seq)` قدیمی حذف و با `UNIQUE(session_id, run_id, seq)` + `UNIQUE(session_id, sha256)` جایگزین شد — رفعِ باگِ بحرانیِ بازنویسیِ بی‌صدا (seq از کلاینت می‌اومد و runهای مختلف از ۰ شروع می‌کردن). ✅ **رویِ MySQLِ لوکالِ واقعی اعمال و تأیید شد** (2026-09-16): `DESCRIBE`/`SHOW INDEX` + idempotencyِ سطحِ statement (errno 1060/1091/1061) + سناریویِ دو-run/seq=0 با curlِ واقعی — جزئیات: [verification](../../verification/2026-09-16-audio-durability-stage1.md) |
-| `018_client_case_file.sql` | **commitنشده**، فقط MySQL | جدولِ جدیدِ `client_case_file` (پرونده‌ی روندِ درمان — AI Case File)؛ افزودنیِ خالص. ✅ **رویِ یک MySQLِ لوکالِ تازه (standalone، init‌شده در همین نشست) اعمال و با `DESCRIBE` تأیید شد**؛ تستِ end-to-endِ واقعی (regenerate با OpenRouterِ واقعی) هم موفق بود — جزئیات: [verification](../../verification/2026-09-17-ai-case-file-real-e2e.md) |
-| `019_case_file_corpus_signature.sql` | **commitنشده**، فقط MySQL | دو ستونِ `corpus_signature`/`generating_started_at` به `client_case_file` (افزودنیِ خالص). ✅ رویِ MySQLِ standaloneِ لوکال apply شد (خودکار، تنها با ری‌استارتِ `tsx watch` بعدِ ذخیره‌ی فایل‌ها) و با `DESCRIBE` تأیید شد؛ end-to-endِ واقعی (regenerate با OpenRouترِ واقعی، شاملِ سناریوهایِ skip/race-409/force-400) هم موفق بود — جزئیات: [verification](../../verification/2026-09-17-case-file-corpus-signature-and-race-lock.md) |
-| `020_therapist_case_file_auto_generate.sql` | **commitنشده**، فقط MySQL | ستونِ `therapists.case_file_auto_generate BOOLEAN NULL` — تنظیمِ سه‌حالته‌ی سطحِ‌تراپیست برایِ خودکارسازیِ تولیدِ پرونده بعدِ پایانِ جلسه (فازِ ۲ِ Module 08؛ `NULL`=هنوز پرسیده نشده، `TRUE`/`FALSE`=پاسخِ صریح، همیشه قابلِ‌تغییر). افزودنیِ خالص. ✅ رویِ MySQLِ standaloneِ لوکال apply شد (خودکار با ری‌استارتِ `tsx watch`) و با لاگِ migration runner تأیید شد؛ end-to-endِ واقعی (auto-trigger با OpenRouترِ واقعی روی یک مراجعِ canaryِ غیرفعال + تأییدِ خاموش/روشنِ toggle) هم موفق بود — جزئیات: [verification](../../verification/2026-09-18-case-file-auto-trigger-and-style-fixes.md) |
-| `021_observability_events.sql` | **commitنشده**، فقط MySQL | دو جدولِ جدیدِ `obs_events`/`obs_ui_events` — لایه‌ی رصد/حسابرسیِ فازِ ۱ (پلنِ تأییدشده‌ی مالک، 2026-09-22). افزودنیِ خالص، بدونِ لمسِ جدولِ موجود. ✅ رویِ MySQLِ لوکالِ dev اعمال شد (خودکار، با ری‌استارتِ `tsx watch` بعدِ ذخیره‌ی فایل)؛ با `DESCRIBE`/`_migrations` و اجرایِ مجددِ دستیِ همان دو `CREATE TABLE IF NOT EXISTS` (بدونِ خطا) تأیید شد. جزئیات: بخشِ ۲.۱ همین فایل. |
+قاعده: additive مگر اینکه «تبدیلِ داده» نوشته شده باشد (LAW-007). ⚠️ runner فایل را با `;` تکه می‌کند — در متن/کامنتِ SQL هیچ `;` نگذارید (`test:tu`).
 
-| `022_therapist_case_file_enabled.sql` | tracked، فقط MySQL | `therapists.case_file_enabled` (نگاه کنید به PROJECT_STATUS) |
-| `023_audio_upload_pipeline.sql` | **commitنشده**، فقط MySQL (2026-09-23) | سه جدولِ جدید `audio_uploads`، `audio_jobs`، `notifications` ([subsystem 06](../07-subsystems/06-audio-upload-pipeline.md))؛ `session_audio.transcribed_at` (رفعِ F1)؛ `client_case_file.content_version` (رفعِ F6)؛ CHECKِ `sessions_source_check` حالا `live\|manual\|upload` (DROP + ADD — errno 3821 در `migrate.ts` قابلِ چشم‌پوشی شد). افزودنی؛ هیچ ردیفِ موجودی تغییر نمی‌کند. ✅ رویِ MySQLِ لوکالِ dev با startِ سرور اعمال شد و با `information_schema` تأیید شد (جدول‌ها، ستون‌ها، CHECKها) |
-| `024_client_recording_consent.sql` | commitنشده، فقط MySQL (2026-09-24)؛ **رویِ production اعمال شد 2026-09-25** (backupِ DB پیش از آن) | `clients.recording_consent_at DATETIME NULL` — رضایتِ یک‌باره برایِ هر مراجع (دستورِ مالک). افزودنی، بدونِ backfill (رضایتِ «همان جلسه»ی قدیمی دائمی تفسیر نمی‌شود). ✅ رویِ MySQLِ dev اعمال و با E2E تأیید شد |
-| `025_upload_multi_part.sql` | commitنشده، فقط MySQL (2026-09-25)؛ ✅ **رویِ MySQLِ dev اعمال شد** (E2E، با `information_schema` تأیید)؛ ✅ **رویِ production اعمال شد 2026-09-25** (deployِ `45b0482`، backupِ DB `feelia-pre-025-*` پیش از آن) | آپلودِ چندبخشی برایِ یک جلسه: `audio_uploads.group_id CHAR(36)`، `part_index INT`، `parts_total INT`، `duration_ms INT` (همه NULL‌پذیر) + index `idx_audio_uploads_group (therapist_id, group_id)`؛ `audio_jobs.source_parts TEXT` (JSONِ `[{uploadId, path}]`). افزودنی، بدونِ backfill؛ آپلودِ تک‌فایلی بدونِ تغییر (همه NULL) |
-| `026_session_auto_close.sql` | commitنشده، فقط MySQL (2026-09-26)؛ ✅ **رویِ MySQLِ dev اعمال شد** (E2E، با `information_schema` تأیید)؛ ❌ رویِ production اعمال نشده | `sessions.auto_closed_at DATETIME NULL` — زمانِ بستنِ خودکارِ جلسه‌ی زنده‌ی رهاشده توسطِ `features/sessions/autoClose.ts` (A3)؛ بازگشایی با PUT `status=in_progress` یا mintِ رونویسی آن را NULL می‌کند. افزودنی، بدونِ backfill |
-| `027_session_audio_client_seq.sql` | commitنشده، فقط MySQL (2026-09-26)؛ ✅ **رویِ MySQLِ dev اعمال شد** (E2E)؛ ❌ رویِ production اعمال نشده | `session_audio.client_seq INT NULL` — شماره‌ی سگمنت در همان run (از کلاینت). ترتیبِ پخش/concat = (زمانِ شروعِ run از `run_id`، `client_seq`) — `sortByRecordingOrder` در `sessionAudioArchive.ts` (A2). NULL = ردیفِ قدیمی/آپلود ⇒ `seq`. افزودنی، بدونِ backfill |
-| `028_audit_log.sql` | commitنشده، فقط MySQL (2026-09-26)؛ ✅ **رویِ MySQLِ dev اعمال شد** (E2E)؛ ❌ رویِ production اعمال نشده | جدولِ `audit_log` (`id, ts DATETIME(3), actor_id, actor_is_admin, action, target_type, target_id, detail JSON`) — ممیزیِ کنش‌هایِ حساس (A6): export، تغییر/حذفِ تراپیست، حذفِ مراجع/جلسه، مشاهده‌ی متن و پخش/دانلودِ صدا توسطِ ادمین، ثبت/لغوِ رضایت، بستنِ خودکار، ادمین‌شدنِ خودکار. بدونِ FK (ردِ حسابرسی بعد از حذف می‌ماند)؛ detail فقط از `sanitizeDetail`؛ helper: `server/src/obs/audit.ts` (`recordAudit`). **نگهداری: ۲ سال** (تصمیمِ مالک 2026-09-26؛ `AUDIT_LOG_RETENTION_DAYS`=۷۳۰، جاروبِ روزانه‌ی `sweepOldObsEvents` در `obs/sweep.ts`) — کامنتِ داخلِ خودِ migration («فعلاً بدونِ انقضا») عمداً ویرایش نشد (LAW-007: migrationِ اعمال‌شده دست نمی‌خورد) |
+| فایل | خلاصه |
+|---|---|
+| `001_clients.sql` | `clients(id, code UNIQUE, alias, created_at)` |
+| `002_sessions.sql` | `sessions` + `idx_sessions_client` |
+| `003_notes.sql` | `session_notes` + `idx_notes_session` |
+| `004_therapists.sql` | `therapists`، `auth_sessions`، `clients.therapist_id` |
+| `005_therapist_phone.sql` | `therapists.phone` (unique)، email اختیاری |
+| `006_admin.sql` | `is_admin`، `active` |
+| `007_realtime.sql` | `transcript_version`، `realtime_reliable`، `stt_mode`، `batch_status` + index |
+| `008_client_status.sql` | `clients.status`، `status_reason`، `category` + CHECKها + index |
+| `009_client_gender.sql` | `clients.gender`؛ **تبدیلِ داده** `adult-f/m → adult`+gender؛ CHECKها |
+| `010_therapist_specialty.sql` | `therapists.specialty` |
+| `011_session_audio.sql` | جدولِ `session_audio` + indexها |
+| `012_session_source.sql` | `sessions.source` (`live`/`manual`) + CHECK |
+| `013_session_date_jalali.mjs` | **تبدیلِ داده:** `sessions.date` → شمسیِ `YYYY/MM/DD` (تأییدِ مالک 2026-09-14؛ idempotent؛ backup پیش از اجرا) |
+| `014_session_date_optional.sql` | `sessions.date` NULL‌پذیر (فقط `source=manual`) |
+| `015_client_pinned.sql` | `clients.pinned_at` (سنجاق به «نمای امروز») |
+| `016_session_audio_duration.sql` | `session_audio.duration_ms` |
+| `017_session_audio_run_kind_sha.sql` | `run_id`، `kind`، `sha256`؛ `UNIQUE(session_id,seq)` ⇒ `UNIQUE(session_id,run_id,seq)` + `UNIQUE(session_id,sha256)` (رفعِ بازنویسیِ بی‌صدا) |
+| `018_client_case_file.sql` | جدولِ `client_case_file` |
+| `019_case_file_corpus_signature.sql` | `corpus_signature`، `generating_started_at` |
+| `020_therapist_case_file_auto_generate.sql` | `therapists.case_file_auto_generate` (سه‌حالته) |
+| `021_observability_events.sql` | `obs_events`، `obs_ui_events` (بدونِ FK، LAW-010) |
+| `022_therapist_case_file_enabled.sql` | `therapists.case_file_enabled` |
+| `023_audio_upload_pipeline.sql` | `audio_uploads`، `audio_jobs`، `notifications`؛ `session_audio.transcribed_at`؛ `client_case_file.content_version`؛ CHECKِ `sessions_source_check` ⇒ `live|manual|upload` |
+| `024_client_recording_consent.sql` | `clients.recording_consent_at` (رضایتِ یک‌باره، LAW-009؛ بدونِ backfill) |
+| `025_upload_multi_part.sql` | `audio_uploads.group_id/part_index/parts_total/duration_ms`؛ `audio_jobs.source_parts` |
+| `026_session_auto_close.sql` | `sessions.auto_closed_at` |
+| `027_session_audio_client_seq.sql` | `session_audio.client_seq` (ترتیبِ پخش) |
+| `028_audit_log.sql` | جدولِ `audit_log` (بدونِ FK) |
+| `029_treatment_unit.sql` | `tu_*` (seed با `INSERT IGNORE`)، `client_members`، `clients.unit_type`، `sessions.attendees`، `sessions.pre_note`، `therapists.modalities` |
+| `030_partner_role_labels.sql` | `UPDATE tu_member_roles`: «همسر» ⇒ «خانم»/«آقا» برایِ `partner_f`/`partner_m` (داده‌ی seed) |
+| `031_final_transcript.sql` | `therapists.final_transcript_enabled`؛ جدولِ `final_transcripts` |
+| `032_modality_dbt_pbt.sql` | seedِ مدالیته‌هایِ `dbt`/`pbt` + اصطلاحات |
+| `033_upload_audio_quality.sql` | `audio_jobs.audio_quality/quality_warning/low_conf_ratio` |
+| `034_final_transcript_turns.sql` | `final_transcripts.clean_turns` |
 
-| `029_treatment_unit.sql` | commitنشده (2026-09-27)؛ ❌ رویِ هیچ DBِ واقعی اعمال نشده | کاتالوگِ `tu_unit_types`، `tu_member_roles`، `tu_modalities`، `tu_modality_terms` (seed با `INSERT IGNORE`)؛ `client_members(id, client_id FK CASCADE, role_code, alias, category, gender, sort)`؛ `clients.unit_type` (پیش‌فرض `individual`)؛ `sessions.attendees JSON NULL` (NULL = همه‌ی اعضا)، `sessions.pre_note TEXT NULL` (**از 2026-09-29 دیگر نوشته نمی‌شود** — یادداشتِ پیش از جلسه ردیفِ `session_notes(type='note_before')` است؛ مقادیرِ موجود فقط‌خواندنی نمایش داده و واردِ پرونده می‌شوند)؛ `therapists.modalities JSON NULL`. افزودنی، بدونِ backfill — مراجعِ قدیمی عضوِ ضمنی از `clients.category/gender` دارد. ⚠️ runner با `;` تکه می‌کند: هیچ `;` در متن/کامنت (تستِ `test:tu`) |
-| `030_partner_role_labels.sql` | commitنشده (2026-09-27)؛ ✅ رویِ dev اعمال شد (2026-09-27)، ❌ prod نه | `UPDATE tu_member_roles`: برچسبِ `partner_f`→«خانم»، `partner_m`→«آقا» (به‌جایِ «همسر» برای هر دو). |
-| `031_final_transcript.sql` | commitنشده (2026-09-28)؛ ✅ رویِ MySQLِ dev اعمال شد (E2E 2026-09-28)؛ ❌ prod نه | `therapists.final_transcript_enabled BOOLEAN NOT NULL DEFAULT FALSE`. جدولِ `final_transcripts` (یک ردیف به ازایِ هر جلسه، PK=`session_id` FK CASCADE، FKِ therapist/client CASCADE): `stage` (`waiting_audio`/`transcribing`/`polishing`/`done`/`failed`/`skipped`، CHECK)، `attempts`، `next_attempt_at`، `locked_until` (lease)، `source` (`async`/`realtime`)، `source_version` (مبنایِ stale)، `soniox_file_id`، `soniox_transcription_id`، `transcription_started_at`، `async_text`/`clean_text` LONGTEXT (**متنِ بالینی**)، `polish_report` JSON (فقط شمارنده و مدل)، `error_code`، `queued_at`، `finished_at`. اعلانِ `final_transcript_ready` با `job_id = session_id`. `sessions.transcript` دست نمی‌خورد. [subsystem 07](../07-subsystems/07-final-transcript.md) |
-| `032_modality_dbt_pbt.sql` | commitنشده (2026-09-28)؛ ✅ رویِ dev اعمال شد (2026-09-28)، ❌ prod نه | `INSERT IGNORE` رویکردهایِ `dbt` («رفتاردرمانیِ دیالکتیکی (DBT)»، sort 15) و `pbt` («درمانِ مبتنی بر فرایند (PBT)»، sort 65) در `tu_modalities` + اصطلاحاتِ هرکدام در `tu_modality_terms` (توضیحِ رویکردها در کامنتِ فایل). |
-| `034_final_transcript_turns.sql` | commitنشده (2026-09-28)؛ ❌ dev/prod هنوز نه (با deploy اعمال می‌شود) | `final_transcripts.clean_turns JSON NULL` (بعد از `clean_text`): نوبت‌هایِ ساختاریافته `[{role, text, raw?, sp?, marker?}]` — **متنِ بالینی** (همان سطحِ `clean_text`/`async_text`). برایِ اصلاحِ نقشِ گوینده و نمایشِ ویرایش‌ها در UI. ردیفِ قدیمی NULL ⇒ UI همان `clean_text`. additive. |
-| `033_upload_audio_quality.sql` | commitنشده (2026-09-28)؛ ✅ رویِ dev اعمال شد (2026-09-28، با اجازه‌ی مالک)، ❌ prod نه | پلنِ B: `audio_jobs.audio_quality JSON NULL` (سنجه‌هایِ سطحِ صدا + flagها، بدونِ صدا/متن)، `audio_jobs.quality_warning VARCHAR(32) NULL` (`low_confidence`)، `audio_jobs.low_conf_ratio DECIMAL(6,4) NULL`. additive. |
-
-جدولِ سیستمی: `_migrations(id SERIAL, name TEXT UNIQUE, applied_at TIMESTAMPTZ)` — ساخته‌شده در `migrate.ts` (نسخه‌ی Postgres؛ معادلِ MySQL همان نقش را با `AUTO_INCREMENT`/`DATETIME` دارد — بخشِ ۲ همین فایل را برایِ وضعیتِ فعلیِ دوگانگیِ schema ببینید).
+جدولِ سیستمی: `_migrations(id INT AUTO_INCREMENT PK, name VARCHAR(255) UNIQUE, applied_at DATETIME)` — ساخته‌شده در `server/src/db/migrate.ts`.
 
 ## ۲. جداول
 
@@ -74,6 +86,9 @@
 | is_admin | BOOLEAN | no | false | |
 | active | BOOLEAN | no | true | false → همه‌ی درخواست‌ها بی‌نشست |
 | specialty | TEXT | yes | — | (010) |
+| case_file_enabled | BOOLEAN | no | false | (022) فیچرِ پرونده برایِ این تراپیست روشن است؟ پیش‌فرض خاموش؛ محدودسازیِ فازِ اولِ deploy (تصمیمِ مالک 2026-09-23) |
+| modalities | JSON | yes | NULL | (029) رویکردهایِ درمانیِ انتخابی (`tu_modalities.code[]`) |
+| final_transcript_enabled | BOOLEAN | no | false | (031) «متنِ نهایی» برایِ این تراپیست (پیش‌فرض خاموش) |
 | case_file_auto_generate | BOOLEAN | yes | NULL | (020) سه‌حالته: NULL=هنوز پرسیده نشده، TRUE/FALSE=پاسخِ صریح — خودکارسازیِ تولیدِ پرونده بعدِ پایانِ جلسه (فقط مراجعینِ inactive، فعلاً) |
 
 ### `auth_sessions`
@@ -97,6 +112,7 @@
 | category | TEXT | yes | | CHECK `child|teen|adult` (بعد از 009) |
 | gender | TEXT | yes | | CHECK `f|m`؛ اپ فقط برای teen/adult |
 | pinned_at | DATETIME | yes | | بعد از 015 (فقط MySQL)؛ غیرِnull یعنی سنجاق‌شده به صفحه‌ی اول؛ با `status→inactive` خودکار null می‌شود |
+| unit_type | VARCHAR(24) | no | `'individual'` | (029) کدِ `tu_unit_types` (`individual|couple|family|child_parent`)؛ اعضا در `client_members`؛ مراجعِ قدیمی عضوِ ضمنی از `category/gender` دارد |
 | recording_consent_at | DATETIME | yes | | بعد از 024 (2026-09-24)؛ زمانِ **اولین** رضایتِ صریحِ ضبط/رونویسی (جلسه‌ی زنده یا آپلود) — «یک بار برایِ هر مراجع». NULL = پرسیده می‌شود. لغو ⇒ NULL. بدونِ backfill |
 
 ### `sessions`
@@ -118,7 +134,10 @@
 | realtime_reliable | BOOLEAN | yes | | |
 | stt_mode | TEXT | yes | | enum زیر |
 | batch_status | TEXT | yes | | enum زیر؛ `idx_sessions_batch` جزئی |
-| source | TEXT | no | `'live'` | CHECK `live|manual` (012)؛ `manual` = ثبتِ دستیِ جلسه‌ی گذشته، بدونِ صدا/رونویسی |
+| source | TEXT | no | `'live'` | CHECK `live|manual|upload` (012؛ `upload` از 023)؛ `manual` = ثبتِ دستیِ جلسه‌ی گذشته، بدونِ صدا/رونویسی |
+| auto_closed_at | DATETIME | yes | | (026) زمانِ بستنِ خودکارِ جلسه‌ی زنده‌ی رهاشده (`features/sessions/autoClose.ts`)؛ بازگشایی (PUT `status=in_progress` یا mintِ رونویسی) آن را NULL می‌کند |
+| attendees | JSON | yes | | (029) شرکت‌کنندگانِ همین جلسه (زیرمجموعه‌ی `client_members.id`)؛ NULL = همه‌ی اعضا |
+| pre_note | TEXT | yes | | (029) **دیگر نوشته نمی‌شود** — یادداشتِ پیش از جلسه اکنون ردیفِ `session_notes(type='note_before'/'voice_before')` است؛ مقادیرِ موجود فقط‌خواندنی نمایش داده و واردِ پرونده می‌شوند |
 
 ### `session_notes`
 | ستون | نوع | نکته |
@@ -145,6 +164,7 @@
 | bytes | INTEGER NOT NULL | |
 | mime | TEXT | |
 | source | TEXT NOT NULL | پیش‌فرض `'durable'`؛ `'offline'` رزرو؛ **`'upload'` (023)** برایِ نسخه‌ی نرمال‌شده‌ی فایلِ آپلودی |
+| client_seq | INT NULL | **(027)** شماره‌ی سگمنت در همان run (از کلاینت)؛ ترتیبِ پخش/concat = (زمانِ شروعِ run از `run_id`، `client_seq`) — `sortByRecordingOrder` در `features/transcription/archive/`؛ NULL = ردیفِ قدیمی/آپلود ⇒ `seq` |
 | transcribed_at | DATETIME NULL | **(023، رفعِ F1)** زمانی که متنِ همین بایت‌ها (session+sha256) در صفِ batch اعمال شد — تضمینِ exactly-once؛ ردیف‌هایِ قبل از 023 `NULL` |
 | duration_ms | INTEGER NULL | **(016، 2026-09-16)** از ری‌ماکسِ ffmpeg هنگامِ آرشیو؛ `NULL` اگر ffmpeg نبود/خطا داد یا سگمنت قبل از 016 آرشیو شده — بدونِ backfill خودکار |
 | created_at | TIMESTAMPTZ | `idx_session_audio_created` برای sweep |
@@ -203,19 +223,34 @@
 `role`، `tagName`ِ عنصرِ کلیک‌شده — هرگز متن)، `value_num` INT NULL.
 ایندکس‌ها: `(ts)`، `(therapist_id,ts)`، `(session_id,ts)`، `(nav_id,seq)`.
 
+### `audit_log` (028) — ممیزیِ کنش‌هایِ حساس
+`id` BIGINT PK، `ts` DATETIME(3)، `actor_id` CHAR(36) NULL، `actor_is_admin` BOOLEAN، `action` VARCHAR(48)، `target_type` VARCHAR(24) NULL، `target_id` CHAR(36) NULL، `detail` JSON NULL (فقط از `sanitizeDetail`). ایندکس‌ها: `(ts)`، `(target_type,target_id,ts)`، `(actor_id,ts)`، `(action,ts)`. **بدونِ FK** (ردِ حسابرسی بعد از حذف می‌ماند، LAW-010). نویسنده: `server/src/obs/audit.ts` (`recordAudit`): export، تغییر/حذفِ تراپیست، حذفِ مراجع/جلسه، مشاهده‌ی متن و پخش/دانلودِ صدا توسطِ ادمین، ثبت/لغوِ رضایت، بستنِ خودکار، ادمین‌شدنِ خودکار. نگهداری: `AUDIT_LOG_RETENTION_DAYS` ([configuration-catalog](configuration-catalog.md)؛ جاروبِ `sweepOldObsEvents` در `obs/sweep.ts`). سندِ مالک: [observability-audit](../06-platform/observability-audit.md).
+
+### `client_members` و کاتالوگِ `tu_*` (029، 030، 032) — واحدِ درمان
+- `client_members(id PK, client_id FK CASCADE, role_code, alias VARCHAR(80), category VARCHAR(8), gender CHAR(1), sort, created_at)` — اعضایِ واحدِ درمان؛ ایندکس `(client_id, sort)`. `role_code` بدونِ FK به `tu_member_roles` (اعتبار در دامنه).
+- `tu_member_roles(code PK, label_fa, gender, age_group, ask_age, ask_gender, context_label, sort, active)`؛ `tu_unit_types(code PK, label_fa, min_members, max_members, allowed_roles JSON, presets JSON, context_setting, sort, active)`؛ `tu_modalities(code PK, label_fa, default_unit, context_label, sort, active)`؛ `tu_modality_terms(modality_code FK CASCADE, term)` PK ترکیبی.
+- کاتالوگ‌ها با `INSERT IGNORE` seed می‌شوند؛ ویرایشِ seed = migrationِ جدید (نه ویرایشِ فایلِ اعمال‌شده). سندِ مالک: [ماژول 09](../04-modules/09-treatment-unit/module-prd.md).
+
+### `final_transcripts` (031، 034) — «متنِ نهایی»
+یک ردیف به‌ازایِ هر جلسه: `session_id` PK (FK CASCADE)، `therapist_id`/`client_id` (FK CASCADE)، `stage` CHECK `waiting_audio|transcribing|polishing|done|failed|skipped`، `attempts`، `next_attempt_at`، `locked_until` (lease)، `source` CHECK `async|realtime`، `source_version` (مبنایِ stale)، `soniox_file_id`، `soniox_transcription_id`، `transcription_started_at`، `async_text`/`clean_text` LONGTEXT (**متنِ بالینی**)، `clean_turns` JSON (034؛ نوبت‌هایِ ساختاریافته `[{role,text,raw?,sp?,marker?}]` — **متنِ بالینی**؛ NULL ⇒ UI همان `clean_text`)، `polish_report` JSON (فقط شمارنده و مدل)، `error_code`، `queued_at`، `finished_at`. index `(stage, next_attempt_at)`. `sessions.transcript` هرگز دست نمی‌خورد. سندِ مالک: [subsystem 07](../07-subsystems/07-final-transcript.md).
+
 ## ۳. Enumها (مقادیرِ واقعی در کد)
 
 | فیلد | مقادیر | نویسنده‌ها |
 |---|---|---|
 | `sessions.status` | `in_progress`، `recovered`، `completed`، `canceled` | `POST /api/sessions`، `PUT` (آزاد)، `features/legacy-ws/transcription.routes.ts` |
 | `sessions.batch_status` | `queued`، `processing`، `done`، `failed`، null | `features/transcription/batch/` |
-| `sessions.stt_mode` | `realtime`، `batch`، `batch-pending`، `realtime-unreliable-noaudio`، null | `feelia-rt.js`، `batchqueue.ts` |
+| `sessions.stt_mode` | `realtime`، `batch`، `batch-pending`، `realtime-unreliable-noaudio`، null | `feelia-rt.js`، `features/transcription/batch/` |
 | `session_notes.type` | `note_during`، `note_after`، `sign`، `voice`، **`note_before`، `voice_before` (2026-09-29 — یادداشتِ متنی/صوتیِ پیش از جلسه؛ تنها نوع‌هایِ ویرایش‌پذیر با `PATCH /api/notes/:id`؛ VARCHAR(16) کافی است، بدونِ migration)** | UI، batch/voice-note، `createLiveSession`، `processQueue` (`purpose=pre-note`) |
 | `session_notes.sign_type` | `گریان`، `لرزش`، `تنش عضلانی`، `سکوت طولانی`، `خشم`، `پرخاشگری`، `اتصال چشمی گریزان`، `خواب‌آلودگی`، `بی‌قراری` | `.sign-chip[data-sign]` |
 | `clients.status_reason` (UI) | `ناتوانی مالی`، `ظرفیت روحی/زمانی`، `روند تکمیل شد`، `سایر` + متنِ آزاد؛ «نامشخص» → null (فقط در ساختِ مراجع از تبِ غیرفعال)؛ سرور trim و حداکثر ۲۰۰ کاراکتر | `deactivateClientModal`، `newClientModal` |
-| `sessions.source` | `live`، `manual`، `upload` (023) | `POST /api/sessions` (`mode`)؛ `POST /api/uploads/:id/complete` |
+| `sessions.source` | `live`، `manual`، `upload` (CHECK؛ `upload` از 023) | `POST /api/sessions` (`mode`)؛ `POST /api/uploads/:id/complete` |
 | `sessions.stt_mode` (افزوده) | `upload` (023) | `worker.ts` (+ `jobStore.sql.ts`) |
-| `session_audio.source` | `durable`، `upload` (023) (و `offline` در type) | `sessionAudioArchive.ts` |
+| `session_audio.source` | `durable`، `upload` (023) (و `offline` در type) | `features/transcription/archive/` |
+| `clients.unit_type` | `individual`، `couple`، `family`، `child_parent` (کاتالوگِ `tu_unit_types`) | `features/treatment-unit/` |
+| `final_transcripts.stage` | `waiting_audio`، `transcribing`، `polishing`، `done`، `failed`، `skipped` | `features/final-transcript/` |
+| `audio_uploads.status` | `uploading`، `complete`، `failed`، `canceled` | `features/audio-upload/` |
+| `audio_jobs.stage` | `queued`، `normalizing`، `transcribing`، `case_file`، `done`، `failed` | `features/audio-upload/` |
 | `client_case_file.status` | `ready`، `generating`، `error`، `stale` | `features/case-file/adapters/repository/caseFileRepository.sql.ts` |
 
 ## ۴. کوئری‌های حساس به عملکرد

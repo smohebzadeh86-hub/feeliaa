@@ -2,6 +2,30 @@
 
 > **وضعیت:** ACTIVE-CANONICAL · REQ-010…019.
 
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../../02-reference/feature-index.md) (`clients`) · قالب: [feature-doc-template](../../00-governance/feature-doc-template.md) (LAW-026)
+
+### چرا — تصمیم‌هایِ ثبت‌شده
+- (تصمیمِ مالک، 2026-09-24/25 — LAW-009) رضایتِ ضبط **یک بار برایِ هر مراجع**؛ بعد از ثبت UI هیچ متن/دکمه‌ای درباره‌ی رضایت نشان نمی‌دهد (`DELETE …/recording-consent` بدونِ UI ماند).
+- دسته/جنسیت از هم جدا شدند (migration 009: `adult-f/m ⇒ adult + gender`).
+- مراجعِ غیرفعال: `status_reason` اختیاری؛ غیرفعال‌شدن `pinned_at` را پاک می‌کند (2026-09-16)؛ جلسه‌ی زنده‌ی جدید 409 `client-inactive` — آپلود برایِ فعال/غیرفعال یکسان است (REQ-110).
+- نوعِ واحد (فردی/زوج/خانواده) در [ماژول 09](../09-treatment-unit/module-prd.md).
+
+### مرزها
+- `features/clients/index.ts` فقط `hasStoredConsent`/`recordClientConsent` را export می‌کند (مصرف: `sessions`، `audio-upload`). ساخت/توضیحِ واحد از `treatment-unit/index.ts`.
+- حذفِ مراجع ⇒ `session-media` purge ([session-media-purge](../../06-platform/session-media-purge.md)).
+
+### کد
+- Backend: `features/clients/{clients.routes,clients.repository,consent}.ts`، `db/ownership.ts` (`getOwnedClient`). Frontend: `loadClients`، `applyClientFilters`، `renderTodayClientsView`، `renderAllClientsView`، `showAllClients` ([frontend-map](../../02-reference/frontend-map.md)).
+
+### داده
+- مالک: `clients`؛ `client_members` را `treatment-unit` مالک است. [database-catalog §۰](../../02-reference/database-catalog.md).
+
+### تست
+- `test:api` (فقط با مجوز)؛ `test:tu` بخشِ واحد را می‌پوشاند؛ فیلترهایِ UI فقط با mock.
+
+### ریسک و بدهی
+- `code` سراسری‌یکتا (نه per-therapist)؛ مراجعِ `therapist_id IS NULL` (پیش از 004) نامعلوم؛ `/api/recovered` متنِ کامل برمی‌گرداند در حالی که UI فقط متادیتا می‌خواهد.
+
 ## Problem
 تراپیست باید پرونده‌ی مراجعین را بدونِ ثبتِ هویتِ واقعی‌شان سازمان‌دهی کند و مراجعینِ فعال و متوقف‌شده را از هم جدا ببیند.
 

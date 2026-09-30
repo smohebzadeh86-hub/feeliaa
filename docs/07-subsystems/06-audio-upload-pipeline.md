@@ -1,6 +1,6 @@
 # Subsystem 06 — آپلودِ فایلِ صوتیِ جلسه و pipelineِ پس‌زمینه
 
-> **وضعیت:** ACTIVE-CANONICAL (مالکِ جزئیاتِ این مسیر) · ایجاد 2026-09-23 · commit نشده · **deploy شد به production 2026-09-24** (migration 023 اعمال شد؛ `SONIOX_ORPHAN_SWEEP=1`). · **2026-09-25:** آپلودِ چندبخشی (§۲.۱، migration 025) — commit `45b0482`، **deploy شد به production** (migration 025 applied). · **2026-09-25 (بعدتر):** سیاستِ پرونده‌ی آپلود (`UPLOAD_CASE_FILE_INACTIVE`، خاموش) + `case_file_planned` — deploy شد؛ commit نشده.
+> **وضعیت:** ACTIVE-CANONICAL (مالکِ جزئیاتِ این مسیر) · ایجاد 2026-09-23 · آپلودِ چندبخشی (§۲.۱، migration 025، 2026-09-25) · سیاستِ پرونده‌ی آپلود (`UPLOAD_CASE_FILE_INACTIVE`، خاموش) + `case_file_planned` (2026-09-25).
 > **منشأ:** بازخوردِ تراپیست (اینترنتِ کلینیک ناپایدار است؛ باید بتوان صدایِ ضبط‌شده را بعداً وارد کرد) + دستورِ صریحِ مالک.
 > **کد:** `server/src/features/audio-upload/` (`uploads.routes.ts`، `uploadStore.ts`، `media.ts`، `jobMachine.ts`، `worker.ts` (+ `jobStore.sql.ts`))،
 > `server/src/features/notifications/notify.ts`، `server/src/features/case-file/application/autoTrigger.ts`، `public/feelia-upload.js`،
@@ -21,6 +21,13 @@
 > `CaseFileGenerationError.transient`؛ `autoTrigger` با `retryTransient` ⇒ `'transient'` بدونِ اعلان؛ `stepCaseFile` ⇒ `waiting` + `error_code='case-file-retry'`،
 > تلاشِ دوباره بعد از ۱، ۵، ۱۵ دقیقه (`CASE_FILE_TRANSIENT_RETRY_MS`)؛ تلاشِ چهارم `lastAttempt` ⇒ شکستِ عادی (`done/failed` + `case_file_failed`). مسیرِ جلسه‌ی زنده تغییری نکرد.
 > **الحاقِ تکه‌ها (2026-09-25):** `uploadStore.ts#assembleUpload` هر تکه را با `WriteStream`ِ جداگانه (append) می‌نویسد — رفعِ `MaxListenersExceededWarning` برایِ ≥۱۰ تکه.
+
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../02-reference/feature-index.md) (`audio-upload`) · قالب: [feature-doc-template](../00-governance/feature-doc-template.md) (LAW-026) — «چرا»ی هر تصمیم در متنِ زیر و Event Log؛ ساختارِ استاندارد:
+
+- **مرزها:** `features/audio-upload/index.ts` صادر می‌کند: `collectUploadSonioxRefs`، `releaseSonioxRefs`، `sweepStaleUploads`، `sweepOrphanUploadDirs`، `startAudioJobWorker`، `sweepSonioxOrphans`، `tryFinalizeGroup`؛ routeها مستقیم از `uploads.routes.ts` (R3). اعلان‌ها: [notifications](../06-platform/notifications.md).
+- **داده:** مالک: `audio_uploads`، `audio_jobs` (023، 025، 033)؛ می‌نویسد: `sessions` (`uploadSession.ts`، `jobStore.sql.ts`)، `session_audio` (source=upload)، `notifications`؛ فایل‌ها `data/uploads/`.
+- **تست:** `pnpm test:up` (`scripts/upload-harness.ts`: ماشینِ حالت با portهایِ جعلی + ffmpegِ واقعی)؛ E2Eِ واقعیِ فایلِ ۶۰دقیقه‌ای در [verification](../../verification/2026-09-23-audio-upload-pipeline.md).
+- **ریسک و بدهی:** نقضِ آگاهانه‌ی LAW-009 (متنِ رضایت دست نخورد)؛ آستانه‌هایِ کیفیت از یک گفت‌وگویِ ساختگی (R20)؛ `sessions` را مستقیم می‌نویسد.
 
 ## ۱. هدف و مرز
 

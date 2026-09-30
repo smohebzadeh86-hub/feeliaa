@@ -9,10 +9,11 @@
 | [01-architecture](01-architecture/system-architecture.md) | معماریِ سیستم/اپلیکیشن/داده/یکپارچه‌سازی/استقرار | بالا |
 | [02-reference](02-reference/api-catalog.md) | catalogهای استخراج‌شده از کد | متوسط (کد برنده است) |
 | [03-requirements](03-requirements/requirement-catalog.md) | REQ-xxx و traceability | بالا (فعلاً DERIVED) |
-| [04-modules](02-reference/module-map.md) | PRD (WHAT/WHY) + Implementation Plan (HOW) | بالا |
+| [04-modules](02-reference/module-map.md) | PRD (WHAT/WHY) + Implementation Plan (HOW) — ۹ ماژول | بالا |
 | [05-plans](05-plans/master-implementation-plan.md) | ترتیبِ کلیِ کارها | PROPOSED |
-| [06-platform](06-platform/README.md) | cross-cutting | بالا |
+| [06-platform](06-platform/README.md) | cross-cutting (LLM، obs/audit، notifications، session-media) | بالا |
 | [07-subsystems](07-subsystems/README.md) | briefهای فنیِ پرریسک | بالا |
+| [feature-index](02-reference/feature-index.md) | **رجیستریِ فیچرها** (feature ↔ کد ↔ سند ↔ تست ↔ جدول) — نقطه‌ی شروعِ هر task | بالا |
 | [analytics-clarity.md](analytics-clarity.md) | مشخصاتِ تفصیلیِ Clarity (allowlist، mask) | بالا — مالکِ آن factها |
 | [admin-panel.md](admin-panel.md) | سندِ طراحیِ اولیه‌ی پنل ادمین | **HISTORICAL** — استفاده نکنید |
 

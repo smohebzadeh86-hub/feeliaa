@@ -1,7 +1,7 @@
 # Module 02 — Client Management · Implementation Plan
 
 ## Current State
-همه در working tree، commitنشده: status/category/gender پایه + UIِ تب/فیلتر/مرتب‌سازی/مدال‌ها (migrations 008، 009) در `2763414`؛ ساختِ مراجع با status/reason از تبِ غیرفعال، یکسان‌سازیِ اندازه‌ی کارتِ فعال/غیرفعال و متنِ دکمه‌ی آرشیو در `54a17fd` (2026-09-15). **(2026-09-16، commitنشده)** صفحه‌ی مراجعین به دو screen تقسیم شد: `#screenClients` (نمای «امروز + سنجاق‌شده») و `#screenAllClients` (منطقِ قبلیِ تب/فیلتر/مرتب‌سازی + سربرگ‌های تاریخی)؛ endpointِ سنجاق (`PATCH /:id/pin`) و migrationِ `015_client_pinned.sql` (فقط MySQL) اضافه شد. بدونِ تستِ خودکار؛ [verification](../../../verification/2026-09-16-clients-today-view-and-all-clients.md) دستی (UI با mock + migration روی MySQLِ لوکالِ واقعی).
+status/category/gender پایه + UIِ تب/فیلتر/مرتب‌سازی/مدال‌ها (migrations 008، 009)؛ ساختِ مراجع با status/reason از تبِ غیرفعال، یکسان‌سازیِ اندازه‌ی کارتِ فعال/غیرفعال و متنِ دکمه‌ی آرشیو (2026-09-15). (2026-09-16) صفحه‌ی مراجعین به دو screen تقسیم شد: `#screenClients` (نمای «امروز + سنجاق‌شده») و `#screenAllClients` (منطقِ قبلیِ تب/فیلتر/مرتب‌سازی + سربرگ‌های تاریخی)؛ endpointِ سنجاق (`PATCH /:id/pin`) و migrationِ `015_client_pinned.sql` (فقط MySQL) اضافه شد. بدونِ تستِ خودکار؛ [verification](../../../verification/2026-09-16-clients-today-view-and-all-clients.md) دستی (UI با mock + migration روی MySQLِ لوکالِ واقعی).
 
 ## Code Anchors
 | لایه | anchor |

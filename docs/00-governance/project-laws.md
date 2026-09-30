@@ -120,14 +120,15 @@ state in-memory (`features/legacy-ws/p1.ts` records، `mintHits` در `features/
 ### LAW-007 — انضباطِ migration
 - فایلِ جدید: `server/src/db/mysql/migrations/NNN_snake_name.sql` با شماره‌ی بعدی؛ ترتیب با sort نامِ فایل است. **(اصلاح‌شده 2026-09-16:** `migrate.ts` در working treeِ فعلی فقط از این مسیرِ MySQL می‌خواند (`resolveMigrationsDir`) — `server/src/db/migrations/` نسخه‌ی Postgresِ متروک است که فقط تا cutoverِ نهاییِ production نگه داشته شده، دیگر توسطِ هیچ runnerِ زنده‌ای اجرا نمی‌شود. جزئیات: [database-catalog §مهاجرت](../02-reference/database-catalog.md).)
 - migrationِ اعمال‌شده هرگز ویرایش/حذف/تغییرِ نام نمی‌شود (در `_migrations` با نام ثبت شده).
-- idempotent: MySQL از `IF NOT EXISTS`ِ Postgres پشتیبانی نمی‌کند — idempotency با نادیده‌گرفتنِ errnoهای مشخص (۱۰۶۰/۱۰۶۱/۱۰۹۱/۳۸۲۲/۳۸۲۳) در `migrate.ts` انجام می‌شود (جزئیات: `server/src/db/mysql/migrations/README.md`).
+- idempotent: MySQL از `IF NOT EXISTS`ِ Postgres پشتیبانی نمی‌کند — idempotency با نادیده‌گرفتنِ errnoهای مشخص (۱۰۶۰/۱۰۶۱/۱۰۹۱/۳۸۲۱/۳۸۲۲/۳۸۲۳؛ مجموعه‌ی دقیق: `IGNORABLE_ERRNOS` در `migrate.ts`) در `migrate.ts` انجام می‌شود (جزئیات: `server/src/db/mysql/migrations/README.md`).
 - پیش‌فرض additive. هر migrationِ داده‌تغییردهنده (مثل `009` که `category` را تبدیل می‌کند) یا حذف‌کننده نیازمندِ تأییدِ مالک + یادداشتِ backup است.
 - migrationها خودکار در startup اجرا می‌شوند؛ migrationِ خراب یعنی سرور بالا نمی‌آید.
 - بعد از هر migration: [database-catalog](../02-reference/database-catalog.md) به‌روز شود.
 
 ### LAW-016 — تستِ واقعی قبل از ادعای «انجام شد»
 - تغییر در `public/feelia-rt.js` → `pnpm test:rt`.
-- تغییر در `server/` → `cd server && npx tsc --noEmit`.
+- تغییر در `server/` → `cd server && npx tsc --noEmit` **و** `pnpm test:arch` (مرزِ ماژول، LAW-025)؛ اگر route عوض شد `pnpm test:routes` هم.
+- تغییر در `docs/` یا ساختارِ feature/جدول/env/route/script → `pnpm test:docs` (LAW-027).
 - نتیجه‌ی واقعی (شاملِ شکست‌های از قبل موجود) گزارش شود؛ شکستِ جدید پنهان نشود؛ «احتمالاً کار می‌کند» جایگزینِ اجرا نیست.
 - تستِ UI بدونِ ساختنِ حساب/واردکردنِ رمز انجام شود (mock backend در scratchpad که `public/` واقعی را سرو کند).
 
@@ -161,3 +162,29 @@ state in-memory (`features/legacy-ws/p1.ts` records، `mintHits` در `features/
 - Event Log فقط اضافه‌شدنی است؛ اصلاح = ورودیِ جدید.
 - task بدونِ این ثبت «انجام‌شده» محسوب نمی‌شود (مکملِ LAW-017).
 - بدونِ داده‌ی حساس (LAW-001).
+
+## F. ساختارِ ماژولار و بهداشتِ سند
+
+> **وضعیت (2026-09-30):** LAW-025/026/027 با دستورِ مالک («اجرا کن» رویِ پلنِ تکمیلِ مستندات) افزوده شد.
+
+### LAW-025 — مرزِ ماژول
+- قواعدِ R1–R7 قانون‌اند (اجرای ماشینی: `pnpm test:arch`، `scripts/check-backend-boundaries.mjs`):
+  - **R1** featureها فقط از `features/<x>/index.ts`ِ یکدیگر import می‌کنند.
+  - **R2** platform (`shared/`، `db/`، `auth/`، `obs/`، `llm/`؛ checker همه را می‌سنجد) هرگز از `features/` import نمی‌کند.
+  - **R3** ریشه‌ی ترکیب (`app.ts`، `index.ts`، `jobs/`) فقط `index.ts` یا `*.routes.ts` را import می‌کند.
+  - **R4** بدونِ چرخه‌ی importِ استاتیک.
+  - **R5** لایه‌بندیِ داخلی (domain ← application ← adapters/api؛ سیم‌کشی فقط در `composition.ts`/`instance.ts`/`runner.ts`) برایِ featureهایِ لایه‌ای: `case-file`، `treatment-unit`، `final-transcript`.
+  - **R6** پوشه‌هایِ قدیمیِ `http/`، `stt/`، `ws/` وجود ندارند.
+- **R7:** هر feature باید `index.ts` داشته باشد (checker می‌سنجد). **Violation فعلی (allowlistِ نام‌دار `NO_INDEX_ALLOWLIST`، backlog):** `admin`، `auth`، `client-config`، `legacy-ws` — checker خودش اجازه نمی‌دهد allowlist بی‌دلیل بماند یا featureِ جدیدی به آن اضافه شود.
+- هر جدول **یک featureِ مالک** دارد (ستونِ «مالک» در [database-catalog](../02-reference/database-catalog.md)). **Violation فعلی:** `sessions` را چند featureِ دیگر هم با SQLِ مستقیم می‌نویسند (backlog: API واحدِ نوشتن).
+- کدِ فرانتِ جدید برایِ فیچرِ جدید در فایلِ IIFEِ جداگانه (`public/feelia-<x>.js`، مجاز طبقِ LAW-014) — نه افزودنِ دیگرِ بلوک به `index.html`.
+
+### LAW-026 — سندِ فیچر
+هیچ feature «done» نیست مگر: ردیف در [feature-index](../02-reference/feature-index.md) + سندِ مالک طبقِ [feature-doc-template](feature-doc-template.md) (شاملِ «چرا»، مرزها، داده، تست، `last-verified`). «چرا» فقط از منبعِ واقعی (Event Log / verification / کامنتِ کد) می‌آید؛ منبع نبود ⇒ `UNKNOWN — نیازمندِ تأییدِ مالک`.
+
+### LAW-027 — بهداشتِ سند
+- عدد/ثابت/env فقط در [configuration-catalog](../02-reference/configuration-catalog.md)؛ جاهایِ دیگر لینک.
+- وضعیتِ commit/deploy فقط در `PROJECT_STATUS.md`؛ اسنادِ محتوا برچسبِ «commit نشده/deploy شد» نمی‌گیرند.
+- بخشِ patchِ تاریخ‌دار («به‌روزرسانی 09-xx») ممنوع؛ تغییر در متنِ اصلی ادغام و دلیلش در بخشِ «چرا»ی سندِ مالک ثبت می‌شود.
+- مسیر به‌صورتِ `server/src/features/...`؛ مسیرهایِ قدیمیِ `http/`، `stt/`، `ws/`، `batchqueue.ts` در اسنادِ canonical نمی‌آیند (مگر اشاره‌ی تاریخی با برچسبِ «قدیم»).
+- اجرای ماشینی: `pnpm test:docs`.

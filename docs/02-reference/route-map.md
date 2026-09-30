@@ -1,6 +1,6 @@
 # Route Map — screenهای UI و ثبتِ روت‌های سرور
 
-> **وضعیت:** ACTIVE-CANONICAL · منبع: `public/index.html` (`showScreen`) و `server/src/index.ts`. endpointها: [api-catalog](api-catalog.md).
+> **وضعیت:** ACTIVE-CANONICAL · last-verified: 2026-09-30 @ `17d6919` · منبع: `public/index.html` (`showScreen`، ۱۶ صفحه) و `server/src/app.ts` (`buildApp`). نقشه‌ی تابع/state: [frontend-map](frontend-map.md). endpointها: [api-catalog](api-catalog.md).
 
 ## ۱. UI — screenها
 
@@ -16,10 +16,17 @@ URL هرگز عوض نمی‌شود؛ ناوبری فقط با `showScreen(name)
 | `ClientDetail` | `openClientDetail` | `Setup` (`startFromDetail`)، `Clients` | `clients/:id`، `sessions/:id`، resolve-speakers، `PUT` تاریخ، `DELETE` جلسه | `#detailTitle`، `#sessionsList`، `#sessionDetail` |
 | `Admin` | `openAdminPanel` (دکمه‌ی `#adminBtn` فقط برای `is_admin`) | `AdminTherapist`، `Clients` | stats، therapists، export، PATCH/DELETE | کلِ section |
 | `AdminTherapist` | `openAdminTherapistDetail` | `AdminSessions`، `Admin` | therapists/:id/clients، DELETE clients | کلِ section |
-| `AdminSessions` | `openAdminClientSessions` | `AdminTherapist` | clients/:id/sessions، sessions/:id/audio، stream | کلِ section |
+| `AdminSessions` | `openAdminClientSessions` | `AdminTherapist`، `AdminSessionDetail` | clients/:id/sessions، sessions/:id/audio، stream | کلِ section |
+| `AdminSessionDetail` | `openAdminSessionDetail(sessionId, clientTitle)` | `AdminSessions`، `AdminSessionTimeline` | `admin/sessions/:id`، `…/audio`، `…/diagnosis` | کلِ section |
+| `AdminActivity` | `openAdminActivity` (ناوبریِ `data-admin-nav="activity"`) | `AdminSessionTimeline`، `AdminSessionDetail` | `admin/sessions/recent`، `admin/obs/*` | کلِ section |
+| `AdminSessionTimeline` | `openAdminSessionTimeline(sessionId, title)` | `AdminActivity` | `admin/sessions/:id/timeline` | کلِ section |
+| `AdminAudio` | `openAdminAudio` | `AdminSessionDetail` | `admin/audio-archive`، `admin/session-audio/:id/stream`، `DELETE admin/sessions/:id/audio` | کلِ section |
+| `AdminVoiceNotes` | `openAdminVoiceNotes` | `AdminSessionDetail` | `admin/voice-notes`، `…/:noteId/text` | کلِ section |
+| `AllClients` | `showAllClients` | `ClientDetail`، `Clients` | `clients` | — |
+| `SessionDetail` | `doViewTranscript(sessionId)` (از `ClientDetail`) | `ClientDetail` | `sessions/:id`، `final-transcript`، `notes` | جزئیاتِ جلسه (mask) |
 
-### مدال‌ها
-`newClientModal`، `resolveSpeakersModal`، `deactivateClientModal`، `editCategoryModal`، `cancelModal`، `exitModal`، `deleteSessionModal`، `editSessionModal`، `deleteTherapistModal`، `deleteClientModal`. (بجز `cancelModal`، همه `data-clarity-mask`.)
+### مدال‌ها (۱۸)
+`newClientModal`، `audioUploadModal`، `resolveSpeakersModal`، `logoutUploadModal`، `deactivateClientModal`، `editCategoryModal`، `editUnitModal`، `modalitiesModal`، `caseFileAutoPromptModal`، `cfAddItemModal`، `cfDeleteItemModal`، `genericConfirmModal`، `cancelModal`، `exitModal`، `deleteSessionModal`، `editSessionModal`، `deleteTherapistModal`، `deleteClientModal`.
 
 ### جریانِ اصلی
 ```mermaid
@@ -36,20 +43,17 @@ flowchart LR
 - `DOMContentLoaded → init()`.
 - `beforeunload`: ارسالِ `close-hint` روی `/ws/t` و هشدارِ خروج اگر هر اتصالی باز باشد.
 
-## ۲. Server — ترتیبِ ثبت (`server/src/index.ts`)
+## ۲. Server — ترتیبِ ثبت (`server/src/app.ts`، `buildApp`)
 
 | ترتیب | ثبت | hook | scope |
 |---|---|---|---|
 | 1 | `GET /api/health` | — | root |
 | 2 | `@fastify/multipart` | — | root |
-| 3 | `registerAuthContext` (مستقیم، نه register) | `onRequest`: resolve کوکی → `request.therapistId`، `request.isAdmin` | سراسری |
-| 4 | `authRoutes` | — | plugin |
-| 5 | `adminRoutes` | `preHandler: requireAdmin` | plugin |
-| 6 | `clientRoutes` | `preHandler: requireAuth` | plugin |
-| 7 | `sessionRoutes` | `preHandler: requireAuth` | plugin |
-| 8 | `sttRoutes` | `preHandler: requireAuth` | plugin |
-| 9 | `clientConfigRoutes` | `preHandler: requireAuth` | plugin |
-| 10 | `transcriptionRoutes` (+ `@fastify/websocket`) | `preHandler: requireAuth` | plugin |
-| 11 | `@fastify/static` روی `public/` | — | root |
+| 3 | `registerAuthContext` (مستقیم) | `onRequest`: resolve کوکی → `request.therapistId`، `isAdmin` | سراسری |
+| 4 | `registerObsHooks` | لاگِ درخواست/رصد (بلافاصله بعد از auth) | سراسری |
+| 5 | `authRoutes`، `adminRoutes`، `clientRoutes`، `sessionRoutes`، `sttRoutes`، `clientConfigRoutes`، `transcriptionRoutes` (legacy WS)، `caseFileRoutes`، `treatmentUnitRoutes`، `obsRoutes` | guard در خودِ plugin (`requireAuth`/`requireAdmin`) | plugin |
+| 6 | scopeِ آپلود: `registerUploadChunkParser` + `audioUploadRoutes` + `notificationRoutes` (parserِ `application/octet-stream` روی هر دو — قراردادِ عمدی، FINDING در Event Log) | `requireAuth` | plugin |
+| 7 | `finalTranscriptRoutes` | `requireAuth` | plugin |
+| 8 | `@fastify/static` روی `public/` | — | root |
 
-نتیجه: هر درخواست (حتی static) یک کوئریِ resolveِ نشست اجرا می‌کند اگر کوکی داشته باشد.
+نتیجه: هر درخواست (حتی static) یک کوئریِ resolveِ نشست اجرا می‌کند اگر کوکی داشته باشد. قراردادِ دقیقِ method/path/guard: `scripts/route-snapshot.txt` (`pnpm test:routes`).

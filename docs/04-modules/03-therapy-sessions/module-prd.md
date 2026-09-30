@@ -2,6 +2,32 @@
 
 > **وضعیت:** ACTIVE-CANONICAL · REQ-020…032 · موتورِ رونویسی: [ماژول 04](../04-transcription/module-prd.md).
 
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../../02-reference/feature-index.md) (`sessions`) · قالب: [feature-doc-template](../../00-governance/feature-doc-template.md) (LAW-026)
+
+### چرا — تصمیم‌هایِ ثبت‌شده
+- (LAW-009، 2026-09-24/25) رضایتِ یک‌باره: `POST /api/sessions` رضایتِ ثبت‌شده‌ی مراجع را به‌جایِ `consent:true` می‌پذیرد؛ اولین بار ثبتش می‌کند.
+- (تصمیمِ مالک، A3 2026-09-26) جلسه‌ی زنده‌ی رهاشده **خودکار بسته** می‌شود (`features/sessions/autoClose.ts`؛ بی‌فعالیتیِ سه‌سیگنالی: `updated_at`، صدایِ رسیده، رویدادِ obs) و قابلِ ادامه است (PUT `status=in_progress` یا mintِ رونویسی، `auto_closed_at ⇒ NULL`). دلیل: جلسه‌ی بی‌پایان ادمین را گمراه، پرونده را trigger‌نشده و preflightِ deploy را همیشه «جلسه‌ی زنده» می‌کرد.
+- (A5، 2026-09-26) `PUT status` اعتبارسنجی شد (`invalid-status`/`invalid-transition`)؛ `completed`/`canceled` نهایی‌اند مگر جلسه‌ی خودکاربسته.
+- preflight (میکروفون + `/api/stt/check`) **غیرمسدودکننده** برایِ STT است (LAW-012؛ UI-08).
+- (2026-09-28، سنجشِ فاز ۰B) بیشترین افتِ کیفیتِ متن/تفکیکِ گوینده از خودِ صداست ⇒ بخشِ جمع‌شونده‌ی «نکته‌هایی برایِ متنِ دقیق‌تر» (`#recTips`) در Setup؛ بازطراحیِ فشرده‌ی «بررسیِ میکروفون و اتصال» (2026-09-30).
+- تاریخ همه‌جا شمسی (`YYYY/MM/DD`)؛ ثبتِ دستیِ جلسه‌ی گذشته مستقیم جلسه می‌سازد (تصمیم‌هایِ 2026-09-14/15 در Business Rules).
+
+### مرزها
+- `features/sessions/index.ts`: `normalizeSessionDate/StartTime/nowInTehran`، `isSessionNumConflict…`، `autoCloseAbandonedSessions`. `sessions` جدولِ خودش را با چند featureِ دیگر شریک می‌نویسد (بدهی، LAW-025).
+- وابستگی‌ها: `clients` (رضایت)، `treatment-unit` (حاضرین)، `case-file`/`final-transcript` (trigger بعد از پایان)، `session-media` (حذف). زیرماژول‌ها: `notes.routes.ts` ([ماژول 05](../05-notes-and-signs/module-prd.md))، `batch.routes.ts` ([ماژول 04](../04-transcription/module-prd.md))، `voiceNote.legacy.ts` (LEGACY، LAW-015).
+
+### کد
+- Backend: `features/sessions/{sessions.routes,sessions.repository,autoClose,sessionDate,sessionNumber}.ts`. Frontend: `setupNewSession`، `runPreflight`، `startSession`، `liveResumeSession`، `finishSession`، `doViewTranscript` ([frontend-map](../../02-reference/frontend-map.md)).
+
+### داده
+- مالک: `sessions` (ستون‌هایِ 002/007/012/014/026/029). `session_notes` را ماژول 05 مالک است. [database-catalog §۰](../../02-reference/database-catalog.md).
+
+### تست
+- `test:api` (فقط با مجوز؛ شاملِ pre_note، PUT status)؛ `test:rt` بخشِ موتور را می‌پوشاند؛ auto-close با E2Eِ DBِ dev تأیید شده ([verification](../../../verification/2026-09-26-storage-fixes-full-test-run.md)).
+
+### ریسک و بدهی
+- `sessions.transcript` را چند feature می‌نویسد (LAW-008 باید در همه رعایت شود)؛ `DIAG-TEMP` در `sessions.routes.ts` (LAW-001/023)؛ جلسه‌ی بسته‌شده‌ی خودکار در پنجره‌ای کوتاه ممکن است داده‌ی autosave را از دست بدهد (تست نشده).
+
 ## Problem
 جلسه‌ی درمانی رویدادی غیرقابلِ‌تکرار است: قطعیِ اینترنت، رفرشِ صفحه یا خطای سرویس نباید آن را از بین ببرد؛ و بدونِ رضایتِ مراجع نباید ضبط شود.
 
@@ -23,6 +49,9 @@
 | UC-03.7 | لغو → تأیید → حذفِ جلسه |
 | UC-03.8 | رفرش/بستنِ تب وسطِ جلسه → در ورودِ بعدی بنرِ «ادامه‌ی رونویسیِ زنده» |
 | UC-03.9 | جلسه‌ی `recovered` → بنرِ «ادامه و تکمیل» → Wrapup |
+| UC-03.11 | **رضایتِ یک‌باره** (2026-09-24): اولین جلسه/آپلودِ مراجع تیکِ «موافق است» می‌گیرد و رضایت روی `clients.recording_consent_at` ثبت می‌شود؛ از آن به بعد پرسیده نمی‌شود و UI درباره‌اش چیزی نشان نمی‌دهد |
+| UC-03.12 | **بستنِ خودکار** (2026-09-26): جلسه‌ی رهاشده پس از بی‌فعالیتیِ سه‌سیگنالی (پیش‌فرضِ ۲ ساعت؛ مقدار: configuration-catalog) `completed` با `auto_closed_at` می‌شود؛ پرونده/«متنِ نهایی» trigger می‌شوند؛ ادامه‌ی جلسه آن را باز می‌کند |
+| UC-03.13 | **preflight و نکاتِ ضبط** در Setup: بررسیِ میکروفون و `/api/stt/check` (STT غیرمسدودکننده)، هشدارِ WebView/HTTP، بخشِ جمع‌شونده‌ی «نکته‌هایی برایِ متنِ دقیق‌تر» (`#recTips`) |
 | UC-03.10 | پرونده: فهرستِ جلسات، دیدنِ متن+یادداشت‌ها، ویرایشِ تاریخ/ساعت، حذفِ جلسه، بازسازیِ گوینده‌ها (ماژول 04) |
 
 ## Business Rules
@@ -58,7 +87,7 @@ REQ-020…031. کلیدی:
 DB: `in_progress`، `recovered`، `completed`، `canceled` ([data-architecture §4.1](../../01-architecture/data-architecture.md)). موتور: [subsystem 01](../../07-subsystems/01-browser-realtime-engine.md). UI: Setup → Live → Wrapup.
 
 ## Validation
-`consent` truthy (فقط جلسه‌ی زنده)؛ `client_id` مالک؛ `status` در PUT اعتبارسنجی **نمی‌شود** (شکاف)؛ تاریخ (POST/PUT، وقتی مقدار دارد) باید `Y/M/D` معتبر باشد — شمسی، یا میلادی که به شمسی تبدیل می‌شود؛ ارقامِ فارسی/عربی و `-` پذیرفته و به `YYYY/MM/DD` لاتین نرمال می‌شوند؛ ساعت `H:MM`/`HH:MM` → `HH:MM`؛ نامعتبر → 400. بدونِ ساعت: همیشه وقتِ ایران (`Asia/Tehran`)، برایِ هر دو mode. بدونِ تاریخ: جلسه‌ی زنده وقتِ ایران می‌گیرد؛ جلسه‌ی `manual` مقدار `NULL` می‌ماند («بدونِ تاریخ»، migration 014). در PUT، پاک‌کردنِ صریحِ تاریخ (رشته‌ی خالی/`null`) فقط برایِ `source=manual` مجاز است.
+`consent` truthy (فقط جلسه‌ی زنده)؛ `client_id` مالک؛ `status` در PUT فقط `in_progress|recovered|completed|canceled` (400 `invalid-status`؛ 409 `invalid-transition` از حالتِ نهایی جز جلسه‌ی خودکاربسته)؛ تاریخ (POST/PUT، وقتی مقدار دارد) باید `Y/M/D` معتبر باشد — شمسی، یا میلادی که به شمسی تبدیل می‌شود؛ ارقامِ فارسی/عربی و `-` پذیرفته و به `YYYY/MM/DD` لاتین نرمال می‌شوند؛ ساعت `H:MM`/`HH:MM` → `HH:MM`؛ نامعتبر → 400. بدونِ ساعت: همیشه وقتِ ایران (`Asia/Tehran`)، برایِ هر دو mode. بدونِ تاریخ: جلسه‌ی زنده وقتِ ایران می‌گیرد؛ جلسه‌ی `manual` مقدار `NULL` می‌ماند («بدونِ تاریخ»، migration 014). در PUT، پاک‌کردنِ صریحِ تاریخ (رشته‌ی خالی/`null`) فقط برایِ `source=manual` مجاز است.
 
 ## Dependencies
 ماژول 02، 04، 05؛ platform؛ localStorage.
@@ -76,7 +105,7 @@ DB: `in_progress`، `recovered`، `completed`، `canceled` ([data-architecture �
 
 ## Known Contradictions
 - **C1:** متنِ کارتِ رضایت درباره‌ی ذخیره‌نشدنِ صدا با واقعیت نمی‌خواند ([LAW-009](../../00-governance/project-laws.md)).
-- ~~**C4:** تاریخِ پیش‌فرضِ سرور میلادی، راهنمای ویرایش شمسی، نمایشِ Setup شمسی.~~ رفع، commit شده در `54a17fd` (2026-09-15): همه‌جا شمسی؛ migration 013 داده‌ی قبلی را تبدیل می‌کند؛ 014 آن را برایِ جلسه‌ی دستی اختیاری می‌کند.
+- ~~**C4:** تاریخِ پیش‌فرضِ سرور میلادی، راهنمای ویرایش شمسی، نمایشِ Setup شمسی.~~ رفع (2026-09-15): همه‌جا شمسی؛ migration 013 داده‌ی قبلی را تبدیل می‌کند؛ 014 آن را برایِ جلسه‌ی دستی اختیاری می‌کند.
 - **بررسیِ UI (2026-09-14):** انتظارِ بی‌دلیل برای STT (UI-08)؛ تایمر هنگامِ قطعی می‌ایستد (UI-14)؛ جلسه‌ی «در جریان» در پرونده دکمه‌ی ادامه ندارد (UI-12)؛ کنترل‌های «توقف/پایان» در موبایل زیرِ خطِ دید (UI-22) — [فهرستِ کامل](../../05-plans/ui-ux-audit-2026-09-14.md).
 - **✅ رفع شد 2026-09-14، commit شده در `ecf00b4`:** خروج وسطِ جلسه ضبط را متوقف نمی‌کرد (UI-01) → اکنون بلاک می‌شود؛ دوبارکلیکِ «شروع» دو جلسه می‌ساخت (UI-04) → اکنون دکمه تا پایانِ درخواست غیرفعال است. جزئیات: [UI audit — بخشِ رفعِ فازِ ۰](../../05-plans/ui-ux-audit-2026-09-14.md#رفعِ-فازِ-۰--2026-09-14).
 

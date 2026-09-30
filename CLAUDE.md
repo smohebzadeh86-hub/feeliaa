@@ -1,14 +1,14 @@
 # CLAUDE.md — نقطه‌ی ورودِ اجباریِ هر AI Agent
 
 > این فایل Router است، نه مرجعِ جزئیات. هر fact جزئی مالکِ canonical خودش را در `docs/` دارد.
-> آخرین بازسازیِ ساختار مستندات: 2026-09-13 (از روی working tree شاخه‌ی `feat/clarity`).
+> آخرین بازسازیِ ساختار مستندات: 2026-09-30 (از روی working tree شاخه‌ی `feat/clarity` @ `17d6919`).
 
 ## ۱. پروژه چیست؟ (یک پاراگراف)
 
 **فیلیا (Feelia)** یک وب‌اپ فارسی برای تراپیست‌هاست: مدیریتِ مراجعین، ثبتِ جلسه‌ی درمانی با **رضایتِ مراجع**،
 رونویسیِ زنده‌ی فارسی با Soniox (مستقیم از مرورگر با کلیدِ موقت)، ثبتِ علائم/یادداشت/یادداشتِ صوتی،
-و پنلِ ادمین. Backend: Node.js + Fastify 5 + PostgreSQL (TypeScript، `server/`). Frontend: یک SPA تک‌فایلی
-بدونِ build (`public/index.html` + `public/feelia-rt.js` + `public/feelia-analytics.js`).
+و پنلِ ادمین. Backend: Node.js + Fastify 5 + MySQL (TypeScript، `server/`؛ ۲۰ جدول، migration تا 034). Frontend: یک SPA بدونِ build
+(`public/index.html` + `feelia-rt.js` + `feelia-upload.js` + `feelia-obs.js` + `feelia-analytics.js`).
 **داده‌ها بالینی و فوق‌حساس‌اند.**
 
 ## ۲. ترتیبِ اجباریِ خواندن
@@ -43,7 +43,15 @@ CLAUDE.md (همین فایل)
 | هر چیزی درباره‌ی رونویسیِ زنده، reconnect، pause/resume | `docs/07-subsystems/01-browser-realtime-engine.md`، `03-transcript-integrity.md`، `docs/04-modules/04-transcription/` |
 | آپلودِ فایلِ صوتیِ جلسه، jobِ پس‌زمینه، اعلان‌ها | `docs/07-subsystems/06-audio-upload-pipeline.md` |
 | صدا، صف آفلاین، batch fallback، یادداشتِ صوتیِ ناموفق | `docs/07-subsystems/02-audio-durability-batch-fallback.md`، `05-session-audio-archive-speaker-resolve.md` |
+| «متنِ نهایی» (polish/نوبت‌به‌نوبت) | `docs/07-subsystems/07-final-transcript.md` |
+| پروندهٔ درمان (AI Case File) | `docs/04-modules/08-ai-case-file/` |
+| واحدِ درمان (treatment-unit، زوج/خانواده) | `docs/04-modules/09-treatment-unit/` |
+| لایهٔ LLM (provider، کلید، هزینه) | `docs/06-platform/llm-provider-layer.md` |
+| observability / audit / اعلان / پاکسازیِ صدا | `docs/06-platform/observability-audit.md`، `notifications.md`، `session-media-purge.md` |
+| ساختارِ ماژول/مرزِ import | LAW-025، `docs/01-architecture/application-architecture.md` §1 |
+| نقشه‌ی فرانت (صفحه/تابع/state) | `docs/02-reference/frontend-map.md` |
 | `/ws/t`، `/ws/voice`، `SonioxDirect` | `docs/07-subsystems/04-legacy-ws-proxy-p1.md` (مسیرِ LEGACY — قانون LAW-015) |
+| **هر feature (نقطه‌ی شروع)** | `docs/02-reference/feature-index.md` ← ردیفِ feature ← سندِ مالکش (قالب: `docs/00-governance/feature-doc-template.md`) |
 | مراجعین | `docs/04-modules/02-client-management/` |
 | جلسه (شروع/پایان/لغو/ادامه/ویرایش) | `docs/04-modules/03-therapy-sessions/` |
 | علائم/یادداشت‌ها | `docs/04-modules/05-notes-and-signs/` |
@@ -85,7 +93,7 @@ CLAUDE.md (همین فایل)
 | env var یا ثابتِ timeout/retention | `docs/02-reference/configuration-catalog.md` |
 | رفتارِ محصول | PRD ماژول + `docs/03-requirements/requirement-catalog.md` + `traceability-matrix.md` |
 | lifecycle/state machine/صدا | subsystem مربوط |
-| فایل/پوشه‌ی جدید | `docs/02-reference/repository-map.md`، `module-map.md` |
+| فایل/پوشه‌ی جدید | `docs/02-reference/repository-map.md`، `module-map.md`، **`feature-index.md`** (LAW-026) |
 | رویداد/صفحه‌ی Clarity | `docs/analytics-clarity.md` + `public/feelia-analytics.js` |
 | وضعیتِ کلی / ریسکِ جدید | `PROJECT_MASTER_REFERENCE.md` بخش‌های 20–22 |
 | اجرای تست/بررسی | یک فایلِ تاریخ‌دار در `verification/` |
@@ -111,6 +119,9 @@ pnpm test:routes
 pnpm test:arch
 ```
 ```bash
+pnpm test:docs
+```
+```bash
 cd server && npx tsc --noEmit
 ```
 
@@ -118,10 +129,12 @@ cd server && npx tsc --noEmit
 - `pnpm test:rt` = harness موتورِ realtime (`scripts/rt-harness.cjs`) — بدونِ شبکه/DB. وضعیتِ فعلی: بخش 20 Master Reference.
 - `pnpm test:cf` = harness پرونده‌ی درمان (`scripts/case-file-harness.ts`، اجرا با tsx) — بدونِ شبکه/DB/LLMِ واقعی؛ دادهٔ ساختگی.
 - `pnpm test:up` = harness pipelineِ آپلودِ فایلِ صوتی (`scripts/upload-harness.ts`، 2026-09-23) — ماشینِ حالتِ job با portهایِ جعلی (بدونِ DB/Soniox) + ffmpegِ واقعی رویِ فایل‌هایِ ساختگی.
+- `pnpm test:tu` = harness واحدِ درمان (`scripts/treatment-unit-harness.ts`) — دامنه/کاربرد/نگاشتِ مدالیته؛ بدونِ DB/شبکه.
 - `pnpm test:ft` = harness «متنِ نهایی» (`scripts/final-transcript-harness.ts`، 2026-09-27) — ماشینِ حالت، نگهبان‌ها و polish با LLMِ جعلی؛ بدونِ DB/شبکه.
 - `pnpm test:llm` = harness لایه‌ی LLMِ مستقل از provider (`scripts/llm-harness.ts`، 2026-09-28) — config هر provider (OpenAI/OpenRouter/متیس/DeepSeek/custom)، رگرسیونِ بدنه‌ی درخواست، حالت‌هایِ JSON، providerِ جایگزین؛ کلاینتِ جعلی، بدونِ شبکه.
+- `pnpm test:docs` = بهداشتِ مستندات (`scripts/check-docs.mjs`، LAW-027): پوششِ feature-index، documentation-map، لینک‌ها/مسیرها، routeها↔api-catalog، migrationها↔database-catalog، envها↔configuration-catalog، scriptها↔این بخش؛ بدونِ DB/شبکه.
 - `pnpm test:routes` = قراردادِ routeها (method/path + hookهایِ مؤثر مثلِ `requireAuth`/`requireAdmin` + bodyLimit) در برابرِ `scripts/route-snapshot.txt`؛ بدونِ DB. `-- --update` فقط وقتی route عمداً عوض شده.
-- `pnpm test:arch` = قواعدِ مرزِ ماژول‌هایِ backend (`scripts/check-backend-boundaries.mjs`، 2026-09-28): importِ بینِ featureها فقط از `features/<x>/index.ts`، platform (`shared/db/auth/obs`) هرگز از features، بدونِ چرخه‌ی importِ استاتیک. ساختار: `docs/01-architecture/application-architecture.md` §1.
+- `pnpm test:arch` = قواعدِ مرزِ ماژول‌هایِ backend (`scripts/check-backend-boundaries.mjs`، 2026-09-28): importِ بینِ featureها فقط از `features/<x>/index.ts`، platform (`shared/db/auth/obs/llm`) هرگز از features، بدونِ چرخه‌ی importِ استاتیک، لایه‌بندیِ case-file/treatment-unit/final-transcript، و `index.ts` برایِ هر feature (allowlistِ نام‌دار برایِ ۴ بدهی). ساختار: `docs/01-architecture/application-architecture.md` §1.
 - `pnpm test:api` = characterizationِ APIِ backend رویِ **DBِ مشترکِ dev** با fixtureِ ساختگی + Sonioxِ mock (`scripts/api-contract-harness.mts`). فقط با `FEELIA_E2E_OK=1` و **مجوزِ صریحِ مالک در همان گفتگو** اجرا می‌شود؛ `FEELIA_E2E_ENV_FILE` (مسیرِ `.env` برایِ فقط `DATABASE_URL`)، `FEELIA_API_GOLDEN` برایِ مقایسه. fixtureها در پایان پاک می‌شوند.
 - CI وجود ندارد.
 

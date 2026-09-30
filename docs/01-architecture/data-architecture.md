@@ -1,74 +1,55 @@
 # Data Architecture
 
-> **وضعیت:** ACTIVE-CANONICAL · مالکِ جزئیاتِ ستون‌ها: [database-catalog](../02-reference/database-catalog.md). این سند مدل، مالکیت و چرخه‌ی عمر را توضیح می‌دهد.
+> **وضعیت:** ACTIVE-CANONICAL · last-verified: 2026-09-30 @ `17d6919`
+> مالکِ جزئیاتِ ستون‌ها و **مالکِ هر جدول**: [database-catalog](../02-reference/database-catalog.md). این سند مدل، مالکیت و چرخه‌ی عمر را توضیح می‌دهد.
+> منبعِ schema: `server/src/db/mysql/migrations/001–034` (MySQL 8؛ اجرا در startup با `server/src/db/migrate.ts`).
 
 ## ۱. محل‌های نگهداریِ داده
 
-| محل | چه چیزی | حساسیت | نگهداری |
+مقدارِ نگهداری/سقف‌ها فقط در [configuration-catalog](../02-reference/configuration-catalog.md) است؛ اینجا به‌صورتِ کیفی آمده (LAW-027).
+
+| محل | چه چیزی | حساسیت | نگهداری / مالک |
 |---|---|---|---|
-| MySQL (production، از 2026-09-16؛ Postgres قبلی روی سرور نگه داشته شده برایِ rollback) | حساب‌ها، نشست‌های auth، مراجعین، جلسات + متن، یادداشت/علائم، متادیتای صدای آرشیو | بسیار بالا | نامحدود تا حذف |
-| `<cwd>/data/batch-queue/` | فایل‌های `.webm` در انتظارِ رونویسی/آرشیو | بسیار بالا | تا موفقیت؛ فایل‌های قدیمی‌تر از ۲۴h در startup حذف |
-| `<cwd>/data/session-audio/<sessionId>/NNNNNN.webm` | آرشیوِ صدا برای ادمین | بسیار بالا | ۱۴ روز (startup + هر ۲۴h) |
-| `<cwd>/data/uploads/<uploadId>/` (2026-09-23، تأییدِ مالک، LAW-010) | تکه‌هایِ آپلودِ فایلِ صوتیِ جلسه + `source.*`ِ الحاق‌شده | بسیار بالا | نیمه‌کاره: ۷ روز بی‌فعالیت؛ کامل: تا پایانِ نرمال‌سازی (حداکثر ۱۴ روز)؛ پوشه‌ی بی‌ردیف (حذفِ جلسه/مراجع/تراپیست) فوراً حذف — [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md) |
-| MySQL `audio_uploads`/`audio_jobs`/`notifications` (023) | متادیتایِ آپلود/job (نامِ فایلِ اصلی، شناسه‌هایِ Soniox)، اعلان‌ها (بدونِ متنِ بالینی) | بالا | cascade با تراپیست/مراجع/جلسه؛ اعلان‌ها ۳۰ روز |
-| مرورگر IndexedDB `feelia-uploads/tasks` (2026-09-23) | **خودِ فایلِ صوتیِ انتخاب‌شده** تا پایانِ آپلود (برایِ ادامه بعد از رفرش) | بسیار بالا | حذف بعد از «دریافت شد»/تکراری/لغو یا خطایِ دائمی؛ به therapistId گره خورده |
+| MySQL | حساب‌ها، نشست‌هایِ auth، مراجعین/اعضا، جلسات + متن، یادداشت/علائم، متادیتایِ صدا، پرونده، آپلود/job، «متنِ نهایی»، اعلان‌ها، رصد/ممیزی | بسیار بالا | نامحدود تا حذف؛ `obs_*` و `audit_log` بر اساسِ سن (LAW-010) — [database-catalog](../02-reference/database-catalog.md) |
+| `<cwd>/data/batch-queue/` | فایل‌هایِ صدایِ در انتظارِ رونویسی/آرشیو | بسیار بالا | گذرا؛ پاک‌سازی در startup و ساعتی — [subsystem 02](../07-subsystems/02-audio-durability-batch-fallback.md) |
+| `<cwd>/data/session-audio/<sessionId>/` | آرشیوِ صدا برایِ ادمین (شاملِ نسخه‌ی نرمال‌شده‌ی آپلود و صدایِ `note-`/`prenote-`) | بسیار بالا | آرشیوِ محدود (LAW-010) — [subsystem 05](../07-subsystems/05-session-audio-archive-speaker-resolve.md) |
+| `<cwd>/data/uploads/<uploadId>/` | تکه‌هایِ آپلودِ فایلِ صوتیِ جلسه + `source.*` | بسیار بالا | تا پایانِ نرمال‌سازی؛ یتیم‌ها حذف — [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md) |
 | `os.tmpdir()/feelia-speaker-resolve-*` | concatِ موقتِ ffmpeg | بسیار بالا | حذف در `finally` |
-| حافظه‌ی پروسه | P1 records (شاملِ hint و بافرِ صدا)، jobهای resolve (متنِ preview)، mintHits | بالا | تا ری‌استارت؛ jobها >۲h حذف |
-| Soniox | فایل و transcriptionِ async | بسیار بالا | در `finally` حذف می‌شوند (`deleteTranscription`، `deleteFile`)؛ jobِ آپلود بعد از ثبتِ متن/شکستِ دائمی حذف می‌کند؛ یتیم‌هایِ بعد از کرش با `sweepSonioxOrphans` (فقط با `SONIOX_ORPHAN_SWEEP=1`، > ۲۴h) — رفعِ F3، 2026-09-23 |
-| مرورگر IndexedDB `feelia-audio/segments` | سگمنت‌های ۶۰ثانیه‌ای صدا | بسیار بالا | تا آپلودِ موفق/abort؛ سقفِ کل ۳۰۰MB |
-| مرورگر localStorage | `feelia_active_session`، `feelia_direct`، `feelia_ux_consent_v1:<therapistId>` | متوسط (شناسه) | نامحدود |
-| مرورگر sessionStorage | `p1c-<sessionId>` | پایین | تب |
-| لاگ‌های سرور | شناسه‌ها، طول‌ها؛ **به‌علاوه‌ی دُمِ متن در `DIAG-TEMP`** | متغیر | بسته به pm2/journal (UNVERIFIED) |
+| حافظه‌ی پروسه | P1 records، jobهایِ resolve، `mintHits`، قفل‌هایِ کلیددار (`shared/keyedLock.ts`) | بالا | تا ری‌استارت (LAW-013) |
+| Soniox (خارجی) | فایل و transcriptionِ async | بسیار بالا | حذف در `finally`/پس از ثبتِ متن؛ یتیم‌هایِ بعد از کرش با `sweepSonioxOrphans` (فقط با فلگِ prod) — [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md) |
+| LLM provider (خارجی) | متنِ جلسه/پرونده برایِ polish و تولیدِ پرونده | بسیار بالا | سیاستِ provider — [llm-provider-layer](../06-platform/llm-provider-layer.md)، [integration-architecture](integration-architecture.md) |
+| مرورگر IndexedDB | `feelia-audio/segments` (سگمنتِ صدایِ durable)، `feelia-uploads/tasks` (فایلِ آپلودی)، `feelia-predraft/clips` (پیش‌نویسِ صوتیِ pre-note) | بسیار بالا | تا آپلودِ موفق/لغو/انقضا — [configuration-catalog §۴](../02-reference/configuration-catalog.md) |
+| مرورگر localStorage/sessionStorage | `feelia_active_session`، `feelia_note_outbox`، `feelia_pending_complete`، `feelia_direct`، `feelia_theme`، `feelia-cf-open:*`، `p1c-<sessionId>` | متوسط (شناسه؛ outbox شاملِ متنِ یادداشت) | تا پاک‌سازی — همان بخش |
+| لاگ‌هایِ سرور | شناسه‌ها/طول‌ها + JSONL رصد (`obs/fileSink.ts`)؛ **به‌علاوه‌ی دُمِ متن در `DIAG-TEMP`** (نقضِ LAW-001) | متغیر | pm2/journal (UNVERIFIED) + چرخشِ فایلِ obs |
 
 ## ۲. مدلِ موجودیت‌ها
 
 ```mermaid
 erDiagram
   therapists ||--o{ auth_sessions : "CASCADE"
-  therapists ||--o{ clients : "therapist_id (nullable) CASCADE"
+  therapists ||--o{ clients : "therapist_id CASCADE"
+  therapists ||--o{ audio_uploads : "CASCADE"
+  therapists ||--o{ notifications : "CASCADE"
   clients ||--o{ sessions : "CASCADE"
+  clients ||--o{ client_members : "CASCADE"
+  clients ||--|| client_case_file : "CASCADE (۱:۱)"
+  clients ||--o{ audio_uploads : "CASCADE"
   sessions ||--o{ session_notes : "CASCADE"
   sessions ||--o{ session_audio : "CASCADE (فقط ردیف)"
-  therapists {
-    uuid id PK
-    text phone "unique partial"
-    text email "nullable unique"
-    text password_hash
-    bool is_admin
-    bool active
-  }
-  clients {
-    uuid id PK
-    text code "UNIQUE global CL-XXXX"
-    text status "active|inactive"
-    text category "child|teen|adult"
-    text gender "f|m"
-  }
-  sessions {
-    uuid id PK
-    int session_num "UNIQUE per client"
-    text status
-    text transcript
-    int transcript_version
-    text batch_status
-  }
-  session_notes {
-    uuid id PK
-    text type "note_during|note_after|sign|voice"
-    int offset_ms
-  }
-  session_audio {
-    uuid id PK
-    int seq "UNIQUE per session"
-    text path "مسیرِ مطلقِ فایل"
-  }
+  sessions ||--o| final_transcripts : "CASCADE (۱:۱)"
+  sessions ||--o{ audio_jobs : "CASCADE"
+  audio_uploads ||--o| audio_jobs : "upload_id UNIQUE CASCADE"
+  tu_modalities ||--o{ tu_modality_terms : "CASCADE"
 ```
+
+جدول‌هایِ بدونِ FK (عمدی): `obs_events`، `obs_ui_events`، `audit_log` (ردِ حسابرسی بعد از حذف می‌ماند)، کاتالوگِ `tu_unit_types`/`tu_member_roles` (مرجعِ کدها؛ اعتبار در دامنه). `client_case_file.generated_from_session_id` عمداً بدونِ FK. ستون‌ها: [database-catalog](../02-reference/database-catalog.md).
 
 ## ۳. مالکیت و ایزولاسیون
 
-- مالکیت از طریقِ زنجیره‌ی `session → client → therapist_id`؛ جدولِ `sessions` ستونِ therapist ندارد.
-- `clients.therapist_id` nullable است (migration 004 با `ADD COLUMN`). مراجعینِ ساخته‌شده قبل از 004 بدونِ مالک هستند: برای هیچ تراپیستی نمایش داده نمی‌شوند و در export ادمین (که بر اساسِ therapist است) هم نمی‌آیند — **INFERRED**؛ وجودِ چنین ردیف‌هایی در production نامعلوم است.
+- مالکیتِ داده از زنجیره‌ی `session → client → therapist_id`؛ `sessions` ستونِ therapist ندارد (بجز جدول‌هایِ job/آپلود/«متنِ نهایی» که `therapist_id` را برایِ کوئریِ سریع دارند).
+- `clients.therapist_id` nullable است (migration 004 با `ADD COLUMN`): مراجعینِ پیش از 004 بدونِ مالک‌اند و برایِ هیچ تراپیستی/export نمی‌آیند — **INFERRED**؛ وجودشان در production نامعلوم است.
 - `clients.code` در کلِ سیستم یکتاست (نه per-therapist).
+- دسترسی فقط با `getOwnedClient`/`getOwnedSession` (`server/src/db/ownership.ts`، LAW-004).
 
 ## ۴. چرخه‌ی عمر
 
@@ -76,58 +57,60 @@ erDiagram
 ```mermaid
 stateDiagram-v2
   [*] --> in_progress: POST /api/sessions
-  in_progress --> recovered: grace 60s پس از قطعی (فقط مسیرِ legacy /ws/t)
+  in_progress --> recovered: grace پس از قطعی (فقط مسیرِ legacy /ws/t)
   recovered --> in_progress: liveResumeSession (PUT status)
   in_progress --> completed: endNewRTSession / finishSession / WS finalize
+  in_progress --> completed: autoClose (رهاشده؛ auto_closed_at)
+  completed --> in_progress: فقط اگر auto_closed_at پر است (PUT status؛ auto_closed_at=NULL)
   recovered --> completed: resumeSession → Wrapup → finishSession
   in_progress --> canceled: WS cancel (legacy)
   in_progress --> [*]: لغو در UI = DELETE /api/sessions/:id
 ```
-- `PUT /api/sessions/:id` هر رشته‌ای را برای `status` می‌پذیرد (بدونِ اعتبارسنجی).
-- `recovered` فقط توسطِ `features/legacy-ws/transcription.routes.ts` تولید می‌شود؛ مسیرِ FeeliaRT هیچ‌وقت آن را تنظیم نمی‌کند (**INFERRED** از grep).
+- `PUT /api/sessions/:id` فقط `in_progress|recovered|completed|canceled` را می‌پذیرد (`400 invalid-status`)؛ `completed`/`canceled` نهایی‌اند (`409 invalid-transition`) مگر جلسه‌ی بسته‌شده‌ی خودکار (`auto_closed_at`) که تراپیست ادامه‌اش دهد (A5، 2026-09-26).
+- `recovered` فقط توسطِ `features/legacy-ws/transcription.routes.ts` تولید می‌شود.
+- بستنِ خودکار: `features/sessions/autoClose.ts` ([ماژول 03](../04-modules/03-therapy-sessions/module-prd.md)).
 
 ### 4.2 متن (`transcript`, `transcript_version`)
-مالک: [subsystem 03](../07-subsystems/03-transcript-integrity.md).
+مالک: [subsystem 03](../07-subsystems/03-transcript-integrity.md). **چند featureِ دیگر هم `sessions.transcript` را می‌نویسند** (آپلود، batch، legacy-ws؛ [database-catalog §۰](../02-reference/database-catalog.md)) — همه باید LAW-008 را رعایت کنند؛ API واحدِ نوشتن در backlog است (LAW-025).
 
 ### 4.3 صدا
 ```mermaid
 flowchart LR
-  MR["MediaRecorder durable<br/>24kbps"] -->|onstop| IDB[("IndexedDB")]
+  MR["MediaRecorder durable"] -->|onstop| IDB[("IndexedDB")]
   IDB -->|"purpose=transcript (unreliable)"| Q[("data/batch-queue")]
-  IDB -->|"purpose=archive (reliable / orphan sweep)"| Q
-  IDB -->|"purpose=note"| Q
+  IDB -->|"purpose=archive"| Q
+  IDB -->|"purpose=note / pre-note"| Q
   Q -->|async STT موفق| M["merge / note insert"]
   Q -->|پس از موفقیت یا archive| AR[("data/session-audio + session_audio")]
-  Q -->|">24h"| X1["حذف"]
-  AR -->|">14d"| X2["حذف فایل + ردیف"]
-  AR -->|ffmpeg concat| RS["resolve-speakers"]
+  AR -->|ffmpeg concat| RS["resolve-speakers / متنِ نهایی"]
 ```
 
-**مسیرِ آپلودِ فایل (2026-09-23):** `File` → IndexedDB `feelia-uploads` → تکه‌هایِ ۴MB → `data/uploads/<id>` → `source.*` → ffmpeg (Opus) → `data/session-audio/<sessionId>/` (`session_audio.source='upload'`، ۱۴ روز) → Soniox async → متن در `sessions.transcript` (exactly-once با `audio_jobs.transcript_applied_at`). جزئیات: [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md).
+**مسیرِ آپلودِ فایل:** `File` → IndexedDB `feelia-uploads` → تکه‌ها → `data/uploads/<id>` → `source.*` → ffmpeg → `data/session-audio/<sessionId>/` (`session_audio.source='upload'`) → Soniox async → متن در `sessions.transcript` (exactly-once با `audio_jobs.transcript_applied_at`). [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md).
 
 ### 4.4 حذف
+حذفِ جلسه/مراجع/تراپیست: cascadeِ DB + **`features/session-media/purge.ts`** (فایل‌هایِ `data/session-audio` و منابعِ Soniox؛ ابتدا `prepareSessionMediaPurge` پیش از `DELETE`، سپس `purgeSessionMedia` بعد از موفقیت) — [session-media-purge](../06-platform/session-media-purge.md). `obs_*`/`audit_log` عمداً باقی می‌مانند (LAW-010).
+
 | عمل | اثر در DB | اثر روی فایل‌ها |
 |---|---|---|
-| حذفِ تراپیست (ادمین) | cascade: auth_sessions، clients، sessions، notes، session_audio | **فایل‌های `data/session-audio` حذف نمی‌شوند** و sweeper (که از ردیف‌ها می‌خواند) پیدایشان نمی‌کند → یتیمِ دائمی (**INFERRED**) |
-| حذفِ مراجع | cascade: sessions، notes، session_audio | همان |
-| حذفِ جلسه / لغو | cascade: notes، session_audio | همان؛ فایل‌های batch-queue تا ۲۴h |
+| حذفِ تراپیست (ادمین) | cascade به همه‌ی جدول‌هایِ وابسته | purge (بالا)؛ IndexedDBِ مرورگر دست نمی‌خورد |
+| حذفِ مراجع / جلسه | cascade | همان |
 | abort در مرورگر | — | `AudioQueueDB.clearForSession` |
 | logout | نشستِ auth حذف | IndexedDB دست نمی‌خورد |
-| انقضای نشست auth | ردیف باقی می‌ماند (بدونِ sweeper) | — |
+| انقضای نشستِ auth | ردیف باقی می‌ماند (بدونِ sweeper — INFERRED؛ `auth/session.ts` را ببینید) | — |
 
 ## ۵. migration
 
-- اجرا: خودکار در startup، ترتیبِ الفبایی، ثبت در `_migrations(name)`؛ هر فایل در یک `query()` (بدونِ transaction صریح).
-- تاریخچه: 001–014 در git (008–014 با commitِ `54a17fd`، 2026-09-15؛ هنوز رویِ production اجرا نشده). 012 افزودنیِ خالص است (`sessions.source` = `live`|`manual`). **013 داده را تبدیل می‌کند** (`sessions.date` میلادی/نانرمال → شمسیِ `YYYY/MM/DD`؛ تأییدِ مالک 2026-09-14؛ backup قبل از deploy الزامی). 014 افزودنیِ خالص است (`sessions.date DROP NOT NULL` — فقط `source=manual` بدونِ ورودی می‌تواند `NULL` بماند). 009 داده را تبدیل می‌کند (`adult-f/m → adult + gender`).
-- قوانین: LAW-007.
+- اجرا: خودکار در startup، ترتیبِ نامِ فایل، ثبت در `_migrations(name)`؛ هر فایل تکه‌تکه با `;` (idempotency با نادیده‌گرفتنِ errnoهایِ مشخص) — [migrations/README](../../server/src/db/mysql/migrations/README.md)، LAW-007.
+- داده‌تغییردهنده‌ها: **009** (`adult-f/m → adult + gender`)، **013** (تاریخِ شمسی؛ `.mjs`)، **030** (برچسبِ seed). بقیه additive.
+- تاریخچه و ترجمه‌ی دیالکت از Postgres: [database-catalog](../02-reference/database-catalog.md) (بالا) و `server/src/db/mysql/schema.sql`.
 
-## ۶. ریسک‌های داده
+## ۶. ریسک‌هایِ داده
 
 | ریسک | منبع |
 |---|---|
-| فایل‌های یتیمِ صدا بعد از حذف | §4.4 |
-| نبودِ sweeper برای `auth_sessions` منقضی | `auth/session.ts` |
-| export ادمین فیلدهای `status/category/gender/specialty` و `stt_mode`… را ندارد | `buildTherapistExport` در `features/admin/` |
-| `date`/`start_time` به‌صورتِ TEXT — C4 (فرمتِ ناهمگون) رفع شد: شمسیِ `YYYY/MM/DD` و `HH:MM` با ارقامِ لاتین، نرمال‌سازی در `features/sessions/sessionDate.ts`، تبدیلِ داده‌ی قبلی با migration 013، `date` با 014 nullable (فقط `source=manual`) — همه commit شده در `54a17fd` (2026-09-15) | `002_sessions.sql`، `POST`/`PUT /api/sessions`، `013_session_date_jalali.sql`، `014_session_date_optional.sql` |
-| `offset_ms || null` مقدارِ 0 را null می‌کند | `POST /api/sessions/:id/notes` |
+| نبودِ sweeper برایِ `auth_sessions` منقضی | `auth/session.ts` |
+| export ادمین بعضی فیلدها را ندارد (`status/category/gender/specialty`، `stt_mode`، …) | `buildTherapistExport` در `features/admin/` |
+| `offset_ms || null` مقدارِ 0 را null می‌کند | `POST /api/sessions/:id/notes` (INFERRED — بازبینی نشده) |
 | `/api/recovered` متنِ کاملِ جلسات را برمی‌گرداند در حالی که UI فقط متادیتا لازم دارد | `features/clients/clients.routes.ts` |
+| نوشتنِ چندفeatureیِ `sessions` | LAW-025، [database-catalog §۰](../02-reference/database-catalog.md) |
+| متنِ بالینی در `final_transcripts.async_text/clean_text/clean_turns` و `client_case_file.content` (کپیِ مشتق از `sessions.transcript`) | LAW-001 |

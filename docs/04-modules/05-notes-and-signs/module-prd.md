@@ -1,6 +1,30 @@
 # Module 05 — Notes & Signs · PRD
 
-> **وضعیت:** ACTIVE-CANONICAL · REQ-060…064.
+> **وضعیت:** ACTIVE-CANONICAL · REQ-060…066.
+
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../../02-reference/feature-index.md) (`notes`) · قالب: [feature-doc-template](../../00-governance/feature-doc-template.md) (LAW-026)
+
+### چرا — تصمیم‌هایِ ثبت‌شده
+- (REQ-066، 2026-09-29، مالک) یادداشتِ **پیش از جلسه** متنی/صوتی؛ صدا در آرشیوِ موجود (`kind='prenote'`، LAW-010) و پخش در پنلِ ادمین؛ **متن بدونِ برچسبِ گوینده** (دستورِ مالک)؛ حینِ جلسه ویرایش نمی‌شود.
+- (2026-09-30، مالک) متنِ **زنده** حینِ ضبطِ pre-note (mint با `purpose:'pre-note'` بدونِ `session_id`)، تأیید/ضبط مجدد/حذفِ فایل، پنلِ جمع‌شونده؛ پخش‌کننده‌ی صدا از Setup حذف شد (فایل مثل قبل ذخیره و در ادمین شنیدنی است).
+- (2026-09-27، مالک) علامتِ بدنی با زمان داخلِ متنِ ذخیره‌شده (`[علامت · ۰۳:۱۲ — گریان]`).
+- (A1، 2026-09-26) یادداشت/علامتِ ناموفق در `feelia_note_outbox` می‌ماند و دوباره فرستاده می‌شود (رفعِ گم‌شدنِ بی‌صدا).
+- یادداشتِ صوتی هرگز واردِ transcript نمی‌شود (LAW-008).
+
+### مرزها
+- `features/sessions/notes.routes.ts` (بخشِ `sessions`)؛ `voiceNote.legacy.ts` LEGACY. رونویسیِ `note`/`pre-note` از `transcription/batch` (`purpose`). پرونده (`case-file`) یادداشت‌ها را می‌خواند.
+
+### کد
+- Backend: `notes.routes.ts` (POST/PATCH/DELETE)، `transcription/signMarkers.ts`. Frontend: `.sign-chip`، `addQuickNote`، `renderNotesLog`، `makePreVoice`، `restorePreVoiceDrafts`، `enqueuePreVoiceClips`، `preDraftClaimed` ([frontend-map](../../02-reference/frontend-map.md)).
+
+### داده
+- مالک: `session_notes`؛ صدایِ pre-note/note در `session_audio` (`kind`). مرورگر: `feelia_note_outbox`، IndexedDB `feelia-predraft`.
+
+### تست
+- `test:rt` (signMarker T50–T53، outbox)، `test:up` H52/H53، `test:cf` PN1، `test:api` (pre_note ⇒ note_before، PATCH، batch-audio pre-note) — [verification](../../../verification/2026-09-29-pre-session-notes.md).
+
+### ریسک و بدهی
+- متنِ رضایت با صدایِ pre-note هم ناهم‌خوان است (به دستورِ مالک دست نخورد، LAW-009)؛ متنِ تایپ‌شده و فایلِ انتخاب‌شده‌ی آپلود پایدار نیستند؛ `offset_ms || null` مقدارِ 0 را null می‌کند.
 
 ## Problem
 مشاهداتِ غیرکلامی (گریه، سکوت، بی‌قراری) و فکرهای لحظه‌ایِ تراپیست در متنِ رونویسی نیستند؛ اگر با زمان ثبت نشوند، ارزشِ بالینی‌شان از دست می‌رود.
@@ -68,10 +92,13 @@
 - حذفِ علامت در Wrapup (`removeSign`) — رفتارِ حذف از DB بررسی شود (کد در بازه‌ی خوانده‌نشده‌ی `index.html` است؛ **UNVERIFIED**).
 - **باگ (تأییدشده 2026-09-14، روی production فعال) — ✅ رفع شد در working tree 2026-09-14:** یادداشتِ صوتیِ مسیرِ اصلی (FeeliaRT، `stopVoiceNoteDirect`) فقط به آرایه‌ی محلیِ `wrapupNotes` اضافه می‌شد و هیچ‌وقت به سرور ارسال نمی‌شد. اکنون `POST /api/sessions/:id/notes` صریح می‌فرستد (مثلِ `addTextNote`). کد commit نشده؛ روی production همچنان باگ فعال است تا push/deploy. → [UI audit، UI-02](../../05-plans/ui-ux-audit-2026-09-14.md).
 
+- **متنِ زنده حینِ ضبط (2026-09-30):** `makePreVoice` با کلیدِ موقتِ `POST /api/stt/realtime-session` (`purpose:'pre-note'`، بدونِ `session_id`؛ بدونِ contextِ جلسه) به Soniox وصل می‌شود (best-effort — شکست = فقط بدونِ متنِ زنده)؛ متنِ ذخیره‌شده همچنان بعد از شروعِ جلسه از صدایِ آرشیوشده‌ی سرور ساخته می‌شود. هر کلیپ «تأیید» / «ضبط مجدد» / «حذفِ فایلِ صوتی» دارد؛ **کلیپِ تأییدنشده «شروع جلسه» و «شروعِ آپلود» را می‌بندد**؛ پیش‌نویس‌هایِ بازیابی‌شده تأییدشده‌اند؛ پنل جمع‌شونده است. پخش‌کننده‌ی صدا در Setup/مودال رندر نمی‌شود.
+- **جلوگیری از ارسالِ دوباره (2026-09-29/30):** کلیپ‌هایِ در راهِ ارسال با `preDraftClaimed` رزرو می‌شوند؛ بازیابی آن‌ها را رد می‌کند.
+
 ## Known Gaps (یادداشتِ پیش از جلسه)
 - ~~صدا تا «شروع جلسه» فقط در حافظه‌ی تب~~ — رفع شد (2026-09-29): پیش‌نویسِ پایدار در IndexedDB. متنِ تایپ‌شده و فایلِ انتخاب‌شده‌ی آپلود هنوز پایدار نیستند.
 - **متنِ یادداشتِ صوتیِ پیش از جلسه بدونِ برچسبِ «گوینده N:»** است (دستورِ مالک 2026-09-29): رونویسیِ `pre-note` با `enable_speaker_diarization=false`. یادداشتِ صوتیِ بعد از جلسه (`note`) همچنان برچسب دارد.
-- کلیپی که در مودالِ آپلود ضبط شده با همان کلیدِ مراجع پیش‌نویس می‌شود؛ اگر پیش از «دریافت شد» صفحه‌ی شروعِ همان مراجع باز شود، آن‌جا هم بازیابی می‌شود و ممکن است دوبار فرستاده شود (تست نشده، لبه‌ای).
+- ~~کلیپِ مودالِ آپلود ممکن است دوبار فرستاده شود~~ — با `preDraftClaimed` رفع شد و تست‌هایِ ماندگار دارد (`test:up` H52/H53، [verification](../../../verification/2026-09-29-pre-session-notes.md) §۵).
 - ویرایشِ متن بعد از completed شدنِ جلسه امضایِ corpusِ پرونده را عوض نمی‌کند ⇒ پرونده‌ی خودکار دوباره ساخته نمی‌شود (ویرایشِ Wrapup پیش از «ذخیره و پایان» است).
 - متنِ رضایت («صدا هیچ‌جا ذخیره نمی‌شود») با این صدا هم ناهم‌خوان است — صدایِ خودِ درمانگر است نه مراجع؛ به دستورِ قبلیِ مالک متن دست نخورد (LAW-009).
 

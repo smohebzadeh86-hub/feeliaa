@@ -1,5 +1,7 @@
 # تحلیلِ تجربه‌ی کاربری با Microsoft Clarity
 
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](02-reference/feature-index.md) (`client-config`) · allowlist/mask: `public/feelia-analytics.js` + `data-clarity-mask` در `index.html` (کد مقدم است).
+
 > **به‌روزرسانی (2026-09-15، تصمیمِ مالک D1):** دیگر رضایتِ تراپیست پرسیده نمی‌شود — با projectId
 > معتبر مستقیم activate می‌شود. نقضِ آگاهانه‌ی LAW-011 («هرگز بدونِ رضایتِ ذخیره‌شده‌ی تراپیست») به
 > دستورِ مالک؛ باقیِ LAW-011 (بدونِ identify، فقط allowlist، mask، هرگز برایِ ادمین) دست‌نخورده است.

@@ -5,6 +5,30 @@
 > (ایمیل هنوز اختیاری). حساب‌های موجود که این فیلدها را نداشتند دست‌نخورده می‌مانند —
 > بدونِ migration/`NOT NULL` در DB. UC-01.1 و REQ-003 زیر طبقِ همین تصمیم اصلاح شدند.
 
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../../02-reference/feature-index.md) (`auth`) · قالب: [feature-doc-template](../../00-governance/feature-doc-template.md) (LAW-026)
+
+### چرا — تصمیم‌هایِ ثبت‌شده
+- ثبت‌نام باز برایِ همه و بدونِ بازیابیِ رمز/OTP (وضعیتِ موجود، تصمیمِ صریحِ مالک ثبت نشده — UNKNOWN).
+- اولین ادمین با `ADMIN_PHONE` (bootstrap)، نه سیستمِ auth دوم.
+- (تصمیمِ مالک D3، 2026-09-15) نام و تخصص در ثبت‌نامِ جدید اجباری است (بدونِ `NOT NULL` در DB).
+- غیرفعال‌سازیِ حساب فوراً اثر می‌کند (resolveِ نشست هر درخواست `active` را می‌خواند).
+
+### مرزها
+- `features/auth/` **`index.ts` ندارد** ([LAW-025](../../00-governance/project-laws.md) allowlist)؛ `app.ts` مستقیم `auth.routes.ts` را import می‌کند (R3 مجاز).
+- platform `server/src/auth/{guard,session,password}.ts` (R2: از features import نمی‌کند). `caseFileEnabled` در همان کوئریِ نشست resolve می‌شود.
+
+### کد
+- Backend: `features/auth/{auth.routes,therapists.repository}.ts`، `auth/*`. Frontend: `toggleAuthMode`، `submitAuth`، `logout`، `init`، `enterApp` ([frontend-map](../../02-reference/frontend-map.md)).
+
+### داده
+- مالک: `therapists`، `auth_sessions` (فقط SHA-256 توکن) — [database-catalog §۰](../../02-reference/database-catalog.md).
+
+### تست
+- harnessِ اختصاصی ندارد؛ فقط `test:api` (DBِ dev، با مجوزِ مالک) و `test:routes` (guardها).
+
+### ریسک و بدهی
+- نبودِ rate-limit برایِ login و CSP/security headers (R7)؛ `auth_sessions` منقضی پاک نمی‌شود (INFERRED)؛ `index.ts` برایِ feature ندارد.
+
 ## Problem
 تراپیست‌ها باید با هویتی ساده و مرسوم در ایران (شماره‌ی موبایل) وارد شوند و داده‌ی بالینی‌شان از بقیه جدا بماند؛ مالکِ سیستم هم باید بتواند حساب‌ها را کنترل کند.
 

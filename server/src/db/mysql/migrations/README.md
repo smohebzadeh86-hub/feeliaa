@@ -1,19 +1,18 @@
 # MySQL migrations — یادداشتِ idempotency (LAW-007)
 
-این پوشه معادلِ MySQLِ `server/src/db/migrations/001..014` (PostgreSQL) است. شماره‌گذاری و
-ترتیب یکسان است؛ هر فایل توضیح می‌دهد چه چیزی نسبت به نسخه‌ی Postgres فرق کرده و چرا.
+این پوشه **تنها migrationِ زنده** است (001–034؛ MySQL). ۰۰۱–۰۱۴ معادلِ نسخه‌ی متروکِ Postgres (`server/src/db/migrations/`) هستند و شماره‌گذاریِ یکسان دارند؛ از 015 به بعد فقط MySQL. فهرستِ شرح‌دار: [database-catalog §۱](../../../../../docs/02-reference/database-catalog.md).
 
 **۱۳ یک فایلِ `.mjs` است، نه `.sql`** — چون داده‌تغییردهنده و شاملِ ریاضیِ تبدیلِ
 شمسی/میلادی است؛ به‌جایِ بازنویسیِ دستیِ آن ریاضی در SQLِ خام (ریسکِ خطا روی داده‌ی
-بالینی)، همان تابعِ تست‌شده‌ی `server/src/http/sessionDate.ts` را دوباره پیاده می‌کند.
+بالینی)، همان ریاضیِ تبدیلِ تست‌شده‌ی `gregorianToJalali` (اکنون `server/src/shared/jalali.ts`) را دوباره پیاده می‌کند.
 
 ## چرا این فایل‌ها فاقدِ `IF NOT EXISTS`/`ADD COLUMN IF NOT EXISTS` هستند
 
 MySQL (بر خلافِ Postgres) از `CREATE INDEX IF NOT EXISTS` و
 `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` پشتیبانی نمی‌کند. برای idempotency (اجرای
 امنِ دوباره — همان نیازی که Postgres با `DO $$ ... EXCEPTION WHEN duplicate_object`
-حل می‌کند)، migration runner (`migrate.ts` معادلِ MySQL — هنوز نوشته نشده، بخشِ بعدیِ
-کار) باید این خطاهای مشخصِ MySQL را بگیرد و نادیده بگیرد:
+حل می‌کند)، migration runner (`server/src/db/migrate.ts`) این خطاهای مشخصِ MySQL را می‌گیرد و نادیده می‌گیرد
+(مجموعه‌ی دقیق: `IGNORABLE_ERRNOS` در همان فایل — علاوه بر جدولِ زیر، 3821 برایِ `DROP CHECK`ِ تکراری در 023):
 
 | خطا | کد | یعنی چه |
 |---|---|---|
@@ -23,13 +22,8 @@ MySQL (بر خلافِ Postgres) از `CREATE INDEX IF NOT EXISTS` و
 | `ER_DUP_CHECK_CONSTRAINT` / `ER_CHECK_CONSTRAINT_DUP_NAME` | 3822 | CHECK constraint با همین نام وجود دارد |
 | `ER_CANT_DROP_FIELD_OR_KEY` | 1091 | `DROP CONSTRAINT` روی چیزی که وجود ندارد (برایِ اجرایِ دوباره‌ی 009 بی‌خطر) |
 
-راهِ عملی: هر statement را جدا (نه کلِ فایل یک‌جا) اجرا کنید و اگر کدِ خطا یکی از
-موارد بالا بود، از آن statement رد شوید؛ در غیرِ این صورت خطا را پرتاب کنید (مثلِ
-رفتارِ فعلیِ `migrate.ts` که کلِ startup را در صورتِ شکست متوقف می‌کند).
+رفتارِ runner: هر فایل با `;` به statementها تکه می‌شود و هر statement جدا اجرا می‌شود (⚠️ در متن/کامنتِ SQL هیچ `;` نگذارید)؛ اگر کدِ خطا یکی از موارد بالا بود از آن statement رد می‌شود، وگرنه خطا پرتاب و کلِ startup متوقف می‌شود.
 
 ## وضعیت
 
-این فایل‌ها هنوز به هیچ migration runnerِ زنده‌ای وصل نیستند — سرورِ فعلی همچنان
-از `server/src/db/migrations/` (Postgres) با `server/src/db/migrate.ts` استفاده
-می‌کند. سیم‌کشیِ واقعی (اتصال به MySQL، اجرایِ خودکار در startup) بخشِ جداگانه‌ای
-از کار است که نیازمندِ یک سرورِ MySQLِ واقعی برایِ تست است (LAW-016).
+runnerِ زنده `server/src/db/migrate.ts` است: در startup، فایل‌هایِ `.sql`/`.mjs` این پوشه را به ترتیبِ نام اجرا و در `_migrations` ثبت می‌کند (فایلِ `.mjs` تابعِ `migrate<NNN>` را export می‌کند). `server/scripts/copy-assets.mjs` هنگامِ build این پوشه را به `dist/` می‌برد. انضباط: [LAW-007](../../../../../docs/00-governance/project-laws.md).

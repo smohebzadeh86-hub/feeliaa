@@ -5,6 +5,29 @@
 > **داخلِ پنل هم** می‌بیند (نه فقط export) — `GET /api/admin/sessions/:id`، فقط‌خواندنی،
 > `data-clarity-mask`. UC-06.7، Acceptance و Out of Scope زیر طبقِ همین تصمیم اصلاح شدند.
 
+> last-verified: 2026-09-30 @ `17d6919` · مالک: [feature-index](../../02-reference/feature-index.md) (`admin`) · قالب: [feature-doc-template](../../00-governance/feature-doc-template.md) (LAW-026)
+
+### چرا — تصمیم‌هایِ ثبت‌شده
+- (D2، 2026-09-15، مالک) ادمین متنِ رونویسی/یادداشت/علائم را **داخلِ پنل** هم می‌بیند (نه فقط export)؛ `data-clarity-mask`.
+- (B1–B3، 2026-09-26) بازطراحی: sidebar، آرشیوِ صدا، یادداشت‌هایِ صوتی؛ (A6) ممیزیِ کنش‌هایِ حساس در `audit_log`؛ diagnosis «چه اتفاقی افتاد؟».
+- روشن/خاموش‌کردنِ «متنِ نهایی» فقط از ادمین (2026-09-28).
+- خروجِ داده فقط از مسیرهایِ ادمین (LAW-005).
+
+### مرزها
+- `features/admin/` **`index.ts` ندارد** (allowlist LAW-025)؛ `app.ts` مستقیم `admin.routes.ts` را import می‌کند. وابستگی‌ها به `transcription` (آرشیو/فایل کامل) و `session-media` فقط از `index.ts`. خواندنِ `obs_*` و `audit_log` از platform `obs/`.
+
+### کد
+- Backend: `admin.routes.ts` ⇒ `{therapists,sessions,audio,export,obs}.admin.ts`، `admin.repository.ts`، `diagnosis.ts` (تابعِ خالص)، `filters.ts`. Frontend: ۸ صفحه‌ی `#screenAdmin*` (`openAdminPanel`، `openAdminTherapistDetail`، `openAdminClientSessions`، `openAdminSessionDetail`، `openAdminActivity`، `openAdminSessionTimeline`، `openAdminAudio`، `openAdminVoiceNotes`) — [route-map](../../02-reference/route-map.md)، [frontend-map](../../02-reference/frontend-map.md).
+
+### داده
+- مالکِ جدولی نیست؛ می‌خواند/حذف/خروجی می‌دهد: همه‌ی جدول‌ها؛ می‌نویسد: `therapists` (فعال/ادمین/فلگ‌هایِ `case_file_enabled`، `final_transcript_enabled`)، حذفِ مراجع/تراپیست/صدا. [database-catalog §۰](../../02-reference/database-catalog.md).
+
+### تست
+- `test:api` (ادمین)؛ E2Eِ B2 ×8 و B3 ×4 — [verification](../../../verification/2026-09-26-storage-fixes-full-test-run.md)؛ `test:routes` (requireAdmin)؛ UI با mock.
+
+### ریسک و بدهی
+- حذفِ مراجع/تراپیست در UI بدونِ تاییدِ تایپی (R9)؛ export در حافظه و N+1؛ `:id` بدونِ اعتبارسنجیِ UUID؛ `index.ts` ندارد.
+
 ## Problem
 بدونِ نقشِ مدیریتی، کسی نمی‌داند چند نفر ثبت‌نام کرده‌اند، حسابی را نمی‌توان متوقف کرد، درخواستِ حذفِ داده اجرا نمی‌شود، و باگ‌های STT قابلِ‌ریشه‌یابی نیستند.
 
@@ -62,6 +85,12 @@ platform (guard)، subsystem 05 (آرشیو)، همه‌ی جداول.
 - [ ] در فهرستِ مراجعین/جلساتِ ادمین متنِ رونویسی مستقیم دیده نمی‌شود؛ فقط پس از کلیکِ صریحِ «مشاهده‌ی متن و یادداشت‌ها» (D2).
 - [ ] export شاملِ transcript و notes است.
 - [ ] پخشِ صدا بدونِ نشستِ ادمین → 401/403.
+
+### صفحه‌هایِ ادمین (۸)
+`#screenAdmin` (نمای کلی و تراپیست‌ها)، `#screenAdminTherapist`، `#screenAdminSessions`، `#screenAdminSessionDetail`، `#screenAdminActivity` (فعالیت‌ها)، `#screenAdminSessionTimeline`، `#screenAdminAudio` (آرشیوِ صدا)، `#screenAdminVoiceNotes` — ورودها: [route-map §۱](../../02-reference/route-map.md).
+
+### Diagnosis — «چه اتفاقی افتاد؟» (2026-09-26/29)
+`GET /api/admin/sessions/:id/diagnosis` از `sessions` + `session_audio` + `obs_events` + `obs_ui_events` + صفِ batch یافته‌هایِ `ok|warn|error` می‌سازد (تابعِ خالصِ `features/admin/diagnosis.ts`)؛ **متنِ بالینی برنمی‌گردد** (فقط شمارش/طول). برایِ جلسه‌ی `upload` از `audio_jobs`/`audio_uploads` و برایِ «متنِ نهایی» از `final_transcripts` می‌خواند. جزئیاتِ payload: [api-catalog §7.1](../../02-reference/api-catalog.md).
 
 ## Known Contradictions (با طراحیِ v1)
 | طراحیِ v1 | واقعیت | وضعیت |

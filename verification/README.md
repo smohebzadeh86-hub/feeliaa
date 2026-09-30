@@ -13,3 +13,6 @@
 | [../docs/05-plans/ui-ux-audit-2026-09-14.md](../docs/05-plans/ui-ux-audit-2026-09-14.md) §2 | evidenceِ اجرای UI (2026-09-14) با mock backend و Sonioxِ جعلی: ۴۷ یافته با شاهدِ «اجرا/کد/محاسبه» و ستونِ production. evidence داخلِ سندِ برنامه قرار گرفته چون مالک یک فایل خواسته بود |
 | [2026-09-14-ux-audit-runtime.md](2026-09-14-ux-audit-runtime.md) | اجرای UI با mock برای UX audit: شکستِ بی‌صدای ذخیره‌ی یادداشت، خروج در حالتِ FAILED با میکروفونِ live، متنِ خالیِ یادداشت‌ها در پرونده، موبایل، کیبورد، کنتراست |
 | [2026-09-14-clarity-test-pass.md](2026-09-14-clarity-test-pass.md) | تستِ محلیِ Clarity (بدونِ deploy): typecheck/build، harness 29/6، static mask/allowlist، route inject 10/10، sandbox ِ `feelia-analytics.js` 41/41؛ کلیکِ واقعی و payloadِ Clarity تست نشده. نوشته‌شده توسطِ نشستِ دیگر |
+| [2026-09-30-docs-modularity-audit.md](2026-09-30-docs-modularity-audit.md) | فاز ۰: baseline (`test:arch`/`test:routes`/`tsc`) + یافته‌هایِ drift/ماژولاریتی/سندِ فیچر |
+| [2026-09-30-docs-phases-1-6.md](2026-09-30-docs-phases-1-6.md) | نتیجه‌ی فازهایِ ۱–۶ + آزمونِ cold-read |
+| [2026-09-30-docs-followup-p7-banners-tests.md](2026-09-30-docs-followup-p7-banners-tests.md) | تست‌هایِ رفتاری + `test:api` + فاز ۷ + bannerها |

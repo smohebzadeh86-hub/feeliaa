@@ -1,13 +1,14 @@
 # Repository Map
 
-> **وضعیت:** ACTIVE-CANONICAL · Snapshot: `git ls-files` (۳۸ فایل tracked) + `git status` در 2026-09-13.
-> Git: `T` = tracked · `M` = tracked و modified · `U` = untracked · `I` = ignored.
+> **وضعیت:** ACTIVE-CANONICAL · last-verified: 2026-09-30 @ `17d6919` (`git ls-files` + `git status`).
+> Git: `T` = tracked · `U` = untracked · `I` = ignored. وضعیتِ commit فقط نشانِ لحظه‌ی snapshot است؛ وضعیتِ زنده در `PROJECT_STATUS.md` (LAW-027). نگاشتِ feature↔کد: [feature-index](feature-index.md).
 
 ```
 feeliaa/
-├── CLAUDE.md                          U  router agent (جدید)
-├── PROJECT_MASTER_REFERENCE.md        U  master reference (جدید)
-├── PROJECT_STATUS.md                  M  وضعیتِ زنده + Event Log (tracked از `54a17fd`؛ با هر رویداد به‌روز می‌شود)
+├── CLAUDE.md                          T  router agent
+├── PROJECT_MASTER_REFERENCE.md        T  master reference
+├── PROJECT_STATUS.md                  T  وضعیتِ زنده + Event Log (با هر رویداد به‌روز می‌شود)
+├── CURRENT_UI_STATE.md                U  snapshotِ UI (EVIDENCE)
 ├── package.json                       T  root: dev, test:rt, test:cf, test:up, test:tu, test:ft, test:llm, test:api, test:routes, test:arch
 ├── pnpm-workspace.yaml                T
 ├── pnpm-lock.yaml                     T
@@ -22,11 +23,11 @@ feeliaa/
 ├── feelia-f9b0a9c.tar                 U  snapshot — نباید commit شود
 │
 ├── public/                               فرانت (سرو شده توسط سرور)
-│   ├── index.html                     T  SPA کامل (تا commit `54a17fd`)
-│   ├── feelia-rt.js                   T  موتورِ realtime (تا commit `54a17fd`)
-│   ├── feelia-analytics.js            U  Clarity
-│   ├── feelia-obs.js                  U  جدید، فازِ ۱ِ رصد/حسابرسی (2026-09-22) — تله‌متریِ کلیک/ناوبریِ سمتِ کلاینت به `/api/obs/events`
-│   └── feelia-upload.js               U  جدید 2026-09-23 — موتورِ آپلودِ تکه‌تکه/قابلِ ادامه‌ی فایلِ صوتیِ جلسه (IndexedDB `feelia-uploads`)
+│   ├── index.html                     T  SPA اصلی (یک اسکریپتِ بزرگ — [frontend-map](frontend-map.md))
+│   ├── feelia-rt.js                   T  موتورِ realtime
+│   ├── feelia-analytics.js            T  Clarity
+│   ├── feelia-obs.js                  T  تله‌متریِ کلیک/ناوبری به `/api/obs/events`
+│   └── feelia-upload.js               T  موتورِ آپلودِ تکه‌تکه/قابلِ ادامه (IndexedDB `feelia-uploads`)
 │
 ├── server/
 │   ├── package.json, tsconfig.json    T
@@ -65,7 +66,9 @@ feeliaa/
 │
 ├── server-deploy/                     U  EVIDENCE/stale: کپیِ server در f9b0a9c + .env + dist + node_modules
 │
-├── scripts/rt-harness.cjs             T  تستِ FeeliaRT
+├── scripts/rt-harness.cjs             T  تستِ FeeliaRT (`pnpm test:rt`)
+├── scripts/treatment-unit-harness.ts  T  تستِ واحدِ درمان (`pnpm test:tu`؛ دامنه/نگاشتِ مدالیته/migration؛ بدونِ DB)
+├── scripts/check-docs.mjs             T  `pnpm test:docs` — بهداشتِ مستندات (LAW-027)
 ├── scripts/case-file-harness.ts       T  تستِ پرونده‌ی درمان (findings/merge/patch/repairLoop؛ بدونِ شبکه/DB) — 2026-09-20
 ├── scripts/final-transcript-harness.ts U  تستِ «متنِ نهایی» (`pnpm test:ft`؛ ماشینِ حالت، نگهبان‌ها، تکه‌بندی، polish با LLMِ جعلی) — 2026-09-27
 ├── scripts/llm-harness.ts             U  تستِ لایه‌ی LLM (`pnpm test:llm`؛ config هر provider، رگرسیونِ بدنه‌ی OpenRouter/OpenAI، JSON، providerِ جایگزین؛ کلاینتِ جعلی) — 2026-09-28
@@ -75,20 +78,18 @@ feeliaa/
 ├── scripts/check-backend-boundaries.mjs T `pnpm test:arch` — قواعدِ مرز/چرخه‌ی ماژول‌هایِ backend (2026-09-28)
 │
 ├── docs/
-│   ├── README.md                      U
-│   ├── admin-panel.md                 T  HISTORICAL
-│   ├── analytics-clarity.md           U  ACTIVE (مالکِ جزئیاتِ Clarity)
-│   ├── 00-governance/ … 07-subsystems/  U  معماریِ مستندات
+│   ├── README.md · admin-panel.md (HISTORICAL) · analytics-clarity.md (ACTIVE)
+│   └── 00-governance/ … 07-subsystems/  معماریِ مستندات (`02-reference/feature-index.md` = رجیستریِ فیچرها)
 │
 └── verification/                      U  evidence تاریخ‌دار
 ```
 
 ## نکاتِ مهم
-- **کارِ commitنشده:** کدِ محصول دیگر commitنشده نیست — تا `54a17fd` (2026-09-15) push شده. فقط فایل‌های `U` بالا که صراحتاً «مستندات/artifact» علامت خورده‌اند (خودِ `docs/`، `CLAUDE.md`، `PROJECT_MASTER_REFERENCE.md`، `.claude/`، و artifactهای نامرتبط مثلِ `feelia-f9b0a9c.tar`/`server-deploy/`/`soniox.html`/`package-lock.json`) هنوز در git نیستند.
-- `server/data/` شاملِ صدای واقعیِ جلسات است (در dev: پوشه‌های `batch-queue` و `session-audio` موجودند). هرگز باز/کپی/commit نشود (LAW-001، LAW-002).
-- `server-deploy/.env` و `server/.env` هر دو secret دارند.
+- `server/data/` شاملِ صدای واقعیِ جلسات است (`batch-queue`، `session-audio`، `uploads`). هرگز باز/کپی/commit نشود (LAW-001، LAW-002).
+- `server-deploy/.env` و `server/.env` هر دو secret دارند؛ `server-deploy/` کپیِ قدیمی است (EVIDENCE).
 - `node_modules/` در root، `server/`، `server-deploy/`.
-- شاخه‌ها: `main` (`8bcdf0e`)، `feat/clarity` (فعلی، `54a17fd`، **جلوتر از main**، بدونِ merge)، `backup-before-merge-de6cb31`؛ remote: `origin` (`feat/clarity` push‌شده، `main` دست‌نخورده).
+- شاخه‌ها و وضعیتِ push/merge: فقط `git branch -vv` و `PROJECT_STATUS.md`.
+- `server/src/db/migrations/` = Postgresِ متروک (هیچ runnerِ زنده‌ای)؛ MySQL: `server/src/db/mysql/migrations/`.
 
 ## نقشه‌ی مسیرهایِ قدیم → جدید (بازسازیِ ماژولارِ 2026-09-28)
 شماره‌خط‌هایِ اسنادِ قدیمی و `verification/` به مسیرهایِ قدیم اشاره می‌کنند؛ این جدول برایِ پیدا کردنِ همان کد است. رفتار عوض نشده.

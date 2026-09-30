@@ -1,13 +1,10 @@
 # Application Architecture
 
-> **وضعیت:** ACTIVE-CANONICAL · Snapshot 2026-09-13 (working tree)؛ Backend به‌روزشده 2026-09-28 (بازسازیِ ماژولار). شماره‌خط‌ها snapshot هستند؛ به نامِ symbol اعتماد کنید.
+> **وضعیت:** ACTIVE-CANONICAL · last-verified: 2026-09-30 @ `17d6919` · قواعدِ مرز = [LAW-025](../00-governance/project-laws.md) · نگاشتِ feature↔سند: [feature-index](../02-reference/feature-index.md). شماره‌خط‌ها snapshot هستند؛ به نامِ symbol اعتماد کنید.
 
 ## ۱. Backend (`server/`)
 
-> **بازسازیِ ماژولار (2026-09-28، شاخه‌ی `refactor/backend-modular-v2` — اجرایِ دوباره رویِ کدِ `65b264c`):** ساختارِ لایه‌ایِ قدیم (`http/`، `stt/`، `ws/`) به
-> featureها منتقل شد **بدونِ تغییرِ رفتار** (route snapshot، API contract harness، مجموعه‌ی رشته‌هایِ SQL و promptها
-> بایت‌به‌بایت یکسان؛ [verification](../../verification/2026-09-28-backend-modular-refactor-v2.md)). نقشه‌ی مسیرهایِ قدیم → جدید:
-> [repository-map](../02-reference/repository-map.md).
+> **چرا ماژولار (2026-09-28):** ساختارِ لایه‌ایِ قدیم (`http/`، `stt/`، `ws/`) به `features/*` منتقل شد **بدونِ تغییرِ رفتار** (route snapshot، API contract harness، SQL و promptها یکسان؛ [verification](../../verification/2026-09-28-backend-modular-refactor-v2.md)). نگاشتِ مسیرهایِ قدیم→جدید: [repository-map](../02-reference/repository-map.md).
 
 ### 1.1 ساختار
 
@@ -55,7 +52,7 @@ server/src/
 - **Repository:** SQLِ خامِ پارامتری در `*.repository.ts` (و تراکنش‌هایِ ساختِ جلسه در `sessions.repository.ts` / `audio-upload/uploadSession.ts`)؛
   handler فقط validation، ترتیبِ عملیات، پاسخ، `logEvent` و ممیزی را دارد.
 - **مرزها (`pnpm test:arch`):** featureها فقط از `features/<x>/index.ts` یکدیگر import می‌کنند؛ `shared/`، `db/`، `auth/`، `obs/` هرگز از
-  features import نمی‌کنند؛ `app.ts`/`jobs/` فقط `index.ts` یا `*.routes.ts`؛ چرخه‌ی importِ استاتیک ممنوع؛ لایه‌بندیِ case-file.
+  features import نمی‌کنند؛ `app.ts`/`jobs/` فقط `index.ts` یا `*.routes.ts`؛ چرخه‌ی importِ استاتیک ممنوع؛ لایه‌بندیِ case-file/treatment-unit/final-transcript (R5)؛ هر feature `index.ts` دارد (R7، با allowlistِ نام‌دار).
   `index.ts`ِ featureهایِ قدیمی‌تر routeها را export **نمی‌کند** (routeها را `app.ts` مستقیم import می‌کند) — همین از چرخه‌ی
   audio-upload → sessions → session-media → audio-upload جلوگیری می‌کند. treatment-unit و final-transcript از ابتدا routeها را
   از `index.ts` می‌دادند و همان‌طور ماندند (R3 هر دو شکل را می‌پذیرد).
@@ -69,13 +66,15 @@ server/src/
 
 ### 2.1 فایل‌ها
 
-| فایل | خط | نقش |
-|---|---|---|
-| `index.html` | ~3640 | CSS (tokenهای سیستمِ طراحی)، markup همه‌ی screenها و مدال‌ها، و یک `<script>` بزرگ با همه‌ی منطقِ UI |
-| `feelia-rt.js` | ~1220 | IIFE → `window.FeeliaRT` (موتورِ realtime + `AudioQueueDB`) |
-| `feelia-analytics.js` | ~290 | IIFE → `window.FeeliaAnalytics` |
+| فایل | نقش |
+|---|---|
+| `index.html` | CSS (tokenهای سیستمِ طراحی)، markup همه‌ی screenها (۱۶) و مدال‌ها (۱۸)، و یک `<script>` بزرگِ global با همه‌ی منطقِ UI (≈۴۵۰ تابع؛ بدونِ قانونِ ساختاری — backlog) |
+| `feelia-rt.js` | IIFE → `window.FeeliaRT` (موتورِ realtime + `AudioQueueDB`) — [subsystem 01](../07-subsystems/01-browser-realtime-engine.md) |
+| `feelia-analytics.js` | IIFE → `window.FeeliaAnalytics` (Clarity) |
+| `feelia-obs.js` | IIFE → `window.FeeliaObs` (تله‌متریِ کلیک/ناوبری به `/api/obs/events`) |
+| `feelia-upload.js` | IIFE → `window.FeeliaUpload` (آپلودِ تکه‌تکه/قابلِ ادامه) — [subsystem 06](../07-subsystems/06-audio-upload-pipeline.md) |
 
-ترتیبِ لود: `feelia-rt.js` → `feelia-analytics.js` → inline script؛ `DOMContentLoaded → init()`.
+ترتیبِ لود: `feelia-rt.js` → `feelia-analytics.js` → `feelia-obs.js` → `feelia-upload.js` → inline script؛ `DOMContentLoaded → init()`. فرانتِ جدید برایِ فیچرِ جدید در IIFEِ جدا (LAW-025). نقشه‌ی تابع/state: [frontend-map](../02-reference/frontend-map.md).
 
 ### 2.2 مدلِ UI
 - SPA بدونِ router: `showScreen(name)` روی `section#screen<Name>` (`hidden`). URL عوض نمی‌شود.

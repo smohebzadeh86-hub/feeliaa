@@ -77,7 +77,7 @@
 ورودی‌ها در handlerها با شرط‌های دستی اعتبارسنجی می‌شوند؛ schema validation فاستیفای استفاده نمی‌شود.
 
 ## Dependencies
-PostgreSQL، Soniox، ffmpeg (اختیاری)، reverse proxyِ HTTPS (UNVERIFIED).
+MySQL، Soniox، LLM provider، ffmpeg، reverse proxyِ HTTPS (UNVERIFIED).
 
 ## Acceptance Criteria
 - درخواستِ بدونِ کوکی به روتِ تراپیست → 401؛ غیرادمین به ادمین → 403؛ منبعِ دیگری → 404.

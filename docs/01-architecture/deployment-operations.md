@@ -12,7 +12,8 @@
 | MySQL 8.0.16+ (از 2026-09-15؛ PostgreSQL فقط تاریخی) | `server/src/db/connection.ts` (`mysql2`)، `server/src/db/mysql/schema.sql` | production: MySQL رویِ همان سرور (`localhost`)؛ نسخه‌ی دقیق بررسی نشد |
 | ffmpeg در PATH یا `FFMPEG_PATH` | `features/transcription/speakerResolve.ts`، remuxِ صدایِ جلسه | فقط برای resolve-speakers/remux؛ **رویِ production نصب نیست** (لاگِ `spawn ffmpeg ENOENT`، 2026-09-23 — fail-open) |
 | HTTPS جلوی اپ | الزامِ getUserMedia (هشدارِ `maybeShowHttpsHint`) | UNVERIFIED |
-| دسترسیِ خروجی به `api.soniox.com` (یا `PROXY_URL`) | `stt/*` | الزامی برای mint |
+| دسترسیِ خروجی به `api.soniox.com` (یا `PROXY_URL`) | `features/transcription/soniox/*` | الزامی برای mint |
+| دسترسیِ خروجی به providerِ LLM (فقط وقتی «متنِ نهایی»/پرونده روشن است) | `server/src/llm/*` | polish و پرونده؛ [llm-provider-layer](../06-platform/llm-provider-layer.md) |
 
 ## ۲. محیطِ توسعه (تأییدشده از repo)
 
@@ -109,7 +110,7 @@ nginx باید WebSocket upgrade را برای `/ws/*` پشتیبانی کند (
 
 از آن‌جا که `/root/feeliaa-mysql` گیت ندارد، رویه‌یِ deploy تارِ محلی + `scp` + استخراجِ مستقیم است
 (کاملِ آن در بخشِ ۴). خلاصه:
-1. لوکال build (`pnpm --filter server run build`) + تست (`pnpm test:rt`, `pnpm test:cf`, `tsc --noEmit`).
+1. لوکال build (`pnpm --filter server run build`) + تست (همه‌ی `pnpm test:*`ِ بدونِ DB — `CLAUDE.md` §8 — و `tsc --noEmit`).
 2. تارِ `server/ public/ package.json pnpm-lock.yaml pnpm-workspace.yaml` (بدونِ `.env`/`node_modules`/`data`؛
    قبل از ارسال تأیید کنید `.env` در آرشیو نیست) → `scp` به `/root/`.
 3. **Preflightِ اجباری — آیا کسی الان از سایت استفاده می‌کند؟** (بلافاصله قبل از گامِ ۴؛ فقط-خواندنی) — [§۵.۱](#۵۱-preflight-کاربرِ-فعال-قبل-از-restart).
@@ -179,7 +180,7 @@ DOTENV_CONFIG_PATH=/root/feeliaa-mysql/.env node server/_preflight.mjs; rm -f se
 درخواست‌هایِ دیگر (`/api/sessions/...`، `/api/stt/...`، آپلود) نشانه‌ی کارِ واقعی‌اند.
 
 **پنجره‌ی ۶ ساعته برایِ `batch_running`:** در اولین اجرا (2026-09-26) سه ردیفِ `batch_status='queued'` با عمرِ ۱۰۸ و ۳۳۹ ساعت پیدا شد —
-همان باگِ «batch_statusِ گیرکرده» که رفعش در working tree است ولی deploy نشده؛ jobِ واقعی نیستند و بدونِ این فیلتر preflight همیشه WAIT می‌داد.
+همان باگِ «batch_statusِ گیرکرده» (رفع‌شده)؛ jobِ واقعی نیستند و بدونِ این فیلتر preflight همیشه WAIT می‌داد.
 
 **وضعیت:** اولین اجرا رویِ production: 2026-09-26 — اسکریپت درست اجرا و حذف شد (Event Log). از dev باید با `ssh … 'bash -s' <<'REMOTE'` اجرا شود (تأیید دوباره 2026-09-29، deployِ `aba0783`).
 **نکته‌ی Git Bash (2026-09-29):** `tar -czf C:/…` در Git Bash `C:` را host تفسیر می‌کند («Cannot connect to C: resolve failed») — تار را با مسیرِ نسبی بسازید.
@@ -204,4 +205,4 @@ DOTENV_CONFIG_PATH=/root/feeliaa-mysql/.env node server/_preflight.mjs; rm -f se
 | scale | فقط یک instance (LAW-013) |
 
 ## ۷. CI/CD
-وجود ندارد. تست‌ها دستی: `pnpm test:rt` و `npx tsc --noEmit`.
+وجود ندارد. تست‌ها دستی و بدونِ DB/شبکه: `pnpm test:rt|cf|up|tu|ft|llm|routes|arch|docs` و `cd server && npx tsc --noEmit` (فهرست: `CLAUDE.md` §8)؛ `test:api` فقط با مجوزِ مالک.

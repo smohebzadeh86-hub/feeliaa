@@ -1,6 +1,6 @@
 # Documentation Map — نقشه‌ی کاملِ مستندات
 
-> **وضعیت:** ACTIVE · **اعتبار:** HIGH · آخرین به‌روزرسانی: 2026-09-13
+> **وضعیت:** ACTIVE · **اعتبار:** HIGH · آخرین به‌روزرسانی: 2026-09-30
 > هر سندِ جدید باید اینجا ثبت شود (LAW-017).
 
 ## ۱. واژگانِ وضعیت
@@ -34,6 +34,7 @@
 | [source-of-truth.md](source-of-truth.md) | حلِ تعارض | ACTIVE-CANONICAL | HIGH | COMPLETE | کلِ پروژه | laws | تغییرِ سلسله‌مراتب |
 | [ai-agent-reading-guide.md](ai-agent-reading-guide.md) | workflow agent | ACTIVE-CANONICAL | HIGH | COMPLETE | agentها | laws، module-map | درسِ جدید از خطا |
 | [documentation-map.md](documentation-map.md) | همین فهرست | ACTIVE-CANONICAL | HIGH | COMPLETE | docs | همه | هر سندِ جدید/تغییرِ وضعیت |
+| [feature-doc-template](feature-doc-template.md) | قالبِ اجباریِ سندِ فیچر (LAW-026) | ACTIVE-CANONICAL | HIGH | COMPLETE | همه‌ی featureها | laws | تغییرِ قالب |
 | [`PROJECT_STATUS.md`](../../PROJECT_STATUS.md) | وضعیتِ زنده (مطابقِ ساختارِ دستورِ مستندسازی) + Event Logِ همه‌ی رویدادها | ACTIVE-CANONICAL (مالکِ Event Log) | HIGH | COMPLETE | کلِ پروژه | همه | **هر رویداد** (LAW-024) |
 
 ## ۳. معماری، مرجع، requirement
@@ -52,6 +53,8 @@
 | [configuration-catalog](../02-reference/configuration-catalog.md) | env، ثابت‌ها، storage | ACTIVE-CANONICAL | MEDIUM | COMPLETE | کد | کد | env/ثابت |
 | [error-code-catalog](../02-reference/error-code-catalog.md) | خطاها و کدها | ACTIVE-CANONICAL | MEDIUM | HAS-INFERRED | API | کد | کدِ خطای جدید |
 | [repository-map](../02-reference/repository-map.md) | هر مسیر و وضعیتش | ACTIVE-CANONICAL | MEDIUM | COMPLETE | repo | git | فایل/پوشه‌ی جدید |
+| [feature-index](../02-reference/feature-index.md) | رجیستریِ واحدِ feature↔کد↔سند↔تست↔جدول | ACTIVE-CANONICAL | HIGH | COMPLETE | کلِ repo | کد | feature/جدول/harnessِ جدید |
+| [frontend-map](../02-reference/frontend-map.md) | نقشه‌ی فرانت: featureها ↔ صفحه/تابع/state/storage | ACTIVE-CANONICAL | MEDIUM | HAS-INFERRED | public/ | کد | تابع/صفحه‌ی جدید |
 | [glossary](../02-reference/glossary.md) | اصطلاحات | ACTIVE-CANONICAL | MEDIUM | COMPLETE | پروژه | — | اصطلاحِ جدید |
 | [requirement-catalog](../03-requirements/requirement-catalog.md) | REQ-xxx | ACTIVE-CANONICAL (REQها DERIVED) | HIGH | COMPLETE | محصول | کد، اسنادِ قبلی | تغییرِ رفتار/تأیید |
 | [traceability-matrix](../03-requirements/traceability-matrix.md) | REQ→PRD→کد→تست | ACTIVE-CANONICAL | HIGH | PARTIAL (بیشترِ REQها تست ندارند) | محصول | catalog | تغییرِ REQ/تست |
@@ -67,13 +70,18 @@
 | [05-notes-and-signs PRD](../04-modules/05-notes-and-signs/module-prd.md) / [Plan](../04-modules/05-notes-and-signs/implementation-plan.md) | علائم/یادداشت | ACTIVE-CANONICAL | HIGH | COMPLETE | تغییرِ یادداشت |
 | [06-admin-panel PRD](../04-modules/06-admin-panel/module-prd.md) / [Plan](../04-modules/06-admin-panel/implementation-plan.md) | ادمین | ACTIVE-CANONICAL | HIGH | COMPLETE | تغییرِ ادمین |
 | [07-ux-analytics PRD](../04-modules/07-ux-analytics/module-prd.md) / [Plan](../04-modules/07-ux-analytics/implementation-plan.md) | Clarity | ACTIVE-CANONICAL | HIGH | COMPLETE | تغییرِ analytics |
+| [08-ai-case-file PRD](../04-modules/08-ai-case-file/module-prd.md) / [Plan](../04-modules/08-ai-case-file/implementation-plan.md) / [content-style-guide](../04-modules/08-ai-case-file/content-style-guide.md) | پروندهٔ درمان (AI) | ACTIVE-CANONICAL | HIGH | HAS-INFERRED | تغییرِ case-file |
+| [09-treatment-unit PRD](../04-modules/09-treatment-unit/module-prd.md) / [Plan](../04-modules/09-treatment-unit/implementation-plan.md) | واحدِ درمان | ACTIVE-CANONICAL | HIGH | HAS-INFERRED | تغییرِ treatment-unit |
 | [06-platform README](../06-platform/README.md) / [PRD](../06-platform/platform-prd.md) / [Plan](../06-platform/implementation-plan.md) | cross-cutting | ACTIVE-CANONICAL | HIGH | HAS-INFERRED | تغییرِ زیرساخت |
+| [llm-provider-layer](../06-platform/llm-provider-layer.md) / [observability-audit](../06-platform/observability-audit.md) / [notifications](../06-platform/notifications.md) / [session-media-purge](../06-platform/session-media-purge.md) | سرویس‌هایِ مشترک | ACTIVE-CANONICAL | HIGH | HAS-INFERRED | تغییرِ همان سرویس |
 | [07-subsystems README](../07-subsystems/README.md) | فهرستِ subsystemها | ACTIVE-CANONICAL | HIGH | COMPLETE | subsystemِ جدید |
 | [01-browser-realtime-engine](../07-subsystems/01-browser-realtime-engine.md) | FeeliaRT | ACTIVE-CANONICAL | HIGH | COMPLETE | feelia-rt.js |
 | [02-audio-durability-batch-fallback](../07-subsystems/02-audio-durability-batch-fallback.md) | صف صدا و batch | ACTIVE-CANONICAL | HIGH | COMPLETE | batch/IndexedDB |
 | [03-transcript-integrity](../07-subsystems/03-transcript-integrity.md) | CAS و merge | ACTIVE-CANONICAL | HIGH | COMPLETE | هر نوشتنِ transcript |
 | [04-legacy-ws-proxy-p1](../07-subsystems/04-legacy-ws-proxy-p1.md) | مسیرِ قدیمی | ACTIVE-CANONICAL (کدِ LEGACY) | MEDIUM | COMPLETE | ws/ |
 | [05-session-audio-archive-speaker-resolve](../07-subsystems/05-session-audio-archive-speaker-resolve.md) | آرشیو و resolve | ACTIVE-CANONICAL | HIGH | HAS-INFERRED | آرشیو/ffmpeg |
+| [06-audio-upload-pipeline](../07-subsystems/06-audio-upload-pipeline.md) | آپلودِ فایلِ صوتی | ACTIVE-CANONICAL | HIGH | COMPLETE | audio-upload |
+| [07-final-transcript](../07-subsystems/07-final-transcript.md) | متنِ نهایی | ACTIVE-CANONICAL | HIGH | COMPLETE | final-transcript |
 | [master-implementation-plan](../05-plans/master-implementation-plan.md) | ترتیبِ کارها | **PROPOSED** | MEDIUM | COMPLETE | تصمیمِ مالک/پیشرفت |
 | [ui-ux-audit-2026-09-14](../05-plans/ui-ux-audit-2026-09-14.md) | بررسیِ کاملِ UI: باگ‌ها (با شاهدِ اجرا/کد و ستونِ production) + پیشنهادهای بهبود و نقشه‌ی اجرا | یافته‌ها: EVIDENCE (2026-09-14) · پیشنهادها: **PROPOSED** | MEDIUM | HAS-INFERRED | رفعِ هر UI-xx یا تصمیمِ مالک |
 | [ux-audit-2026-09-14/UX_AUDIT_REPORT](../05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) (+ [UX_FINDINGS](../05-plans/ux-audit-2026-09-14/UX_FINDINGS.md)، [USER_JOURNEYS](../05-plans/ux-audit-2026-09-14/USER_JOURNEYS.md)، [UX_OPEN_QUESTIONS](../05-plans/ux-audit-2026-09-14/UX_OPEN_QUESTIONS.md)، [UX_PRIORITY_ROADMAP](../05-plans/ux-audit-2026-09-14/UX_PRIORITY_ROADMAP.md)) | UX audit از دیدِ پژوهشِ تجربه‌ی کاربر: ۴۲ یافته UX-xx، مسیرهای کاربر، سناریوهای شکست، حریمِ خصوصی، دسترس‌پذیری، محتوای فارسی، سؤالاتِ باز، نقشه‌ی اولویت | یافته‌ها: EVIDENCE (2026-09-14) · راه‌حل‌ها و roadmap: **PROPOSED** · مدلِ ذهنی: ASSUMPTION | MEDIUM | HAS-INFERRED | رفعِ هر UX-xx، تحقیقِ کاربر، یا تصمیمِ مالک |
@@ -82,6 +90,8 @@
 
 | مسیر | چیست؟ | Status | معتبر؟ | Duplicate؟ | تعارض با کد؟ | اقدام |
 |---|---|---|---|---|---|---|
+| [`CURRENT_UI_STATE.md`](../../CURRENT_UI_STATE.md) (root، untracked) | snapshotِ UI در یک تاریخ | EVIDENCE | — | — | — | مبنای کار نیست؛ commit با تصمیمِ مالک |
+| [`docs/08-history/event-log-2026-09.md`](../08-history/event-log-2026-09.md) | آرشیوِ Event Logِ تا 2026-09-28 + زنجیره‌ی قدیمیِ سربرگِ STATUS (انتقال، نه حذف؛ فاز ۷) | EVIDENCE | — | — | — | فقط‌خواندنی؛ ورودیِ جدید در `PROJECT_STATUS.md` |
 | [`docs/analytics-clarity.md`](../analytics-clarity.md) | مشخصاتِ Clarity (نسخه‌ی پیاده‌سازی‌شده) | **ACTIVE-CANONICAL** برای allowlist/mask/consent | بله — با `feelia-analytics.js` و `index.html` تطبیق داده شد | نه (ماژول 07 به آن لینک می‌دهد) | تعارضِ مهمی دیده نشد | در جا ماند (کد به این مسیر ارجاع می‌دهد)؛ سربرگِ وضعیت اضافه شد |
 | [`docs/admin-panel.md`](../admin-panel.md) | سندِ طراحیِ v1.0 پنل ادمین (commit `37bbe34`) | **HISTORICAL** | جزئی | بله، با ماژول 06 | بله: (۱) «ادمین هیچ‌جا متنِ رونویسی نمی‌بیند» ↔ export شاملِ transcript است؛ (۲) پخشِ صدای جلسات برای ادمین در طراحی نیست؛ (۳) فهرستِ API ناقص (export، sessions، audio)؛ (۴) الگوی تأیید برای حذفِ مراجع ↔ UI بدونِ تأیید | محتوای مفید به [ماژول 06](../04-modules/06-admin-panel/module-prd.md) منتقل شد؛ بنرِ HISTORICAL اضافه شد؛ حذف نشد |
 | `soniox.html` (root، untracked) | کپیِ markdownِ مستنداتِ Soniox (realtime) | ACTIVE-SUPPORTING (خارجی) | نامعلوم — تاریخ ندارد | — | — | در `index.html` به آن ارجاع شده؛ برای رفتارِ Soniox مستنداتِ آنلاین مقدم است؛ درباره‌ی commit شدنش (محتوای شخصِ ثالث) تصمیم با مالک |
