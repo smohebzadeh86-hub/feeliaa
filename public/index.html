@@ -411,9 +411,18 @@ input::-ms-reveal{display:none}
 .tu-member .cat-select{margin-bottom:0}
 .tu-add{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
 .tu-link{border:none;background:none;color:var(--sage-deep);font:inherit;font-size:12px;cursor:pointer;padding:0;text-decoration:underline}
-.rec-tips{border:1.5px solid var(--line);border-radius:var(--r-sm);padding:10px 14px;margin:0 0 14px;background:var(--card);font-size:13px}
-.rec-tips summary{cursor:pointer;color:var(--sage-deep);font-weight:600;list-style-position:inside}
-.rec-tips ul{margin:8px 0 2px;padding-inline-start:18px;line-height:1.9;color:var(--muted)}
+.rec-tips{border:1.5px solid var(--line);border-radius:var(--r-md);margin:0 0 14px;background:var(--card);font-size:13px;transition:border-color .15s}
+.rec-tips:hover,.rec-tips[open]{border-color:var(--gold-soft)}
+.rec-tips summary{display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;list-style:none;color:var(--ink-2);font-weight:600;line-height:1.6}
+.rec-tips summary::-webkit-details-marker{display:none}
+.rec-tips-ico{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--gold-soft);color:var(--gold-deep)}
+.rec-tips-ico svg{width:16px;height:16px}
+.rec-tips-txt{flex:1;min-width:0}
+.rec-tips-hint{flex:none;display:flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--gold-deep)}
+.rec-tips-hint svg{width:14px;height:14px;transition:transform .2s}
+.rec-tips[open] .rec-tips-hint svg{transform:rotate(180deg)}
+.rec-tips summary:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;border-radius:var(--r-md)}
+.rec-tips ul{margin:0;padding:2px 12px 12px;padding-inline-start:40px;line-height:1.9;color:var(--ink-2)}
 .pf-box{margin-bottom:14px}
 .pf-strip{display:flex;align-items:stretch;gap:8px}
 .pf-pill{flex:1 1 0;min-width:0;display:flex;align-items:center;gap:7px;padding:9px 12px;border:1.5px solid var(--line);border-radius:var(--r-md);background:var(--card);font-size:12.5px;line-height:1.5}
@@ -1223,7 +1232,11 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     </div>
     <!-- (2026-09-28) بیشترین افتِ کیفیتِ متن و جداکردنِ گوینده‌ها از خودِ صداست، نه از پردازش (فاز ۰B) -->
     <details class="rec-tips" id="recTips">
-      <summary>برایِ متنِ دقیق‌تر و جداشدنِ درستِ گوینده‌ها</summary>
+      <summary>
+        <span class="rec-tips-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1.1 1.3 1.1 2.2h5c0-.9.5-1.7 1.1-2.2A6 6 0 0 0 12 3z"/></svg></span>
+        <span class="rec-tips-txt">نکته‌هایی برایِ متنِ دقیق‌تر و جداشدنِ درستِ گوینده‌ها</span>
+        <span class="rec-tips-hint">بخوانید<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+      </summary>
       <ul>
         <li>دستگاه را وسطِ جمع و رو به بالا بگذارید، نه در جیب، زیرِ کاغذ یا رویِ مبلِ نرم.</li>
         <li>دور از تلویزیون، پنکه، کولر و پنجره‌ی رو به خیابان.</li>
