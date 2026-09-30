@@ -398,6 +398,13 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-30 — CODE + DEPLOY — رفعِ FINDINGِ `session_id` در mintِ `pre-note`؛ فقط `stt.routes.ts`
+- **رفع:** برایِ `purpose:'pre-note'`، `session_id`ِ ارسالیِ کلاینت نادیده گرفته می‌شود (`const session_id = purpose==='pre-note' ? undefined : rawSessionId`)، پس رشته‌ی دلخواه دیگر به `clientReferenceId`/لاگ نمی‌رسد. رفتارِ `transcript`/`note` بدونِ تغییر.
+- **تست:** `tsc` تمیز؛ `test:routes`/`test:arch` OK؛ اسکریپتِ یک‌بارمصرف با `app.inject` + `https.request`ِ جعلی (بدونِ DB/شبکه، حذف‌شده): pre-note بدونِ sid ⇒ 200 و `feelia:T1:none:pre-note`؛ pre-note با sid مخرب (`EVIL\nINJECT`) ⇒ 200 و همان `…:none:pre-note`؛ transcript بدونِ sid ⇒ 400.
+- **Deploy (به دستورِ مالک):** build لوکال؛ فقط `server/src/…/stt.routes.ts` + `server/dist/…/stt.routes.js`؛ sha1 پیش از deploy = commitِ قبلی (`743096cb13b8`)؛ Preflight §۵.۱ = GO؛ پشتیبان `/root/backups/code-pre-sid-20260930-132016.tar.gz`؛ `pm2 restart feelia-mysql --update-env`؛ لاگ بدونِ خطا، migrationِ جدیدی نبود؛ `/api/health` ok؛ بدونِ ورود هر دو mint ⇒ 401؛ sha1ِ dist روی سرور = تار (`89591e325bf5`).
+- **تست نشد:** mintِ واقعی با حسابِ production.
+- **عامل:** این نشست
+
 ### 2026-09-30 — CODE + DEPLOY — رفعِ شکستنِ هدرِ کارتِ کلیپ در موبایل + deployِ کاملِ یادداشتِ صوتیِ پیش از جلسه (`1a0c6f3` + `5b20870`)
 - **رفع:** در ۳۹۰px عنوان و چیپِ «منتظرِ تأیید» در دو خط می‌شکستند ⇒ `.pv-head` حالا `flex-wrap` دارد و `b`/`.pv-chip` `nowrap`؛ جا نشود چیپ زیرِ عنوان می‌رود. تأیید در mock (عرضِ ۳۹۰، تمِ روشن): هر دو تک‌خط.
 - **Deploy (به دستورِ مالک):** build لوکال (`pnpm --filter server run build`)؛ تار از فایل‌هایِ tracked (`git ls-files`) + `server/dist`؛ working tree هنگامِ ساخت بدونِ تغییرِ tracked بود (۴۱۶ فایل، بدونِ `.env`/`data`). پیش از deploy sha1ِ (بدونِ CR) ۲۰۱ فایلِ کدِ production با تار مقایسه شد: **فقط `public/index.html` و `server/src/features/transcription/stt.routes.ts` فرق داشتند**؛ بعد از deploy همه‌ی ۲۰۱ مورد برابر. Preflight §۵.۱ = **GO** (همه‌ی شمارنده‌ها ۰). پشتیبان `/root/backups/code-pre-prenote-20260930-131542.tar.gz`. استخراج ⇒ `pnpm install --frozen-lockfile` (بدونِ تغییر) ⇒ `pm2 restart feelia-mysql --update-env`؛ migrationِ جدیدی نبود (آخرین 034، همه `already applied`)؛ لاگ بدونِ خطا؛ `/api/health` ok؛ `pv-head` در صفحه‌ی سرو‌شده؛ بدونِ ورود `POST /api/stt/realtime-session` با `pre-note` و بدونِ آن هر دو **401**.
