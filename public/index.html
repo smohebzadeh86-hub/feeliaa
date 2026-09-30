@@ -452,16 +452,64 @@ input::-ms-reveal{display:none}
 .presence-line{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;color:var(--ink-2)}
 .presence-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .presence-box textarea{width:100%;margin-top:10px;min-height:64px;font-size:13px}
+.pn-change{border:1.5px solid var(--line);background:var(--field);color:var(--sage-deep);font:inherit;font-size:12px;font-weight:600;padding:3px 12px;border-radius:99px;cursor:pointer;flex:none}
+.pn-change:hover{border-color:var(--sage);background:var(--sage-mist)}
+.pn-wrap{margin-top:12px;padding-top:12px;border-top:1px solid var(--line-soft)}
+.pn-toggle{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:1.5px dashed var(--line);border-radius:var(--r-md);background:transparent;font-family:inherit;color:var(--ink-2);cursor:pointer;text-align:right;transition:border-color .15s,background .15s}
+.pn-toggle:hover{border-color:var(--sage);background:var(--sage-mist)}
+.pn-toggle[hidden],.pn-panel[hidden]{display:none}
+.pn-ico{width:34px;height:34px;flex:none;border-radius:var(--r-sm);background:var(--sage-soft);color:var(--sage-deep);display:grid;place-items:center}
+.pn-ico svg{width:18px;height:18px}
+.pn-toggle-text{display:flex;flex-direction:column;flex:1;min-width:0;line-height:1.6}
+.pn-toggle-text b{font-size:13.5px;font-weight:700;color:var(--ink)}
+.pn-toggle-text small{font-size:11.5px;color:var(--muted)}
+.pn-plus{width:26px;height:26px;flex:none;border-radius:50%;border:1.5px solid var(--line);color:var(--sage-deep);display:grid;place-items:center}
+.pn-plus svg{width:14px;height:14px}
+.pn-toggle:hover .pn-plus{background:var(--sage);border-color:var(--sage);color:#fff}
+.pn-panel{border:1.5px solid var(--line);border-radius:var(--r-md);padding:12px;background:var(--field)}
+.pn-panel textarea{margin-bottom:0;background-color:var(--card)}
+.pn-head{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.pn-head .pn-ico{width:28px;height:28px}
+.pn-head .pn-ico svg{width:15px;height:15px}
+.pn-head b{font-size:13.5px;font-weight:700;color:var(--ink)}
+.pn-head small{margin-inline-start:auto;font-size:11px;color:var(--muted);background:var(--sage-mist);padding:1px 9px;border-radius:99px}
+.pn-mic svg{width:15px;height:15px;flex:none}
+.pn-panel .pre-note-hint{padding-top:8px;margin-top:10px;border-top:1px dashed var(--line)}
 /* یادداشتِ پیش از جلسه — متنی + صوتی (2026-09-29): Setup، مودالِ آپلود، Wrapup و صفحه‌ی جلسه */
 .pre-note-area textarea{width:100%;min-height:64px;font-size:13px}
 .pre-voice-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .pre-voice-list:empty{display:none}
-.pre-voice-item{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.pre-voice-item audio{flex:1;min-width:150px;height:32px}
-.pre-voice-rec{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px;font-size:13px;color:var(--clay-deep);font-weight:600}
+.pre-voice-live{margin-top:8px;padding:10px 12px;border-radius:var(--r-sm);border-inline-start:3px solid var(--sage);background:var(--sage-mist);font-size:13px;line-height:2;color:var(--ink-2);min-height:44px;white-space:pre-wrap}
+.pre-voice-live .pv-live-tail,.pre-voice-live.pv-live-tail{color:var(--muted)}
+.pn-collapse{background:none;border:none;color:var(--muted);cursor:pointer;padding:4px 6px;border-radius:8px;display:inline-flex;margin-inline-start:6px}
+.pn-collapse svg{width:16px;height:16px}
+.pn-collapse:hover{color:var(--sage-deep);background:var(--sage-mist)}
+.pre-voice-item{background:var(--card);border:1.5px solid var(--line);border-radius:var(--r-md);padding:12px;display:flex;flex-direction:column;gap:10px;transition:border-color .2s,background .2s}
+.pre-voice-item.is-ok{border-color:var(--sage-soft);background:var(--sage-mist)}
+.pv-head{display:flex;align-items:center;gap:10px}
+.pv-head .pv-ico{width:28px;height:28px;flex:none;border-radius:var(--r-sm);background:var(--sage-soft);color:var(--sage-deep);display:grid;place-items:center}
+.pv-head .pv-ico svg{width:15px;height:15px}
+.pv-head b{font-size:13px;font-weight:700;color:var(--ink)}
+.pv-head .pv-dur{font-size:11.5px;color:var(--muted)}
+.pv-chip{margin-inline-start:auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:2px 10px;border-radius:99px;background:var(--gold-soft);color:var(--gold-deep)}
+.pv-chip svg{width:12px;height:12px}
+.pv-chip.ok{background:var(--sage-soft);color:var(--sage-deep)}
+.pre-voice-item .pv-text{font-size:13px;line-height:2.1;color:var(--ink-2);background:var(--field);border:1px solid var(--line-soft);border-radius:var(--r-sm);padding:9px 12px;white-space:pre-wrap;max-height:180px;overflow-y:auto}
+.pre-voice-item .pv-text.pv-muted{color:var(--muted);font-size:12px}
+.pv-actions{display:flex;align-items:center;gap:8px}
+.pv-btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;border-radius:99px;font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;border:1.5px solid transparent;transition:background .15s,border-color .15s,color .15s}
+.pv-btn svg{width:15px;height:15px;flex:none}
+.pv-btn.ok{background:var(--sage);color:#fff}
+.pv-btn.ok:hover{background:var(--sage-hover)}
+.pv-btn.redo{background:transparent;color:var(--ink-2);border-color:var(--line)}
+.pv-btn.redo:hover{border-color:var(--sage);color:var(--sage-deep);background:var(--sage-mist)}
+.pv-btn.del{margin-inline-start:auto;width:36px;padding:0;background:transparent;color:var(--muted);border-color:transparent}
+.pv-btn.del:hover{color:var(--clay-deep);background:var(--clay-soft);border-color:var(--clay-line)}
+.pre-voice-rec{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:8px;padding:8px 12px;border-radius:var(--r-sm);background:var(--sage-mist);border:1px solid var(--sage-soft);font-size:13px;color:var(--sage-deep);font-weight:600}
+.pre-voice-rec .pv-rec-btns{margin-inline-start:auto;display:flex;gap:8px}
 .pre-voice-rec span{white-space:nowrap}
 .pre-voice-rec .btn{flex:none}
-.pre-voice-dot{width:10px;height:10px;border-radius:50%;background:var(--clay-deep);animation:preRecBlink 1.2s ease-in-out infinite}
+.pre-voice-dot{width:10px;height:10px;border-radius:50%;background:var(--sage);animation:preRecBlink 1.2s ease-in-out infinite}
 @keyframes preRecBlink{50%{opacity:.25}}
 .pre-note-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;align-items:center}
 .pre-note-hint{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.8}
@@ -1188,20 +1236,28 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <div class="session-summary" id="setupChips" data-clarity-mask="true"></div>
     <!-- زمینه‌ی جلسه (واحدِ درمان): حاضرینِ امروز (پیش‌فرض = همه‌ی اعضا) + یادداشتِ اختیاریِ پیش از جلسه -->
     <div class="presence-box" id="presenceBox" data-clarity-mask="true" hidden>
-      <div class="presence-line" id="presenceLine"><span id="presenceSummary"></span><button class="tu-link" id="presenceEditBtn" onclick="togglePresenceEdit()">تغییر</button></div>
+      <div class="presence-line" id="presenceLine"><span id="presenceSummary"></span><button class="pn-change" id="presenceEditBtn" onclick="togglePresenceEdit()">تغییر</button></div>
       <div id="presenceEdit" hidden>
         <div class="presence-chips" id="presenceChips"></div>
         <button class="tu-link" style="margin-top:8px" onclick="openEditUnitModal('setup')">تغییرِ نوعِ جلسه / اعضا…</button>
       </div>
-      <div style="margin-top:8px"><button class="tu-link" id="preNoteToggle" onclick="togglePreNote()">+ یادداشتِ پیش از جلسه — متنی یا صوتی (اختیاری)</button></div>
-      <div id="preNoteArea" class="pre-note-area" hidden>
-        <textarea id="preNoteInput" maxlength="2000" placeholder="مثلاً: امروز فقط یکی از زوجین می‌آید و بخشی از جلسه فردی است…"></textarea>
+      <div class="pn-wrap">
+      <button type="button" class="pn-toggle" id="preNoteToggle" onclick="togglePreNote()">
+        <span class="pn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span>
+        <span class="pn-toggle-text"><b>یادداشتِ پیش از جلسه</b><small>اختیاری · متنی یا صوتی</small></span>
+        <span class="pn-plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+      </button>
+      <div id="preNoteArea" class="pre-note-area pn-panel" hidden>
+        <div class="pn-head"><span class="pn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg></span><b>یادداشتِ پیش از جلسه</b><small>اختیاری</small><button type="button" class="pn-collapse" id="preNoteCollapse" onclick="collapsePreNote()" title="جمع‌کردن" aria-label="جمع‌کردن"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg></button></div>
+        <textarea id="preNoteInput" oninput="updatePreNoteToggleBadge()" maxlength="2000" placeholder="مثلاً: امروز فقط یکی از زوجین می‌آید و بخشی از جلسه فردی است…"></textarea>
         <div class="pre-voice-list" id="setupPreVoiceList"></div>
+        <div class="pre-voice-live" id="setupPreVoiceLive" hidden></div>
         <div class="pre-voice-rec" id="setupPreVoiceRec" hidden><span class="pre-voice-dot"></span><span>در حال ضبط</span><span id="setupPreVoiceTimer">۰۰:۰۰</span>
-          <button type="button" class="btn btn-ghost btn-sm" onclick="preVoiceSetup.cancel()">انصراف</button>
-          <button type="button" class="btn btn-danger btn-sm" onclick="preVoiceSetup.stop()">پایان ضبط</button></div>
-        <div class="pre-note-actions"><button type="button" class="btn btn-secondary btn-sm" id="setupPreVoiceBtn" onclick="preVoiceSetup.start()">ضبطِ یادداشتِ صوتی</button></div>
+          <span class="pv-rec-btns"><button type="button" class="btn btn-ghost btn-sm" onclick="preVoiceSetup.cancel()">انصراف</button>
+          <button type="button" class="btn btn-primary btn-sm" onclick="preVoiceSetup.stop()">پایان ضبط</button></span></div>
+        <div class="pre-note-actions"><button type="button" class="btn btn-secondary btn-sm pn-mic" id="setupPreVoiceBtn" onclick="preVoiceSetup.start()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>ضبطِ یادداشتِ صوتی</button></div>
         <div class="pre-note-hint">صدا همان لحظه‌ی پایانِ ضبط در همین مرورگر ذخیره می‌شود (با بستنِ صفحه نمی‌رود؛ همان مراجع را دوباره باز کنید) و با «شروع جلسه» به متن تبدیل می‌شود. متنِ تایپ‌شده تا شروعِ جلسه ذخیره نمی‌شود. بعد از پایانِ جلسه می‌توانید متن‌ها را ویرایش کنید.</div>
+      </div>
       </div>
     </div>
     <div class="consent-box" id="consentBox">
@@ -1521,9 +1577,10 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <div class="pre-note-area" style="margin-bottom:14px" data-clarity-mask="true">
       <textarea id="upPreNoteInput" maxlength="2000" placeholder="توضیحی درباره‌ی این جلسه، متنی یا صوتی…"></textarea>
       <div class="pre-voice-list" id="upPreVoiceList"></div>
+      <div class="pre-voice-live" id="upPreVoiceLive" hidden></div>
       <div class="pre-voice-rec" id="upPreVoiceRec" hidden><span class="pre-voice-dot"></span><span>در حال ضبط</span><span id="upPreVoiceTimer">۰۰:۰۰</span>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="preVoiceUpload.cancel()">انصراف</button>
-        <button type="button" class="btn btn-danger btn-sm" onclick="preVoiceUpload.stop()">پایان ضبط</button></div>
+        <span class="pv-rec-btns"><button type="button" class="btn btn-ghost btn-sm" onclick="preVoiceUpload.cancel()">انصراف</button>
+        <button type="button" class="btn btn-primary btn-sm" onclick="preVoiceUpload.stop()">پایان ضبط</button></span></div>
       <div class="pre-note-actions"><button type="button" class="btn btn-secondary btn-sm" id="upPreVoiceBtn" onclick="preVoiceUpload.start()">ضبطِ یادداشتِ صوتی</button></div>
       <div class="pre-note-hint">یادداشت‌ها بعد از «دریافت شد» به همین جلسه اضافه می‌شوند. صدای ضبط‌شده در این مرورگر ذخیره می‌شود؛ ولی فایل‌هایِ انتخاب‌شده و متنِ تایپ‌شده نه — تا آن موقع صفحه را نبندید.</div>
     </div>
@@ -1746,6 +1803,8 @@ const IC_CAL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 const IC_CLK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 const IC_TRSH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>';
 const IC_X='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+const IC_REDO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>';
+const IC_CLOCK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
 const IC_MIC='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>';
 const IC_PEN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>';
 const IC_EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>';
@@ -4364,6 +4423,7 @@ function resetPresence(){
   $('presenceBox').hidden=true;$('presenceEdit').hidden=true;
   $('preNoteArea').hidden=true;$('preNoteInput').value='';
   $('preNoteToggle').hidden=false;
+  const tg=$('preNoteToggle').querySelector('small');if(tg)tg.textContent='اختیاری · متنی یا صوتی';
   preVoiceSetup.release(); // پیش‌نویسِ پایدار نگه داشته می‌شود
 }
 async function loadPresenceForSetup(client){
@@ -4403,6 +4463,17 @@ function renderPresence(){
 }
 function togglePresenceEdit(){$('presenceEdit').hidden=!$('presenceEdit').hidden;}
 function togglePreNote(){$('preNoteArea').hidden=false;$('preNoteToggle').hidden=true;$('preNoteInput').focus();}
+// جمع‌کردنِ پنل (محتوا حفظ می‌شود). وسطِ ضبط ممکن نیست؛ دکمه‌ی «یادداشتِ پیش از جلسه» وجودِ محتوا را نشان می‌دهد.
+async function collapsePreNote(){
+  if(preVoiceSetup.isRecording())await preVoiceSetup.stop();
+  $('preNoteArea').hidden=true;$('preNoteToggle').hidden=false;
+  updatePreNoteToggleBadge();
+}
+function updatePreNoteToggleBadge(){
+  const has=!!$('preNoteInput').value.trim()||preVoiceSetup.count()>0;
+  const small=$('preNoteToggle').querySelector('small');
+  if(small)small.textContent=has?'دارای یادداشت · برای دیدن/ویرایش بزنید':'اختیاری · متنی یا صوتی';
+}
 function presenceBody(){
   const body={};
   if(presenceUnit&&presenceSelected&&presenceSelected.size<presenceUnit.members.length)body.attendees=Array.from(presenceSelected);
@@ -4474,8 +4545,8 @@ setTimeout(function(){PreDraft.purgeExpired();},5000);
 // (در شکست، پیش‌نویس می‌ماند و در بازکردنِ بعدی بازیابی می‌شود). فقط حافظه: با رفرش خالی می‌شود، که همان بازیابیِ مطلوب است.
 const preDraftClaimed=new Set();
 function claimPreDrafts(clips){(clips||[]).forEach(function(c){if(c&&c.draftId)preDraftClaimed.add(c.draftId);});}
-function makePreVoice(prefix,scopeFn){
-  const st={clips:[],rec:null,stream:null,chunks:[],t0:0,timer:null,discard:false,waiters:[],scope:null};
+function makePreVoice(prefix,scopeFn,onChange){
+  const st={live:null,clips:[],rec:null,stream:null,chunks:[],t0:0,timer:null,discard:false,waiters:[],scope:null};
   const el=function(id){return document.getElementById(prefix+id);};
   function render(){
     const box=el('PreVoiceList');
@@ -4483,19 +4554,110 @@ function makePreVoice(prefix,scopeFn){
       box.innerHTML='';
       st.clips.forEach(function(c,i){
         const row=document.createElement('div');row.className='pre-voice-item';
-        const tag=document.createElement('span');tag.className='note-tag tag-voice';
-        tag.innerHTML=IC_MIC;tag.appendChild(document.createTextNode('یادداشتِ صوتیِ '+toFa(i+1)+' · '+formatTimer(c.durMs)));
-        row.appendChild(tag);
-        const a=document.createElement('audio');a.controls=true;a.preload='metadata';a.src=c.url;row.appendChild(a);
-        const rm=document.createElement('button');rm.type='button';rm.className='note-remove';rm.innerHTML=IC_TRSH+'حذف';
-        rm.addEventListener('click',function(){try{URL.revokeObjectURL(c.url);}catch(e){}PreDraft.del(c.draftId);st.clips.splice(i,1);render();});
-        row.appendChild(rm);
+        row.classList.toggle('is-ok',!!c.confirmed);
+        const head=document.createElement('div');head.className='pv-head';
+        const ico=document.createElement('span');ico.className='pv-ico';ico.innerHTML=IC_MIC;head.appendChild(ico);
+        const ttl=document.createElement('b');ttl.textContent='یادداشتِ صوتیِ '+toFa(i+1);head.appendChild(ttl);
+        const dur=document.createElement('span');dur.className='pv-dur';dur.dir='ltr';dur.textContent=formatTimer(c.durMs);head.appendChild(dur);
+        const chip=document.createElement('span');chip.className='pv-chip'+(c.confirmed?' ok':'');
+        chip.innerHTML=(c.confirmed?IC_CHECK:IC_CLOCK)+(c.confirmed?'تأیید شد':'منتظرِ تأیید');head.appendChild(chip);
+        row.appendChild(head);
+        // متنِ زنده‌ی همین کلیپ (فقط برایِ بازبینی؛ متنِ ذخیره‌شده بعد از شروعِ جلسه از خودِ صدا ساخته می‌شود). خودِ صدا اینجا پخش نمی‌شود؛
+        // در پنلِ ادمین قابلِ شنیدن است.
+        const tx=document.createElement('div');tx.className='pv-text';
+        if(c.text){tx.textContent=c.text;}
+        else if(c.captionPending){tx.classList.add('pv-muted');tx.textContent='در حالِ آماده‌سازیِ متن…';}
+        else if(!c.liveTried){tx.classList.add('pv-muted');tx.textContent='صدا ذخیره شده است.';}
+        else{tx.classList.add('pv-muted');tx.textContent='متنِ زنده در دسترس نبود — صدا ضبط شده و بعد از شروعِ جلسه به متن تبدیل می‌شود.';}
+        row.appendChild(tx);
+        const acts=document.createElement('div');acts.className='pv-actions';
+        if(!c.confirmed){
+          const okb=document.createElement('button');okb.type='button';okb.className='pv-btn ok';okb.innerHTML=IC_CHECK+'تأیید';
+          okb.addEventListener('click',function(){c.confirmed=true;render();});
+          acts.appendChild(okb);
+        }
+        const rr=document.createElement('button');rr.type='button';rr.className='pv-btn redo';rr.innerHTML=IC_REDO+'ضبط مجدد';
+        rr.addEventListener('click',function(){removeClip(c);start();});
+        acts.appendChild(rr);
+        const rm=document.createElement('button');rm.type='button';rm.className='pv-btn del';rm.title='حذفِ فایلِ صوتی';rm.setAttribute('aria-label','حذفِ فایلِ صوتی');rm.innerHTML=IC_TRSH;
+        rm.addEventListener('click',function(){removeClip(c);});
+        acts.appendChild(rm);
+        row.appendChild(acts);
         box.appendChild(row);
       });
     }
     const recOn=!!st.rec;
     if(el('PreVoiceRec'))el('PreVoiceRec').hidden=!recOn;
     if(el('PreVoiceBtn'))el('PreVoiceBtn').hidden=recOn;
+    renderLive();
+    if(onChange)onChange();
+  }
+  function removeClip(c){
+    const i=st.clips.indexOf(c);if(i<0)return;
+    try{URL.revokeObjectURL(c.url);}catch(e){}
+    PreDraft.del(c.draftId);st.clips.splice(i,1);render();
+  }
+  // رونویسیِ زنده‌ی حینِ ضبط (Soniox، کلیدِ موقتِ purpose=pre-note). best-effort: هر خطا فقط متنِ زنده را حذف می‌کند و ضبط ادامه دارد.
+  function liveOpen(){
+    const L={ws:null,final:'',tail:'',queue:[],open:false,closed:false,failed:false,endRequested:false};
+    L.donePromise=new Promise(function(res){L.done=res;});
+    st.live=L;
+    api('/api/stt/realtime-session',{method:'POST',body:{purpose:'pre-note'}}).then(function(cred){
+      if(L.closed)return;
+      const ws=new WebSocket(cred.websocket_url);ws.binaryType='arraybuffer';L.ws=ws;
+      ws.onopen=function(){
+        if(L.closed){try{ws.close();}catch(e){}return;}
+        const d=cred.stt_defaults||{};
+        ws.send(JSON.stringify({api_key:cred.api_key,model:d.model||cred.model||'stt-rt-v5',audio_format:'auto',language_hints:['fa'],enable_language_identification:true,enable_endpoint_detection:true}));
+        L.open=true;L.queue.forEach(function(b){try{ws.send(b);}catch(e){}});L.queue=[];
+        if(L.endRequested){try{ws.send(new ArrayBuffer(0));}catch(e){}}
+      };
+      ws.onmessage=function(ev){
+        let m;try{m=JSON.parse(ev.data);}catch(e){return;}
+        if(m.error_code||m.error_type){liveClose(L,true);return;}
+        let tail='';
+        (m.tokens||[]).forEach(function(t){if(!t.text||t.text==='<end>'||t.text==='<fin>')return;if(t.is_final)L.final+=t.text;else tail+=t.text;});
+        L.tail=tail;renderLive();
+        if(m.finished)liveClose(L,false);
+      };
+      ws.onerror=function(){liveClose(L,true);};
+      ws.onclose=function(){liveClose(L,false);};
+    }).catch(function(){liveClose(L,true);});
+    renderLive();
+    return L;
+  }
+  function liveSend(blob){
+    const L=st.live;if(!L||L.closed)return;
+    blob.arrayBuffer().then(function(buf){
+      if(L.closed)return;
+      if(L.open&&L.ws&&L.ws.readyState===1){try{L.ws.send(buf);}catch(e){}}else L.queue.push(buf);
+    }).catch(function(){});
+  }
+  // پایانِ صدا ⇒ منتظرِ توکن‌هایِ نهایی (حداکثر ۴ ثانیه)؛ متنِ نهایی را برمی‌گرداند.
+  function liveEnd(L,discard){
+    if(!L)return Promise.resolve('');
+    if(discard||L.closed){liveClose(L,L.failed);return Promise.resolve((L.final+L.tail).trim());}
+    L.endRequested=true;
+    if(L.open&&L.ws&&L.ws.readyState===1){try{L.ws.send(new ArrayBuffer(0));}catch(e){}}
+    return Promise.race([L.donePromise,new Promise(function(r){setTimeout(r,4000);})]).then(function(){liveClose(L,false);return (L.final+L.tail).trim();});
+  }
+  function liveClose(L,failed){
+    if(typeof L==='boolean'){failed=L;L=st.live;}
+    if(!L||L.closed)return;
+    L.closed=true;L.failed=!!failed;
+    try{if(L.ws)L.ws.close();}catch(e){}
+    if(L.done)L.done();
+    renderLive();
+  }
+  function renderLive(){
+    const box=el('PreVoiceLive');if(!box)return;
+    const L=st.live;
+    if(!st.rec||!L){box.hidden=true;box.textContent='';return;}
+    box.hidden=false;box.textContent='';
+    if(!L.final&&!L.tail){box.classList.add('pv-live-tail');box.textContent=L.failed?'متنِ زنده در دسترس نیست — ضبط ادامه دارد.':'شروع به صحبت کنید؛ متن همین‌جا نشان داده می‌شود…';return;}
+    box.classList.remove('pv-live-tail');
+    box.appendChild(document.createTextNode(L.final));
+    const t=document.createElement('span');t.className='pv-live-tail';t.textContent=L.tail;box.appendChild(t);
   }
   function tick(){
     const ms=Date.now()-st.t0;
@@ -4517,17 +4679,21 @@ function makePreVoice(prefix,scopeFn){
     catch(e){Mic_stopStream(stream);showBanner('error','ضبطِ صدا شروع نشد — لطفاً یادداشت را تایپ کنید.');return;}
     st.stream=stream;st.rec=rec;st.chunks=[];st.discard=false;st.t0=Date.now();
     st.scope=scopeFn?scopeFn():null; // مراجعِ لحظه‌ی شروعِ ضبط (پیش‌نویسِ پایدار)
-    rec.ondataavailable=function(e){if(e.data&&e.data.size)st.chunks.push(e.data);};
+    rec.ondataavailable=function(e){if(e.data&&e.data.size){st.chunks.push(e.data);liveSend(e.data);}};
+    const live=liveOpen();
     rec.onstop=function(){
       const durMs=Date.now()-st.t0;
+      const liveP=liveEnd(live,st.discard);
+      if(st.live===live)st.live=null;
       Mic_stopStream(st.stream);st.stream=null;
       if(st.timer){clearInterval(st.timer);st.timer=null;}
       const type=rec.mimeType||mime||'audio/webm';
       const blob=new Blob(st.chunks,{type:type});
       st.chunks=[];st.rec=null;
       if(!st.discard&&blob.size>1000){
-        const clip={blob:blob,mime:type,durMs:durMs,url:URL.createObjectURL(blob)};
+        const clip={blob:blob,mime:type,durMs:durMs,url:URL.createObjectURL(blob),confirmed:false,liveTried:true,captionPending:true,text:''};
         st.clips.push(clip);
+        liveP.then(function(t){clip.text=t||'';clip.captionPending=false;render();});
         if(st.scope){
           const id='d'+Date.now().toString(36)+Math.random().toString(36).slice(2,8);
           // ذخیره‌ی ناموفق (بدونِ IndexedDB/سهمیه) ⇒ کلیپ فقط در حافظه می‌ماند (draftId ندارد)
@@ -4538,7 +4704,7 @@ function makePreVoice(prefix,scopeFn){
       render();
       const w=st.waiters;st.waiters=[];w.forEach(function(f){f();});
     };
-    rec.start(1000);
+    rec.start(500);
     if(el('PreVoiceTimer'))el('PreVoiceTimer').textContent=formatTimer(0);
     st.timer=setInterval(tick,500);
     render();
@@ -4569,14 +4735,15 @@ function makePreVoice(prefix,scopeFn){
     render();
   }
   return {start:start,stop:stop,cancel:cancel,clear:clear,release:release,take:take,put:put,
-    count:function(){return st.clips.length;},isRecording:function(){return !!st.rec;}};
+    count:function(){return st.clips.length;},
+    unconfirmed:function(){return st.clips.filter(function(c){return !c.confirmed;}).length;},isRecording:function(){return !!st.rec;}};
 }
-const preVoiceSetup=makePreVoice('setup',function(){return currentClient&&currentClient.id?String(currentClient.id):null;});
+const preVoiceSetup=makePreVoice('setup',function(){return currentClient&&currentClient.id?String(currentClient.id):null;},function(){updatePreNoteToggleBadge();});
 // بازگردانیِ کلیپ‌هایِ پیش‌نویسِ همین مراجع (صفحه بسته/رفرش شده بود) — بعد از resetPresence
 async function restorePreVoiceDrafts(client){
   const recs=(await PreDraft.list(String(client.id))).filter(function(r){return !preDraftClaimed.has(r.id);});
   if(!recs.length||!currentClient||currentClient.id!==client.id)return;
-  preVoiceSetup.put(recs.map(function(r){return {blob:r.blob,mime:r.mime,durMs:r.durMs,draftId:r.id,url:URL.createObjectURL(r.blob)};}));
+  preVoiceSetup.put(recs.map(function(r){return {blob:r.blob,mime:r.mime,durMs:r.durMs,draftId:r.id,confirmed:true,url:URL.createObjectURL(r.blob)};}));
   $('preNoteArea').hidden=false;$('preNoteToggle').hidden=true;
   showBanner('info','یادداشتِ صوتیِ ذخیره‌شده‌ی پیش از جلسه بازیابی شد.');
 }
@@ -7088,9 +7255,13 @@ async function startSession(){
   // خطا) غیرفعال می‌شود؛ روی موفقیت صفحه عوض می‌شود، روی خطا با updateStartButtonState
   // دوباره طبقِ وضعیتِ واقعیِ consent/میکروفون فعال می‌شود (نه بی‌قیدوشرط).
   if($('btnStartSession').disabled)return;
+  if(preVoiceSetup.isRecording())await preVoiceSetup.stop();
+  if(preVoiceSetup.unconfirmed()){
+    $('preNoteArea').hidden=false;$('preNoteToggle').hidden=true;
+    showBanner('error','یادداشتِ صوتیِ پیش از جلسه را «تأیید» کنید، دوباره ضبط کنید یا حذف کنید؛ بعد جلسه را شروع کنید.');return;
+  }
   $('btnStartSession').disabled=true;
   uxTrack('session_start_clicked');
-  if(preVoiceSetup.isRecording())await preVoiceSetup.stop();
   try{
     // ⭐ تاریخ/ساعت از همان ساعتِ دستگاه که صفحه‌ی Setup نشان داده (شمسی، ارقامِ لاتین) —
     // قبلاً سرور تاریخِ میلادیِ خودش را می‌گذاشت و با نمایش و ثبتِ دستی ناهمگون بود.
@@ -9001,6 +9172,7 @@ function updateAudioUploadButton(){
 async function startAudioUpload(){
   if(!audioUploadFiles.length||!audioUploadConsentOk()||!currentClient||!window.FeeliaUpload)return;
   if(preVoiceUpload.isRecording())await preVoiceUpload.stop();
+  if(preVoiceUpload.unconfirmed()){showAudioUploadError('یادداشتِ صوتیِ ضبط‌شده را «تأیید» کنید، دوباره ضبط کنید یا حذف کنید.');return;}
   const pre={keys:null,text:$('upPreNoteInput').value.trim().slice(0,2000),clips:preVoiceUpload.take()};
   claimPreDrafts(pre.clips);
   // رضایتِ تازه با همین آپلود رویِ سرور ثبت می‌شود (POST /api/uploads با consent:true) — دفعه‌ی بعد پرسیده نشود.

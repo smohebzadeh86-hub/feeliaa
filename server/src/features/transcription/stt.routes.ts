@@ -99,8 +99,10 @@ export async function sttRoutes(app: FastifyInstance) {
       session_id?: string;
       purpose?: string;
     };
-    const purpose = rawPurpose === 'note' ? 'note' : 'transcript';
-    if (!session_id) {
+    // 'pre-note' (2026-09-30): متنِ زنده‌ی یادداشتِ صوتیِ پیش از جلسه — جلسه هنوز ساخته نشده، پس session_id ندارد.
+    // فقط نمایشِ زنده؛ متنِ ذخیره‌شده همچنان از صدایِ آپلودشده روی سرور می‌آید.
+    const purpose = rawPurpose === 'note' ? 'note' : rawPurpose === 'pre-note' ? 'pre-note' : 'transcript';
+    if (!session_id && purpose !== 'pre-note') {
       reply.code(400);
       return { error: 'session_id الزامی است' };
     }
@@ -113,8 +115,8 @@ export async function sttRoutes(app: FastifyInstance) {
       reply.code(429);
       return { error: 'درخواست زیاد؛ کمی صبر کنید' };
     }
-    const owned = await getOwnedSession(session_id, therapistId);
-    if (!owned) {
+    const owned = purpose === 'pre-note' ? null : await getOwnedSession(session_id as string, therapistId);
+    if (purpose !== 'pre-note' && !owned) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
@@ -127,7 +129,7 @@ export async function sttRoutes(app: FastifyInstance) {
     // realtimeِ transcript دوباره باز بشه.
     // ⭐ (A3، 2026-09-26) جلسه‌ای که worker به‌خاطرِ بی‌فعالیتی خودکار بسته (مثلاً توقفِ طولانی و بعد «ادامه» در
     // همان صفحه) با اولین mintِ رونویسی دوباره باز می‌شود — بسته‌شدنِ خودکار نباید ادامه‌ی جلسه را قفل کند.
-    if (purpose === 'transcript' && owned.status === 'completed' && owned.auto_closed_at) {
+    if (owned && purpose === 'transcript' && owned.status === 'completed' && owned.auto_closed_at) {
       const re = await query(
         `UPDATE sessions SET status = 'in_progress', auto_closed_at = NULL, updated_at = NOW() WHERE id = ? AND status = 'completed' AND auto_closed_at IS NOT NULL`,
         [session_id]
@@ -137,13 +139,13 @@ export async function sttRoutes(app: FastifyInstance) {
         logEvent({ event: 'session.reopened', sessionId: session_id, therapistId, detail: { source: 'mint' } });
       }
     }
-    if (purpose === 'transcript' && (owned.status === 'completed' || owned.status === 'canceled')) {
+    if (owned && purpose === 'transcript' && (owned.status === 'completed' || owned.status === 'canceled')) {
       reply.code(400);
       return { error: 'جلسه پایان یافته است' };
     }
     try {
       const minted = await mintTemporaryKey({
-        clientReferenceId: `feelia:${therapistId}:${session_id}:${purpose}`,
+        clientReferenceId: `feelia:${therapistId}:${session_id ?? 'none'}:${purpose}`,
         singleUse: true,
         expiresInSeconds: TEMP_KEY_EXPIRES_IN_SECONDS,
         maxSessionDurationSeconds: TEMP_KEY_MAX_SESSION_SECONDS,
@@ -152,7 +154,7 @@ export async function sttRoutes(app: FastifyInstance) {
       console.log(
         `[stt-mint] temp-key issued therapist=${therapistId} session=${session_id} expires_in=${TEMP_KEY_EXPIRES_IN_SECONDS}s single_use=true`
       );
-      logEvent({ event: 'stt.mint_ok', sessionId: session_id, therapistId, detail: { purpose } });
+      logEvent({ event: 'stt.mint_ok', sessionId: session_id ?? undefined, therapistId, detail: { purpose } });
       return {
         websocket_url: SONIOX_WS_URL,
         model: 'stt-rt-v5',
@@ -163,9 +165,9 @@ export async function sttRoutes(app: FastifyInstance) {
         expires_at: minted.expires_at,
         // یادداشتِ صوتی تک‌گوینده است — contextِ «جلسه‌ی چندنفره» فقط برایِ transcript.
         // (2026-09-27) contextِ جلسه از واحدِ درمان + حاضرین مشتق می‌شود. fail-open: در خطا contextِ ثابتِ قبلی.
-        stt_defaults: purpose === 'note'
+        stt_defaults: purpose !== 'transcript'
           ? { ...STT_DEFAULTS, context: undefined }
-          : { ...STT_DEFAULTS, context: await treatmentUnits.sessionSttContext(session_id) },
+          : { ...STT_DEFAULTS, context: await treatmentUnits.sessionSttContext(session_id as string) },
       };
     } catch (err) {
       const code = err instanceof TempKeyError ? err.code : 'mint-transport';
@@ -174,7 +176,7 @@ export async function sttRoutes(app: FastifyInstance) {
       console.log(
         `[stt-mint] fail code=${code} therapist=${therapistId} session=${session_id} key_len=${masterKey.length}`
       );
-      logEvent({ event: 'stt.mint_failed', sessionId: session_id, therapistId, severity: 'warn', code, detail: { purpose } });
+      logEvent({ event: 'stt.mint_failed', sessionId: session_id ?? undefined, therapistId, severity: 'warn', code, detail: { purpose } });
       reply.code(status);
       // 503 یعنی: session می‌تواند ساخته/ادامه یابد ولی realtime الان ممکن نیست —
       // فرانت باید durable ضبط کند و به صف batch برود، نه اینکه session را بلاک کند.
