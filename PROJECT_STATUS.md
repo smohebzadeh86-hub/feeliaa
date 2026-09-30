@@ -398,6 +398,14 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-30 — CODE + DEPLOY — بازطراحیِ راهنمای «نکاتِ ضبط» (`.rec-tips`) در Setup؛ commit `db50bf0` + deployِ فقط `public/index.html`
+- **چه شد:** راهنمای جمع‌شونده‌ی «برایِ متنِ دقیق‌تر…» شبیهِ pillِ وضعیتِ سبز بود (متنِ `--sage-deep`، مثلثِ پیش‌فرض، بدونِ نشانه‌ی «بخوانید»). حالا: آیکونِ لامپ در دایره‌ی طلایی، عنوانِ جمله‌ی کامل («نکته‌هایی برایِ متنِ دقیق‌تر و جداشدنِ درستِ گوینده‌ها»)، متنِ خنثی (`--ink-2`)، برچسبِ «بخوانید» + شورونِ چرخان، hover/open با حاشیه‌ی طلایی، `focus-visible`. متنِ نکته‌ها و رفتارِ `<details>` دست‌نخورده.
+- **فایل‌ها:** `public/index.html` (CSS `.rec-tips*` + `<summary>`).
+- **Commit/Deploy (به دستورِ مالک):** commit با `git apply --cached` فقط دو هانکِ همین کار؛ کارِ نیمه‌تمامِ نشست‌هایِ دیگر در `index.html`/`stt.routes.ts` commit و deploy نشد. پیش از deploy sha1ِ (بدونِ CR) `public/index.html` در production با `7d4f959` یکسان بود (`6a039abb752f`)؛ پشتیبان `/root/backups/index.html-pre-tips-20260930-160905`؛ فقط همان فایل جایگزین شد (بدونِ restart/migration؛ `no-cache`)؛ sha1ِ بعد `1faec2da30b9` = `git show HEAD:public/index.html`؛ `/api/health` ok؛ `rec-tips-ico` در صفحه‌یِ سرو‌شده. **توجه:** فایلِ مستقر = blobِ HEAD (شاملِ commitهایِ `7d4f959` + `db50bf0`)، نه working tree.
+- **تست / تأیید:** parseِ اسکریپتِ inlineِ HEAD سالم (`node --check`)؛ رندرِ CSS/HTMLِ واقعیِ commit در مرورگر (صفحه‌ی آزمایشی در scratchpad، نه SPAِ کامل) در تمِ تیره/روشن، حالتِ بسته/باز، عرضِ ۴۸۰px بررسی شد. SPAِ کاملِ پشتِ ورود تست نشد.
+- **عامل:** این نشست
+- **کارِ باز:** بررسیِ روی گوشیِ واقعی؛ `.claude/launch.json` (untracked) یک configِ `tips-preview` گرفت.
+
 ### 2026-09-30 — CODE + DEPLOY — بازطراحیِ فشرده‌ی «بررسیِ میکروفون و اتصال» در Setup؛ commit `7d4f959` + deployِ فقط `public/index.html`
 - **چه شد:** سه ردیفِ بزرگِ قبلی (دو banner + دکمه‌ی تمام‌عرض) به یک ردیف تبدیل شد: دو pill وضعیت (میکروفون / رونویسی، آیکون + نقطه‌ی رنگی، حالت‌هایِ checking/ok/warn/error) + دکمه‌ی آیکونیِ «بررسی دوباره». پیامِ بلندِ هشدار/خطا فقط در صورتِ نیاز زیرِ ردیف (`.pf-note`) می‌آید. فقط توکن‌هایِ موجودِ سیستمِ طراحی (sage/gold/clay). رفتارِ `runPreflight`/`updateStartButtonState` بدونِ تغییر (فقط تابعِ کمکیِ `pfSet`)؛ idهایِ `preflightMicRow`/`preflightSttRow`/`preflightBox` حفظ شد.
 - **فایل‌ها:** `public/index.html` (HTMLِ بلوکِ preflight، CSS `.pf-*`، `pfSet` + `runPreflight`).
