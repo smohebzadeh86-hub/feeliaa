@@ -398,6 +398,15 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-09-30 — CODE + DEPLOY — بازطراحیِ فشرده‌ی «بررسیِ میکروفون و اتصال» در Setup؛ commit `7d4f959` + deployِ فقط `public/index.html`
+- **چه شد:** سه ردیفِ بزرگِ قبلی (دو banner + دکمه‌ی تمام‌عرض) به یک ردیف تبدیل شد: دو pill وضعیت (میکروفون / رونویسی، آیکون + نقطه‌ی رنگی، حالت‌هایِ checking/ok/warn/error) + دکمه‌ی آیکونیِ «بررسی دوباره». پیامِ بلندِ هشدار/خطا فقط در صورتِ نیاز زیرِ ردیف (`.pf-note`) می‌آید. فقط توکن‌هایِ موجودِ سیستمِ طراحی (sage/gold/clay). رفتارِ `runPreflight`/`updateStartButtonState` بدونِ تغییر (فقط تابعِ کمکیِ `pfSet`)؛ idهایِ `preflightMicRow`/`preflightSttRow`/`preflightBox` حفظ شد.
+- **فایل‌ها:** `public/index.html` (HTMLِ بلوکِ preflight، CSS `.pf-*`، `pfSet` + `runPreflight`).
+- **Commit/Deploy (به دستورِ مالک):** commit از worktreeِ تمیز روی `4d61177` فقط با هانک‌هایِ همین کار؛ کارِ نیمه‌تمامِ نشستِ دیگر (`stt.routes.ts`، بقیه‌ی `index.html`) در working tree دست‌نخورده و **commit/deploy نشده** ماند. پیش از deploy sha1ِ `public/index.html` در production با `4d61177` یکسان بود (`5c7955ea…`)؛ پشتیبان `/root/backups/index.html-pre-pf-strip-<ts>`؛ فقط همان فایل جایگزین شد (بدونِ restart/migration؛ `no-cache`)؛ sha1ِ بعد `6a039abb…` = worktree؛ `/api/health` ok و `pf-strip` در صفحه‌یِ سرو‌شده.
+- **تست / تأیید:** parseِ اسکریپتِ inline سالم؛ بررسیِ بصری در مرورگر **انجام نشد** (نیازمندِ ورود/mock).
+- **عامل:** این نشست
+- **FINDING:** هنگامِ ثبتِ همین ورودی، `PROJECT_STATUS.md`ِ working tree به‌خطایِ اسکریپتِ این نشست خالی شد؛ دو ورودیِ commit‌نشده‌یِ نشستِ دیگر («یادداشتِ پیش از جلسه») از transcriptِ همان نشست بازسازی شد — متنِ آن‌ها باید بازبینی شود.
+- **کارِ باز / پیامد:** بررسیِ بصریِ light/dark و موبایل (زیرِ ۴۲۰px برچسبِ pill پنهان است).
+
 ### 2026-09-30 — DEPLOY — `dad0147` (رفعِ ارسالِ دوباره‌ی پیش‌نویسِ صدا) رویِ production؛ فقط `public/index.html`
 - **درخواستِ مالک:** «ادامه بده» (پس از اعلامِ برنامه: تست‌ها ⇒ commit ⇒ deploy).
 - **پیش از deploy:** checksumِ بی‌CRِ `index.html`ِ production = `aba0783` (بدونِ drift)؛ فقط این فایل بینِ `aba0783` و `dad0147` در `server/`+`public/` فرق دارد؛ preflight **GO** (همه ۰).
