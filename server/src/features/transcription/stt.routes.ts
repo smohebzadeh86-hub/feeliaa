@@ -95,13 +95,15 @@ export async function sttRoutes(app: FastifyInstance) {
       reply.code(500);
       return { error: 'کلید Soniox روی سرور تنظیم نشده', code: 'no-key' };
     }
-    const { session_id, purpose: rawPurpose } = (request.body ?? {}) as {
+    const { session_id: rawSessionId, purpose: rawPurpose } = (request.body ?? {}) as {
       session_id?: string;
       purpose?: string;
     };
     // 'pre-note' (2026-09-30): متنِ زنده‌ی یادداشتِ صوتیِ پیش از جلسه — جلسه هنوز ساخته نشده، پس session_id ندارد.
     // فقط نمایشِ زنده؛ متنِ ذخیره‌شده همچنان از صدایِ آپلودشده روی سرور می‌آید.
     const purpose = rawPurpose === 'note' ? 'note' : rawPurpose === 'pre-note' ? 'pre-note' : 'transcript';
+    // pre-note جلسه ندارد؛ session_idِ ارسالی نادیده گرفته می‌شود تا رشته‌ی دلخواه وارد clientReferenceId/لاگ نشود.
+    const session_id = purpose === 'pre-note' ? undefined : rawSessionId;
     if (!session_id && purpose !== 'pre-note') {
       reply.code(400);
       return { error: 'session_id الزامی است' };
