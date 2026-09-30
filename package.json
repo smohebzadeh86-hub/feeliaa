@@ -13,6 +13,7 @@
     "test:llm": "pnpm --filter server exec tsx ../scripts/llm-harness.ts",
     "test:api": "pnpm --filter server exec tsx ../scripts/api-contract-harness.mts",
     "test:routes": "pnpm --filter server exec tsx ../scripts/route-snapshot.ts",
-    "test:arch": "node scripts/check-backend-boundaries.mjs"
+    "test:arch": "node scripts/check-backend-boundaries.mjs",
+    "test:docs": "node scripts/check-docs.mjs"
   }
 }

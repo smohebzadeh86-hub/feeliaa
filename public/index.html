@@ -1993,6 +1993,7 @@ function formatTimer(ms){const s=Math.floor(ms/1000);return toFa(pad2(Math.floor
 function showBanner(k,m){bannerBox.innerHTML='<div class="banner '+k+'">'+m+'</div>';}
 function clearBanner(){bannerBox.innerHTML='';}
 // تحلیلِ تجربه‌ی کاربری (Clarity): فقط نامِ رویداد از allowlistِ public/feelia-analytics.js — هرگز داده. fail-open.
+// ===== [feature:client-config] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 function uxTrack(name){try{if(window.FeeliaAnalytics)window.FeeliaAnalytics.event(name);}catch(e){}}
 // پیامِ خطای میکروفون بر اساسِ نوعِ خطای واقعیِ مرورگر — نه یک جمله‌ی عمومی برای همه‌چیز.
 // قدم ۳ (پروژه فیلیا): افتراقی برای هر name جدا + WebView + ناامن بودن صفحه.
@@ -2285,6 +2286,7 @@ function cleanDirectText(t){
   s=s.replace(/\n{3,}/g,'\n\n').trim();
   return s;
 }
+// ===== [feature:legacy-ws] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 async function startDirectLive(){
   directFallbackDone=false;
   directFinalText='';
@@ -2923,6 +2925,7 @@ function resetPasswordVisibility(){
   btn.setAttribute('aria-label','نمایشِ رمز');
   btn.setAttribute('aria-pressed','false');
 }
+// ===== [feature:auth] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 function toggleAuthMode(){
   authMode=authMode==='login'?'register':'login';
   $('authNameField').hidden=authMode!=='register';
@@ -3138,6 +3141,7 @@ let adminDeleteTargetTherapist=null;
 let adminDeleteTargetClient=null;
 let currentAdminTherapistId=null;
 
+// ===== [feature:admin] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 async function openAdminPanel(){
   if(hasActiveRecording()){
     showBanner('warn','ابتدا جلسه‌ی زنده را پایان دهید یا لغو کنید.');
@@ -4183,6 +4187,7 @@ function loadTuCatalog(){
   }).catch(function(){tuCatalogPromise=null;return null;});
   return tuCatalogPromise;
 }
+// ===== [feature:treatment-unit] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 function tuUnit(code){return tuCatalog?tuCatalog.unit_types.find(function(u){return u.code===code;}):null;}
 function tuRole(code){return tuCatalog?tuCatalog.roles.find(function(r){return r.code===code;}):null;}
 function tuDefaultPreset(u){return (u.presets||[]).find(function(p){return p.default;})||(u.presets||[])[0]||null;}
@@ -4909,6 +4914,7 @@ function flushUploadPreNotes(){
 }
 if(window.FeeliaUpload)window.FeeliaUpload.onChange(flushUploadPreNotes);
 
+// ===== [feature:clients] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 async function loadClients(){
   try{
     $('skeletonList').hidden=false;
@@ -6230,6 +6236,7 @@ async function answerCaseFileAutoPrompt(enabled){
   }catch(e){showBanner('error',e.message);}
 }
 
+// ===== [feature:case-file] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 function renderCaseFile(){
   const sec=$('caseFileSection');
   const rec=currentCaseFile&&currentCaseFile.record;
@@ -6886,6 +6893,7 @@ function ftButton(label,fn,cls){
   const b=document.createElement('button');b.className='btn btn-sm '+(cls||'btn-ghost');b.textContent=label;
   b.addEventListener('click',fn);return b;
 }
+// ===== [feature:final-transcript] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 function renderFinalTranscript(){
   const bar=$('finalTranscriptBar');
   const s=currentViewSession,st=ftState;
@@ -7177,6 +7185,7 @@ function renderSetupChips(){
   const d=new Date();
   $('setupChips').innerHTML='<span class="sum-chip">'+IC_CAL+toFa(toJalali(d))+'</span><span class="sum-chip">'+IC_CLK+nowClock()+'</span>';
 }
+// ===== [feature:sessions] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 function setupNewSession(client){
   currentClient=client;
   clearBanner();
@@ -7363,6 +7372,7 @@ function stopDurationAutosave(){
 // این glue وقتی feelia-rt.js لود شده باشد، lifecycle جدید را صاحب می‌شود.
 let rtSession=null;
 let rtVoice=null;
+// ===== [feature:transcription] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 async function startNewRTSession(){
   rtSession=window.FeeliaRT.createSession(currentSession.id,{mode:'live',
     onState:rtOnState,
@@ -7919,6 +7929,7 @@ async function removeSignMarkerFromTranscript(sessionId,s){
 }
 
 // ⭐ فیکس اصلی: addEventListener + DOM createElement — بجای innerHTML با onclick
+// ===== [feature:notes] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 function renderSignsLog(){
   const log=$('signsLog');
   log.innerHTML='';
@@ -9024,6 +9035,7 @@ function uploadExtOf(name){const m=/\.([a-zA-Z0-9]{1,6})$/.exec(String(name||'')
 // از صفحه‌ی Setup: بعد از شروعِ آپلود به پرونده‌ی همین مراجع می‌رویم (همان‌جا وضعیتِ پردازش دیده می‌شود)،
 // نه اینکه تراپیست رویِ صفحه‌ی «جلسه‌ی جدید» بماند. انصراف از مودال روی Setup می‌ماند.
 let audioUploadFromSetup=false;
+// ===== [feature:audio-upload] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 function openAudioUploadFromSetup(){
   if(!currentClient)return;
   openAudioUploadModal();
@@ -9482,6 +9494,7 @@ async function markAllNotificationsRead(){
   try{await api('/api/notifications/read',{method:'POST',body:{all:true}});}catch(e){}
   refreshProcessing();
 }
+// ===== [feature:notifications] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
 async function openNotification(id){
   const n=procNotifs.find(function(x){return x.id===id;});
   if(!n)return;
