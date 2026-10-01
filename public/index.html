@@ -3346,6 +3346,7 @@ function renderAdminRecentSessions(sessions){
     meta.style.cssText='font-size:11.5px;color:var(--muted);margin-top:4px';
     meta.textContent=adminSessionStatusFa(s.status)+' · طول متن '+toFa(s.transcript_len||0)+' نویسه · '+
       toFa(Math.round((s.audio_duration_ms||0)/1000))+' ثانیه صدا · '+toFa(s.audio_count||0)+' سگمنت صدا · '+
+      (s.last_recording_at?'آخرین ضبط: '+fmtDateTime(s.last_recording_at)+' · ':'')+
       'آخرین نوشتن: '+fmtDateTime(s.updated_at);
     row.appendChild(title);
     row.appendChild(meta);
@@ -4270,7 +4271,8 @@ async function openAdminClientSessions(clientId,title){
       // (2026-09-26) مدت با fmtDur (نه گرد به دقیقه: جلسه‌ی ۲۰ثانیه‌ای «۰ دقیقه» می‌شد) + طولِ متن + وضعیتِ بازیابیِ متن
       date.textContent=(s.date?toFa(s.date):'بدونِ تاریخ')+(isLiveRow?' · شروع '+toFa(s.start_time):'')+(s.duration_ms?' · '+fmtDur(s.duration_ms):'')
         +adminSourceLabel(s.source)+(s.consent?' · رضایت ✓':' · بدونِ رضایت')
-        +' · متن '+toFa(Number(s.transcript_len||0).toLocaleString('en-US'))+' نویسه';
+        +' · متن '+toFa(Number(s.transcript_len||0).toLocaleString('en-US'))+' نویسه'
+        +(s.last_recording_at?' · آخرین ضبط '+fmtDateTime(s.last_recording_at):'');
       div.appendChild(date);
       const progress=s.source==='upload'
         ?(s.batch_status==='queued'||s.batch_status==='processing'?'فایل در حالِ پردازش':s.batch_status==='failed'?'پردازشِ فایل ناموفق':'')

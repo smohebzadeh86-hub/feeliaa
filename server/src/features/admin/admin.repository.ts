@@ -54,16 +54,18 @@ export async function getClientBrief(id: string): Promise<any> {
   return (await query('SELECT id, code, alias FROM clients WHERE id = ?', [id])).rows[0];
 }
 
+// (2026-10-01) ترتیب: آخرین ضبطِ صدایِ جلسه (kind='session')، وگرنه زمانِ ساختِ جلسه — تازه‌ترین بالا.
 export async function listSessionsOfClient(clientId: string): Promise<any[]> {
   const sessions = await query(`
       SELECT s.id, s.session_num, s.date, s.start_time, s.duration_ms, s.status, s.source, s.consent,
-        s.updated_at, s.batch_status, s.auto_closed_at, s.realtime_reliable, CHAR_LENGTH(COALESCE(s.transcript, '')) as transcript_len,
-        COUNT(a.id) as audio_count
+        s.created_at, s.updated_at, s.batch_status, s.auto_closed_at, s.realtime_reliable, CHAR_LENGTH(COALESCE(s.transcript, '')) as transcript_len,
+        COUNT(a.id) as audio_count,
+        MAX(CASE WHEN a.kind = 'session' THEN a.created_at END) AS last_recording_at
       FROM sessions s
       LEFT JOIN session_audio a ON a.session_id = s.id
       WHERE s.client_id = ?
       GROUP BY s.id
-      ORDER BY s.session_num DESC
+      ORDER BY COALESCE(MAX(CASE WHEN a.kind = 'session' THEN a.created_at END), s.created_at) DESC, s.session_num DESC
     `, [clientId]);
   return sessions.rows;
 }
@@ -163,12 +165,13 @@ export async function listRecentSessions(conditions: string[], params: unknown[]
               (SELECT COUNT(*) FROM session_audio a WHERE a.session_id = s.id) AS audio_count,
               (SELECT COALESCE(SUM(a.bytes), 0) FROM session_audio a WHERE a.session_id = s.id) AS audio_bytes,
               (SELECT COALESCE(SUM(a.duration_ms), 0) FROM session_audio a WHERE a.session_id = s.id) AS audio_duration_ms,
-              (SELECT COUNT(*) FROM session_notes n WHERE n.session_id = s.id) AS note_count
+              (SELECT COUNT(*) FROM session_notes n WHERE n.session_id = s.id) AS note_count,
+              (SELECT MAX(a.created_at) FROM session_audio a WHERE a.session_id = s.id AND a.kind = 'session') AS last_recording_at
        FROM sessions s
        JOIN clients c ON c.id = s.client_id
        JOIN therapists t ON t.id = c.therapist_id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY s.updated_at DESC
+       ORDER BY COALESCE(last_recording_at, s.created_at) DESC, s.updated_at DESC
        LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );

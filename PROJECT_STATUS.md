@@ -222,6 +222,14 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — CODE — پنلِ ادمین: مرتب‌سازیِ جلسات بر اساسِ آخرین جلسه/آخرین ضبط
+- **چه شد:** درخواستِ مالک. دو فهرستِ جلسه در پنلِ ادمین (`GET /api/admin/clients/:id/sessions` = «جلساتِ ثبت‌شده»ی مراجع، قبلاً `session_num DESC`؛ `GET /api/admin/sessions/recent` = «جلساتِ اخیر»، قبلاً `updated_at DESC`) حالا با `COALESCE(last_recording_at, s.created_at) DESC` مرتب می‌شوند؛ `last_recording_at` = آخرین سگمنتِ `session_audio` با `kind='session'` (یادداشتِ صوتی حساب نمی‌شود). فیلدِ `last_recording_at` به هر دو پاسخ اضافه شد و در UI به‌صورتِ «آخرین ضبط» نمایش داده می‌شود. فیلترِ `since_hours` همچنان رویِ `updated_at` است. بدونِ migration، بدونِ تغییرِ route.
+- **فایل‌ها:** `server/src/features/admin/admin.repository.ts` (`listSessionsOfClient`، `listRecentSessions`)، `public/index.html` (`renderAdminRecentSessions`، `openAdminClientSessions`).
+- **اسنادِ به‌روزشده:** `docs/02-reference/api-catalog.md` (دو ردیف).
+- **تست / تأیید:** `npx tsc --noEmit` تمیز؛ `test:routes` OK (141)؛ `test:arch` OK؛ `test:docs` OK. اجرایِ فقط‌خواندنیِ هر دو تابع رویِ DBِ dev (فقط شناسه/زمان، بدونِ متن): ترتیب نزولی و درست، جلسه‌ی دستیِ بدونِ صدا با `created_at` در جایِ درست. UI در مرورگر رندر نشد.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** commit/deploy نشده.
+
 ### 2026-10-01 — FINDING (اصلاح) — `index.html` ِ production ثبت شده بود
 - **چه شد:** در ورودیِ «GIT + DEPLOY … (`061d0ca`)» نوشتم `public/index.html` ِ production «بدونِ ورودی در Event Log» deploy شده — **نادرست بود.** همان تغییر (دکمه‌ی «کپیِ کلِ متن» به‌صورتِ آیکونِ SVG داخلِ کادرِ متن، commitنشده) در ورودیِ «CODE + DEPLOY (production) — دکمه‌ی کپیِ کلِ متن (آیکونِ SVG کوچک) …» ثبت شده است. همچنان commit نشده و این نشست آن را commit نمی‌کند؛ در deployِ بعدی همان نسخه‌ی production حفظ می‌شود.
 - **عامل:** این نشست.
