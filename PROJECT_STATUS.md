@@ -222,6 +222,16 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — DEPLOY (production) — نگهداریِ صدا ۳۰ روز
+- **انجام شد با مجوزِ صریحِ مالک:** فقط تغییرِ «۱۴ ⇒ ۳۰ روز» (`archive/store.ts`، `uploadStore.ts`، متنِ `public/index.html` و کامنت‌ها) از worktreeِ تمیزِ `0a04829` ساخته و deploy شد؛ کارِ نیمه‌تمامِ نشستِ دیگر (pre-note، migration 035، STT context) در working tree **نرفت**. پیش از deploy checksumِ `server/src`+`public` با HEAD مقایسه شد: تنها اختلافِ production با پایه همین ۷ فایل بود.
+- Preflight (§5.1): GO (همه‌ی شمارنده‌ها ۰). پشتیبانِ کد: `/root/backups/code-pre-ret30-<ts>.tar.gz`. `pnpm install --frozen-lockfile`، build، `pm2 restart feelia-mysql` ⇒ بدونِ migrationِ جدید (آخرین 034)، `/api/health` = ok/connected؛ `dist` و `index.html` روی سرور شاملِ مقدارِ ۳۰ روز تأیید شد. تست‌هایِ پیش از deploy: `test:up` 54/54، `test:routes` OK، `tsc` OK.
+- **وضعیت:** production اکنون صدا را ۳۰ روز نگه می‌دارد. اسنادِ هم‌گام‌شده هنوز commit نشده‌اند (فقط working tree). R1/R18 باز.
+
+### 2026-10-01 — CODE+DOCS — نگهداریِ صدا از ۱۴ روز به ۳۰ روز (یک ماه) — فقط working tree، deploy نشده
+- **تصمیمِ مالک:** «ذخیره‌سازیِ صداها بشه یک ماه». `RETENTION_MS` در `server/src/features/transcription/archive/store.ts` ⇒ ۳۰ روز (sweepِ آرشیو و «روزهایِ باقی‌مانده»ِ ادمین `SESSION_AUDIO_RETENTION_MS` از همین مشتق می‌شوند)؛ جاروبِ فایلِ خامِ آپلود (`uploadStore.ts`، `INTERVAL 30 DAY`) هم‌تراز شد. **بدونِ تغییر:** آپلودِ نیمه‌کاره ۷ روز، صفِ مرورگر ۷ روز، `batch-queue` ۲۴ ساعت، پنجره‌یِ نمایِ jobهایِ ادمین/آپلود (۱۴ روز — نمای است نه صدا).
+- متنِ UI (`public/index.html`: زیرعنوانِ مراجع/ادمین و فیلتر) و کامنت‌ها و اسنادِ مالک (LAW-009/010، config/error catalog، subsystem 02/05/06، PRDها، glossary) به ۳۰ روز هم‌گام شد. R1/R18 (تعارضِ متنِ رضایت) همچنان باز است؛ مدتِ طولانی‌تر آن را تشدید می‌کند.
+- **تست:** `tsc --noEmit` OK، `test:docs` OK، `test:up` 54/54. **Deploy نشده** — برایِ اعمال رویِ production نیاز به deploy (سرور + `public/index.html`) و مجوزِ صریح است؛ فایل‌هایِ موجود با sweepِ بعدی با آستانه‌یِ جدید سنجیده می‌شوند.
+
 ### 2026-10-01 — GIT — push شاخه‌ی `feat/clarity` به origin (`f34c98f..aef35a6`)
 - **مجوزِ مالک:** «push کن». push عادی (بدونِ force) به `https://github.com/smohebzadeh86-hub/feeliaa.git`.
 - **commitهایِ push‌شده (۶):** `6f2e6d5` (پنلِ ادمین: زنده/صف/سلامت)، `64a8914` (status آن deploy)، `bc71bae` (timezoneِ تهران در فرانت)، `f9b6489` (status deployِ آن)، `a522116` (status اصلاحِ ۹ جلسه‌یِ قدیمی)، `aef35a6` (برچسبِ «زمانِ آپلود»). همه پیش‌تر روی production اعمال شده بودند (کد/فایلِ استاتیک؛ اصلاحِ داده مستقیم رویِ DB).
