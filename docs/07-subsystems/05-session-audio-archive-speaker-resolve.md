@@ -22,6 +22,7 @@
 | DB | (از 017) seq را **سرور** زیرِ قفلِ per-session (`withSessionLock`) با `MAX(seq)+1` تعیین می‌کند؛ `sha256` تکراری ⇒ no-op (idempotent)؛ `UNIQUE(session_id, run_id, seq)` — هیچ archiveِ موفقی بازنویسی نمی‌شود |
 | دسترسی | فقط ادمین: فهرست (شاملِ `duration_ms`) + stream با Range و `?download=1` اختیاری (`Content-Disposition: attachment`)؛ از static سرو نمی‌شود |
 | sweep | startup + هر ۲۴h: ردیف‌های `created_at < now-30d` → حذفِ فایل و ردیف؛ پوشه‌های خالی حذف |
+| kindِ فایلِ صفِ ۲۴ساعته | جاروبِ صفِ batch (`batch/sweep.ts`) پیش از حذف همان kindِ `processQueue` را می‌گذارد (`archiveKindForFile`): `.prenote.` ⇒ `prenote`، `.note.`/`.notearchive.` ⇒ `note`، بقیه ⇒ `session`. پیش از 2026-10-01 `.prenote.` به‌اشتباه `session` آرشیو می‌شد و یادداشتِ صوتیِ درمانگر داخلِ صدایِ کاملِ جلسه می‌رفت |
 
 ### باگِ رفع‌شده — نمایشِ `0:00` در پخش‌کننده‌ی ادمین (2026-09-16)
 **ریشه:** خروجیِ خامِ `MediaRecorder`ِ مرورگر (محدودیتِ شناخته‌شده‌ی Chromium) عنصرِ Duration را در هدرِ WebM نمی‌نویسد → `audio.duration` مرورگر `Infinity`/`NaN` می‌شود و `<audio controls>` آن را `0:00` نشان می‌دهد. **تأییدِ مستقیم در مرورگرِ واقعی:** فایلِ headerless بدونِ ری‌ماکس `duration=Infinity` خواند؛ همان فایل بعدِ ری‌ماکسِ `-c copy` را `duration=4.008` (برابرِ طولِ واقعیِ کلیپِ تست) خواند.

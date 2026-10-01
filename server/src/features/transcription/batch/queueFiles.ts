@@ -106,6 +106,13 @@ export function isNoteArchiveFile(f: string): boolean {
 export function isPreNoteFile(f: string): boolean {
   return f.includes('.prenote.');
 }
+// kindِ آرشیوِ ادمین (session_audio.kind) از رویِ نامِ فایلِ صف — همان نگاشتِ processQueue.
+// ⭐ (2026-10-01) جاروبِ ۲۴ساعته قبلاً `.prenote.` را 'session' آرشیو می‌کرد ⇒ یادداشتِ صوتیِ درمانگر داخلِ صدایِ کاملِ جلسه می‌رفت.
+export function archiveKindForFile(f: string): 'session' | 'note' | 'prenote' {
+  if (isPreNoteFile(f)) return 'prenote';
+  if (isNoteFile(f) || isNoteArchiveFile(f)) return 'note';
+  return 'session';
+}
 
 // seq/run/mime از اسمِ فایل استخراج می‌شه (فرمت:
 // <sessionId>-<seqِ ۶رقمی>-<runId>-<timestamp>[.note|.archive|.late|.notearchive|.prenote].<webm|ogg|m4a>)

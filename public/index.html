@@ -994,6 +994,10 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
       <span>صفِ پردازش</span>
     </button>
+    <button class="admin-nav-item" data-admin-nav="quality" onclick="FeeliaAdminQuality.open()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+      <span>کیفیتِ رونویسی</span>
+    </button>
     <button class="admin-nav-item" data-admin-nav="system" onclick="openAdminSystem()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
       <span>سلامتِ سیستم</span>
@@ -1089,6 +1093,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     </div>
     <!-- تشخیصِ جلسه (audit ذخیره‌سازی 2026-09-26): «چه اتفاقی افتاد؟» — GET /api/admin/sessions/:id/diagnosis -->
     <div id="adminSessionDiagnosis" style="margin-bottom:14px"></div>
+    <div id="adminFtHistory" style="margin-bottom:14px" hidden></div>
     <div class="transcript-box" id="adminSessionDetailTranscript"></div>
     <div id="adminSessionDetailNotes" style="margin-top:14px"></div>
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminSessionDetail()">بازگشت</button>
@@ -1220,6 +1225,27 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <div id="adminQueueList"></div>
     <div class="empty" id="adminQueueEmpty" hidden><p>موردی یافت نشد</p></div>
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="loadAdminQueue()">به‌روزرسانی</button>
+  </section>
+
+  <!-- «کیفیتِ رونویسی» (Session Data Engine، 2026-10-01) — منطق در public/feelia-admin-quality.js -->
+  <section id="screenAdminQuality" class="card screen" data-clarity-mask="true" hidden>
+    <div class="card-head">
+      <h2>کیفیتِ رونویسی</h2>
+      <p>جلساتِ آپلودی، بدترین اول: پوششِ متن نسبت به صدایِ گفتاری، حفره‌ها، گوینده‌ها و اطمینان — فقط عدد، بدونِ متن. جلساتِ پیش از ۹ مهر ۱۴۰۵ سنجیده نشده‌اند.</p>
+    </div>
+    <div id="adminQualityStats" class="admin-stats"></div>
+    <div class="admin-row-meta" id="adminQualityFlags"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+      <select id="adminQualityTherapist" onchange="FeeliaAdminQuality.load()"><option value="">همه‌ی تراپیست‌ها</option></select>
+      <select id="adminQualityDays" onchange="FeeliaAdminQuality.load()">
+        <option value="7">۷ روزِ اخیر</option>
+        <option value="30" selected>۳۰ روزِ اخیر</option>
+        <option value="90">۹۰ روزِ اخیر</option>
+      </select>
+    </div>
+    <div id="adminQualityList"></div>
+    <div class="empty" id="adminQualityEmpty" hidden><p>هنوز جلسه‌ی آپلودیِ سنجیده‌شده‌ای نیست</p></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="FeeliaAdminQuality.load()">به‌روزرسانی</button>
   </section>
 
   <section id="screenAdminSystem" class="card screen" data-clarity-mask="true" hidden>
@@ -1884,6 +1910,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
 <script src="/feelia-analytics.js"></script>
 <script src="/feelia-obs.js"></script>
 <script src="/feelia-upload.js"></script>
+<script src="/feelia-admin-quality.js"></script>
 <script>
 'use strict';
 
@@ -2722,11 +2749,11 @@ function updateSteps(idx){
   }
 }
 // (B1) صفحه‌هایِ ادمین ⇒ کدام آیتمِ sidebar فعال است. AdminSessionDetail از چند جا باز می‌شود (adminDetailReturn).
-const ADMIN_SCREEN_NAV={Admin:'overview',AdminTherapist:'overview',AdminSessions:'overview',AdminSessionDetail:null,AdminActivity:'activity',AdminSessionTimeline:'activity',AdminAudio:'audio',AdminVoiceNotes:'voice',AdminLive:'live',AdminQueue:'queue',AdminSystem:'system'};
+const ADMIN_SCREEN_NAV={Admin:'overview',AdminTherapist:'overview',AdminSessions:'overview',AdminSessionDetail:null,AdminActivity:'activity',AdminSessionTimeline:'activity',AdminAudio:'audio',AdminVoiceNotes:'voice',AdminLive:'live',AdminQueue:'queue',AdminQuality:'quality',AdminSystem:'system'};
 let adminDetailReturn='sessions';
 let adminTimelineReturn='activity';
 function showScreen(name){
-  ['Auth','Clients','AllClients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions','AdminSessionDetail','AdminActivity','AdminSessionTimeline','AdminAudio','AdminVoiceNotes','AdminLive','AdminQueue','AdminSystem'].forEach(s=>{
+  ['Auth','Clients','AllClients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions','AdminSessionDetail','AdminActivity','AdminSessionTimeline','AdminAudio','AdminVoiceNotes','AdminLive','AdminQueue','AdminQuality','AdminSystem'].forEach(s=>{
     const el=$('screen'+s);
     if(el)el.hidden=s!==name;
   });
@@ -2735,7 +2762,7 @@ function showScreen(name){
   const nav=$('adminNav');
   if(nav){
     nav.hidden=!isAdminScreen;
-    const sec=isAdminScreen?((name==='AdminSessionTimeline'&&adminTimelineReturn==='live'?'live':ADMIN_SCREEN_NAV[name])||({audio:'audio',voice:'voice',live:'live',queue:'queue'}[adminDetailReturn])||'overview'):null;
+    const sec=isAdminScreen?((name==='AdminSessionTimeline'&&adminTimelineReturn==='live'?'live':ADMIN_SCREEN_NAV[name])||({audio:'audio',voice:'voice',live:'live',queue:'queue',quality:'quality'}[adminDetailReturn])||'overview'):null;
     nav.querySelectorAll('[data-admin-nav]').forEach(function(b){
       const on=b.dataset.adminNav===sec;
       b.classList.toggle('active',on);
@@ -3112,6 +3139,7 @@ async function doLogout(purgeLocalUploads){
   $('adminBtn').hidden=true;
   // آپلودِ در جریان متوقف می‌شود (فایل در IndexedDB برایِ همان حساب می‌ماند و بعد از ورودِ دوباره ادامه می‌یابد).
   try{if(window.FeeliaUpload)window.FeeliaUpload.setTherapist(null);}catch(e){}
+  try{if(window.FeeliaRT&&window.FeeliaRT.setQueueOwner)window.FeeliaRT.setQueueOwner(null);}catch(e){}
   stopProcessingWatch();
   stopSessionJobPoll();
   $('trayBtn').hidden=true;
@@ -3141,6 +3169,8 @@ async function enterApp(){
   try{
     if(window.FeeliaUpload){window.FeeliaUpload.setTherapist(currentTherapist.id);window.FeeliaUpload.resumePending();}
   }catch(e){}
+  // مالکِ صفِ صدایِ جلسه (مرورگرِ مشترک: صدایِ تراپیستِ دیگر با این حساب فرستاده/حذف نمی‌شود) — پیش از sweepOrphanedAudioQueue.
+  try{if(window.FeeliaRT&&window.FeeliaRT.setQueueOwner)window.FeeliaRT.setQueueOwner(currentTherapist.id);}catch(e){}
   startProcessingWatch();
   showScreen('Clients');
   // fire-and-forget — Clarity هیچ مسیری از ورود را منتظر نمی‌گذارد
@@ -3220,7 +3250,10 @@ async function sweepOrphanedAudioQueue(){
         for(const rec of pending){
           if(!rec.blob||rec.blob.size<=100){await q.remove(rec.id);continue;}
           let done=false;
-          try{
+          // ⭐ (2026-10-01) مرورگرِ مشترک: رکوردِ تراپیستِ دیگر با این حساب فرستاده نمی‌شود (سرور 404 می‌داد) — می‌ماند تا
+          // مالکش وارد شود. رکوردِ قدیمیِ بی‌مالک مثلِ قبل امتحان می‌شود، ولی 404 دیگر حذفش نمی‌کند (uploadQueuedSegment).
+          const mine=!rec.owner||!window.FeeliaRT.isOwnRecord||window.FeeliaRT.isOwnRecord(rec);
+          if(mine)try{
             done=await window.FeeliaRT.uploadQueuedSegment(sid,rec);
             if(done)await q.remove(rec.id);
           }catch(e){/* شکستِ شبکه — توی صف می‌مونه، بارِ بعدِ بازکردنِ اپ امتحان می‌شه */}
@@ -4387,6 +4420,7 @@ async function openAdminSessionDetail(sessionId,clientTitle){
     tBox.textContent=s.transcript||'(متنی ثبت نشده)';
     attachTranscriptExpander(tBox,s.transcript||'',s.duration_ms,transcriptProgressNote(s));
     renderAdminSessionDiagnosis(sessionId);
+    try{if(window.FeeliaAdminQuality)window.FeeliaAdminQuality.renderFtHistory(sessionId);}catch(e){}
     const nb=$('adminSessionDetailNotes');
     nb.innerHTML='';
     const adminNotes=withLegacyPreNote(s,data.notes||[]);
@@ -4446,6 +4480,7 @@ function closeAdminSessionDetail(){
   if(adminDetailReturn==='audio'){adminDetailReturn='sessions';showScreen('AdminAudio');return;}
   if(adminDetailReturn==='voice'){adminDetailReturn='sessions';showScreen('AdminVoiceNotes');return;}
   if(adminDetailReturn==='queue'){showScreen('AdminQueue');return;}
+  if(adminDetailReturn==='quality'){showScreen('AdminQuality');return;}
   showScreen('AdminSessions');
 }
 async function adminDeleteClient(clientId){

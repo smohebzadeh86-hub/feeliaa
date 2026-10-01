@@ -15,6 +15,7 @@ import {
 import { polishTranscript } from './application/polishTranscript.js';
 import { DEFAULT_GUARD_LIMITS } from './domain/polishGuards.js';
 import { createTranscriptLlm } from './adapters/llmJson.js';
+import { lockCurrent, snapshotBaselineIfMissing, appendCurrentAsVersion } from './adapters/versionStore.js';
 
 const LEASE_SECONDS = 20 * 60;
 const HEARTBEAT_MS = 60_000;
@@ -77,11 +78,15 @@ export const sqlFtStore: FtStore = {
     const conn = await pool.getConnection();
     try {
       await conn.beginTransaction();
+      // تاریخچه (migration 037): متنِ قبلیِ پیش از 037 اول کپی می‌شود، بعد نسخه‌ی تازه — هیچ ساختی نسخه‌ی قبلی را گم نمی‌کند.
+      await lockCurrent(conn, job.sessionId);
+      await snapshotBaselineIfMissing(conn, job.sessionId);
       const [r] = await conn.query(
         `UPDATE final_transcripts SET stage = 'done', clean_text = ?, clean_turns = ?, polish_report = ?, error_code = NULL, attempts = 0,
            finished_at = NOW(), locked_until = NULL WHERE session_id = ?`,
         [cleanText, turns ? JSON.stringify(turns) : null, JSON.stringify(report ?? {}), job.sessionId]);
       if ((r as any).affectedRows) {
+        await appendCurrentAsVersion(conn, job.sessionId, 'generated', null);
         // job_id = session_id: یک اعلان به ازایِ هر جلسه (UNIQUE(job_id, kind)) — retry اعلانِ تکراری نمی‌سازد.
         await createNotification({ therapistId: job.therapistId, kind: 'final_transcript_ready', clientId: job.clientId, sessionId: job.sessionId, jobId: job.sessionId }, conn);
       }

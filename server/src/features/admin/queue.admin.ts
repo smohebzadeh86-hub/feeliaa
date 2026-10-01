@@ -1,7 +1,7 @@
 // ادمین: صفِ پردازشِ سراسری (آپلودِ صدا / متنِ نهایی / batch) — فقط متادیتا (LAW-001: بدونِ متن و نامِ فایلِ اصلی)
 // + دو اقدامِ «تلاشِ دوباره» (با ممیزی). pluginِ فرزندِ adminRoutes (requireAdmin).
 import { FastifyInstance } from 'fastify';
-import { listAdminUploadJobs, countAdminUploadJobsByStage, retryFailedAudioJob } from '../audio-upload/index.js';
+import { listAdminUploadJobs, countAdminUploadJobsByStage, retryFailedAudioJob, listAdminUploadQuality } from '../audio-upload/index.js';
 import { retryFinalTranscript } from '../final-transcript/index.js';
 import { pendingAudiosFor } from '../transcription/index.js';
 import { recordAudit } from '../../obs/audit.js';
@@ -50,6 +50,13 @@ export async function queueAdminRoutes(app: FastifyInstance) {
       batch,
       counts: { upload: uploadCounts, final_transcript: ftCountMap, batch: batchCounts },
     };
+  });
+
+  // GET /api/admin/upload-quality?therapist_id=&days= — «کیفیت به عدد»ِ جلساتِ آپلودی، بدترین اول + جمع‌بندی (فقط عدد/پرچم).
+  app.get('/api/admin/upload-quality', async (request) => {
+    const q = request.query as { therapist_id?: string; days?: string };
+    const therapistId = q.therapist_id && UUID_RE.test(q.therapist_id) ? q.therapist_id : null;
+    return listAdminUploadQuality({ therapistId, days: q.days ? Number(q.days) : null });
   });
 
   // POST /api/admin/audio-jobs/:id/retry — همان منطقِ retryِ تراپیست (audio-upload/jobRetry.ts) بدونِ قیدِ مالکیت.

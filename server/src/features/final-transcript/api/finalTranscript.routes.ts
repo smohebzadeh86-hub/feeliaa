@@ -2,7 +2,8 @@
 import type { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../../auth/guard.js';
 import { getOwnedSession } from '../../../db/ownership.js';
-import { query } from '../../../db/connection.js';
+import { query, pool } from '../../../db/connection.js';
+import { lockCurrent, snapshotBaselineIfMissing, appendCurrentAsVersion } from '../adapters/versionStore.js';
 import { logEvent } from '../../../obs/eventLog.js';
 import { retryFinalTranscript, enqueueFinalTranscript } from '../runner.js';
 import { treatmentUnits } from '../../treatment-unit/index.js';
@@ -72,10 +73,26 @@ export async function finalTranscriptRoutes(app: FastifyInstance) {
     }, allowedRoles(await treatmentUnits.sessionSpeakerRoster(id), turns));
     if (!res.ok) { reply.code(400); return { error: res.error === 'bad-role' ? 'نقشِ نامعتبر' : 'نوبتِ نامعتبر', code: res.error }; }
     if (res.changed) {
-      const u = await query(
-        `UPDATE final_transcripts SET clean_text = ?, clean_turns = ? WHERE session_id = ? AND stage = 'done' AND finished_at <=> ?`,
-        [res.text, JSON.stringify(res.turns), id, row.finished_at]);
-      if (!u.rowCount) { reply.code(409); return { error: 'متنِ نهایی هم‌زمان دوباره ساخته شد — صفحه را تازه کنید', code: 'conflict' }; }
+      // تاریخچه (migration 037): نسخه‌ی پیش و پس از اصلاح هر دو می‌مانند؛ همه در یک تراکنش با قفلِ ردیف.
+      const conn = await pool.getConnection();
+      let updated = 0;
+      try {
+        await conn.beginTransaction();
+        await lockCurrent(conn, id);
+        await snapshotBaselineIfMissing(conn, id);
+        const [u] = await conn.query(
+          `UPDATE final_transcripts SET clean_text = ?, clean_turns = ? WHERE session_id = ? AND stage = 'done' AND finished_at <=> ?`,
+          [res.text, JSON.stringify(res.turns), id, row.finished_at]);
+        updated = (u as any).affectedRows || 0;
+        if (updated) await appendCurrentAsVersion(conn, id, 'role_edit', request.therapistId ?? null);
+        await conn.commit();
+      } catch (e) {
+        try { await conn.rollback(); } catch {}
+        throw e;
+      } finally {
+        conn.release();
+      }
+      if (!updated) { reply.code(409); return { error: 'متنِ نهایی هم‌زمان دوباره ساخته شد — صفحه را تازه کنید', code: 'conflict' }; }
       logEvent({ event: 'final_transcript.role_edit', sessionId: id, therapistId: request.therapistId, detail: { count: res.changed, mode: sameSpeaker ? 'speaker' : 'turn' } });
     }
     return { clean_text: res.text, turns: res.turns, changed: res.changed };

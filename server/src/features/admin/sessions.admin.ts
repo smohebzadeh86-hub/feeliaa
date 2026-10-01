@@ -3,7 +3,10 @@
 import { FastifyInstance } from 'fastify';
 import { listSessionAudio, pendingAudiosFor } from '../transcription/index.js';
 import { recordAudit } from '../../obs/audit.js';
+import { listFinalTranscriptVersions, getFinalTranscriptVersion } from '../final-transcript/index.js';
 import { diagnoseSession } from './diagnosis.js';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { liveHealth, LIVE_WINDOW_HOURS } from './liveHealth.js';
 import {
   getSessionWithTranscript, listSessionNotesForAdmin, listRecentSessions, getSessionForDiagnosis, listSessionEventsBrief,
@@ -43,6 +46,24 @@ export async function sessionsAdminRoutes(app: FastifyInstance) {
     // (A6) مشاهده‌ی متنِ بالینیِ یک جلسه توسطِ ادمین ممیزی می‌شود.
     await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.session_view', targetType: 'session', targetId: id });
     return { session, notes };
+  });
+
+  // GET /api/admin/sessions/:id/final-transcript/versions — تاریخچه‌ی «متنِ نهایی» (migration 037)، فقط متادیتا (بدونِ متن).
+  app.get('/api/admin/sessions/:id/final-transcript/versions', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!UUID_RE.test(id)) { reply.code(404); return { error: 'جلسه یافت نشد' }; }
+    return { versions: await listFinalTranscriptVersions(id) };
+  });
+
+  // GET /api/admin/sessions/:id/final-transcript/versions/:v — متنِ یک نسخه؛ مشاهده ممیزی می‌شود (مثلِ متنِ جلسه).
+  app.get('/api/admin/sessions/:id/final-transcript/versions/:v', async (request, reply) => {
+    const { id, v } = request.params as { id: string; v: string };
+    const n = Number(v);
+    if (!UUID_RE.test(id) || !Number.isInteger(n) || n < 1) { reply.code(404); return { error: 'نسخه یافت نشد' }; }
+    const row = await getFinalTranscriptVersion(id, n);
+    if (!row) { reply.code(404); return { error: 'نسخه یافت نشد' }; }
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.session_view', targetType: 'session', targetId: id, detail: { final_transcript_version: n } });
+    return row;
   });
 
   // ————————————————— لایه‌ی رصد/حسابرسی — فازِ ۱ (پنلِ ادمین) —————————————————

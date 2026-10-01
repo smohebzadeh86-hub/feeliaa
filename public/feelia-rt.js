@@ -153,6 +153,13 @@
   // add صراحتاً false برمی‌گردونه تا caller بتونه به کاربر هشدار بده).
   var AUDIO_QUEUE_MAX_BYTES = 300 * 1024 * 1024; // ۳۰۰ مگابایت
 
+  // ⭐ (2026-10-01، Session Data Engine) مالکِ صف: شناسه‌ی تراپیستِ واردشده در این تب (index.html با setQueueOwner).
+  // هر رکورد مالکش را نگه می‌دارد. باگِ واقعی (کد): در مرورگرِ مشترک، جاروبِ صف صدایِ آپلودنشده‌ی تراپیستِ قبلی را
+  // با حسابِ نفرِ بعدی می‌فرستاد؛ سرور برایِ جلسه‌ی غیرمالک 404 می‌دهد (LAW-004) و 404 ⇒ حذفِ محلی ⇒ صدا برایِ همیشه گم.
+  var queueOwner = null;
+  function setQueueOwner(id) { queueOwner = id || null; }
+  function ownedByCurrent(rec) { return (rec.owner || null) === queueOwner; }
+
   var AudioQueueDB = (function () {
     var dbPromise = null;
     function open() {
@@ -228,6 +235,7 @@
           mime: mime || 'audio/webm',
           bytes: blob.size,
           intent: intent || 'archive',
+          owner: queueOwner,
           createdAt: Date.now(),
         };
         return withStore('readwrite', function (store) { return store.put(rec); }).then(function () {
@@ -322,7 +330,9 @@
     };
     return send(purpose).then(function (res) {
       if (res.ok) return true;
-      if (res.status === 404) return true; // جلسه دیگه وجود نداره — نگه‌داشتن بی‌فایده‌ست
+      // جلسه وجود ندارد — یا مالِ تراپیستِ دیگری است (LAW-004 هر دو را 404 می‌کند). فقط وقتی رکورد مالِ همین
+      // تراپیست است حذف می‌شود؛ وگرنه (مالکِ دیگر/رکوردِ قدیمیِ بی‌مالک) می‌ماند تا مالکش وارد شود یا انقضایِ ۷روزه.
+      if (res.status === 404) return ownedByCurrent(rec);
       if (res.status === 400) {
         return res.json().catch(function () { return {}; }).then(function (d) {
           if (d && String(d.error || '').indexOf('کوتاه') >= 0) return true; // غیرقابلِ‌بازیابی
@@ -2145,6 +2155,9 @@
     // باید همین قفل را بگیرد، وگرنه ممکن است با درایني‌کردنِ همزمانِ RTSession رویِ همون
     // sessionId تداخل کند (رجوع به تعریفِ withAudioLock بالای همین فایل).
     withAudioLock: withAudioLock,
+    // مالکِ صفِ صدا (تراپیستِ واردشده؛ null بعد از خروج) + آیا رکورد مالِ اوست — جاروبِ index.html رکوردِ دیگران را نمی‌فرستد.
+    setQueueOwner: setQueueOwner,
+    isOwnRecord: ownedByCurrent,
     // فقط برایِ scripts/rt-harness.cjs — کوتاه‌کردنِ timeoutهایِ طولانی در تست.
     _setTestTimeouts: function (o) {
       if (o && typeof o.segmentUploadMs === 'number') SEGMENT_UPLOAD_TIMEOUT_MS = o.segmentUploadMs;

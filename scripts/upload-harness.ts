@@ -18,9 +18,10 @@ import {
 import { FileQualityMeter, classifyWindow, measureAudioQuality, parseAudioQuality, speechSpans, QUALITY, type AudioQuality } from '../server/src/features/audio-upload/quality.js';
 import { computeTranscriptMetrics, parseTranscriptMetrics, METRICS, type TimedToken } from '../server/src/features/audio-upload/transcriptMetrics.js';
 import { metricsFindings } from '../server/src/features/admin/diagnosis.js';
+import { rankQualityRows, summarizeQuality } from '../server/src/features/audio-upload/adminQuality.js';
 import { parseProbe, probeMedia, normalizeAudio, sniffObviouslyNotAudio, extensionOf, ACCEPTED_EXTENSIONS, MAX_DURATION_MS } from '../server/src/features/audio-upload/media.js';
 import { expectedChunkBytes } from '../server/src/features/audio-upload/uploadStore.js';
-import { isPreNoteFile, isNoteFile, isArchiveFile, isNoteArchiveFile, isLateFile, seqFromFilename, runIdFromFilename, mimeFromFilename, sessionIdFromFilename } from '../server/src/features/transcription/batch/queueFiles.js';
+import { archiveKindForFile, isPreNoteFile, isNoteFile, isArchiveFile, isNoteArchiveFile, isLateFile, seqFromFilename, runIdFromFilename, mimeFromFilename, sessionIdFromFilename } from '../server/src/features/transcription/batch/queueFiles.js';
 
 let pass = 0;
 let fail = 0;
@@ -899,6 +900,11 @@ async function main() {
     assert.equal(runIdFromFilename(f), 'pnabc123');
     assert.equal(mimeFromFilename(f), 'audio/webm');
     assert.equal(mimeFromFilename(`${sid}-000002-pnx-1790703025765.prenote.ogg`), 'audio/ogg');
+    // (2026-10-01) جاروبِ ۲۴ساعته همان kindِ processQueue را می‌گیرد — یادداشتِ پیش از جلسه هرگز 'session' نیست.
+    assert.equal(archiveKindForFile(f), 'prenote');
+    assert.equal(archiveKindForFile(`${sid}-000000-r1-1790703025765.note.webm`), 'note');
+    assert.equal(archiveKindForFile(`${sid}-000000-r1-1790703025765.notearchive.webm`), 'note');
+    for (const s of ['.archive.', '.late.', '.']) assert.equal(archiveKindForFile(`${sid}-000000-r1-1790703025765${s}webm`), 'session', s);
   });
   await t('H53 متنِ رونویسیِ بدونِ گوینده (diarize خاموش): بدونِ «گوینده N:»؛ با گوینده همان قراردادِ قبلی', () => {
     const noSpeaker = [{ text: 'سلام' }, { text: ' امروز' }, { text: ' دیرتر' }, { text: ' می‌آید.' }] as AsyncToken[];
@@ -1032,6 +1038,22 @@ async function main() {
     assert.equal(parseTranscriptMetrics({ v: 2, flags: [] }), null);
     const unknownCov = metricsFindings(computeTranscriptMetrics({ tokens: toks(0, 10_000), speechSpans: null, durationMs: 10_000, lowConfRatio: null }));
     assert.ok(unknownCov[0].text.includes('سنجیده نشد'));
+  });
+
+  await t('H63 نمایِ کلیِ کیفیتِ ادمین: بدترین اول (پرچمِ بیشتر، بعد پوششِ کمتر، نامعلوم آخر) + جمع‌بندی (میانه/کمینه/شمارِ پرچم)', () => {
+    const mk = (id: string, coverage: number | null, flags: string[], lc: number | null = 0.02) => ({
+      job_id: id, session_id: 's-' + id, session_num: 1, client_code: 'C', therapist_id: 't', therapist_name: 'T',
+      created_at: '2026-10-01T10:00:00.000Z', duration_ms: 60_000,
+      metrics: { ...computeTranscriptMetrics({ tokens: [], speechSpans: null, durationMs: 60_000, lowConfRatio: lc }), coverage, flags: flags as any },
+    });
+    const rows = [mk('a', 0.99, []), mk('b', 0.6, ['low_coverage', 'uncovered_gap']), mk('c', null, []), mk('d', 0.9, ['speakers_merged']), mk('e', 0.8, ['speakers_merged'], null)];
+    assert.deepEqual(rankQualityRows(rows).map((r) => r.job_id), ['b', 'e', 'd', 'a', 'c']);
+    const s = summarizeQuality(rows);
+    assert.equal(s.sessions, 5); assert.equal(s.flagged, 3);
+    assert.equal(s.coverage_median, 0.85); assert.equal(s.coverage_min, 0.6);
+    assert.equal(s.low_conf_median, 0.02);
+    assert.deepEqual(s.flag_counts, { low_coverage: 1, uncovered_gap: 1, speakers_merged: 2 });
+    assert.deepEqual(summarizeQuality([]), { sessions: 0, coverage_median: null, coverage_min: null, low_conf_median: null, flagged: 0, flag_counts: {} });
   });
 
   console.log(`\n${pass} PASS / ${fail} FAIL`);

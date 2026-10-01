@@ -25,6 +25,7 @@
 | `audio_jobs` | `audio-upload` | 023، 025، 033 | `admin` | بالا |
 | `notifications` | `notifications` | 023 | `audio-upload` (ساخت از job) | متوسط (بدونِ متنِ بالینی) |
 | `final_transcripts` | `final-transcript` | 031، 034 | `audio-upload` (پاکسازیِ یتیم/ارجاعِ Soniox) | بسیار بالا (متن) |
+| `final_transcript_versions` | `final-transcript` | 037 | — (فقط `admin` از طریقِ `features/final-transcript/index.ts` می‌خواند) | بسیار بالا (متن) |
 | `tu_unit_types`، `tu_member_roles`، `tu_modalities`، `tu_modality_terms` | `treatment-unit` | 029، 030، 032 | — | پایین (کاتالوگ) |
 | `obs_events`، `obs_ui_events` | platform `obs` | 021 | `admin` (خواندن/پاکسازی) | متوسط |
 | `audit_log` | platform `obs` (`audit.ts`) | 028 | — | بالا |
@@ -71,6 +72,7 @@
 | `034_final_transcript_turns.sql` | `final_transcripts.clean_turns` |
 | `035_upload_pre_note.sql` | `audio_uploads.pre_note` (TEXT NULL؛ یادداشتِ متنیِ پیش از جلسه‌ی آپلود تا لحظه‌ی ساختِ جلسه؛ بعد از آن NULL و در `session_notes(note_before)` است) |
 | `036_upload_transcript_metrics.sql` | `audio_jobs.transcript_metrics` (JSON NULL؛ «کیفیت به عدد»: پوشش/حفره/گوینده/اطمینان — فقط عدد و پرچم، بدونِ متن؛ [subsystem 06 §11](../07-subsystems/06-audio-upload-pipeline.md)) |
+| `037_final_transcript_versions.sql` | جدولِ `final_transcript_versions` (تاریخچه‌ی فقط‌افزودنیِ «متنِ نهایی»؛ [subsystem 07](../07-subsystems/07-final-transcript.md)) |
 
 جدولِ سیستمی: `_migrations(id INT AUTO_INCREMENT PK, name VARCHAR(255) UNIQUE, applied_at DATETIME)` — ساخته‌شده در `server/src/db/migrate.ts`.
 
@@ -235,6 +237,9 @@
 
 ### `final_transcripts` (031، 034) — «متنِ نهایی»
 یک ردیف به‌ازایِ هر جلسه: `session_id` PK (FK CASCADE)، `therapist_id`/`client_id` (FK CASCADE)، `stage` CHECK `waiting_audio|transcribing|polishing|done|failed|skipped`، `attempts`، `next_attempt_at`، `locked_until` (lease)، `source` CHECK `async|realtime`، `source_version` (مبنایِ stale)، `soniox_file_id`، `soniox_transcription_id`، `transcription_started_at`، `async_text`/`clean_text` LONGTEXT (**متنِ بالینی**)، `clean_turns` JSON (034؛ نوبت‌هایِ ساختاریافته `[{role,text,raw?,sp?,marker?}]` — **متنِ بالینی**؛ NULL ⇒ UI همان `clean_text`)، `polish_report` JSON (فقط شمارنده و مدل)، `error_code`، `queued_at`، `finished_at`. index `(stage, next_attempt_at)`. `sessions.transcript` هرگز دست نمی‌خورد. سندِ مالک: [subsystem 07](../07-subsystems/07-final-transcript.md).
+
+### `final_transcript_versions` (037) — تاریخچه‌ی «متنِ نهایی»
+`id` BIGINT PK، `session_id` (FK CASCADE)، `version` (UNIQUE با `session_id`، از ۱)، `kind` CHECK `baseline|generated|role_edit`، `source`/`source_version` (کپیِ ردیفِ جاری)، `clean_text` LONGTEXT NOT NULL، `clean_turns` JSON، `polish_report` JSON (فقط `baseline`/`generated`)، `created_by` (درمانگرِ اصلاحِ نقش، بدونِ FK)، `created_at`. فقط INSERT: `runner.finish` و `PATCH …/final-transcript/roles` داخلِ تراکنش با قفلِ ردیفِ `final_transcripts` (`adapters/versionStore.ts`)؛ `baseline` = متنِ پیش از 037 که فقط پیش از اولین بازنویسی‌اش کپی می‌شود (بدونِ backfill).
 
 ## ۳. Enumها (مقادیرِ واقعی در کد)
 

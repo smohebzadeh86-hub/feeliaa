@@ -41,6 +41,7 @@
 | `public/index.html` | SPA اصلی (همه‌ی صفحه‌ها) | [frontend-map](frontend-map.md)، [route-map](route-map.md) |
 | `public/feelia-rt.js` | موتورِ realtime | subsystem 01 |
 | `public/feelia-upload.js` | آپلودِ فایلِ صوتی | subsystem 06 |
+| `public/feelia-admin-quality.js` | ادمین: «کیفیتِ رونویسی» + تاریخچه‌ی «متنِ نهایی» (Session Data Engine) | [subsystem 06 §11](../07-subsystems/06-audio-upload-pipeline.md)، [subsystem 07](../07-subsystems/07-final-transcript.md) |
 | `public/feelia-obs.js` | رصدِ کلیک/ناوبری | [observability-audit](../06-platform/observability-audit.md) |
 | `public/feelia-analytics.js` | Clarity | [analytics-clarity](../analytics-clarity.md) |
 

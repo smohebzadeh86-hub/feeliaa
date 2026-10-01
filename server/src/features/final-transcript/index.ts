@@ -3,3 +3,5 @@ export { enqueueFinalTranscript, startFinalTranscriptWorker, wakeFinalTranscript
 export { finalTranscriptRoutes } from './api/finalTranscript.routes.js';
 export { appendUploadForPolish } from './domain/transcriptText.js';
 export { retryFinalTranscript } from './runner.js';
+// تاریخچه‌ی فقط‌افزودنی (migration 037) — خواندن برایِ پنلِ ادمین
+export { listVersions as listFinalTranscriptVersions, getVersionText as getFinalTranscriptVersion } from './adapters/versionStore.js';

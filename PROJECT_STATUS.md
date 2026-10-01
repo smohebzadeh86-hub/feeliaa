@@ -222,6 +222,28 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — FINDING (اصلاح) — `index.html` ِ production ثبت شده بود
+- **چه شد:** در ورودیِ «GIT + DEPLOY … (`061d0ca`)» نوشتم `public/index.html` ِ production «بدونِ ورودی در Event Log» deploy شده — **نادرست بود.** همان تغییر (دکمه‌ی «کپیِ کلِ متن» به‌صورتِ آیکونِ SVG داخلِ کادرِ متن، commitنشده) در ورودیِ «CODE + DEPLOY (production) — دکمه‌ی کپیِ کلِ متن (آیکونِ SVG کوچک) …» ثبت شده است. همچنان commit نشده و این نشست آن را commit نمی‌کند؛ در deployِ بعدی همان نسخه‌ی production حفظ می‌شود.
+- **عامل:** این نشست.
+
+
+### 2026-10-01 — CODE + MIGRATION + DOCS + TEST — Core: دو باگِ گم‌شدنِ صدا، «کیفیتِ رونویسی» در پنلِ ادمین، تاریخچه‌ی «متنِ نهایی» (037)
+- **چه شد:** به دستورِ مالک («فعلا انجام بده همینارو 132»). (۱) مرورگرِ مشترک: 404 دیگر صدایِ آپلودنشده‌ی تراپیستِ دیگر را از IndexedDB حذف نمی‌کند (مالکِ رکورد + `setQueueOwner`)؛ جاروبِ ۲۴ساعته‌ی صف `.prenote.` را `kind='prenote'` آرشیو می‌کند (قبلاً `session`). (۳) صفحه‌ی «کیفیتِ رونویسی» در پنلِ ادمین (`GET /api/admin/upload-quality`). (۲) تاریخچه‌ی فقط‌افزودنیِ «متنِ نهایی» (`final_transcript_versions`، migration 037): هر ساخت و هر اصلاحِ نقش یک نسخه؛ متنِ پیش از 037 پیش از اولین بازنویسی کپی می‌شود؛ ادمین فهرست و متنِ هر نسخه را می‌بیند (ممیزی).
+- **فایل‌ها:** `public/{feelia-rt.js, index.html, feelia-admin-quality.js (جدید)}`، `server/src/features/transcription/batch/{queueFiles.ts, sweep.ts}`، `server/src/features/audio-upload/{adminQuality.ts (جدید), index.ts}`، `server/src/features/final-transcript/{adapters/versionStore.ts (جدید), runner.ts, api/finalTranscript.routes.ts, index.ts}`، `server/src/features/admin/{queue.admin.ts, sessions.admin.ts}`، `server/src/db/mysql/migrations/037_final_transcript_versions.sql`، `scripts/{rt-harness.cjs (T57), upload-harness.ts (H52+, H63), route-snapshot.txt}`.
+- **اسنادِ به‌روزشده:** api-catalog (۳ route)، database-catalog (037 + جدول + مالک)، subsystem 02 (404)، 05 (kindِ جاروب)، 06 (نمایِ کلی)، 07 (تاریخچه)، feature-index، [verification](verification/2026-10-01-core-fixes-quality-overview-ft-versions.md).
+- **تست / تأیید:** `tsc` تمیز؛ `test:rt` 103/103؛ `test:up` 64/64؛ `test:ft` 61/61؛ `test:tu` 19/19؛ `test:cf` 111/111؛ `test:arch` OK؛ `test:routes` OK (141، snapshot عمداً به‌روز شد)؛ `test:docs` OK. مرورگرِ واقعی با mockِ scratchpad (صفحه‌ی کیفیت، فیلتر، مشاهده/برگشت، حالتِ خالی، موبایل، کارتِ تاریخچه) بدونِ خطایِ کنسول. **MySQLِ dev با مجوزِ مالک:** migrationهایِ 036 و 037 رویِ DBِ dev اعمال شدند؛ baseline/generated/role_edit درست، پاکسازیِ fixture کامل (`versions=0 sessions=0`).
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** commit/deploy نشده. DBِ dev حالا 036 و 037 را دارد (سرورِ dev در startupِ بعدی «already applied» می‌بیند). routeهایِ HTTPِ جدید با سرورِ واقعی و هم‌زمانیِ واقعیِ دو نویسنده تست نشده‌اند.
+
+
+### 2026-10-01 — GIT + DEPLOY (production) + FINDING — «کیفیت به عدد» (`061d0ca`)، migration 036
+- **مجوزِ مالک:** «commit و deploy کن … قبلش چک کنی که کسی در حال استفاده نباشه».
+- **git:** commit `061d0ca` رویِ `feat/clarity` (پایه `3801a5d`) از worktreeِ تمیز، فقط فایل‌هایِ این کار (۱۵ فایل؛ هانک‌هایِ نشستِ «نظرِ دوم» در `jobMachine.ts`/`worker.ts`/اسناد جدا ماندند). در worktree: `tsc` تمیز، `test:up` 63/63، `test:arch`/`test:routes` OK، `test:ft` 61/61، `test:tu` 19/19، `test:cf` 111/111، `test:rt` بدونِ FAIL، build OK؛ `test:docs` فقط خطایِ از قبل موجودِ `documentation-map ⇒ CURRENT_UI_STATE.md` (فایلِ untracked — در HEAD هم هست). push نشد.
+- **preflight (§5.1):** همه ۰ (جلسه/صدا/mint/آپلود/job/batch/متنِ نهایی) ⇒ GO؛ nginx فقط pollingِ یک تبِ بیکار. دوباره بلافاصله پیش از استخراج: `busy=0`.
+- **deploy:** تارِ **فقط `server/`** (بدونِ `public/` — پایینِ FINDING را ببینید)؛ پشتیبان `/root/backups/code-pre-metrics-20261001T121320Z.tar.gz`؛ استخراج ⇒ `pnpm install --frozen-lockfile` ⇒ build ⇒ `pm2 restart`. لاگ: `036_upload_transcript_metrics.sql applied`؛ `/api/health` ok/connected؛ pm2 online؛ بدونِ خطایِ جدید؛ ستونِ `audio_jobs.transcript_metrics` موجود؛ checksumِ `server/src` ِ production = commit؛ پیش از deploy دقیقاً ۹ فایلِ همین کار با production فرق داشت.
+- **FINDING:** `public/index.html` ِ production (`0069711e78eb`) با commitِ پایه فرق داشت و برابرِ `index.html` ِ commitنشده‌ی working tree بود ⇒ نشستِ دیگری بدونِ ورودی در Event Log آن را deploy کرده است. دست نخورد.
+- **کارِ باز:** آستانه‌ها پس از چند جلسه‌ی آپلودیِ واقعی بازبینی شوند (R20)؛ برگشت = استخراجِ همان پشتیبان + build + restart (ستونِ ۰۳۶ NULLپذیر است و می‌ماند).
+
 ### 2026-10-01 — CODE + MIGRATION + DOCS + TEST — «کیفیت به عدد» برایِ جلسه‌ی آپلودی (Session Data Engine، فاز Q-U)
 - **چه شد:** به دستورِ مالک («اجرا کن»). برایِ هر jobِ آپلودی، از توکن‌هایِ async ِSoniox (قبلاً دور ریخته می‌شدند) + بازه‌هایِ صدادارِ ffmpeg + حاضرینِ واحدِ درمان، متریک‌هایِ عددی ساخته و در `audio_jobs.transcript_metrics` ذخیره می‌شود: پوششِ متن، حفره‌هایِ وسط/ابتدا/انتها، گوینده‌هایِ پیدا‌شده در برابرِ حاضرین، نوبت‌هایِ تکه‌تکه، اطمینان. کارتِ «تشخیصِ جلسه»ی ادمین آن‌ها را نشان می‌دهد. بدونِ تماسِ اضافه با Soniox؛ fail-open؛ فقط عدد (LAW-001). جلساتِ قدیمی متریک ندارند (backfill انجام نشد).
 - **فایل‌ها:** `server/src/features/audio-upload/{transcriptMetrics.ts (جدید), quality.ts, jobMachine.ts, worker.ts, jobStore.sql.ts}`، `server/src/features/transcription/soniox/restClient.ts` (فقط `end_ms` در تایپ)، `server/src/features/admin/{diagnosis.ts, admin.repository.ts}`، `server/src/db/mysql/migrations/036_upload_transcript_metrics.sql`، `scripts/upload-harness.ts` (H54–H62).

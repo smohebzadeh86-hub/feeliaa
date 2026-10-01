@@ -11,6 +11,7 @@ let batchPolls = 0;
 let notePolls = 0;
 let neverDrain = false; // برای T14: صف عمداً تخلیه نمی‌شود
 let mintFailMode = false; // برای T16: mint همیشه 503
+const missingSessions = new Set(); // T57: batch-audio برایِ این جلسه‌ها 404 (ناموجود یا مالِ تراپیستِ دیگر)
 const fetchUrls = [];
 let wsCreatedCount = 0;
 
@@ -83,6 +84,8 @@ globalThis.fetch = async (url, opts = {}) => {
   }
   m = url.match(/^\/api\/sessions\/([^/?]+)\/batch-audio/);
   if (m && method === 'POST') {
+    // T57: جلسه‌ی «ناموجود/غیرمالک» (LAW-004 هر دو 404)
+    if (missingSessions.has(m[1])) return json(404, {});
     const q = new URLSearchParams(url.split('?')[1] || '');
     sentBlobs.push({ sessionId: m[1], purpose: q.get('purpose'), seq: Number(q.get('seq')), blob: opts.body && opts.body.f ? opts.body.f[0] : null });
     const purpose = q.get('purpose') || 'transcript';
@@ -1030,6 +1033,27 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       added === true && up57.length === 1 && up57[0].includes('purpose=pre-note') && left57.length === 0 &&
       !batchQueue.some((q) => q.sessionId === 's57'), up57.join(',') + ' left=' + left57.length);
     await s57.finish(); RT.forget(s57);
+  }
+
+  // T57 (2026-10-01، Session Data Engine): مرورگرِ مشترک — 404 رکوردِ تراپیستِ دیگر را حذف نمی‌کند.
+  // قبلاً هر 404 ⇒ حذفِ محلی؛ سرور برایِ جلسه‌ی غیرمالک هم 404 می‌دهد (LAW-004) ⇒ صدایِ آپلودنشده‌ی نفرِ قبلی گم می‌شد.
+  {
+    missingSessions.add('s58');
+    RT.setQueueOwner('thA');
+    const addedA = await RT.audioQueue.add('s58', 'rA', 0, new Blob(['a'.repeat(600)]), 'audio/webm', 'archive');
+    const recA = (await RT.audioQueue.listForSession('s58'))[0];
+    RT.setQueueOwner('thB');
+    const asB = await RT.withAudioLock('s58', () => RT.uploadQueuedSegment('s58', recA));
+    const legacyAsB = await RT.withAudioLock('s58', () => RT.uploadQueuedSegment('s58', { runId: 'old', seq: 0, blob: new Blob(['l'.repeat(600)]), intent: 'archive' }));
+    const isOwnB = RT.isOwnRecord(recA);
+    RT.setQueueOwner('thA');
+    const asA = await RT.withAudioLock('s58', () => RT.uploadQueuedSegment('s58', recA));
+    RT.setQueueOwner(null);
+    const noOwner = await RT.withAudioLock('s58', () => RT.uploadQueuedSegment('s58', { runId: 'old', seq: 1, blob: new Blob(['n'.repeat(600)]), intent: 'archive' }));
+    await RT.audioQueue.clearForSession('s58');
+    ok('T57 shared browser: 404 keeps another therapist\'s / ownerless record; deletes only own record (or when no owner is known)',
+      addedA === true && recA && recA.owner === 'thA' && asB === false && legacyAsB === false && isOwnB === false && asA === true && noOwner === true,
+      JSON.stringify({ addedA, owner: recA && recA.owner, asB, legacyAsB, isOwnB, asA, noOwner }));
   }
 
   console.log(results.map((r) => r[0]).join('\n'));

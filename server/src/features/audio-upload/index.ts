@@ -7,3 +7,5 @@ export { tryFinalizeGroup } from './groupFinalize.js';
 // صفِ پردازشِ ادمین + «تلاشِ دوباره»ی مشترک
 export { retryFailedAudioJob } from './jobRetry.js';
 export { listAdminUploadJobs, countAdminUploadJobsByStage } from './adminJobs.js';
+// نمایِ کلیِ «کیفیت به عدد» (Session Data Engine)
+export { listAdminUploadQuality } from './adminQuality.js';

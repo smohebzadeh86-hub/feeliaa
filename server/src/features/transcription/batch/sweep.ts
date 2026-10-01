@@ -4,7 +4,7 @@ import path from 'node:path';
 import { query } from '../../../db/connection.js';
 import { logEvent } from '../../../obs/eventLog.js';
 import {
-  QUEUE_DIR, ensureDir, isNoteFile, isNoteArchiveFile, seqFromFilename, runIdFromFilename, mimeFromFilename,
+  QUEUE_DIR, ensureDir, archiveKindForFile, seqFromFilename, runIdFromFilename, mimeFromFilename,
   sessionIdFromFilename, pendingAudiosFor,
 } from './queueFiles.js';
 
@@ -36,7 +36,7 @@ export async function sweepOldBatchFiles(): Promise<void> {
           } else {
             try {
               const buffer = readFileSync(p);
-              await archiveAudioForAdmin(sessionId, seqFromFilename(p), buffer, mimeFromFilename(p), 'durable', runIdFromFilename(p), isNoteFile(f) || isNoteArchiveFile(f) ? 'note' : 'session');
+              await archiveAudioForAdmin(sessionId, seqFromFilename(p), buffer, mimeFromFilename(p), 'durable', runIdFromFilename(p), archiveKindForFile(f));
             } catch (e) {
               console.log('[batch] pre-sweep archive failed (still sweeping):', String(e).slice(0, 160));
             }
