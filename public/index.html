@@ -7316,16 +7316,20 @@ async function ftApplyRole(idx,role,sameSpeaker,menu){
 async function ftCopyText(text){
   const t=String(text||'').replace(/⟦([^⟧]*)⟧/g,function(_,w){return w.replace(/؟$/,'');});
   if(!t.trim()){showBanner('warn','متنی برایِ کپی نیست.');return;}
-  try{
-    if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(t);
-    else{
-      const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0';
-      document.body.appendChild(ta);ta.select();
-      const ok=document.execCommand('copy');ta.remove();
-      if(!ok)throw new Error('copy-failed');
-    }
-    showBanner('info','کلِ متن کپی شد.');
-  }catch(e){showBanner('error','کپی انجام نشد؛ متن را دستی انتخاب کنید.');}
+  // Clipboard API ممکن است وجود داشته باشد ولی رد کند (سیاستِ مجوز، Safari، مرورگرِ داخلِ اپ) ⇒ همیشه راهِ دوم هم امتحان می‌شود
+  let ok=false;
+  if(navigator.clipboard&&window.isSecureContext){try{await navigator.clipboard.writeText(t);ok=true;}catch(e){}}
+  if(!ok){
+    let ta=null;
+    try{
+      ta=document.createElement('textarea');ta.value=t;ta.setAttribute('readonly','');ta.style.cssText='position:fixed;top:0;left:0;opacity:0';
+      document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,t.length);
+      ok=document.execCommand('copy');
+    }catch(e){ok=false;}
+    if(ta)ta.remove();
+  }
+  if(ok)showBanner('info','کلِ متن کپی شد.');
+  else showBanner('error','کپی انجام نشد؛ متن را دستی انتخاب کنید.');
 }
 function ftButton(label,fn,cls){
   const b=document.createElement('button');b.className='btn btn-sm '+(cls||'btn-ghost');b.textContent=label;

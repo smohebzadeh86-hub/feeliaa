@@ -222,6 +222,12 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — TEST (مرورگرِ واقعی) + CODE — دکمه‌ی «کپیِ کلِ متن»: تستِ واقعی، یک باگ پیدا و رفع شد؛ commit شد، push/deploy نشد
+- **روش:** Browser pane + mock backendِ scratchpad (`public/` واقعی، /api/* جعلی با دادهٔ ساختگی؛ بدونِ حساب). جلسه‌ی آپلودی با متنِ نهایی (نقش‌ها، `⟦رادمهر؟⟧`) + متنِ خام.
+- **نتیجه:** دکمه نمایش داده شد؛ کپیِ متنِ نهایی و متنِ خام هر دو متنِ درست را برداشتند (علامتِ `⟦…؟⟧` حذف می‌شود، نقش‌ها می‌مانند)؛ بنرِ «کلِ متن کپی شد.»؛ console بدونِ خطا؛ textareaِ موقت پاک می‌شود.
+- **باگِ پیدا‌شده (در prod هست):** وقتی `navigator.clipboard` موجود است ولی `writeText` رد می‌کند (`NotAllowedError` — در همین pane دیده شد؛ سیاستِ مجوز/Safari/مرورگرِ داخلِ اپ)، کد فقط «کپی انجام نشد» می‌داد و راهِ `execCommand('copy')` را امتحان نمی‌کرد.
+- **رفع (`public/index.html#ftCopyText`):** اول Clipboard API، در صورتِ رد `execCommand` با textareaِ readonly؛ فقط اگر هر دو شکست خوردند خطا. بعد از رفع در همان pane: کپی با راهِ دوم موفق شد (متنِ درست). نسخه‌ی prod هنوز قدیمی است (deploy نشده).
+
 ### 2026-10-01 — DEPLOY (production) — دکمه‌ی «کپیِ کلِ متن» (فقط `public/index.html`، بدونِ restart)
 - **مجوزِ مالک:** «دکمه کپی رو هم deploy کن». commit `d50fd05` (HEAD `0d9fc62`).
 - **بررسی:** checksumِ CR-stripped کدِ production در برابرِ HEAD: تنها `public/index.html` فرق داشت (بدونِ drift). فقط همین فایل جایگزین شد (فایلِ ایستا، با `no-cache` revalidate می‌شود ⇒ restart/build/migration لازم نبود، پس preflight هم لازم نبود). پشتیبان: `/root/backups/index-pre-copybtn-*.html`.
