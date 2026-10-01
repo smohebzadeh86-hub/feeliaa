@@ -2488,10 +2488,18 @@ async function endDirectLive(){
 // استفاده می‌شه، نه برای مکثِ دستی (که خودش عمدیه و نیازی به هشدار نداره).
 function setLiveConnBanner(kind,html){const b=$('liveConnBanner');if(b)b.innerHTML='<div class="banner '+kind+'">'+html+'</div>';}
 function clearLiveConnBanner(){const b=$('liveConnBanner');if(b)b.innerHTML='';}
-function nowClock(){return new Date().toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'});}
+// ⭐ همه‌ی تاریخ/ساعت‌ها به وقتِ تهران (نه timezoneِ مرورگر) تا با سرور و پنلِ ادمین هم‌خوان باشند.
+const FEELIA_TZ='Asia/Tehran';
+function nowClock(){return new Date().toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit',timeZone:FEELIA_TZ});}
+function tehranHM(d){
+  try{
+    const p=new Intl.DateTimeFormat('en-US',{timeZone:FEELIA_TZ,hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(d);
+    return p.find(x=>x.type==='hour').value+':'+p.find(x=>x.type==='minute').value;
+  }catch(e){return pad2(d.getHours())+':'+pad2(d.getMinutes());}
+}
 function toJalali(date){
   try{
-    const fmt=new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn',{year:'numeric',month:'2-digit',day:'2-digit'});
+    const fmt=new Intl.DateTimeFormat('fa-IR-u-ca-persian-nu-latn',{timeZone:FEELIA_TZ,year:'numeric',month:'2-digit',day:'2-digit'});
     const parts=fmt.formatToParts(date);
     return parts.find(p=>p.type==='year')?.value+'/'+parts.find(p=>p.type==='month')?.value+'/'+parts.find(p=>p.type==='day')?.value;
   }catch(e){
@@ -3313,7 +3321,7 @@ function renderAdminRecentSessions(sessions){
   });
 }
 function fmtDateTime(v){
-  try{return new Date(v).toLocaleString('fa-IR');}catch(e){return String(v||'');}
+  try{return new Date(v).toLocaleString('fa-IR',{timeZone:FEELIA_TZ});}catch(e){return String(v||'');}
 }
 
 async function loadAdminObsEvents(){
@@ -3570,7 +3578,7 @@ function renderAdminLive(sessions){
     row.onclick=function(){adminTimelineReturn='live';openAdminSessionTimeline(s.id,titleText);};
     list.appendChild(row);
   });
-  $('adminLiveUpdated').textContent='آخرین به‌روزرسانی: '+new Date().toLocaleTimeString('fa-IR');
+  $('adminLiveUpdated').textContent='آخرین به‌روزرسانی: '+new Date().toLocaleTimeString('fa-IR',{timeZone:FEELIA_TZ});
 }
 
 // ——— صفِ پردازشِ سراسری ———
@@ -3806,7 +3814,7 @@ function renderAdminSystem(d){
   const max=Math.max(1,...bk.map(function(x){return x.count;}));
   bk.forEach(function(x){
     const col=document.createElement('div');
-    col.title=new Date(x.start).toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'})+' — '+toFa(x.count)+' درخواست'+(x.c4xx||x.c5xx?' ('+toFa(x.c4xx)+' × ۴xx، '+toFa(x.c5xx)+' × ۵xx)':'');
+    col.title=new Date(x.start).toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit',timeZone:FEELIA_TZ})+' — '+toFa(x.count)+' درخواست'+(x.c4xx||x.c5xx?' ('+toFa(x.c4xx)+' × ۴xx، '+toFa(x.c5xx)+' × ۵xx)':'');
     const ok=x.count-x.c4xx-x.c5xx;
     [['e5',x.c5xx],['w4',x.c4xx],['ok',ok]].forEach(function(p){
       if(p[1]<=0)return;
@@ -4366,7 +4374,7 @@ async function openAdminSessionDetail(sessionId,clientTitle){
       +adminSourceLabel(s.source)+(s.consent?' · رضایت ✓':' · بدونِ رضایت')
       // (audit ذخیره‌سازی 2026-09-26) ادمین باید ببیند جلسه پایان خورده یا نیمه‌کاره رها شده و آخرین ذخیره کِی بوده.
       +' · '+sessionStatusFa(s)
-      +(s.updated_at?' · آخرین ذخیره '+new Date(s.updated_at).toLocaleString('fa-IR'):'')
+      +(s.updated_at?' · آخرین ذخیره '+new Date(s.updated_at).toLocaleString('fa-IR',{timeZone:FEELIA_TZ}):'')
       +(s.source==='upload'
         ?(s.batch_status==='queued'||s.batch_status==='processing'?' · فایل در حالِ پردازش':s.batch_status==='failed'?' · پردازشِ فایل ناموفق':'')
         :(transcriptProgressNote(s)?' · '+transcriptProgressNote(s):'')
@@ -7692,7 +7700,7 @@ async function startSession(){
     // ⭐ تاریخ/ساعت از همان ساعتِ دستگاه که صفحه‌ی Setup نشان داده (شمسی، ارقامِ لاتین) —
     // قبلاً سرور تاریخِ میلادیِ خودش را می‌گذاشت و با نمایش و ثبتِ دستی ناهمگون بود.
     const startedAt=new Date();
-    const data=await api('/api/sessions',{method:'POST',body:Object.assign({client_id:currentClient.id,consent:true,date:toJalali(startedAt),start_time:pad2(startedAt.getHours())+':'+pad2(startedAt.getMinutes())},presenceBody())});
+    const data=await api('/api/sessions',{method:'POST',body:Object.assign({client_id:currentClient.id,consent:true,date:toJalali(startedAt),start_time:tehranHM(startedAt)},presenceBody())});
     currentSession=data.session;
     if(data.client&&data.client.recording_consent_at)markClientConsent(currentClient.id,data.client.recording_consent_at);
     uxTrack('session_started');

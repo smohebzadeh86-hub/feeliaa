@@ -222,6 +222,11 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — CODE + TEST — یکسان‌سازیِ timezone در فرانت: همه‌ی تاریخ/ساعت‌ها به وقتِ تهران؛ commit شد (deploy در ورودیِ بعدی)
+- **ریشه:** تاریخِ جلسه (`toJalali`) و `start_time` (`getHours`) با timezoneِ مرورگرِ تراپیست ساخته می‌شدند و زمان‌هایِ UTCِ پنلِ ادمین (`fmtDateTime` و …) با timezoneِ مرورگرِ ادمین نمایش داده می‌شدند ⇒ با VPN/ساعتِ غیرِ تهران ناهم‌خوان.
+- **تغییر (`public/index.html`):** ثابتِ `FEELIA_TZ='Asia/Tehran'`؛ `toJalali`، `nowClock`، `fmtDateTime`، نمایشِ آخرین ذخیره/به‌روزرسانی/ستونِ متریک همه با `timeZone`؛ تابعِ جدیدِ `tehranHM` برایِ `start_time` در ایجادِ جلسه. سرور تغییر نکرد (از قبل تهران).
+- **تست (کامل، [verification/2026-10-01-frontend-timezone-tehran.md](verification/2026-10-01-frontend-timezone-tehran.md)):** docs/routes(135)/arch/rt/cf(111)/up(54)/tu(17)/ft(60)/llm(18)/adm(8) همه OK؛ tsc تمیز؛ تابع‌هایِ واقعیِ index.html در ۷ timezone خروجیِ یکسان دادند (از جمله گذرِ نیمه‌شبِ تهران). **تستِ مرورگریِ واقعی** (Browser pane، mock + shimِ timezone نیویورک/توکیو): بدنه‌ی POST جلسه = ساعتِ تهران (12:24) به‌جایِ ساعتِ محلی (4:54/17:54)؛ نمایشِ ادمین ۰:۱۵ برایِ 20:45Z در هر دو. test:api انجام نشد (مجوزِ مالک). جلسه‌هایِ قدیمیِ ثبت‌شده با timezoneِ غیرِ تهران اصلاح نمی‌شوند.
+
 ### 2026-10-01 — GIT + DEPLOY + TEST — commit `6f2e6d5` و deployِ پنلِ ادمین (زنده/صف/سلامت) رویِ production؛ push نشد
 - **مجوزِ مالک:** «اول بررسی کن همه‌چیز درست باشد، بقیه را من مجوز می‌دهم» ⇒ commit + deploy + بررسیِ پس از deploy. اجرایِ workerها رویِ dev عمداً انجام نشد (خطرِ auto-close/برداشتنِ jobِ جلسه‌هایِ واقعیِ DBِ مشترک).
 - **بررسیِ پیش از commit:** `tsc`، `test:arch|routes|docs|adm|up|ft|cf|tu|llm` سبز. `test:rt`: یک اجرا T45 را رد کرد (همزمان با اجراهایِ دیگر)، دو اجرایِ بعدی 102/0 و HEAD تمیز هم 102/0 ⇒ **flakyِ زمان‌بندی، بی‌ربط به این تغییر** (`feelia-rt.js` دست نخورد).
