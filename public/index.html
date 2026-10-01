@@ -3882,7 +3882,7 @@ function renderAdminAudioRow(it){
   const meta=document.createElement('div');meta.className='admin-row-meta';
   meta.textContent=fmtDur(it.audio_ms)+' صدا · '+fmtBytes(it.bytes)+
     (it.audio_kbps!==null&&it.audio_kbps!==undefined?' · '+toFa(it.audio_kbps)+' kbps':'')+
-    ' · '+toFa(it.segments)+' بخش · آخرین ضبط '+fmtDateTime(it.last_at)+' · '+toFa(it.days_left)+' روز تا حذف';
+    ' · '+toFa(it.segments)+' بخش · '+(it.source==='upload'?'زمانِ آپلود ':'آخرین ضبط ')+fmtDateTime(it.last_at)+' · '+toFa(it.days_left)+' روز تا حذف';
   const actions=document.createElement('div');actions.className='admin-row-actions';
   const url='/api/admin/sessions/'+encodeURIComponent(it.session_id)+'/audio/full';
   let player=null;
