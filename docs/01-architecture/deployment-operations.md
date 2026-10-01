@@ -117,7 +117,7 @@ nginx باید WebSocket upgrade را برای `/ws/*` پشتیبانی کند (
    اگر NO-GO بود، restart نکنید؛ صبر و تکرار.
 4. رویِ سرور: backup از DB اگر migrationِ داده‌تغییردهنده در راه است (migrationِ فقط-ADD-COLUMN معمولاً
    نیاز ندارد — همه‌ی migrationهایِ `mysql/migrations` تا امروز idempotent و برگشت‌پذیر با ستونِ NULL/DEFAULT بوده‌اند).
-5. `tar -xzf` مستقیم داخلِ `/root/feeliaa-mysql` → `pnpm install --frozen-lockfile` → `pm2 restart feelia-mysql --update-env`.
+5. `tar -xzf` مستقیم داخلِ `/root/feeliaa-mysql` → `pnpm install --frozen-lockfile` → **`pnpm --filter server run build`** (production از `server/dist/index.js` اجرا می‌شود؛ بدونِ build کدِ قدیمی بالا می‌آید — FINDING 2026-10-01) → `pm2 restart feelia-mysql --update-env`.
 6. لاگ را با `pm2 logs feelia-mysql --lines 40 --nostream` بررسی کنید — همه‌ی migrationهایِ جدید باید `applied` باشند، بدونِ خطا.
 7. `curl -s http://localhost:3000/api/health` → `{"status":"ok","database":"connected"}`.
 8. smoke: شروعِ یک جلسه‌ی آزمایشی **با داده‌ی غیرواقعی** (اگر تغییرِ لمس‌کننده‌ی مسیرِ رونویسی/صدا بود).
