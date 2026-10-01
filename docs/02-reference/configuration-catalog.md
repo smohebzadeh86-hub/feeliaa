@@ -75,7 +75,7 @@
 | `STT_DEFAULTS` | model `stt-rt-v5`، …، `enable_endpoint_detection:true` (از 2026-09-14؛ قبلاً false) | `features/transcription/stt.routes.ts` |
 | `TEMP_KEY_EXPIRES_IN_SECONDS` / `TEMP_KEY_MAX_SESSION_SECONDS` / `MINT_TIMEOUT_MS` | 120 / 7200 / 10000 | `features/transcription/soniox/tempKey.ts` |
 | `QUEUE_DIR` / `MAX_AUDIO_BYTES` / `RETENTION_MS` | `<cwd>/data/batch-queue` / 50MB / ۲۴h | `features/transcription/batch/` |
-| `ARCHIVE_DIR` / `RETENTION_MS` | `<cwd>/data/session-audio` / ۱۴ روز | `features/transcription/archive/` |
+| `ARCHIVE_DIR` / `RETENTION_MS` | `<cwd>/data/session-audio` / ۳۰ روز | `features/transcription/archive/` |
 | JSONLِ obs: `MAX_BYTES` / `KEEP` | 8MB / 5 (سقفِ دیسک ~۴۸MB، `<cwd>/data/logs/obs.jsonl[.1..5]`) | `obs/fileSink.ts` |
 | صفِ obs: `MAX_QUEUE` / `DRAIN_BATCH` / درین هر `2s` (یا `30s` وقتِ خرابیِ DB) | 2000 / 200 | `obs/eventLog.ts` |
 | obs rate-limit | ۲۰ درخواست + ۱۵۰۰ رویداد/دقیقه به‌ازایِ تراپیست | `obs/obs.routes.ts` |

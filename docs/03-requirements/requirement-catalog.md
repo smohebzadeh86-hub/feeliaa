@@ -149,7 +149,7 @@
 |---|---|---|---|
 | REQ-090 | migrationها در startup به ترتیبِ نام اجرا و در `_migrations` ثبت می‌شوند | `db/migrate.ts` | IMPL |
 | REQ-091 | فایل‌های صفِ batch پس از موفقیت حذف و فایل‌های >۲۴h در startup پاک می‌شوند | `features/transcription/batch/`، `index.ts` | IMPL |
-| REQ-092 | آرشیوِ صدا در startup و هر ۲۴h، ۱۴ روز نگهداری | `features/transcription/archive/`، `index.ts` | IMPL |
+| REQ-092 | آرشیوِ صدا در startup و هر ۲۴h، ۳۰ روز نگهداری | `features/transcription/archive/`، `index.ts` | IMPL |
 | REQ-093 | حذفِ داده‌ی مراجع/جلسه/تراپیست باید صدای مربوط روی دیسک (و منابعِ Soniox) را هم حذف کند | LAW-010؛ `features/session-media/purge.ts` | IMPL (رفع 2026-09-22؛ purge غیرِ تراکنشی — [session-media-purge](../06-platform/session-media-purge.md)) |
 | REQ-094 | همه‌ی کوئری‌ها پارامتری؛ اتصال با UTF8 | `db/connection.ts`، همه‌ی handlerها | IMPL |
 | REQ-095 | `GET /api/health` با وضعیتِ DB | `app.ts` (`buildApp`) | IMPL |

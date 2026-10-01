@@ -1,5 +1,5 @@
 // ذخیره‌ی durableِ آپلودِ تکه‌تکه رویِ دیسکِ سرور (migration 023 — محلِ جدیدِ ذخیره‌ی صدا، تأییدِ مالک
-// 2026-09-23 با سقفِ نگهداریِ ۱۴ روز، LAW-010).
+// 2026-09-23 با سقفِ نگهداریِ ۳۰ روز، LAW-010).
 //
 // data/uploads/<uploadId>/
 //   chunk-000000.part …   ← هر تکه جدا، با نوشتنِ اتمیک (tmp + rename): تکه‌ای که رویِ دیسک هست کامل است
@@ -128,7 +128,7 @@ export async function sweepOrphanUploadDirs(): Promise<void> {
 }
 
 // آپلودِ نیمه‌کاره‌ی رهاشده (> ۷ روز) ⇒ canceled + حذفِ تکه‌ها. آپلودِ complete شده‌ای که پوشه‌اش
-// هنوز مانده و jobش تمام شده/شکست خورده و از ۱۴ روز گذشته ⇒ حذفِ فایلِ منبع (سقفِ LAW-010).
+// هنوز مانده و jobش تمام شده/شکست خورده و از ۳۰ روز گذشته ⇒ حذفِ فایلِ منبع (سقفِ LAW-010).
 // finalizeGroup: از uploads.routes.ts (tryFinalizeGroup) تزریق می‌شود تا import حلقوی نشود.
 export async function sweepStaleUploads(finalizeGroup?: (groupId: string, therapistId: string) => Promise<boolean>): Promise<void> {
   try {
@@ -168,7 +168,7 @@ export async function sweepStaleUploads(finalizeGroup?: (groupId: string, therap
       removeUploadDir(row.id);
     }
     const old = await query(
-      `SELECT id FROM audio_uploads WHERE status IN ('complete','failed','canceled') AND updated_at < (NOW() - INTERVAL 14 DAY)`
+      `SELECT id FROM audio_uploads WHERE status IN ('complete','failed','canceled') AND updated_at < (NOW() - INTERVAL 30 DAY)`
     );
     for (const row of old.rows) removeUploadDir(row.id);
     await sweepOrphanUploadDirs();

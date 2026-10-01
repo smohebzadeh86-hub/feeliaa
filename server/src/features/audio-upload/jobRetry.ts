@@ -59,7 +59,7 @@ export async function retryFailedAudioJob(jobId: string, scope: { therapistId?: 
   if (job.stage !== 'failed') {
     return { ok: false, status: 409, code: 'not-failed', error: 'این پردازش در حالِ انجام است یا تمام شده' };
   }
-  // تلاشِ دوباره هرگز آپلودِ دوباره نمی‌خواهد تا وقتی صدا رویِ سرور هست (نسخه‌ی نرمال‌شده ۱۴ روز می‌ماند).
+  // تلاشِ دوباره هرگز آپلودِ دوباره نمی‌خواهد تا وقتی صدا رویِ سرور هست (نسخه‌ی نرمال‌شده ۳۰ روز می‌ماند).
   const rt = failedJobRetryability(job);
   if (!rt.ok) return rt;
   await requeueFailedJob(job, rt.stage, scope.therapistId ?? job.therapist_id);

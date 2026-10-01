@@ -28,7 +28,7 @@
 | Durable recording / سگمنت | `durableRec`، `AudioQueueDB` | ضبطِ موازیِ ۲۴kbps، هر ۶۰s یک فایلِ مستقل در IndexedDB |
 | Batch fallback | `features/transcription/batch/` | رونویسیِ صدای ذخیره‌شده با API async بعد از شکستِ realtime |
 | Purpose | `transcript` / `note` / `archive` | مقصدِ یک سگمنتِ آپلودشده |
-| Archive (صدا) | `session_audio`، `data/session-audio` | نگهداریِ ۱۴روزه‌ی صدا برای بازبینیِ ادمین |
+| Archive (صدا) | `session_audio`، `data/session-audio` | نگهداریِ ۳۰روزه‌ی صدا برای بازبینیِ ادمین |
 | CAS | `transcript_version` | Compare-and-swap؛ نوشتنِ متن فقط با نسخه‌ی پایه‌ی صحیح |
 | Rebase | `persistConfirmed` روی 409 | گرفتنِ متنِ سرور؛ متنِ طولانی‌تر برنده |
 | مارکرِ ناپیوستگی | `noteDiscontinuity` | خطِ «[اتصال دوباره برقرار شد — …]» در متن |

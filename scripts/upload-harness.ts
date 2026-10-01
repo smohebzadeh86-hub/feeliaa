@@ -405,7 +405,7 @@ async function main() {
     assert.equal(w.jobs.get(job.id)!.stage, 'done');
   });
 
-  await t('H15 صدایِ نرمال‌شده منقضی (بعد از ۱۴ روز) ⇒ audio-expired، نه حلقه‌ی بی‌پایان', async () => {
+  await t('H15 صدایِ نرمال‌شده منقضی (بعد از ۳۰ روز) ⇒ audio-expired، نه حلقه‌ی بی‌پایان', async () => {
     const w = newWorld(); const deps = makeDeps(w);
     const job = newJob(w, { stage: 'transcribing', normalizedPath: '/archive/gone.ogg' });
     await drive(w, deps, job.id);

@@ -1073,7 +1073,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
   <section id="screenAdminSessions" class="card screen" data-clarity-mask="true" hidden>
     <div class="card-head">
       <h2 id="adminSessionsTitle"></h2>
-      <p>صدا فقط برایِ بازبینیِ فنی نگه داشته می‌شود — حداکثر ۱۴ روز.</p>
+      <p>صدا فقط برایِ بازبینیِ فنی نگه داشته می‌شود — حداکثر ۳۰ روز.</p>
     </div>
     <div id="adminSessionsList"></div>
     <div class="empty" id="adminSessionsEmpty" hidden><p>این مراجع هنوز جلسه‌ای ندارد</p></div>
@@ -1142,13 +1142,13 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
   <section id="screenAdminAudio" class="card screen" data-clarity-mask="true" hidden>
     <div class="card-head">
       <h2>آرشیوِ صدا</h2>
-      <p id="adminAudioSubtitle">صدایِ جلسات فقط برایِ بازبینیِ فنی نگه داشته می‌شود و بعد از ۱۴ روز خودکار حذف می‌شود.</p>
+      <p id="adminAudioSubtitle">صدایِ جلسات فقط برایِ بازبینیِ فنی نگه داشته می‌شود و بعد از ۳۰ روز خودکار حذف می‌شود.</p>
     </div>
     <div id="adminAudioStats" class="admin-stats"></div>
     <div class="admin-filters">
       <select id="adminAudioTherapist" onchange="reloadAdminAudio()" aria-label="تراپیست"></select>
       <select id="adminAudioPeriod" onchange="reloadAdminAudio()" aria-label="بازه‌ی زمانی">
-        <option value="">همه (۱۴ روزِ اخیر)</option>
+        <option value="">همه (۳۰ روزِ اخیر)</option>
         <option value="1">۲۴ ساعتِ اخیر</option>
         <option value="7">۷ روزِ اخیر</option>
       </select>
@@ -3224,7 +3224,7 @@ async function sweepOrphanedAudioQueue(){
             done=await window.FeeliaRT.uploadQueuedSegment(sid,rec);
             if(done)await q.remove(rec.id);
           }catch(e){/* شکستِ شبکه — توی صف می‌مونه، بارِ بعدِ بازکردنِ اپ امتحان می‌شه */}
-          // ⭐ (A3) صدایِ بالینی نباید بی‌پایان در مرورگر بماند: بعد از ۷ روز تلاشِ ناموفق (سرور خودش صدا را فقط ۱۴ روز
+          // ⭐ (A3) صدایِ بالینی نباید بی‌پایان در مرورگر بماند: بعد از ۷ روز تلاشِ ناموفق (سرور خودش صدا را فقط ۳۰ روز
           // نگه می‌دارد) رکورد پاک و رویدادش (فقط تعداد) ثبت می‌شود.
           if(!done&&rec.createdAt&&Date.now()-rec.createdAt>LOCAL_AUDIO_MAX_AGE_MS){await q.remove(rec.id,rec.bytes);expired++;}
         }
@@ -4915,7 +4915,7 @@ function presenceBody(){
 // ===== یادداشتِ پیش از جلسه — متنی + صوتی (2026-09-29، درخواستِ مالک) =====
 // متن: همراهِ POST /api/sessions (pre_note) ⇒ سرور ردیفِ session_notes(type='note_before') می‌سازد.
 // صدا: تا ساختِ جلسه پیش‌نویسِ پایدار در IndexedDBِ مرورگر (PreDraft)؛ بعد با intent='pre-note' در صفِ پایدارِ FeeliaRT (IndexedDB) و آپلود ⇒
-// سرور آرشیو (kind='prenote'، شنیدنی در پنلِ ادمین، همان ۱۴ روز) و رونویسی ⇒ session_notes(type='voice_before').
+// سرور آرشیو (kind='prenote'، شنیدنی در پنلِ ادمین، همان ۳۰ روز) و رونویسی ⇒ session_notes(type='voice_before').
 // ویرایش فقط بعد از پایانِ ضبط (Wrapup / صفحه‌ی جلسه) — PATCH /api/notes/:id. هیچ‌کدام واردِ متنِ جلسه نمی‌شوند.
 const PRE_VOICE_MAX_MS=5*60000;
 // پیش‌نویسِ پایدارِ صدا (2026-09-29): کلیپِ صفحه‌ی شروع همان لحظه‌ی پایانِ ضبط در IndexedDBِ جدا (feelia-predraft) نوشته می‌شود

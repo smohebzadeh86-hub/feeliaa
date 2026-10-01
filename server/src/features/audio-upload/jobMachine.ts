@@ -267,7 +267,7 @@ async function stepNormalize(job: AudioJob, deps: JobDeps): Promise<StepResult> 
     attempts: 0, errorCode: null, nextAttemptInMs: 0, ...(audioQuality ? { audioQuality } : {}),
   });
   if (durationMs) await deps.store.setSessionDuration(job.sessionId, durationMs);
-  // فایلِ خامِ اصلی دیگر لازم نیست — نسخه‌ی نرمال‌شده در آرشیوِ ۱۴روزه است (LAW-010).
+  // فایلِ خامِ اصلی دیگر لازم نیست — نسخه‌ی نرمال‌شده در آرشیوِ ۳۰روزه است (LAW-010).
   deps.removeUploadDir(job.uploadId);
   if (parts) for (const p of parts) if (p.uploadId !== job.uploadId) deps.removeUploadDir(p.uploadId);
   return CONTINUE;

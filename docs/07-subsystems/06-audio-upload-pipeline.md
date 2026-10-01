@@ -127,13 +127,13 @@ queued → normalizing → transcribing → case_file → done
 - **رفعِ F6:** CAS رویِ `client_case_file.content_version` در تولید و همه‌ی PATCHها ⇒ ویرایشِ تراپیست حینِ تولیدِ چنددقیقه‌ای دیگر پاک نمی‌شود؛ قفلِ «در حالِ تولید» اتمیک (`claimGenerating`).
 - **رفعِ F7 (UI):** شکست/در‌حالِ‌تولیدِ یک بازتولید دیگر پرونده‌ی سالمِ قبلی را پنهان نمی‌کند (بنر بالایِ محتوا).
 
-## ۸. نگه‌داری و حذف (LAW-010 — تأییدِ مالک 2026-09-23: ۱۴ روز)
+## ۸. نگه‌داری و حذف (LAW-010 — تأییدِ مالک 2026-09-23: ۱۴ روز؛ ۳۰ روز از 2026-10-01)
 
 | داده | محل | عمر |
 |---|---|---|
 | تکه‌هایِ آپلودِ نیمه‌کاره | `data/uploads/<id>/` | ۷ روز بی‌فعالیت ⇒ `canceled` + حذف (`sweepStaleUploads`، ساعتی) |
-| فایلِ خامِ کامل | `data/uploads/<id>/source.*` | تا پایانِ نرمال‌سازی؛ حداکثر ۱۴ روز |
-| نسخه‌ی نرمال‌شده | `data/session-audio/<sessionId>/` (`session_audio`) | ۱۴ روز (sweepِ موجود) |
+| فایلِ خامِ کامل | `data/uploads/<id>/source.*` | تا پایانِ نرمال‌سازی؛ حداکثر ۳۰ روز |
+| نسخه‌ی نرمال‌شده | `data/session-audio/<sessionId>/` (`session_audio`) | ۳۰ روز (sweepِ موجود) |
 | فایل/transcription رویِ Soniox | Soniox | بلافاصله بعد از ثبتِ متن یا شکستِ دائمی؛ یتیم‌ها با `sweepSonioxOrphans` (فقط با `SONIOX_ORPHAN_SWEEP=1`، > ۲۴ساعت، فقط نام/مرجعِ `feelia`) |
 | اعلان | `notifications` | ۳۰ روز |
 

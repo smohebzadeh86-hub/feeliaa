@@ -109,7 +109,7 @@
 
 | # | منبع A | منبع B | برنده | اقدام |
 |---|---|---|---|---|
-| C1 | متنِ رضایت و privacy note در `index.html`: «صدا هیچ‌جا ذخیره نمی‌شود» | IndexedDB + آرشیوِ ۱۴روزه + پخشِ ادمین | LAW-009 (متن باید حقیقت بگوید) — کد وضعیتِ موجود است | تصمیمِ مالک: P0-1 در master plan |
+| C1 | متنِ رضایت و privacy note در `index.html`: «صدا هیچ‌جا ذخیره نمی‌شود» | IndexedDB + آرشیوِ ۳۰روزه + پخشِ ادمین | LAW-009 (متن باید حقیقت بگوید) — کد وضعیتِ موجود است | تصمیمِ مالک: P0-1 در master plan |
 | C2 | `docs/admin-panel.md`: ادمین transcript نمی‌بیند | `buildTherapistExport` شاملِ `transcript` | کد (سند HISTORICAL شد) | ثبت در PRD ادمین |
 | C3 | `analytics-clarity.md`: prod با pm2 در `/root/feeliaa` | `diag-collect.sh`: `$HOME/server-deploy` | هیچ‌کدام تأییدشده نیست | تأیید از سرور (P1-3) |
 | C4 | هشدار/راهنمای ویرایشِ تاریخ: شمسی (`۱۴۰۳/۰۵/۱۲`) | پیش‌فرضِ `POST /api/sessions`: تاریخِ میلادی | کد | ✅ رفع در working tree (2026-09-14): مالک «شمسی» انتخاب کرد — migration 013 + `features/sessions/sessionDate.ts` |

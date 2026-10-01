@@ -1,6 +1,6 @@
 // آرشیوِ صدایِ جلسات — فقط برایِ بازبینیِ ادمین (پیداکردنِ ریشه‌ی باگ‌هایِ STT).
 // جدا از data/batch-queue (که یه صفِ گذرا برایِ رونویسیه و بعدِ موفقیت پاک می‌شه):
-// این یه آرشیوِ عمدیه، با نگه‌داریِ محدود (پیش‌فرض ۱۴ روز)، فقط پشتِ requireAdmin
+// این یه آرشیوِ عمدیه، با نگه‌داریِ محدود (۳۰ روز)، فقط پشتِ requireAdmin
 // قابلِ‌شنیدنه — نه تراپیست، نه هیچ کاربرِ عادی.
 //
 // محل و قفلِ آرشیو (data/session-audio/<sessionId>/) + نوع‌ها. قفلِ per-session یک instance است که هم نوشتن و هم
@@ -10,7 +10,7 @@ import path from 'node:path';
 import { createKeyedLock } from '../../../shared/keyedLock.js';
 
 export const ARCHIVE_DIR = path.join(process.cwd(), 'data', 'session-audio');
-export const RETENTION_MS = 14 * 24 * 60 * 60 * 1000; // ۱۴ روز — طبقِ تصمیمِ تیم
+export const RETENTION_MS = 30 * 24 * 60 * 60 * 1000; // ۳۰ روز (یک ماه) — تصمیمِ مالک 2026-10-01
 export const SESSION_AUDIO_RETENTION_MS = RETENTION_MS; // برایِ «روزهایِ باقی‌مانده» در آرشیوِ ادمین (B2)
 
 export function ensureArchiveDir() {
