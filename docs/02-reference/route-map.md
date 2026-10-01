@@ -22,6 +22,9 @@ URL هرگز عوض نمی‌شود؛ ناوبری فقط با `showScreen(name)
 | `AdminSessionTimeline` | `openAdminSessionTimeline(sessionId, title)` | `AdminActivity` | `admin/sessions/:id/timeline` | کلِ section |
 | `AdminAudio` | `openAdminAudio` | `AdminSessionDetail` | `admin/audio-archive`، `admin/session-audio/:id/stream`، `DELETE admin/sessions/:id/audio` | کلِ section |
 | `AdminVoiceNotes` | `openAdminVoiceNotes` | `AdminSessionDetail` | `admin/voice-notes`، `…/:noteId/text` | کلِ section |
+| `AdminLive` | `openAdminLive` (`data-admin-nav="live"`) | `AdminSessionTimeline` | `admin/sessions/live` (poll ۱۵ث، فقط وقتی دیده می‌شود) | کلِ section |
+| `AdminQueue` | `openAdminQueue` (`data-admin-nav="queue"`) | `AdminSessionDetail` | `admin/queue`، `POST admin/audio-jobs/:id/retry`، `POST admin/sessions/:id/final-transcript/retry` | کلِ section |
+| `AdminSystem` | `openAdminSystem` (`data-admin-nav="system"`) | — | `admin/system` | کلِ section |
 | `AllClients` | `showAllClients` | `ClientDetail`، `Clients` | `clients` | — |
 | `SessionDetail` | `doViewTranscript(sessionId)` (از `ClientDetail`) | `ClientDetail` | `sessions/:id`، `final-transcript`، `notes` | جزئیاتِ جلسه (mask) |
 

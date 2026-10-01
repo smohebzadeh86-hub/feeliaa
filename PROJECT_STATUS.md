@@ -222,6 +222,14 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — DECISION + CODE + TEST + DOCS — پنلِ ادمین: «جلساتِ زنده»، «صفِ پردازشِ سراسری»، «سلامتِ سیستم»؛ commit/deploy نشد
+- **تصمیمِ مالک (این گفتگو):** از سندِ `feelia-admin-panel-spec` فقط این سه مورد؛ جلساتِ زنده **بدونِ شنودِ زنده** (فقط وضعیت). کانالِ Push/Email/Webhook (ساختگی) و UIِ گزارشِ رضایت/ممیزی خارج از این دور. طراحیِ بصریِ سند اعمال نشد (SPAِ بدونِ build، بدونِ dependency).
+- **بک‌اند:** `GET /api/admin/sessions/live` (`features/admin/liveHealth.ts`)، `GET /api/admin/queue`، `POST /api/admin/audio-jobs/:id/retry`، `POST /api/admin/sessions/:id/final-transcript/retry` (`queue.admin.ts`)، `GET /api/admin/system` (`system.admin.ts`). منطقِ retry از `uploads.routes.ts` به `audio-upload/jobRetry.ts` منتقل شد (رفتارِ تراپیست بدونِ تغییر)؛ `jobView` به `jobView.ts`؛ `adminJobs.ts` (بدونِ `original_name`). دو actionِ جدیدِ audit. پلتفرم: `obs/heartbeat.ts` (`scheduleBeating` رویِ همه‌ی `setInterval`هایِ `backgroundJobs.ts` + tickِ دو worker)، `obs/httpMetrics.ts` (۴۸ سطلِ ۳۰دقیقه‌ای + reservoirِ p95؛ از `httpHook`). **انحراف از پلن:** متریک در فایلِ جدا `httpMetrics.ts` است (نه داخلِ `httpHook.ts`).
+- **فرانت:** سه section + سه آیتمِ nav در `public/index.html`؛ polling ۱۵ثانیه‌ایِ زنده فقط وقتی دیده می‌شود؛ CSV سمتِ کلاینت؛ retry با مودالِ تأیید.
+- **تست:** tsc، `test:arch`، `test:routes` (بعد از update)، `test:up` 54/0، `test:docs`، و `test:adm` (جدید، 8/0) سبز؛ UI با mock (دسکتاپ/موبایل/تیره/روشن). **با مجوزِ صریحِ مالک:** `FEELIA_E2E_OK=1 test:api` رویِ DBِ dev ⇒ 362 ورودی، exit 0، fixtureها پاک؛ و E2Eِ موقتِ ۷ سناریو رویِ MySQLِ واقعی برایِ ۵ endpointِ جدید (۷/۷ PASS، اسکریپت حذف شد). heartbeatِ workerهایِ واقعی فقط بعد از deploy قابلِ دیدن است. [verification](verification/2026-10-01-admin-live-queue-system.md).
+- **مستندات:** api-catalog §7، error-code-catalog، PRD ماژول 06 (UC-06.9…11، صفحه‌ها ۸→۱۱)، frontend-map، route-map، feature-index، repository-map، observability-audit، REQ-123 + traceability، CLAUDE.md §8 (`test:adm`).
+- **عامل:** این نشست.
+
 ### 2026-09-30 — TEST + DOCS + CODE(comment) + GIT — پایانِ پلنِ مستندات: `test:*` و `test:api`، فاز ۷، bannerهایِ فرانت، commit
 - **دستورِ مالک:** «همه رو انجام بده و commit کن» (مجوزِ `test:api`، فاز ۷، bannerها).
 - **تست:** `test:rt` 102/0، `cf` 111، `up` 54، `tu` 17، `ft` 59، `llm` 18 — همه بدونِ شکست؛ `FEELIA_E2E_OK=1 test:api` رویِ DBِ dev با fixtureِ ساختگی exit 0 (۳۶۲ ورودی، fixtureها پاک، بدونِ golden)؛ `test:docs`/`arch`/`routes`/`tsc` سبز. [verification](verification/2026-09-30-docs-followup-p7-banners-tests.md).

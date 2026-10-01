@@ -16,7 +16,7 @@ const JOB_SELECT = `SELECT j.id, j.stage, j.attempts, j.error_code, j.duration_m
     j.transcript_applied_at, j.transcript_chars, j.created_at, j.updated_at, j.finished_at, j.next_attempt_at,
     j.audio_quality, j.quality_warning,
     j.session_id, j.client_id, j.upload_id, s.session_num, c.code AS client_code, c.alias AS client_alias, c.status AS client_status,
-    u.original_name, u.parts_total, t.case_file_enabled AS t_case_file_enabled, t.case_file_auto_generate AS t_case_file_auto_generate
+    u.original_name, u.parts_total, t.name AS therapist_name, t.id AS therapist_id, t.case_file_enabled AS t_case_file_enabled, t.case_file_auto_generate AS t_case_file_auto_generate
   FROM audio_jobs j
   JOIN sessions s ON s.id = j.session_id
   JOIN clients c ON c.id = j.client_id
@@ -40,13 +40,17 @@ export async function ownedJobRow(id: string, therapistId: string | null): Promi
 }
 
 // where: یکی از دو شرطِ ثابتِ scope (active/recent) که route انتخاب می‌کند.
-export async function listJobRows(where: string, therapistId: string | null): Promise<any[]> {
-  return (await query(`${JOB_SELECT} WHERE ${where} ORDER BY j.created_at DESC LIMIT 30`, [therapistId])).rows;
+export async function listJobRows(where: string, therapistId: string | null, params: unknown[] = [therapistId], limit = 30): Promise<any[]> {
+  return (await query(`${JOB_SELECT} WHERE ${where} ORDER BY j.created_at DESC LIMIT ${Math.max(1, Math.floor(limit))}`, params)).rows;
 }
 
 // ————— ردیفِ خامِ audio_jobs —————
 export async function getJobByUpload(uploadId: string): Promise<any> {
   return (await query('SELECT * FROM audio_jobs WHERE upload_id = ?', [uploadId])).rows[0];
+}
+
+export async function getJobById(id: string): Promise<any> {
+  return (await query('SELECT * FROM audio_jobs WHERE id = ?', [id])).rows[0];
 }
 
 export async function getOwnedJob(id: string, therapistId: string | null): Promise<any> {

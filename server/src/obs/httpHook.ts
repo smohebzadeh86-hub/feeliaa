@@ -4,6 +4,7 @@
 import type { FastifyInstance } from 'fastify';
 import { logEvent } from './eventLog.js';
 import { writeJsonl } from './fileSink.js';
+import { httpMetrics } from './httpMetrics.js';
 
 const OBS_SLOW_MS = Number(process.env.OBS_SLOW_MS) > 0 ? Number(process.env.OBS_SLOW_MS) : 1500;
 
@@ -46,6 +47,7 @@ export function registerObsHooks(app: FastifyInstance): void {
       const route = request.routeOptions?.url || null;
       const statusCode = reply.statusCode;
       const method = request.method;
+      httpMetrics.record(statusCode, durationMs);
       const therapistId = (request as any).therapistId as string | null | undefined;
 
       const isSlow = durationMs >= OBS_SLOW_MS;

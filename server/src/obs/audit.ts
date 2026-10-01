@@ -14,6 +14,8 @@ export const AUDIT_ACTIONS = [
   'admin.audio_play',           // پخشِ صدا (شروع، نه هر Range)
   'admin.audio_download',
   'admin.session_audio_delete', // حذفِ فقط صدایِ یک جلسه (B2)
+  'admin.audio_job_retry',      // تلاشِ دوباره‌ی jobِ آپلودِ یک تراپیست از صفِ سراسری
+  'admin.final_transcript_retry', // تلاشِ دوباره‌ی «متنِ نهایی»ِ یک جلسه از صفِ سراسری
   'admin.voice_note_text_view', // نمایشِ متنِ یادداشتِ صوتی (B3)
   'admin.flag_granted',         // ادمین‌شدنِ خودکار با ADMIN_PHONE (ensureAdminFlag)
   'therapist.client_delete',

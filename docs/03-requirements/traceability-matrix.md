@@ -60,6 +60,7 @@
 | REQ-120 | [llm-provider-layer](../06-platform/llm-provider-layer.md) | `server/src/llm/config.ts` | `scripts/llm-harness.ts` (`test:llm`) | harness |
 | REQ-121 | [observability-audit](../06-platform/observability-audit.md) | `server/src/obs/audit.ts` | `test:api` (دستی) | E2Eِ 2026-09-26 |
 | REQ-122 | platform | `scripts/check-backend-boundaries.mjs` | `test:arch` | harness |
+| REQ-123 | [admin-panel](../04-modules/06-admin-panel/module-prd.md) | `server/src/features/admin/queue.admin.ts`، `system.admin.ts`، `liveHealth.ts` | `scripts/admin-monitor-harness.ts` (`test:adm`) | harness + mock UI ([verification](../../verification/2026-10-01-admin-live-queue-system.md)) |
 
 ## شکاف‌های پوشش (برای master plan)
 1. auth، clients، sessions، admin harnessِ خودکارِ اختصاصی ندارند (فقط `test:api` دستی رویِ DBِ dev و `test:routes` برایِ guardها).

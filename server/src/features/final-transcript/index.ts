@@ -2,3 +2,4 @@
 export { enqueueFinalTranscript, startFinalTranscriptWorker, wakeFinalTranscriptWorker } from './runner.js';
 export { finalTranscriptRoutes } from './api/finalTranscript.routes.js';
 export { appendUploadForPolish } from './domain/transcriptText.js';
+export { retryFinalTranscript } from './runner.js';

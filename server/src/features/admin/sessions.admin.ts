@@ -4,12 +4,32 @@ import { FastifyInstance } from 'fastify';
 import { listSessionAudio, pendingAudiosFor } from '../transcription/index.js';
 import { recordAudit } from '../../obs/audit.js';
 import { diagnoseSession } from './diagnosis.js';
+import { liveHealth, LIVE_WINDOW_HOURS } from './liveHealth.js';
 import {
   getSessionWithTranscript, listSessionNotesForAdmin, listRecentSessions, getSessionForDiagnosis, listSessionEventsBrief,
-  listSessionUiEventsBrief, listUploadJobsForDiagnosis, getFinalTranscriptForDiagnosis, getSessionTimelineHead, listSessionEvents, listSessionUiEvents, listSessionNotesMeta,
+  listSessionUiEventsBrief, listUploadJobsForDiagnosis, getFinalTranscriptForDiagnosis, getSessionTimelineHead, listSessionEvents, listSessionUiEvents, listSessionNotesMeta, listLiveSessions,
 } from './admin.repository.js';
 
 export async function sessionsAdminRoutes(app: FastifyInstance) {
+  // GET /api/admin/sessions/live — جلساتِ زنده‌ی در حالِ ضبط (فقط وضعیت، بدونِ شنودِ زنده — تصمیمِ مالک 2026-10-01).
+  // فقط متادیتا؛ بدونِ audit (متنِ بالینی برنمی‌گردد).
+  app.get('/api/admin/sessions/live', async () => {
+    const rows = await listLiveSessions(LIVE_WINDOW_HOURS);
+    return {
+      sessions: rows.map((r) => {
+        const lastAge = r.last_segment_age_s === null || r.last_segment_age_s === undefined ? null : Number(r.last_segment_age_s);
+        return {
+          id: r.id, session_num: r.session_num, client_id: r.client_id, client_code: r.client_code,
+          therapist_id: r.therapist_id, therapist_name: r.therapist_name,
+          duration_ms: r.duration_ms === null ? null : Number(r.duration_ms), updated_at: r.updated_at, auto_closed_at: r.auto_closed_at ?? null,
+          segment_count: Number(r.seg_count || 0), segment_bytes: Number(r.seg_bytes || 0), last_segment_age_s: lastAge,
+          transcript_len: Number(r.transcript_len || 0),
+          health: liveHealth(lastAge, Number(r.since_update_s || 0)),
+        };
+      }),
+    };
+  });
+
   // GET /api/admin/sessions/:id — متنِ کاملِ رونویسی + همه‌ی یادداشت‌ها/علائمِ یک جلسه
   // (تصمیمِ مالک D2، 2026-09-15: دسترسیِ کاملِ ادمین داخلِ پنل، فقط‌خواندنی؛ بدونِ لاگِ متن، LAW-001).
   app.get('/api/admin/sessions/:id', async (request, reply) => {

@@ -2,6 +2,7 @@
 // تمامِ وضعیت در DB، lease + heartbeat، آزادسازیِ leaseها در startup (LAW-013: تک‌پروسه).
 import { query, pool } from '../../db/connection.js';
 import { logEvent } from '../../obs/eventLog.js';
+import { beat } from '../../obs/heartbeat.js';
 import { createNotification } from '../notifications/index.js';
 import { treatmentUnits } from '../treatment-unit/index.js';
 import {
@@ -312,6 +313,7 @@ async function tick(): Promise<void> {
   if (ticking || !deps) return;
   ticking = true;
   try {
+    beat('final-transcript-worker', TICK_MS);
     if (running.size >= CONCURRENCY) return;
     const due = await query(
       `SELECT session_id FROM final_transcripts

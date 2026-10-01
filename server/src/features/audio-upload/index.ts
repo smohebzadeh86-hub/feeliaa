@@ -4,3 +4,6 @@ export { sweepStaleUploads, sweepOrphanUploadDirs } from './uploadStore.js';
 export { startAudioJobWorker } from './worker.js';
 export { sweepSonioxOrphans } from './orphanSweep.js';
 export { tryFinalizeGroup } from './groupFinalize.js';
+// صفِ پردازشِ ادمین + «تلاشِ دوباره»ی مشترک
+export { retryFailedAudioJob } from './jobRetry.js';
+export { listAdminUploadJobs, countAdminUploadJobsByStage } from './adminJobs.js';

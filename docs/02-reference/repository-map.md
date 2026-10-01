@@ -53,7 +53,7 @@ feeliaa/
 │           │   ├── batch/       queueFiles · recoveryMerge · processQueue · sweep
 │           │   └── archive/     store · ffmpegOps · archiveWrite · listing · fullAudio · sweep
 │           ├── session-media/   purge.ts · index.ts
-│           ├── admin/           admin.routes.ts · therapists/sessions/audio/export/obs.admin.ts · admin.repository.ts · diagnosis.ts · filters.ts
+│           ├── admin/           admin.routes.ts · therapists/sessions/audio/export/obs.admin.ts · queue.admin.ts · system.admin.ts · admin.repository.ts · diagnosis.ts · liveHealth.ts · filters.ts
 │           ├── audio-upload/    uploads.routes.ts · uploads.repository.ts · uploadSession.ts · groupFinalize.ts · uploadLocks.ts · jobMachine.ts
 │           │                    · jobStore.sql.ts · worker.ts · quota.ts · sonioxRefs.ts · orphanSweep.ts · uploadStore.ts · media.ts · quality.ts · index.ts
 │           ├── notifications/   notify.ts · notifications.routes.ts · index.ts

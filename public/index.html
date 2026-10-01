@@ -873,6 +873,31 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
 .admin-nav-item:hover{background:var(--sage-mist);color:var(--sage-deep)}
 .admin-nav-item.active{background:var(--sage-soft);color:var(--sage-deep)}
 .admin-nav-sep{height:1px;background:var(--line-soft);margin:6px 4px}
+/* (2026-10-01) جلساتِ زنده / صفِ پردازش / سلامتِ سیستم — فقط توکن‌هایِ موجود */
+.adm-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--muted);vertical-align:middle;margin-inline:4px 2px;flex:none}
+.adm-dot.ok{background:var(--sage)}
+.adm-dot.warn{background:var(--gold)}
+.adm-dot.bad{background:var(--clay)}
+.adm-progress{height:5px;border-radius:99px;background:var(--line-soft);overflow:hidden;margin-top:8px}
+.adm-progress>i{display:block;height:100%;background:var(--sage);border-radius:99px}
+.adm-progress.bad>i{background:var(--clay)}
+.adm-progress.warn>i{background:var(--gold)}
+.admin-row.clickable{cursor:pointer}
+.admin-row.clickable:hover{border-color:var(--sage)}
+.adm-chart{display:flex;direction:ltr;align-items:flex-end;gap:2px;height:120px;margin-top:10px}
+.adm-chart>div{flex:1;min-width:0;display:flex;flex-direction:column-reverse;height:100%;justify-content:flex-start}
+.adm-chart .ok{background:var(--sage);border-radius:2px 2px 0 0}
+.adm-chart .w4{background:var(--gold)}
+.adm-chart .e5{background:var(--clay)}
+.adm-chart-axis{display:flex;justify-content:space-between;direction:ltr;font-size:11px;color:var(--muted);margin-top:4px}
+.adm-health-ok{color:var(--sage-deep);font-weight:700}
+.adm-health-list{margin:8px 0 0;padding-inline-start:18px;font-size:13px;line-height:2}
+.adm-worker{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line-soft);flex-wrap:wrap}
+.adm-worker:last-child{border-bottom:0}
+@media (max-width:760px){
+  .adm-chart{height:90px}
+  .admin-stats{grid-template-columns:repeat(2,1fr)}
+}
 @media (max-width:760px){
   body.admin-mode .wrap{display:block}
   .admin-nav{flex-direction:row;overflow-x:auto;position:static;margin-bottom:14px;padding:6px;gap:6px;scrollbar-width:none}
@@ -960,6 +985,18 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <button class="admin-nav-item" data-admin-nav="activity" onclick="openAdminActivity()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
       <span>فعالیت‌ها</span>
+    </button>
+    <button class="admin-nav-item" data-admin-nav="live" onclick="openAdminLive()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"/></svg>
+      <span>جلساتِ زنده</span>
+    </button>
+    <button class="admin-nav-item" data-admin-nav="queue" onclick="openAdminQueue()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>
+      <span>صفِ پردازش</span>
+    </button>
+    <button class="admin-nav-item" data-admin-nav="system" onclick="openAdminSystem()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <span>سلامتِ سیستم</span>
     </button>
     <button class="admin-nav-item" data-admin-nav="audio" onclick="openAdminAudio()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3zM3 19a2 2 0 0 0 2 2h1v-6H3z"/></svg>
@@ -1149,6 +1186,58 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     </div>
     <div id="adminTimelineList"></div>
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminSessionTimeline()">بازگشت</button>
+  </section>
+
+  <!-- (2026-10-01) جلساتِ زنده / صفِ پردازشِ سراسری / سلامتِ سیستم — فقط متادیتا (بدونِ متنِ بالینی، بدونِ شنودِ زنده) -->
+  <section id="screenAdminLive" class="card screen" data-clarity-mask="true" hidden>
+    <div class="card-head">
+      <h2>جلساتِ زنده</h2>
+      <p>وضعیتِ جلساتِ در حالِ ضبط — فقط وضعیت؛ شنودِ زنده وجود ندارد. هر ۱۵ ثانیه خودکار به‌روز می‌شود.</p>
+    </div>
+    <div id="adminLiveStats" class="admin-stats"></div>
+    <div id="adminLiveList"></div>
+    <div class="empty" id="adminLiveEmpty" hidden><p>در حالِ حاضر جلسه‌ی زنده‌ای در حالِ ضبط نیست</p></div>
+    <div class="admin-row-meta" id="adminLiveUpdated"></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="loadAdminLive()">به‌روزرسانی</button>
+  </section>
+
+  <section id="screenAdminQueue" class="card screen" data-clarity-mask="true" hidden>
+    <div class="card-head">
+      <h2>صفِ پردازش</h2>
+      <p>پردازش‌هایِ پس‌زمینه‌ی همه‌ی تراپیست‌ها: آپلودِ صدا، متنِ نهایی و رونویسیِ batch — فقط وضعیت، بدونِ متن و نامِ فایل.</p>
+    </div>
+    <div id="adminQueueStats" class="admin-stats"></div>
+    <div class="client-tabs" role="tablist">
+      <button class="client-tab active" id="adminQueueTabUpload" role="tab" aria-selected="true" onclick="adminQueueTab('upload')">آپلودِ صدا</button>
+      <button class="client-tab" id="adminQueueTabFinal" role="tab" aria-selected="false" onclick="adminQueueTab('final')">متنِ نهایی</button>
+      <button class="client-tab" id="adminQueueTabBatch" role="tab" aria-selected="false" onclick="adminQueueTab('batch')">batch</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0">
+      <select id="adminQueueTherapist" onchange="loadAdminQueue()"><option value="">همه‌ی تراپیست‌ها</option></select>
+      <select id="adminQueueStage" onchange="loadAdminQueue()"></select>
+      <button class="btn btn-sm btn-ghost" onclick="adminQueueCsv()">خروجیِ CSV</button>
+    </div>
+    <div id="adminQueueList"></div>
+    <div class="empty" id="adminQueueEmpty" hidden><p>موردی یافت نشد</p></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="loadAdminQueue()">به‌روزرسانی</button>
+  </section>
+
+  <section id="screenAdminSystem" class="card screen" data-clarity-mask="true" hidden>
+    <div class="card-head">
+      <h2>سلامتِ سیستم</h2>
+      <p>وضعیتِ سرور، پایگاه‌داده، workerها و ترافیک. آمارِ ترافیک از آخرین راه‌اندازیِ سرور و حداکثر ۲۴ ساعت است.</p>
+    </div>
+    <div id="adminSystemStats" class="admin-stats"></div>
+    <div id="adminSystemHealth" class="card admin-row"></div>
+    <div class="card admin-row"><div class="admin-row-title">پردازشگرها و جاروب‌ها</div><div id="adminSystemWorkers"></div></div>
+    <div class="card admin-row">
+      <div class="admin-row-title">ترافیکِ ۲۴ ساعتِ اخیر <span class="admin-row-meta" id="adminSystemChartMeta"></span></div>
+      <div id="adminSystemChart" class="adm-chart" role="img" aria-label="نمودارِ ترافیکِ ۲۴ ساعتِ اخیر در ۴۸ بازه‌ی ۳۰دقیقه‌ای"></div>
+      <div class="adm-chart-axis"><span>۲۴ ساعت پیش</span><span>اکنون</span></div>
+      <div class="admin-row-meta"><span class="adm-dot ok"></span> موفق <span class="adm-dot warn"></span> خطای ۴xx <span class="adm-dot bad"></span> خطای ۵xx</div>
+    </div>
+    <div class="card admin-row"><div class="admin-row-title">حجمِ پوشه‌هایِ data/</div><div id="adminSystemDirs" class="admin-row-meta"></div></div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="loadAdminSystem()">به‌روزرسانی</button>
   </section>
 
   <section id="screenClients" class="card screen" hidden>
@@ -2625,10 +2714,11 @@ function updateSteps(idx){
   }
 }
 // (B1) صفحه‌هایِ ادمین ⇒ کدام آیتمِ sidebar فعال است. AdminSessionDetail از چند جا باز می‌شود (adminDetailReturn).
-const ADMIN_SCREEN_NAV={Admin:'overview',AdminTherapist:'overview',AdminSessions:'overview',AdminSessionDetail:null,AdminActivity:'activity',AdminSessionTimeline:'activity',AdminAudio:'audio',AdminVoiceNotes:'voice'};
+const ADMIN_SCREEN_NAV={Admin:'overview',AdminTherapist:'overview',AdminSessions:'overview',AdminSessionDetail:null,AdminActivity:'activity',AdminSessionTimeline:'activity',AdminAudio:'audio',AdminVoiceNotes:'voice',AdminLive:'live',AdminQueue:'queue',AdminSystem:'system'};
 let adminDetailReturn='sessions';
+let adminTimelineReturn='activity';
 function showScreen(name){
-  ['Auth','Clients','AllClients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions','AdminSessionDetail','AdminActivity','AdminSessionTimeline','AdminAudio','AdminVoiceNotes'].forEach(s=>{
+  ['Auth','Clients','AllClients','Setup','Live','Wrapup','ClientDetail','SessionDetail','Admin','AdminTherapist','AdminSessions','AdminSessionDetail','AdminActivity','AdminSessionTimeline','AdminAudio','AdminVoiceNotes','AdminLive','AdminQueue','AdminSystem'].forEach(s=>{
     const el=$('screen'+s);
     if(el)el.hidden=s!==name;
   });
@@ -2637,7 +2727,7 @@ function showScreen(name){
   const nav=$('adminNav');
   if(nav){
     nav.hidden=!isAdminScreen;
-    const sec=isAdminScreen?(ADMIN_SCREEN_NAV[name]||({audio:'audio',voice:'voice'}[adminDetailReturn])||'overview'):null;
+    const sec=isAdminScreen?((name==='AdminSessionTimeline'&&adminTimelineReturn==='live'?'live':ADMIN_SCREEN_NAV[name])||({audio:'audio',voice:'voice',live:'live',queue:'queue'}[adminDetailReturn])||'overview'):null;
     nav.querySelectorAll('[data-admin-nav]').forEach(function(b){
       const on=b.dataset.adminNav===sec;
       b.classList.toggle('active',on);
@@ -2650,6 +2740,7 @@ function showScreen(name){
   // صفحه‌ی «همه» تبِ غیرفعال را انتخاب کرده باشد و برگردد، clientTabِ سراسری هنوز
   // 'inactive' می‌ماند و دکمه‌ی «مراجع جدید»ِ همین صفحه (که از newClientTargetStatus
   // می‌خواند) بی‌صدا یک مراجعِ غیرفعال می‌سازد.
+  if(name!=='AdminLive')stopAdminLivePoll();
   if(name!=='Setup'&&preVoiceSetup.isRecording())preVoiceSetup.stop();
   if(name==='Wrapup')refreshWrapupPreNotes();else stopWrapupPreNotesPoll();
   if(name==='Clients'){clientsView='today';clientTab='active';}
@@ -3267,6 +3358,7 @@ async function openAdminSessionTimeline(sessionId,titleText){
   }catch(e){showBanner('error',e.message);}
 }
 function closeAdminSessionTimeline(){
+  if(adminTimelineReturn==='live'){adminTimelineReturn='activity';openAdminLive();return;}
   showScreen('AdminActivity');
   adminActivityTab('sessions');
 }
@@ -3410,6 +3502,330 @@ function adminDownload(url){
   const a=document.createElement('a');
   a.href=url;a.download='';document.body.appendChild(a);a.click();a.remove();
 }
+
+// ===== (2026-10-01) جلساتِ زنده / صفِ پردازشِ سراسری / سلامتِ سیستم — فقط متادیتا =====
+// «n ثانیه/دقیقه/ساعت پیش» از ثانیه
+function adminAgoFa(sec){
+  if(sec===null||sec===undefined)return 'هنوز نه';
+  sec=Math.max(0,Math.round(Number(sec)||0));
+  if(sec<60)return toFa(sec)+' ثانیه پیش';
+  if(sec<3600)return toFa(Math.floor(sec/60))+' دقیقه پیش';
+  if(sec<86400)return toFa(Math.floor(sec/3600))+' ساعت پیش';
+  return toFa(Math.floor(sec/86400))+' روز پیش';
+}
+function adminAgoFromDate(v){
+  if(!v)return '—';
+  const t=new Date(v).getTime();
+  return Number.isFinite(t)?adminAgoFa((Date.now()-t)/1000):'—';
+}
+
+// ——— جلساتِ زنده ———
+let adminLiveTimer=null;
+const ADMIN_LIVE_POLL_MS=15000;
+const ADMIN_LIVE_HEALTH={recording:{fa:'در حالِ ضبط',cls:'ok'},quiet:{fa:'ساکت',cls:'warn'},stalled:{fa:'متوقف',cls:'bad'}};
+function adminLiveVisible(){return !document.hidden&&$('screenAdminLive')&&!$('screenAdminLive').hidden;}
+function stopAdminLivePoll(){if(adminLiveTimer){clearInterval(adminLiveTimer);adminLiveTimer=null;}}
+function startAdminLivePoll(){
+  stopAdminLivePoll();
+  adminLiveTimer=setInterval(function(){if(adminLiveVisible())loadAdminLive();},ADMIN_LIVE_POLL_MS);
+}
+async function openAdminLive(){
+  if(hasActiveRecording()){showBanner('warn','ابتدا جلسه‌ی زنده را پایان دهید یا لغو کنید.');return;}
+  clearBanner();
+  adminDetailReturn='live';
+  showScreen('AdminLive');
+  await loadAdminLive();
+  startAdminLivePoll();
+}
+async function loadAdminLive(){
+  try{
+    const data=await api('/api/admin/sessions/live');
+    renderAdminLive(data.sessions||[]);
+  }catch(e){showBanner('error',e.message);}
+}
+function renderAdminLive(sessions){
+  const cnt={recording:0,quiet:0,stalled:0};
+  sessions.forEach(function(s){if(cnt[s.health]!==undefined)cnt[s.health]++;});
+  $('adminLiveStats').innerHTML=
+    adminStatTile('در حالِ ضبط',toFa(cnt.recording))+
+    adminStatTile('ساکت',toFa(cnt.quiet),cnt.quiet>0)+
+    adminStatTile('متوقف',toFa(cnt.stalled),cnt.stalled>0);
+  const list=$('adminLiveList');
+  list.innerHTML='';
+  $('adminLiveEmpty').hidden=sessions.length>0;
+  sessions.forEach(function(s){
+    const h=ADMIN_LIVE_HEALTH[s.health]||ADMIN_LIVE_HEALTH.quiet;
+    const row=document.createElement('div');
+    row.className='card admin-row clickable';
+    const head=document.createElement('div');head.className='admin-row-head';
+    const title=document.createElement('div');title.className='admin-row-title';
+    const titleText=(s.therapist_name||'—')+' · '+(s.client_code||'—')+' · جلسه‌ی '+toFa(s.session_num);
+    title.textContent=titleText;
+    const badges=document.createElement('div');badges.className='admin-row-badges';
+    badges.appendChild(adminBadge(h.cls,h.fa));
+    head.appendChild(title);head.appendChild(badges);
+    const meta=document.createElement('div');meta.className='admin-row-meta';
+    meta.textContent='مدت '+fmtDur(s.duration_ms)+' · آخرین سگمنت: '+adminAgoFa(s.last_segment_age_s)+' · '+toFa(s.segment_count)+' سگمنت صدا · '+fmtBytes(s.segment_bytes);
+    row.appendChild(head);row.appendChild(meta);
+    row.onclick=function(){adminTimelineReturn='live';openAdminSessionTimeline(s.id,titleText);};
+    list.appendChild(row);
+  });
+  $('adminLiveUpdated').textContent='آخرین به‌روزرسانی: '+new Date().toLocaleTimeString('fa-IR');
+}
+
+// ——— صفِ پردازشِ سراسری ———
+let adminQueueCurrentTab='upload';
+let adminQueueData=null;
+const ADMIN_QUEUE_STAGES={
+  upload:{order:['queued','normalizing','transcribing','case_file','done'],labels:{queued:'در صف',normalizing:'آماده‌سازیِ صدا',transcribing:'رونویسی',case_file:'پرونده',done:'تمام‌شده',failed:'ناموفق'}},
+  final:{order:['waiting_audio','transcribing','polishing','done'],labels:{waiting_audio:'منتظرِ صدا',transcribing:'رونویسی',polishing:'مرتب‌سازی',done:'تمام‌شده',failed:'ناموفق',skipped:'ردشده'}},
+  batch:{order:['queued','processing'],labels:{queued:'در صف',processing:'در حالِ پردازش',failed:'ناموفق'}}
+};
+function adminStageCls(stage){return stage==='failed'?'bad':(stage==='done'||stage==='skipped')?'ok':'warn';}
+async function openAdminQueue(){
+  if(hasActiveRecording()){showBanner('warn','ابتدا جلسه‌ی زنده را پایان دهید یا لغو کنید.');return;}
+  clearBanner();
+  adminDetailReturn='queue';
+  showScreen('AdminQueue');
+  await fillAdminTherapistFilter('adminQueueTherapist');
+  adminQueueFillStages();
+  await loadAdminQueue();
+}
+function adminQueueFillStages(){
+  const sel=$('adminQueueStage');
+  const cur=sel.value;
+  const L=ADMIN_QUEUE_STAGES[adminQueueCurrentTab].labels;
+  sel.innerHTML='<option value="">همه‌ی وضعیت‌ها</option>'+Object.keys(L).map(function(k){return '<option value="'+k+'">'+escapeHtml(L[k])+'</option>';}).join('');
+  sel.value=L[cur]?cur:'';
+}
+function adminQueueTab(tab){
+  adminQueueCurrentTab=tab;
+  [['upload','Upload'],['final','Final'],['batch','Batch']].forEach(function(p){
+    const b=$('adminQueueTab'+p[1]);
+    b.classList.toggle('active',p[0]===tab);
+    b.setAttribute('aria-selected',p[0]===tab?'true':'false');
+  });
+  adminQueueFillStages();
+  loadAdminQueue();
+}
+async function loadAdminQueue(){
+  try{
+    const parts=[];
+    const t=$('adminQueueTherapist').value;if(t)parts.push('therapist_id='+encodeURIComponent(t));
+    const st=$('adminQueueStage').value;if(st)parts.push('stage='+encodeURIComponent(st));
+    adminQueueData=await api('/api/admin/queue'+(parts.length?'?'+parts.join('&'):''));
+    renderAdminQueue();
+  }catch(e){showBanner('error',e.message);}
+}
+function adminQueueItems(){
+  const d=adminQueueData||{};
+  return adminQueueCurrentTab==='upload'?(d.upload_jobs||[]):adminQueueCurrentTab==='final'?(d.final_transcripts||[]):(d.batch||[]);
+}
+function renderAdminQueue(){
+  const d=adminQueueData||{};
+  const c=d.counts||{};
+  const up=c.upload||{},ft=c.final_transcript||{},bt=c.batch||{};
+  const active=function(o,keys){return keys.reduce(function(a,k){return a+(o[k]||0);},0);};
+  $('adminQueueStats').innerHTML=
+    adminStatTile('آپلود در جریان',toFa(active(up,['queued','normalizing','transcribing','case_file'])))+
+    adminStatTile('متنِ نهایی در جریان',toFa(active(ft,['waiting_audio','transcribing','polishing'])))+
+    adminStatTile('batch در صف',toFa(active(bt,['queued','processing'])))+
+    adminStatTile('ناموفق',toFa((up.failed||0)+(ft.failed||0)+(bt.failed||0)),((up.failed||0)+(ft.failed||0)+(bt.failed||0))>0);
+  const list=$('adminQueueList');
+  list.innerHTML='';
+  const items=adminQueueItems();
+  $('adminQueueEmpty').hidden=items.length>0;
+  items.forEach(function(it){list.appendChild(renderAdminQueueRow(it));});
+}
+function adminProgressPct(tab,stage){
+  const order=ADMIN_QUEUE_STAGES[tab].order;
+  if(stage==='done')return 100;
+  const i=order.indexOf(stage);
+  return i<0?100:Math.round(((i+0.5)/(order.length-1))*100*0.999);
+}
+function renderAdminQueueRow(it){
+  const tab=adminQueueCurrentTab;
+  const stage=tab==='batch'?it.batch_status:it.stage;
+  const cfg=ADMIN_QUEUE_STAGES[tab];
+  const cls=adminStageCls(stage);
+  const row=document.createElement('div');
+  row.className='card admin-row';
+  const head=document.createElement('div');head.className='admin-row-head';
+  const title=document.createElement('div');title.className='admin-row-title';
+  const sid=it.session_id;
+  const titleText=(it.therapist_name||'—')+' · '+(it.client_code||'—')+(it.session_num?' · جلسه‌ی '+toFa(it.session_num):'');
+  title.textContent=titleText;
+  const badges=document.createElement('div');badges.className='admin-row-badges';
+  const dot=document.createElement('span');dot.className='adm-dot '+cls;
+  const b=adminBadge(cls,cfg.labels[stage]||stage);
+  b.insertBefore(dot,b.firstChild);
+  badges.appendChild(b);
+  head.appendChild(title);head.appendChild(badges);
+  const meta=document.createElement('div');meta.className='admin-row-meta';
+  const bits=[];
+  if(tab!=='batch'){bits.push('تلاش '+toFa(it.attempts||0));}
+  if(tab==='batch'&&it.pending_files!==undefined)bits.push(toFa(it.pending_files)+' فایلِ منتظر');
+  if(it.error_code)bits.push('کدِ خطا: '+it.error_code);
+  if(tab==='upload'&&it.duration_ms)bits.push('مدتِ صدا '+fmtDur(it.duration_ms));
+  if(tab==='upload'&&it.quality_warning)bits.push('هشدارِ کیفیتِ صدا');
+  const when=tab==='upload'?(it.updated_at||it.created_at):tab==='final'?(it.finished_at||it.queued_at):it.updated_at;
+  bits.push(adminAgoFromDate(when));
+  meta.textContent=bits.join(' · ');
+  row.appendChild(head);row.appendChild(meta);
+  if(tab!=='batch'||stage!=='failed'){
+    const pr=document.createElement('div');pr.className='adm-progress '+(cls==='bad'?'bad':'');
+    const fill=document.createElement('i');fill.style.width=(stage==='failed'?100:adminProgressPct(tab,stage))+'%';
+    pr.appendChild(fill);row.appendChild(pr);
+  }
+  const actions=document.createElement('div');actions.className='admin-row-actions';
+  if(sid)actions.appendChild(adminBtn('مشاهده','btn-ghost',function(){adminDetailReturn='queue';openAdminSessionDetail(sid,(it.therapist_name||'—')+' · '+(it.client_code||'—'));}));
+  if(stage==='failed'&&tab!=='batch'){
+    actions.appendChild(adminBtn('تلاشِ دوباره','btn-secondary',function(){adminQueueRetry(tab,it);}));
+  }
+  row.appendChild(actions);
+  return row;
+}
+function adminQueueRetry(tab,it){
+  showGenericConfirm({
+    title:'تلاشِ دوباره؟',
+    text:'این پردازش دوباره در صف قرار می‌گیرد (بدونِ آپلودِ دوباره). این کار ثبت می‌شود.',
+    okLabel:'بله، دوباره',okClass:'btn-primary',
+    onConfirm:async function(){
+      try{
+        const url=tab==='upload'?'/api/admin/audio-jobs/'+encodeURIComponent(it.id)+'/retry':'/api/admin/sessions/'+encodeURIComponent(it.session_id)+'/final-transcript/retry';
+        await api(url,{method:'POST'});
+        showBanner('info','پردازش دوباره در صف قرار گرفت.');
+        loadAdminQueue();
+      }catch(e){showBanner('error',e.message);}
+    }
+  });
+}
+// خروجیِ CSV سمتِ کلاینت از همان متادیتا — بدونِ نامِ فایلِ اصلی/متن. سلولِ شروع‌شونده با = + - @ خنثی می‌شود.
+function adminCsvCell(v){
+  let s=v===null||v===undefined?'':String(v);
+  if(/^[=+\-@\t\r]/.test(s))s="'"+s;
+  return '"'+s.replace(/"/g,'""')+'"';
+}
+function adminQueueCsv(){
+  const tab=adminQueueCurrentTab;
+  const rows=[['therapist','client_code','session_num','stage','attempts','error_code','time']];
+  adminQueueItems().forEach(function(it){
+    rows.push([it.therapist_name,it.client_code,it.session_num,tab==='batch'?it.batch_status:it.stage,tab==='batch'?'':it.attempts,it.error_code||'',
+      tab==='upload'?(it.updated_at||it.created_at):tab==='final'?(it.finished_at||it.queued_at):it.updated_at]);
+  });
+  const csv='﻿'+rows.map(function(r){return r.map(adminCsvCell).join(',');}).join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');
+  a.href=url;a.download='feelia-queue-'+tab+'.csv';document.body.appendChild(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
+}
+
+// ——— سلامتِ سیستم ———
+const ADMIN_WORKER_LABELS={
+  'audio-upload-worker':'پردازشگرِ آپلودِ صدا','final-transcript-worker':'پردازشگرِ متنِ نهایی','retry-queued-batches':'تلاشِ دوباره‌ی صفِ batch',
+  'sweep-batch-files':'جاروبِ فایل‌هایِ batch','sweep-session-audio':'جاروبِ آرشیوِ صدا','sweep-resolve-jobs':'جاروبِ بازسازیِ گوینده',
+  'sweep-obs-events':'جاروبِ رویدادهایِ رصد','sweep-stale-uploads':'جاروبِ آپلودهایِ رهاشده','sweep-notifications':'جاروبِ اعلان‌ها',
+  'auto-close-sessions':'بستنِ خودکارِ جلسه‌هایِ رهاشده','sweep-soniox-orphans':'جاروبِ فایل‌هایِ یتیمِ Soniox'
+};
+async function openAdminSystem(){
+  if(hasActiveRecording()){showBanner('warn','ابتدا جلسه‌ی زنده را پایان دهید یا لغو کنید.');return;}
+  clearBanner();
+  adminDetailReturn='system';
+  showScreen('AdminSystem');
+  await loadAdminSystem();
+}
+async function loadAdminSystem(){
+  try{renderAdminSystem(await api('/api/admin/system'));}
+  catch(e){showBanner('error',e.message);}
+}
+function fmtUptime(s){
+  s=Math.max(0,Math.round(Number(s)||0));
+  const d=Math.floor(s/86400),h=Math.floor((s%86400)/3600),m=Math.floor((s%3600)/60);
+  return d?toFa(d)+' روز'+(h?' و '+toFa(h)+' ساعت':''):h?toFa(h)+' ساعت'+(m?' و '+toFa(m)+' دقیقه':''):toFa(m)+' دقیقه';
+}
+function adminSystemProblems(d){
+  const p=[];
+  if(!d.db||!d.db.ok)p.push('پایگاه‌داده پاسخ نمی‌دهد');
+  else if(d.db.ping_ms>500)p.push('تأخیرِ پایگاه‌داده زیاد است ('+toFa(Math.round(d.db.ping_ms))+' میلی‌ثانیه)');
+  (d.workers||[]).forEach(function(w){
+    const n=ADMIN_WORKER_LABELS[w.name]||w.name;
+    if(w.status==='stale')p.push(n+' مدتی است اجرا نشده ('+adminAgoFa(w.age_s)+')');
+    else if(w.last_error)p.push(n+' در آخرین اجرا خطا داد');
+  });
+  if(d.obs&&d.obs.queue&&!d.obs.queue.db_healthy)p.push('صفِ رصد به پایگاه‌داده نمی‌نویسد');
+  const disk=d.disk||{};
+  if(disk.total_bytes&&disk.free_bytes/disk.total_bytes<0.1)p.push('فضایِ دیسک کمتر از ۱۰٪ است');
+  if(d.http&&d.http.total>=20&&d.http.error_rate_5xx>0.05)p.push('نرخِ خطایِ ۵xx بالاست ('+toFa((d.http.error_rate_5xx*100).toFixed(1))+'٪)');
+  if(d.llm_unavailable_24h>0)p.push('سرویسِ LLM در ۲۴ ساعتِ اخیر '+toFa(d.llm_unavailable_24h)+' بار در دسترس نبوده');
+  return p;
+}
+function renderAdminSystem(d){
+  const http=d.http||{},disk=d.disk||{},db=d.db||{};
+  const problems=adminSystemProblems(d);
+  const freeTxt=disk.free_bytes===null||disk.free_bytes===undefined?'—':fmtBytes(disk.free_bytes);
+  $('adminSystemStats').innerHTML=
+    adminStatTile('زمانِ فعالیتِ سرور',fmtUptime(d.uptime_s))+
+    adminStatTile('p95 پاسخ (میلی‌ثانیه)',http.p95_ms===null||http.p95_ms===undefined?'—':toFa(Math.round(http.p95_ms)),http.p95_ms>1500)+
+    adminStatTile('نرخِ خطای ۵xx',toFa(((http.error_rate_5xx||0)*100).toFixed(1))+'٪',(http.error_rate_5xx||0)>0.05)+
+    adminStatTile('حجمِ پایگاه‌داده',db.size_bytes===null||db.size_bytes===undefined?'—':fmtBytes(db.size_bytes))+
+    adminStatTile('فضایِ آزادِ دیسک',freeTxt,!!(disk.total_bytes&&disk.free_bytes/disk.total_bytes<0.1));
+  const hb=$('adminSystemHealth');
+  hb.innerHTML='';
+  const ht=document.createElement('div');ht.className='admin-row-title';
+  const dot=document.createElement('span');dot.className='adm-dot '+(problems.length?'warn':'ok');
+  ht.appendChild(dot);
+  ht.appendChild(document.createTextNode(problems.length?'مواردی نیازمندِ توجه است':'سلامت'));
+  hb.appendChild(ht);
+  if(!problems.length){
+    const ok=document.createElement('div');ok.className='adm-health-ok';ok.textContent='همه‌چیز رو به راه است';hb.appendChild(ok);
+  }else{
+    const ul=document.createElement('ul');ul.className='adm-health-list';
+    problems.forEach(function(t){const li=document.createElement('li');li.textContent=t;ul.appendChild(li);});
+    hb.appendChild(ul);
+  }
+  const meta=document.createElement('div');meta.className='admin-row-meta';
+  meta.textContent='Node '+(d.node||'—')+' · پایگاه‌داده: '+(db.ok?'پاسخ در '+toFa(db.ping_ms)+' میلی‌ثانیه':'قطع')+
+    ' · صفِ رصد: '+toFa((d.obs&&d.obs.queue&&d.obs.queue.event_queue_length)||0)+' رویدادِ منتظر'+
+    (d.obs&&d.obs.events_24h?' · ۲۴ ساعتِ اخیر: '+toFa(d.obs.events_24h.error)+' خطا، '+toFa(d.obs.events_24h.warn)+' هشدار':'');
+  hb.appendChild(meta);
+  const wl=$('adminSystemWorkers');
+  wl.innerHTML='';
+  (d.workers||[]).forEach(function(w){
+    const r=document.createElement('div');r.className='adm-worker';
+    const nm=document.createElement('span');
+    const wd=document.createElement('span');wd.className='adm-dot '+(w.status==='ok'&&!w.last_error?'ok':w.status==='unknown'?'':'bad');
+    nm.appendChild(wd);nm.appendChild(document.createTextNode(ADMIN_WORKER_LABELS[w.name]||w.name));
+    const st=document.createElement('span');st.className='admin-row-meta';st.style.margin='0';
+    st.textContent=w.status==='unknown'?'هنوز اجرا نشده':'آخرین اجرا '+adminAgoFa(w.age_s)+(w.last_error?' · خطا':'');
+    r.appendChild(nm);r.appendChild(st);wl.appendChild(r);
+  });
+  if(!(d.workers||[]).length){wl.textContent='هنوز پردازشگری ثبت نشده';}
+  const ch=$('adminSystemChart');
+  ch.innerHTML='';
+  const bk=http.buckets||[];
+  const max=Math.max(1,...bk.map(function(x){return x.count;}));
+  bk.forEach(function(x){
+    const col=document.createElement('div');
+    col.title=new Date(x.start).toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit'})+' — '+toFa(x.count)+' درخواست'+(x.c4xx||x.c5xx?' ('+toFa(x.c4xx)+' × ۴xx، '+toFa(x.c5xx)+' × ۵xx)':'');
+    const ok=x.count-x.c4xx-x.c5xx;
+    [['e5',x.c5xx],['w4',x.c4xx],['ok',ok]].forEach(function(p){
+      if(p[1]<=0)return;
+      const seg=document.createElement('div');seg.className=p[0]==='ok'?'ok':p[0];
+      seg.style.height=(p[1]/max*100)+'%';
+      if(p[0]==='ok')seg.style.minHeight='1px';
+      col.appendChild(seg);
+    });
+    ch.appendChild(col);
+  });
+  $('adminSystemChartMeta').textContent='· '+toFa(http.total||0)+' درخواست · p50 '+(http.p50_ms===null||http.p50_ms===undefined?'—':toFa(Math.round(http.p50_ms))+' میلی‌ثانیه')+' (از آخرین راه‌اندازی، حداکثر ۲۴ ساعت)';
+  const dl=$('adminSystemDirs');
+  dl.textContent=((disk.dirs||[]).map(function(x){return x.name+': '+fmtBytes(x.bytes);}).join(' · ')||'—')+(disk.dirs_cached_at?' · (کش‌شده تا ۵ دقیقه)':'');
+}
+// تازه‌سازیِ خودکارِ «جلساتِ زنده» فقط وقتی صفحه دیده می‌شود
+document.addEventListener('visibilitychange',function(){
+  if(document.hidden)stopAdminLivePoll();
+  else if(adminLiveVisible()){loadAdminLive();startAdminLivePoll();}
+});
 
 // ——— آرشیوِ صدا (B2) ———
 let adminAudioOffset=0;
@@ -4019,6 +4435,7 @@ async function renderAdminSessionDiagnosis(sessionId){
 function closeAdminSessionDetail(){
   if(adminDetailReturn==='audio'){adminDetailReturn='sessions';showScreen('AdminAudio');return;}
   if(adminDetailReturn==='voice'){adminDetailReturn='sessions';showScreen('AdminVoiceNotes');return;}
+  if(adminDetailReturn==='queue'){showScreen('AdminQueue');return;}
   showScreen('AdminSessions');
 }
 async function adminDeleteClient(clientId){

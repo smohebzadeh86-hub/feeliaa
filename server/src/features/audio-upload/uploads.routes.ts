@@ -27,18 +27,16 @@ import {
   expectedChunkBytes, writeChunk, receivedChunks, assembleUpload, removeUploadDir, ensureUploadDir, freeBytes,
 } from './uploadStore.js';
 import { ACCEPTED_EXTENSIONS, MAX_DURATION_MS, extensionOf, probeMedia, sniffObviouslyNotAudio } from './media.js';
+import { jobView } from './jobView.js';
 import { wakeAudioJobWorker } from './worker.js';
-import { parseSourceParts } from './jobStore.sql.js';
-import { parseAudioQuality } from './quality.js';
-import { uploadCaseFileEnabled, uploadCaseFileAllowed } from './jobMachine.js';
-import { existsSync } from 'node:fs';
+import { failedJobRetryability, requeueFailedJob, retryFailedAudioJob } from './jobRetry.js';
 import { hasStoredConsent, recordClientConsent } from '../clients/index.js';
 import { withUploadLock as withLock } from './uploadLocks.js';
 import { finalizeGroup } from './groupFinalize.js';
 import { createSessionAndJobForUpload } from './uploadSession.js';
 import {
-  getOwnedUploadRow, getUploadRow, latestJobRowForSession, jobRowForUpload, jobRowById, ownedJobRow, listJobRows, getJobByUpload,
-  getOwnedJob, requeueFailedJobRow, markSessionBatchQueued, deleteProcessingFailedNotification, listIdleUploadIds,
+  getOwnedUploadRow, getUploadRow, latestJobRowForSession, jobRowForUpload, jobRowById, ownedJobRow, listJobRows,
+  getJobByUpload, listIdleUploadIds,
   expireUploadingUpload, countUploadingUploads, countDeadGroupParts, findGroupPart, findSingleUploadByFingerprint, insertUpload,
   touchUpload, failUpload, markGroupPartComplete, cancelUploadByUser, listCancelableGroupPartIds, cancelGroupPart,
 } from './uploads.repository.js';
@@ -72,76 +70,6 @@ function uploadView(u: any, received?: number[]) {
     part_index: u.part_index ?? null,
     parts_total: u.parts_total ?? null,
   };
-}
-
-function jobView(j: any) {
-  return {
-    id: j.id,
-    stage: j.stage,
-    attempts: j.attempts,
-    error_code: j.error_code,
-    duration_ms: j.duration_ms,
-    case_file_status: j.case_file_status,
-    transcript_ready: !!j.transcript_applied_at,
-    transcript_chars: j.transcript_chars,
-    created_at: j.created_at,
-    updated_at: j.updated_at,
-    finished_at: j.finished_at,
-    next_attempt_at: j.next_attempt_at,
-    session_id: j.session_id,
-    session_num: j.session_num,
-    client_id: j.client_id,
-    client_code: j.client_code,
-    client_alias: j.client_alias,
-    client_status: j.client_status ?? null,
-    // پیش از ثبتِ متن: آیا این job (با وضعیتِ فعلی) به مرحله‌ی پرونده می‌رود؟ تنها منبعِ UI برایِ stepper (همان uploadCaseFileAllowed).
-    case_file_planned: uploadCaseFileAllowed({
-      clientStatus: j.client_status ?? null,
-      caseFileEnabled: !!j.t_case_file_enabled,
-      autoGenerate: j.t_case_file_auto_generate === null || j.t_case_file_auto_generate === undefined ? null : !!j.t_case_file_auto_generate,
-    }),
-    original_name: j.original_name,
-    parts_total: j.parts_total ?? null,
-    // پلنِ B: فقط نامِ flagها (علتِ احتمالی) و هشدارِ کم‌اطمینان — سنجه‌هایِ عددی به UI نمی‌روند.
-    quality_flags: parseAudioQuality(j.audio_quality)?.flags ?? [],
-    quality_warning: j.quality_warning ?? null,
-  };
-}
-
-// خطاهایی که تلاشِ دوباره رویِ همان صدا درستشان نمی‌کند (فایلِ مشکل‌دار یا صدایِ ازدست‌رفته).
-const DEAD_JOB_CODES = ['unreadable', 'no-audio', 'too-long', 'audio-missing', 'audio-expired'];
-
-// آیا jobِ شکست‌خورده بدونِ آپلودِ دوباره قابلِ ادامه است؟ (مشترک بینِ retry و تشخیصِ «تکراری»)
-function failedJobRetryability(job: any): { ok: true; stage: string } | { ok: false; status: number; code: string; error: string } {
-  const hasNormalized = !!job.normalized_path && existsSync(job.normalized_path);
-  const parts = parseSourceParts(job.source_parts);
-  const hasSource = parts
-    ? parts.every((p) => existsSync(p.path))
-    : !!job.source_path && existsSync(job.source_path);
-  if (!hasNormalized && !hasSource) {
-    return { ok: false, status: 410, code: 'audio-expired', error: 'فایلِ صوتیِ این جلسه دیگر رویِ سرور نیست — لطفاً دوباره آپلود کنید' };
-  }
-  if (DEAD_JOB_CODES.includes(job.error_code)) {
-    return { ok: false, status: 422, code: job.error_code, error: 'این فایل قابلِ پردازش نیست — تلاشِ دوباره کمکی نمی‌کند' };
-  }
-  // متن ثبت شده ⇒ تنها کارِ باقی مرحله‌ی پرونده است؛ فقط jobی که واقعاً در آن مرحله شکست خورد (running/waiting —
-  // مراجعِ غیرفعال، تصمیمِ مالک 2026-09-25) دوباره به صف می‌رود.
-  if (job.transcript_applied_at && !uploadCaseFileEnabled() && !['running', 'waiting'].includes(job.case_file_status)) {
-    return { ok: false, status: 409, code: 'not-failed', error: 'متنِ این جلسه قبلاً ذخیره شده است' };
-  }
-  return { ok: true, stage: job.transcript_applied_at ? 'case_file' : hasNormalized ? 'transcribing' : 'normalizing' };
-}
-
-// jobِ failed ⇒ دوباره در صف (بدونِ آپلودِ دوباره). false یعنی هم‌زمان کسِ دیگری زودتر این کار را کرده.
-async function requeueFailedJob(job: any, stage: string, therapistId: string): Promise<boolean> {
-  if ((await requeueFailedJobRow(job.id, stage)) !== 1) return false;
-  await markSessionBatchQueued(job.session_id);
-  // اعلانِ شکستِ قبلی دیگر معتبر نیست؛ حذفش لازم است چون UNIQUE(job_id,kind) وگرنه اعلانِ شکستِ
-  // احتمالیِ بعدی را (INSERT IGNORE) بی‌صدا نادیده می‌گرفت.
-  await deleteProcessingFailedNotification(job.id);
-  logEvent({ event: 'audio_job.retry', sessionId: job.session_id, therapistId, detail: { stage } });
-  wakeAudioJobWorker();
-  return true;
 }
 
 // آپلودِ نیمه‌کاره‌ای که این مدت هیچ تکه‌ای نگرفته رها شده حساب می‌شود — فقط وقتی سقفِ آپلودهایِ هم‌زمان پر
@@ -493,21 +421,12 @@ export async function audioUploadRoutes(app: FastifyInstance) {
   app.post('/api/audio-jobs/:id/retry', async (request, reply) => {
     const { id } = request.params as { id: string };
     if (!UUID_RE.test(id)) { reply.code(404); return { error: 'یافت نشد' }; }
-    const job = await getOwnedJob(id, request.therapistId);
-    if (!job) { reply.code(404); return { error: 'یافت نشد' }; }
-    if (job.stage !== 'failed') {
-      reply.code(409);
-      return { error: 'این پردازش در حالِ انجام است یا تمام شده', code: 'not-failed' };
+    const res = await retryFailedAudioJob(id, { therapistId: request.therapistId! });
+    if (!res.ok) {
+      reply.code(res.status);
+      return res.status === 404 ? { error: res.error } : { error: res.error, code: res.code };
     }
-    // تلاشِ دوباره هرگز آپلودِ دوباره نمی‌خواهد تا وقتی صدا رویِ سرور هست (نسخه‌ی نرمال‌شده ۱۴ روز می‌ماند).
-    const rt = failedJobRetryability(job);
-    if (!rt.ok) {
-      reply.code(rt.status);
-      return { error: rt.error, code: rt.code };
-    }
-    await requeueFailedJob(job, rt.stage, request.therapistId!);
-    const v = await jobRowById(id);
-    return { job: jobView(v) };
+    return { job: jobView(res.row) };
   });
 
   app.get('/api/sessions/:id/audio-job', async (request, reply) => {

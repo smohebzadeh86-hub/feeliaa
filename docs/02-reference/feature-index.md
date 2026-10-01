@@ -19,7 +19,7 @@
 | `final-transcript` | `features/final-transcript/` | `index.html` (تبِ «متنِ نهایی») | [subsystem 07](../07-subsystems/07-final-transcript.md) | `test:ft` | `final_transcripts` |
 | `case-file` | `features/case-file/` | `index.html` (پروندهٔ درمان) | [ماژول 08](../04-modules/08-ai-case-file/module-prd.md) | `test:cf` | `client_case_file` |
 | `treatment-unit` | `features/treatment-unit/` | `index.html` (واحدِ درمان/اعضا) | [ماژول 09](../04-modules/09-treatment-unit/module-prd.md) | `test:tu` | `tu_unit_types`، `tu_member_roles`، `tu_modalities`، `tu_modality_terms` |
-| `admin` | `features/admin/` | `index.html` (پنلِ ادمین، ۸ صفحه) | [ماژول 06](../04-modules/06-admin-panel/module-prd.md) | `test:api` | — (فقط می‌خواند/خروجی می‌دهد) |
+| `admin` | `features/admin/` | `index.html` (پنلِ ادمین، ۱۱ صفحه) | [ماژول 06](../04-modules/06-admin-panel/module-prd.md) | `test:api` | — (فقط می‌خواند/خروجی می‌دهد) |
 | `client-config` | `features/client-config/` | `feelia-analytics.js`، `feelia-obs.js` | [ماژول 07](../04-modules/07-ux-analytics/module-prd.md) + [analytics-clarity](../analytics-clarity.md) | — | — |
 | `notifications` | `features/notifications/` | `index.html` (زنگِ اعلان) | [platform/notifications](../06-platform/notifications.md) | `test:up` | `notifications` |
 | `session-media` | `features/session-media/` | — | [platform/session-media-purge](../06-platform/session-media-purge.md) | — | — (فایل‌هایِ `data/`) |

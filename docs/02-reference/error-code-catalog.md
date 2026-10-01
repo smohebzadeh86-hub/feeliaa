@@ -44,6 +44,7 @@
 | `not-audio`، `no-audio`، `unreadable`، `too-long` | 422 | `complete` (و `error_code`ِ job) | فایل صوتی نیست / بی‌صدا / خراب / > ۳۰۰ دقیقه | UI: پیامِ فارسی، بدونِ «تلاشِ دوباره» |
 | `assemble-failed` | 500 | `complete` | الحاقِ تکه‌ها رویِ دیسک ناموفق | UP: تلاشِ دوباره |
 | `not-failed` | 409 | `POST /api/audio-jobs/:id/retry` | job در جریان/تمام‌شده | — |
+| `not-failed`، `audio-expired`، `not-found`، `busy`، `fresh` | 409/410/404 | `POST /api/admin/audio-jobs/:id/retry`، `POST /api/admin/sessions/:id/final-transcript/retry` (2026-10-01) | همان معناهایِ بالا، برایِ retryِ ادمین | UI ادمین: بنرِ خطا |
 | `audio-expired` | 410 | همان (و `error_code`ِ job) | صدا دیگر رویِ سرور نیست (۱۴ روز) | UI: «دوباره آپلود کنید» |
 
 | `mint-transport` | 503 | `tempkey.ts` | DNS/TCP/TLS به Soniox | durable-only / reconnect |

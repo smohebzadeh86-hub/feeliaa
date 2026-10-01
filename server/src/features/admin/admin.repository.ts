@@ -436,3 +436,75 @@ export async function obsTableSizes(): Promise<any[]> {
   );
   return sizeRows.rows;
 }
+
+// ————— جلساتِ در حالِ ضبط / صفِ سراسری / سلامتِ سیستم (2026-10-01) — فقط متادیتا، هرگز متنِ بالینی —————
+// سنِ آخرین سگمنت از خودِ MySQL (TIMESTAMPDIFF با NOW()) — اختلافِ timezoneِ درایور/DB دقیقه‌ها را جابه‌جا نکند.
+export async function listLiveSessions(windowHours: number): Promise<any[]> {
+  return (await query(
+    `SELECT s.id, s.session_num, s.duration_ms, s.updated_at, s.auto_closed_at,
+            c.id AS client_id, c.code AS client_code, t.id AS therapist_id, t.name AS therapist_name,
+            CHAR_LENGTH(s.transcript) AS transcript_len,
+            TIMESTAMPDIFF(SECOND, s.updated_at, NOW()) AS since_update_s,
+            a.seg_count, a.seg_bytes, TIMESTAMPDIFF(SECOND, a.last_at, NOW()) AS last_segment_age_s
+       FROM sessions s
+       JOIN clients c ON c.id = s.client_id
+       JOIN therapists t ON t.id = c.therapist_id
+       LEFT JOIN (SELECT session_id, COUNT(*) AS seg_count, COALESCE(SUM(bytes), 0) AS seg_bytes, MAX(created_at) AS last_at
+                    FROM session_audio WHERE kind = 'session' GROUP BY session_id) a ON a.session_id = s.id
+      WHERE s.status = 'in_progress' AND s.source = 'live' AND s.updated_at >= (NOW() - INTERVAL ? HOUR)
+      ORDER BY s.updated_at DESC LIMIT 200`, [windowHours])).rows;
+}
+
+export async function listFinalTranscriptQueue(f: { therapistId: string | null; stage: string | null }): Promise<any[]> {
+  return (await query(
+    `SELECT f.session_id, f.stage, f.attempts, f.error_code, f.queued_at, f.finished_at, f.next_attempt_at,
+            s.session_num, c.id AS client_id, c.code AS client_code, t.id AS therapist_id, t.name AS therapist_name
+       FROM final_transcripts f
+       JOIN sessions s ON s.id = f.session_id JOIN clients c ON c.id = f.client_id JOIN therapists t ON t.id = f.therapist_id
+      WHERE (f.stage NOT IN ('done','failed','skipped') OR f.queued_at > (NOW() - INTERVAL 14 DAY))
+        AND (? IS NULL OR f.therapist_id = ?) AND (? IS NULL OR f.stage = ?)
+      ORDER BY f.queued_at DESC LIMIT 100`,
+    [f.therapistId, f.therapistId, f.stage, f.stage])).rows;
+}
+
+export async function countFinalTranscriptsByStage(): Promise<any[]> {
+  return (await query(
+    `SELECT stage, COUNT(*) AS n FROM final_transcripts
+      WHERE stage NOT IN ('done','failed','skipped') OR queued_at > (NOW() - INTERVAL 14 DAY) GROUP BY stage`)).rows;
+}
+
+export async function listBatchQueueSessions(therapistId: string | null): Promise<any[]> {
+  return (await query(
+    `SELECT s.id, s.session_num, s.batch_status, s.updated_at, c.id AS client_id, c.code AS client_code,
+            t.id AS therapist_id, t.name AS therapist_name
+       FROM sessions s JOIN clients c ON c.id = s.client_id JOIN therapists t ON t.id = c.therapist_id
+      WHERE s.batch_status IN ('queued','processing','failed') AND (? IS NULL OR t.id = ?)
+      ORDER BY s.updated_at DESC LIMIT 100`, [therapistId, therapistId])).rows;
+}
+
+export async function pingDb(): Promise<number> {
+  const t0 = process.hrtime.bigint();
+  await query('SELECT 1');
+  return Number(process.hrtime.bigint() - t0) / 1e6;
+}
+
+export async function dbTotalSizeBytes(): Promise<number> {
+  const r = await query(
+    `SELECT COALESCE(SUM(DATA_LENGTH + INDEX_LENGTH), 0) AS size_bytes FROM information_schema.tables WHERE table_schema = DATABASE()`);
+  return Number(r.rows[0]?.size_bytes) || 0;
+}
+
+export async function obsSeverityCounts24h(): Promise<{ error: number; warn: number }> {
+  const r = await query(
+    `SELECT severity, COUNT(*) AS n FROM obs_events
+      WHERE ts >= (NOW() - INTERVAL 24 HOUR) AND severity IN ('error','warn') GROUP BY severity`);
+  const out = { error: 0, warn: 0 };
+  for (const row of r.rows as Array<{ severity: 'error' | 'warn'; n: number }>) out[row.severity] = Number(row.n);
+  return out;
+}
+
+export async function countLlmUnavailable24h(): Promise<number> {
+  const r = await query(
+    `SELECT COUNT(*) AS n FROM notifications WHERE kind = 'llm_unavailable' AND created_at >= (NOW() - INTERVAL 24 HOUR)`);
+  return Number(r.rows[0]?.n) || 0;
+}

@@ -37,6 +37,10 @@
 ## Users / Actors
 ادمین (همان حسابِ تراپیست با `is_admin`)؛ مالکِ سرور (`ADMIN_PHONE`).
 
+## افزودنِ «زنده / صف / سلامت» (2026-10-01، تصمیمِ مالک)
+سه صفحه‌ی جدید از «فازهایِ بعد»ِ سندِ طراحی؛ **شنودِ زنده عمداً نیست** (فقط وضعیت). «اعلان‌ها با کانالِ Push/Email/Webhook» ساختگی بود و خارج از دامنه؛ «گزارشِ رضایت/ممیزی» (UIِ `audit_log`) به دورِ بعد موکول شد. طراحیِ بصریِ سند (Next/Tailwind) اعمال نشد — SPAِ بدونِ build. بک‌اند: `liveHealth.ts`، `queue.admin.ts`، `system.admin.ts`؛ پلتفرم: `obs/heartbeat.ts`، `obs/httpMetrics.ts`؛ منطقِ retryِ مشترک: `audio-upload/jobRetry.ts`. تست: `pnpm test:adm`.
+
+
 ## Use Cases
 | UC | شرح |
 |---|---|
@@ -48,6 +52,9 @@
 | UC-06.6 | دیدنِ مراجعینِ یک تراپیست (وضعیت/دسته/جنسیت/تخصص) و حذفِ مراجع |
 | UC-06.7 | دیدنِ جلساتِ یک مراجع، پخشِ سگمنت‌های صدای آرشیو، و مشاهده‌ی متنِ کاملِ رونویسی + یادداشت‌ها/علائمِ هر جلسه (D2، فقط‌خواندنی) |
 | UC-06.8 | دانلودِ JSONِ کاملِ یک تراپیست یا کلِ سیستم |
+| UC-06.9 | (2026-10-01) دیدنِ وضعیتِ جلساتِ در حالِ ضبط (در حالِ ضبط/ساکت/متوقف) — فقط وضعیت، **بدونِ شنودِ زنده** (تصمیمِ مالک)؛ تازه‌سازیِ خودکار هر ۱۵ ثانیه فقط وقتی صفحه دیده می‌شود |
+| UC-06.10 | (2026-10-01) دیدنِ صفِ پردازشِ سراسری (آپلودِ صدا / متنِ نهایی / batch)، فیلتر، خروجیِ CSV، و «تلاشِ دوباره» برایِ jobِ ناموفق (ممیزی‌شده) |
+| UC-06.11 | (2026-10-01) دیدنِ سلامت و آمارِ سیستم: uptime، پایگاه‌داده، دیسک، heartbeatِ workerها، ترافیکِ ۲۴ ساعته |
 
 ## Business Rules
 REQ-070…078؛ LAW-005.
@@ -86,8 +93,8 @@ platform (guard)، subsystem 05 (آرشیو)، همه‌ی جداول.
 - [ ] export شاملِ transcript و notes است.
 - [ ] پخشِ صدا بدونِ نشستِ ادمین → 401/403.
 
-### صفحه‌هایِ ادمین (۸)
-`#screenAdmin` (نمای کلی و تراپیست‌ها)، `#screenAdminTherapist`، `#screenAdminSessions`، `#screenAdminSessionDetail`، `#screenAdminActivity` (فعالیت‌ها)، `#screenAdminSessionTimeline`، `#screenAdminAudio` (آرشیوِ صدا)، `#screenAdminVoiceNotes` — ورودها: [route-map §۱](../../02-reference/route-map.md).
+### صفحه‌هایِ ادمین (۱۱)
+`#screenAdmin` (نمای کلی و تراپیست‌ها)، `#screenAdminTherapist`، `#screenAdminSessions`، `#screenAdminSessionDetail`، `#screenAdminActivity` (فعالیت‌ها)، `#screenAdminSessionTimeline`، `#screenAdminAudio` (آرشیوِ صدا)، `#screenAdminVoiceNotes`، `#screenAdminLive` (جلساتِ زنده)، `#screenAdminQueue` (صفِ پردازش)، `#screenAdminSystem` (سلامتِ سیستم) — هر سه فقط متادیتا و `data-clarity-mask`؛ ورودها: [route-map §۱](../../02-reference/route-map.md).
 
 ### Diagnosis — «چه اتفاقی افتاد؟» (2026-09-26/29)
 `GET /api/admin/sessions/:id/diagnosis` از `sessions` + `session_audio` + `obs_events` + `obs_ui_events` + صفِ batch یافته‌هایِ `ok|warn|error` می‌سازد (تابعِ خالصِ `features/admin/diagnosis.ts`)؛ **متنِ بالینی برنمی‌گردد** (فقط شمارش/طول). برایِ جلسه‌ی `upload` از `audio_jobs`/`audio_uploads` و برایِ «متنِ نهایی» از `final_transcripts` می‌خواند. جزئیاتِ payload: [api-catalog §7.1](../../02-reference/api-catalog.md).

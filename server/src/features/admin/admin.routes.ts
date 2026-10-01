@@ -7,6 +7,8 @@ import { sessionsAdminRoutes } from './sessions.admin.js';
 import { audioAdminRoutes } from './audio.admin.js';
 import { exportAdminRoutes } from './export.admin.js';
 import { obsAdminRoutes } from './obs.admin.js';
+import { queueAdminRoutes } from './queue.admin.js';
+import { systemAdminRoutes } from './system.admin.js';
 
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdmin);
@@ -15,4 +17,6 @@ export async function adminRoutes(app: FastifyInstance) {
   await app.register(audioAdminRoutes);
   await app.register(exportAdminRoutes);
   await app.register(obsAdminRoutes);
+  await app.register(queueAdminRoutes);
+  await app.register(systemAdminRoutes);
 }

@@ -161,3 +161,4 @@
 | REQ-120 | هر فراخوانیِ LLM سقفِ توکنِ خروجی دارد (بدونِ آن OpenRouter ⇒ 402)؛ providerِ جایگزین پیش‌فرض خاموش است (خروجِ متنِ بالینی به providerِ دوم) | `server/src/llm/config.ts` | IMPL (`test:llm`) |
 | REQ-121 | کنش‌هایِ حساسِ ادمین (export، حذف، مشاهده‌ی متن، پخش/دانلودِ صدا، رضایت، بستنِ خودکار) در `audit_log` ثبت می‌شوند؛ بدونِ FK؛ نگهداریِ ۲ سال | `server/src/obs/audit.ts` | IMPL |
 | REQ-122 | مرزِ ماژول‌هایِ backend (R1–R7) رعایت می‌شود؛ `pnpm test:arch` سبز | [LAW-025](../00-governance/project-laws.md)، `scripts/check-backend-boundaries.mjs` | IMPL |
+| REQ-123 | پنلِ ادمین جلساتِ در حالِ ضبط، صفِ پردازشِ سراسری و سلامتِ سیستم را فقط به‌صورتِ متادیتا نشان می‌دهد (بدونِ متنِ بالینی، نامِ فایلِ اصلی، و شنودِ زنده)؛ retryِ ادمین ممیزی می‌شود | `server/src/features/admin/{queue,system}.admin.ts`، `sessions.admin.ts`، `obs/heartbeat.ts` | IMPL (`test:adm`، E2E رویِ DBِ dev 2026-10-01، mock UI) |

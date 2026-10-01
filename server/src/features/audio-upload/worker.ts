@@ -6,6 +6,7 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../../db/connection.js';
+import { beat } from '../../obs/heartbeat.js';
 import {
   archiveAudioFileForAdmin, uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens, buildTextFromAsyncTokens, deleteTranscription, deleteFile, lowConfidenceRatio, markedTextFromTokens, lowConfidenceWarnRatio,
 } from '../transcription/index.js';
@@ -154,6 +155,7 @@ async function tick(): Promise<void> {
   if (ticking || !deps) return;
   ticking = true;
   try {
+    beat('audio-upload-worker', TICK_MS);
     const free = CONCURRENCY - running.size;
     if (free <= 0) return;
     const due = await query(

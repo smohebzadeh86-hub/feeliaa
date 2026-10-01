@@ -23,7 +23,7 @@
 - فرانت: `public/feelia-obs.js` (`window.FeeliaObs`)، `feelia-rt.js` (فقط `client_event`).
 
 ## ۴. کد (Code)
-`eventLog.ts` (`logEvent`، صف، drain)، `redact.ts` (`sanitizeDetail`)، `httpHook.ts`، `audit.ts` (`recordAudit`)، `sweep.ts`، `obs.routes.ts`؛ در فرانت `FeeliaObs` ([frontend-map](../02-reference/frontend-map.md)).
+`eventLog.ts` (`logEvent`، صف، drain)، `redact.ts` (`sanitizeDetail`)، `httpHook.ts`، `httpMetrics.ts` (۴۸ سطلِ ۳۰دقیقه‌ایِ درون‌حافظه‌ای + reservoirِ p50/p95؛ از آخرین راه‌اندازی)، `heartbeat.ts` (`beat`/`scheduleBeating`/`heartbeats`؛ workerِ «ok» اگر آخرین ضربان < ۳× بازه‌اش — برایِ صفحه‌ی «سلامتِ سیستم»)، `audit.ts` (`recordAudit`)، `sweep.ts`، `obs.routes.ts`؛ در فرانت `FeeliaObs` ([frontend-map](../02-reference/frontend-map.md)).
 
 ## ۵. داده (Data)
 مالک: `obs_events`، `obs_ui_events`، `audit_log` — [database-catalog §۰](../02-reference/database-catalog.md). **بدونِ FK** (عمدی، LAW-010). فایلِ JSONL: `<cwd>/data/logs/obs.jsonl` با چرخشِ ۵ نسخه (سقفِ دیسک؛ مقدار: configuration-catalog).
