@@ -222,6 +222,13 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — GIT + DEPLOY (production) + FINDING — commit `7de2733` و deploy؛ «متنِ نهایی» فقط برایِ ادمین و پدرام (از قبل همین‌طور بود)
+- **git:** commit `7de2733` (۳۵ فایل) رویِ `feat/clarity` از worktreeِ تمیز (پایه `0dac5f1`)؛ هانک‌هایِ نشستِ دیگر (دکمه‌ی «کپیِ کلِ متن» در `index.html`، چهار سندِ نگهداریِ ۳۰ روز) وارد commit نشدند. push نشد. `test:docs` در worktree به‌خاطرِ لینکِ شکسته‌ی `CURRENT_UI_STATE.md` (فایلِ untrackedِ نشستِ دیگر در documentation-map) رد می‌شود؛ ربطی به این کار ندارد (در working tree سبز بود).
+- **تست پیش از deploy (worktree):** `tsc`، `test:ft` 61، `test:llm` 22، `test:tu` 19، `test:up` 54، `test:cf` 111، `test:routes`، `test:arch` سبز؛ build موفق.
+- **deploy:** checksumِ کدِ production (CR-stripped) با پایه مقایسه شد: فقط فایل‌هایِ همین commit فرق داشتند (بدونِ drift). preflight = GO (همه ۰). پشتیبانِ کد `/root/backups/code-pre-7de2733-*.tar.gz`؛ تار از worktree ⇒ extract ⇒ `pnpm install --frozen-lockfile` ⇒ `pnpm --filter server run build` ⇒ `pm2 restart feelia-mysql --update-env`. لاگ: `035_upload_pre_note.sql applied`، `[llm] final-transcript: Metis … reasoning=off`، health `ok/connected`.
+- **FINDING:** production از 2026-09-28 با **Metis** کار می‌کند (نه OpenRouter) و `.env`ِ prod متغیرِ عمومیِ `FINAL_TRANSCRIPT_REASONING_EFFORT` ندارد ⇒ پیش‌فرضِ جدیدِ `off` اعمال شد. فرضیه‌ی قبلی («مصرفِ OpenRouter از prod») رد می‌شود؛ مصرفِ OpenRouter مالِ پیش از سوییچ یا ابزارهایِ دیگر است. ثبتِ `llm.call` از همین ری‌استارت در prod فعال است.
+- **فعال‌سازیِ «متنِ نهایی» (درخواستِ مالک: فقط ادمین و پدرام):** SELECTِ فقط‌خواندنیِ `therapists`: `final_transcript_enabled=1` فقط برایِ ادمین (`faf6bd6c`) و «پدرام عاشوری» (`3cb546ef`)، بقیه (۷ نفر) ۰ ⇒ **تغییری لازم نبود و داده‌ای عوض نشد.**
+
 ### 2026-10-01 — CODE + TEST + DOCS — ثبتِ «هر فراخوانیِ LLM» در obs_events (`llm.call`) + گزارشِ کامل؛ commit/deploy نشد
 - **درخواستِ مالک:** هر استفاده ثبت شود. پیش‌تر فقط ویرایش‌هایِ موفقِ «متنِ نهایی» (`polish_report.usage`) ثبت می‌شد؛ شکست‌ها، تلاش‌هایِ دوباره و پرونده‌ی درمان نه.
 - **تغییر:** `llm/jsonCall.ts` ⇒ `onLlmCall`/`LlmCallEvent` برایِ هر درخواستِ HTTP (موفق/ناموفق، `attempt`)، `createJsonCaller(..., ref)` با `sessionId`؛ `jobs/backgroundJobs.ts` آن را به `logEvent('llm.call')` وصل می‌کند (`obs/redact.ts`: `provider`، `finish`). بدونِ migration (جدولِ `obs_events`، نگهداری ۱۸۰ روز). `pnpm llm:usage` حالا بخشِ «همه‌ی فراخوانی‌ها» را هم دارد.
