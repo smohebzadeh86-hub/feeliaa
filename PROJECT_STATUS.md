@@ -222,6 +222,10 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — GIT — بررسیِ نهایی و push: `feat/clarity` ⇒ origin (`aef35a6..d50fd05`، ۷ commit)
+- **بررسی پیش از push (HEAD، working tree تمیز):** `tsc`، `test:rt` (۰ FAIL)، `test:ft` 61، `test:llm` 22، `test:tu` 19، `test:up` 54، `test:cf` 111، `test:routes`، `test:arch`، `test:docs` سبز؛ اسکنِ secret رویِ خطوطِ افزوده‌شده (کلید/رمز/PEM) خالی؛ هیچ `.env`/tar/`data/` در commitها نیست؛ fast-forward.
+- commitهایِ push‌شده: نگهداریِ ۳۰ روزِ صدا (`73208b5`+وضعیت)، `7de2733` (یادداشتِ پیش از جلسه + آمارِ LLM)، وضعیتِ deploy، همگام‌سازیِ اسناد، دکمه‌ی «کپیِ کلِ متن». ⚠️ دکمه‌ی کپی deploy نشده است.
+
 ### 2026-10-01 — GIT + DEPLOY (production) + FINDING — commit `7de2733` و deploy؛ «متنِ نهایی» فقط برایِ ادمین و پدرام (از قبل همین‌طور بود)
 - **git:** commit `7de2733` (۳۵ فایل) رویِ `feat/clarity` از worktreeِ تمیز (پایه `0dac5f1`)؛ هانک‌هایِ نشستِ دیگر (دکمه‌ی «کپیِ کلِ متن» در `index.html`، چهار سندِ نگهداریِ ۳۰ روز) وارد commit نشدند. push نشد. `test:docs` در worktree به‌خاطرِ لینکِ شکسته‌ی `CURRENT_UI_STATE.md` (فایلِ untrackedِ نشستِ دیگر در documentation-map) رد می‌شود؛ ربطی به این کار ندارد (در working tree سبز بود).
 - **تست پیش از deploy (worktree):** `tsc`، `test:ft` 61، `test:llm` 22، `test:tu` 19، `test:up` 54، `test:cf` 111، `test:routes`، `test:arch` سبز؛ build موفق.
