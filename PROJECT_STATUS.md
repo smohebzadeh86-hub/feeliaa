@@ -222,6 +222,11 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — GIT — push شاخه‌ی `feat/clarity` به origin (`f34c98f..aef35a6`)
+- **مجوزِ مالک:** «push کن». push عادی (بدونِ force) به `https://github.com/smohebzadeh86-hub/feeliaa.git`.
+- **commitهایِ push‌شده (۶):** `6f2e6d5` (پنلِ ادمین: زنده/صف/سلامت)، `64a8914` (status آن deploy)، `bc71bae` (timezoneِ تهران در فرانت)، `f9b6489` (status deployِ آن)، `a522116` (status اصلاحِ ۹ جلسه‌یِ قدیمی)، `aef35a6` (برچسبِ «زمانِ آپلود»). همه پیش‌تر روی production اعمال شده بودند (کد/فایلِ استاتیک؛ اصلاحِ داده مستقیم رویِ DB).
+- **push نشد:** تغییراتِ commitنشده‌یِ نشستِ دیگر (final-transcript، preNote در `index.html`) و فایل‌هایِ untracked. این ورودی پس از push نوشته شد ⇒ origin یک commit عقب‌تر است تا push بعدی.
+
 ### 2026-10-01 — CODE + TEST + GIT + DEPLOY — برچسبِ «زمانِ آپلود» برایِ جلسه‌هایِ آپلودی در آرشیوِ صدایِ ادمین
 - **درخواستِ مالک:** در ردیفِ آرشیوِ صدا، برایِ جلسه‌یِ آپلودی به‌جایِ «آخرین ضبط» نوشته شود «زمانِ آپلود» (آن زمان لحظه‌یِ آپلود است، نه ضبط). تغییر: یک خط در `renderAdminAudioRow` (`public/index.html`)؛ `source` از قبل در پاسخِ API بود.
 - **ذخیره‌یِ تاریخ/ساعتِ آپلود (بازبینیِ کد، بدونِ تغییر):** `session_date` یا انتخابِ تراپیست است یا پیش‌فرضِ تاریخِ lastModifiedِ فایل با `jalaliDayTehran`؛ خالی ⇒ `NULL` («بدونِ تاریخ»)؛ `start_time` = `nowInTehran().time` سمتِ سرور (لحظه‌یِ آپلود). همه تهران-محورند؛ `test:up` 54/0.
