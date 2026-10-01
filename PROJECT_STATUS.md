@@ -222,6 +222,11 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — DEPLOY (production) — دکمه‌ی «کپیِ کلِ متن» (فقط `public/index.html`، بدونِ restart)
+- **مجوزِ مالک:** «دکمه کپی رو هم deploy کن». commit `d50fd05` (HEAD `0d9fc62`).
+- **بررسی:** checksumِ CR-stripped کدِ production در برابرِ HEAD: تنها `public/index.html` فرق داشت (بدونِ drift). فقط همین فایل جایگزین شد (فایلِ ایستا، با `no-cache` revalidate می‌شود ⇒ restart/build/migration لازم نبود، پس preflight هم لازم نبود). پشتیبان: `/root/backups/index-pre-copybtn-*.html`.
+- **تأیید:** sha1 رویِ سرور = sha1 محلی (`beffa8c04294`)؛ `GET /` ⇒ 200 و `ftCopyText` در پاسخ؛ `/api/health` ok/connected. تستِ مرورگریِ دکمه انجام نشد (فقط نحوِ JS).
+
 ### 2026-10-01 — GIT — بررسیِ نهایی و push: `feat/clarity` ⇒ origin (`aef35a6..d50fd05`، ۷ commit)
 - **بررسی پیش از push (HEAD، working tree تمیز):** `tsc`، `test:rt` (۰ FAIL)، `test:ft` 61، `test:llm` 22، `test:tu` 19، `test:up` 54، `test:cf` 111، `test:routes`، `test:arch`، `test:docs` سبز؛ اسکنِ secret رویِ خطوطِ افزوده‌شده (کلید/رمز/PEM) خالی؛ هیچ `.env`/tar/`data/` در commitها نیست؛ fast-forward.
 - commitهایِ push‌شده: نگهداریِ ۳۰ روزِ صدا (`73208b5`+وضعیت)، `7de2733` (یادداشتِ پیش از جلسه + آمارِ LLM)، وضعیتِ deploy، همگام‌سازیِ اسناد، دکمه‌ی «کپیِ کلِ متن». ⚠️ دکمه‌ی کپی deploy نشده است.
