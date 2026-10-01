@@ -3450,6 +3450,8 @@ function attachTranscriptExpander(box,text,durationMs,note){
   label.textContent='متنِ جلسه: '+toFa(text.length.toLocaleString('en-US'))+' نویسه'+(durationMs?' · '+fmtDur(durationMs):'')+(note?' · '+note:'');
   if(note)label.style.color='var(--gold-deep)';
   info.appendChild(label);
+  // کپیِ کلِ متنِ جلسه (نهایی یا خام، هر کدام که نمایش داده می‌شود) — فقط برایِ متنِ صفحه‌ی جلسه
+  if(box.id==='transcriptBox')info.appendChild(adminBtn('کپیِ کلِ متن','btn-secondary',function(){ftCopyText(text);}));
   if(text.length>1500){
     info.appendChild(adminBtn('نمایشِ کامل','btn-ghost',function(){
       const open=box.style.maxHeight==='none';
@@ -7310,6 +7312,20 @@ async function ftApplyRole(idx,role,sameSpeaker,menu){
     showBanner('error',e.message);
     menu.querySelectorAll('button').forEach(function(b){b.disabled=false;});
   }
+}
+async function ftCopyText(text){
+  const t=String(text||'').replace(/⟦([^⟧]*)⟧/g,function(_,w){return w.replace(/؟$/,'');});
+  if(!t.trim()){showBanner('warn','متنی برایِ کپی نیست.');return;}
+  try{
+    if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(t);
+    else{
+      const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0';
+      document.body.appendChild(ta);ta.select();
+      const ok=document.execCommand('copy');ta.remove();
+      if(!ok)throw new Error('copy-failed');
+    }
+    showBanner('info','کلِ متن کپی شد.');
+  }catch(e){showBanner('error','کپی انجام نشد؛ متن را دستی انتخاب کنید.');}
 }
 function ftButton(label,fn,cls){
   const b=document.createElement('button');b.className='btn btn-sm '+(cls||'btn-ghost');b.textContent=label;

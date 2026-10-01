@@ -229,6 +229,28 @@
 - **FINDING:** production از 2026-09-28 با **Metis** کار می‌کند (نه OpenRouter) و `.env`ِ prod متغیرِ عمومیِ `FINAL_TRANSCRIPT_REASONING_EFFORT` ندارد ⇒ پیش‌فرضِ جدیدِ `off` اعمال شد. فرضیه‌ی قبلی («مصرفِ OpenRouter از prod») رد می‌شود؛ مصرفِ OpenRouter مالِ پیش از سوییچ یا ابزارهایِ دیگر است. ثبتِ `llm.call` از همین ری‌استارت در prod فعال است.
 - **فعال‌سازیِ «متنِ نهایی» (درخواستِ مالک: فقط ادمین و پدرام):** SELECTِ فقط‌خواندنیِ `therapists`: `final_transcript_enabled=1` فقط برایِ ادمین (`faf6bd6c`) و «پدرام عاشوری» (`3cb546ef`)، بقیه (۷ نفر) ۰ ⇒ **تغییری لازم نبود و داده‌ای عوض نشد.**
 
+### 2026-10-01 — CODE — دکمه‌ی «کپیِ کلِ متن» بالایِ متنِ جلسه (فقط working tree، deploy/commit نشده)
+- `public/index.html`: در `attachTranscriptExpander` (فقط `transcriptBox`) دکمه‌ی «کپیِ کلِ متن» کنارِ «متنِ جلسه: N نویسه»؛ تابعِ `ftCopyText` (clipboard API با fallbackِ `execCommand`). متنِ نمایش‌داده‌شده (نهایی یا خام) کپی می‌شود و نشانگرهایِ ⟦…؟⟧ حذف می‌شوند. بدونِ رویدادِ Clarity و بدونِ تغییرِ بک‌اند. تست‌شده رویِ mock-ft (clipboardِ جعلی)؛ کپیِ واقعیِ سیستم تست نشده.
+
+### 2026-10-01 — DEPLOY (production) — نگهداریِ صدا ۳۰ روز
+- **انجام شد با مجوزِ صریحِ مالک:** فقط تغییرِ «۱۴ ⇒ ۳۰ روز» (`archive/store.ts`، `uploadStore.ts`، متنِ `public/index.html` و کامنت‌ها) از worktreeِ تمیزِ `0a04829` ساخته و deploy شد؛ کارِ نیمه‌تمامِ نشستِ دیگر (pre-note، migration 035، STT context) در working tree **نرفت**. پیش از deploy checksumِ `server/src`+`public` با HEAD مقایسه شد: تنها اختلافِ production با پایه همین ۷ فایل بود.
+- Preflight (§5.1): GO (همه‌ی شمارنده‌ها ۰). پشتیبانِ کد: `/root/backups/code-pre-ret30-<ts>.tar.gz`. `pnpm install --frozen-lockfile`، build، `pm2 restart feelia-mysql` ⇒ بدونِ migrationِ جدید (آخرین 034)، `/api/health` = ok/connected؛ `dist` و `index.html` روی سرور شاملِ مقدارِ ۳۰ روز تأیید شد. تست‌هایِ پیش از deploy: `test:up` 54/54، `test:routes` OK، `tsc` OK.
+- **وضعیت:** production اکنون صدا را ۳۰ روز نگه می‌دارد. اسنادِ هم‌گام‌شده هنوز commit نشده‌اند (فقط working tree). R1/R18 باز.
+
+### 2026-10-01 — CODE+DOCS — نگهداریِ صدا از ۱۴ روز به ۳۰ روز (یک ماه) — فقط working tree، deploy نشده
+- **تصمیمِ مالک:** «ذخیره‌سازیِ صداها بشه یک ماه». `RETENTION_MS` در `server/src/features/transcription/archive/store.ts` ⇒ ۳۰ روز (sweepِ آرشیو و «روزهایِ باقی‌مانده»ِ ادمین `SESSION_AUDIO_RETENTION_MS` از همین مشتق می‌شوند)؛ جاروبِ فایلِ خامِ آپلود (`uploadStore.ts`، `INTERVAL 30 DAY`) هم‌تراز شد. **بدونِ تغییر:** آپلودِ نیمه‌کاره ۷ روز، صفِ مرورگر ۷ روز، `batch-queue` ۲۴ ساعت، پنجره‌یِ نمایِ jobهایِ ادمین/آپلود (۱۴ روز — نمای است نه صدا).
+- متنِ UI (`public/index.html`: زیرعنوانِ مراجع/ادمین و فیلتر) و کامنت‌ها و اسنادِ مالک (LAW-009/010، config/error catalog، subsystem 02/05/06، PRDها، glossary) به ۳۰ روز هم‌گام شد. R1/R18 (تعارضِ متنِ رضایت) همچنان باز است؛ مدتِ طولانی‌تر آن را تشدید می‌کند.
+- **تست:** `tsc --noEmit` OK، `test:docs` OK، `test:up` 54/54. **Deploy نشده** — برایِ اعمال رویِ production نیاز به deploy (سرور + `public/index.html`) و مجوزِ صریح است؛ فایل‌هایِ موجود با sweepِ بعدی با آستانه‌یِ جدید سنجیده می‌شوند.
+
+### 2026-10-01 — AUDIT (production، فقط‌خواندنی) — «تاریخِ جلسه ۶ ولی آخرین ضبط ۸» (CL-4ZPV، جلسه ۳)
+- **یافته:** باگ نیست. جلسه `source=upload` است؛ `date=1405/07/06` تاریخِ جلسه است که تراپیست هنگامِ آپلود وارد کرده، و `session_audio.created_at` = 2026-09-30 08:37Z = ۱۴۰۵/۰۷/۰۸ ۱۲:۰۷ تهران = لحظه‌یِ آپلود. جلسه‌یِ ۲ هم مشابه (تاریخ ۰۷/۰۵، آپلود ۰۷/۰۶). فقط‌خواندنی؛ داده تغییر نکرد.
+- **نکته‌یِ UI (پیشنهاد، انجام نشد):** در «آرشیوِ صدا» برایِ جلسه‌یِ آپلودی عبارتِ «آخرین ضبط» گمراه‌کننده است؛ بهتر «زمانِ آپلود» نشان داده شود.
+
+### 2026-10-01 — AUDIT + DATA-FIX (production) — تطبیق و اصلاحِ start_time جلسه‌هایِ قدیمی با created_at (وقتِ تهران)
+- **مجوز:** مالک «اصلاحِ دیتایِ قدیمی» را انتخاب کرد؛ این گام فقط SELECT بود (بدونِ متنِ بالینی؛ اسکریپتِ موقت حذف شد).
+- **نتیجه:** ۶۳ جلسه (۴۷ زنده، ۷ دستی، ۹ آپلودی). از ۴۷ زنده ۳۸ هم‌خوان؛ **۹ جلسه** دقیقاً ۳:۳۰ عقب (start_time = ساعتِ UTC، همه ۱۴۰۵/۰۶/۲۱ و ۱۴۰۵/۰۶/۲۳، یعنی دورانِ پیش از nowInTehran/فرانتِ timezoneدار). تاریخِ هیچ جلسه‌ای ناهم‌خوان نبود. دستی/آپلودی مقایسه نشدند (تاریخشان انتخابیِ کاربر/زمانِ آپلود است).
+- **اصلاح (مجوزِ صریحِ مالک «بله انجامش بده»):** پشتیبانِ جدولِ `sessions` ⇒ `/root/backups/sessions-pre-tz-fix-20261001085919.sql` (۶۵۷٬۶۹۷ بایت، chmod 600)؛ سپس در یک تراکنش فقط `start_time`ِ همان ۹ جلسه‌یِ زنده (اختلافِ دقیقِ −۲۱۰ دقیقه، تاریخِ بدونِ تغییر) = ساعتِ تهرانِ `created_at`. ۹ ردیف به‌روز شد (نگهبان: شمارِ غیرِ ۹ یا تغییرِ تاریخ ⇒ abort/rollback). تأیید: ۰ ناهم‌خوانی. اسکریپت‌هایِ موقت حذف شد. **برگشت:** import همان فایلِ sql (فقط جدولِ sessions؛ توجه: جلسه‌هایِ ساخته‌شده پس از پشتیبان را هم برمی‌گرداند ⇒ بهتر است UPDATEِ معکوسِ ۹ ردیف).
+
 ### 2026-10-01 — CODE + TEST + DOCS — ثبتِ «هر فراخوانیِ LLM» در obs_events (`llm.call`) + گزارشِ کامل؛ commit/deploy نشد
 - **درخواستِ مالک:** هر استفاده ثبت شود. پیش‌تر فقط ویرایش‌هایِ موفقِ «متنِ نهایی» (`polish_report.usage`) ثبت می‌شد؛ شکست‌ها، تلاش‌هایِ دوباره و پرونده‌ی درمان نه.
 - **تغییر:** `llm/jsonCall.ts` ⇒ `onLlmCall`/`LlmCallEvent` برایِ هر درخواستِ HTTP (موفق/ناموفق، `attempt`)، `createJsonCaller(..., ref)` با `sessionId`؛ `jobs/backgroundJobs.ts` آن را به `logEvent('llm.call')` وصل می‌کند (`obs/redact.ts`: `provider`، `finish`). بدونِ migration (جدولِ `obs_events`، نگهداری ۱۸۰ روز). `pnpm llm:usage` حالا بخشِ «همه‌ی فراخوانی‌ها» را هم دارد.
@@ -271,38 +293,13 @@
 - **تست:** `pnpm test:ft` ۶۰/۰ (تستِ جدیدِ `briefing`: حضور در هر دو پرامپت، سقف، نبودنِ بلوک وقتی خالی)، `tsc` و `test:arch` سبز. با LLM/DBِ واقعی تست نشد.
 - **سند:** `docs/07-subsystems/07-final-transcript.md` به‌روز شد.
 
-### 2026-10-01 — DEPLOY (production) — نگهداریِ صدا ۳۰ روز
-- **انجام شد با مجوزِ صریحِ مالک:** فقط تغییرِ «۱۴ ⇒ ۳۰ روز» (`archive/store.ts`، `uploadStore.ts`، متنِ `public/index.html` و کامنت‌ها) از worktreeِ تمیزِ `0a04829` ساخته و deploy شد؛ کارِ نیمه‌تمامِ نشستِ دیگر (pre-note، migration 035، STT context) در working tree **نرفت**. پیش از deploy checksumِ `server/src`+`public` با HEAD مقایسه شد: تنها اختلافِ production با پایه همین ۷ فایل بود.
-- Preflight (§5.1): GO (همه‌ی شمارنده‌ها ۰). پشتیبانِ کد: `/root/backups/code-pre-ret30-<ts>.tar.gz`. `pnpm install --frozen-lockfile`، build، `pm2 restart feelia-mysql` ⇒ بدونِ migrationِ جدید (آخرین 034)، `/api/health` = ok/connected؛ `dist` و `index.html` روی سرور شاملِ مقدارِ ۳۰ روز تأیید شد. تست‌هایِ پیش از deploy: `test:up` 54/54، `test:routes` OK، `tsc` OK.
-- **وضعیت:** production اکنون صدا را ۳۰ روز نگه می‌دارد. اسنادِ هم‌گام‌شده هنوز commit نشده‌اند (فقط working tree). R1/R18 باز.
-
-### 2026-10-01 — CODE+DOCS — نگهداریِ صدا از ۱۴ روز به ۳۰ روز (یک ماه) — فقط working tree، deploy نشده
-- **تصمیمِ مالک:** «ذخیره‌سازیِ صداها بشه یک ماه». `RETENTION_MS` در `server/src/features/transcription/archive/store.ts` ⇒ ۳۰ روز (sweepِ آرشیو و «روزهایِ باقی‌مانده»ِ ادمین `SESSION_AUDIO_RETENTION_MS` از همین مشتق می‌شوند)؛ جاروبِ فایلِ خامِ آپلود (`uploadStore.ts`، `INTERVAL 30 DAY`) هم‌تراز شد. **بدونِ تغییر:** آپلودِ نیمه‌کاره ۷ روز، صفِ مرورگر ۷ روز، `batch-queue` ۲۴ ساعت، پنجره‌یِ نمایِ jobهایِ ادمین/آپلود (۱۴ روز — نمای است نه صدا).
-- متنِ UI (`public/index.html`: زیرعنوانِ مراجع/ادمین و فیلتر) و کامنت‌ها و اسنادِ مالک (LAW-009/010، config/error catalog، subsystem 02/05/06، PRDها، glossary) به ۳۰ روز هم‌گام شد. R1/R18 (تعارضِ متنِ رضایت) همچنان باز است؛ مدتِ طولانی‌تر آن را تشدید می‌کند.
-- **تست:** `tsc --noEmit` OK، `test:docs` OK، `test:up` 54/54. **Deploy نشده** — برایِ اعمال رویِ production نیاز به deploy (سرور + `public/index.html`) و مجوزِ صریح است؛ فایل‌هایِ موجود با sweepِ بعدی با آستانه‌یِ جدید سنجیده می‌شوند.
-
-### 2026-10-01 — GIT — push شاخه‌ی `feat/clarity` به origin (`f34c98f..aef35a6`)
-- **مجوزِ مالک:** «push کن». push عادی (بدونِ force) به `https://github.com/smohebzadeh86-hub/feeliaa.git`.
-- **commitهایِ push‌شده (۶):** `6f2e6d5` (پنلِ ادمین: زنده/صف/سلامت)، `64a8914` (status آن deploy)، `bc71bae` (timezoneِ تهران در فرانت)، `f9b6489` (status deployِ آن)، `a522116` (status اصلاحِ ۹ جلسه‌یِ قدیمی)، `aef35a6` (برچسبِ «زمانِ آپلود»). همه پیش‌تر روی production اعمال شده بودند (کد/فایلِ استاتیک؛ اصلاحِ داده مستقیم رویِ DB).
-- **push نشد:** تغییراتِ commitنشده‌یِ نشستِ دیگر (final-transcript، preNote در `index.html`) و فایل‌هایِ untracked. این ورودی پس از push نوشته شد ⇒ origin یک commit عقب‌تر است تا push بعدی.
-
-### 2026-10-01 — CODE + TEST + GIT + DEPLOY — برچسبِ «زمانِ آپلود» برایِ جلسه‌هایِ آپلودی در آرشیوِ صدایِ ادمین
-- **درخواستِ مالک:** در ردیفِ آرشیوِ صدا، برایِ جلسه‌یِ آپلودی به‌جایِ «آخرین ضبط» نوشته شود «زمانِ آپلود» (آن زمان لحظه‌یِ آپلود است، نه ضبط). تغییر: یک خط در `renderAdminAudioRow` (`public/index.html`)؛ `source` از قبل در پاسخِ API بود.
-- **ذخیره‌یِ تاریخ/ساعتِ آپلود (بازبینیِ کد، بدونِ تغییر):** `session_date` یا انتخابِ تراپیست است یا پیش‌فرضِ تاریخِ lastModifiedِ فایل با `jalaliDayTehran`؛ خالی ⇒ `NULL` («بدونِ تاریخ»)؛ `start_time` = `nowInTehran().time` سمتِ سرور (لحظه‌یِ آپلود). همه تهران-محورند؛ `test:up` 54/0.
-- **تست:** رندرِ واقعیِ `renderAdminAudioRow` در مرورگر: `source=upload` ⇒ «زمانِ آپلود ۱۴۰۵/۷/۸، ۱۲:۰۷:۱۲»؛ `live` ⇒ «آخرین ضبط». commit از worktreeِ تمیز (در working treeِ اصلی hunkِ نشستِ دیگر برایِ preNote در `index.html` بود)؛ deploy فقط فایلِ استاتیک (بدونِ restart).
-
-### 2026-10-01 — AUDIT + DATA-FIX (production) — تطبیق و اصلاحِ start_time جلسه‌هایِ قدیمی با created_at (وقتِ تهران)
-- **مجوز:** مالک «اصلاحِ دیتایِ قدیمی» را انتخاب کرد؛ این گام فقط SELECT بود (بدونِ متنِ بالینی؛ اسکریپتِ موقت حذف شد).
-- **نتیجه:** ۶۳ جلسه (۴۷ زنده، ۷ دستی، ۹ آپلودی). از ۴۷ زنده ۳۸ هم‌خوان؛ **۹ جلسه** دقیقاً ۳:۳۰ عقب (start_time = ساعتِ UTC، همه ۱۴۰۵/۰۶/۲۱ و ۱۴۰۵/۰۶/۲۳، یعنی دورانِ پیش از nowInTehran/فرانتِ timezoneدار). تاریخِ هیچ جلسه‌ای ناهم‌خوان نبود. دستی/آپلودی مقایسه نشدند (تاریخشان انتخابیِ کاربر/زمانِ آپلود است).
-- **اصلاح (مجوزِ صریحِ مالک «بله انجامش بده»):** پشتیبانِ جدولِ `sessions` ⇒ `/root/backups/sessions-pre-tz-fix-20261001085919.sql` (۶۵۷٬۶۹۷ بایت، chmod 600)؛ سپس در یک تراکنش فقط `start_time`ِ همان ۹ جلسه‌یِ زنده (اختلافِ دقیقِ −۲۱۰ دقیقه، تاریخِ بدونِ تغییر) = ساعتِ تهرانِ `created_at`. ۹ ردیف به‌روز شد (نگهبان: شمارِ غیرِ ۹ یا تغییرِ تاریخ ⇒ abort/rollback). تأیید: ۰ ناهم‌خوانی. اسکریپت‌هایِ موقت حذف شد. **برگشت:** import همان فایلِ sql (فقط جدولِ sessions؛ توجه: جلسه‌هایِ ساخته‌شده پس از پشتیبان را هم برمی‌گرداند ⇒ بهتر است UPDATEِ معکوسِ ۹ ردیف).
-
 ### 2026-10-01 — CODE + TEST + GIT + DEPLOY — یکسان‌سازیِ timezone در فرانت: همه‌ی تاریخ/ساعت‌ها به وقتِ تهران؛ commit `bc71bae` و deploy روی production
 - **ریشه:** تاریخِ جلسه (`toJalali`) و `start_time` (`getHours`) با timezoneِ مرورگرِ تراپیست ساخته می‌شدند و زمان‌هایِ UTCِ پنلِ ادمین (`fmtDateTime` و …) با timezoneِ مرورگرِ ادمین نمایش داده می‌شدند ⇒ با VPN/ساعتِ غیرِ تهران ناهم‌خوان.
 - **تغییر (`public/index.html`):** ثابتِ `FEELIA_TZ='Asia/Tehran'`؛ `toJalali`، `nowClock`، `fmtDateTime`، نمایشِ آخرین ذخیره/به‌روزرسانی/ستونِ متریک همه با `timeZone`؛ تابعِ جدیدِ `tehranHM` برایِ `start_time` در ایجادِ جلسه. سرور تغییر نکرد (از قبل تهران).
 - **تست (کامل، [verification/2026-10-01-frontend-timezone-tehran.md](verification/2026-10-01-frontend-timezone-tehran.md)):** docs/routes(135)/arch/rt/cf(111)/up(54)/tu(17)/ft(60)/llm(18)/adm(8) همه OK؛ tsc تمیز؛ تابع‌هایِ واقعیِ index.html در ۷ timezone خروجیِ یکسان دادند (از جمله گذرِ نیمه‌شبِ تهران). **تستِ مرورگریِ واقعی** (Browser pane، mock + shimِ timezone نیویورک/توکیو): بدنه‌ی POST جلسه = ساعتِ تهران (12:24) به‌جایِ ساعتِ محلی (4:54/17:54)؛ نمایشِ ادمین ۰:۱۵ برایِ 20:45Z در هر دو. test:api انجام نشد (مجوزِ مالک). جلسه‌هایِ قدیمیِ ثبت‌شده با timezoneِ غیرِ تهران اصلاح نمی‌شوند.
+- **git/deploy (مجوزِ مالک: «commit کن و deploy کن»):** به‌خاطرِ hunkهایِ نشستِ دیگر (final-transcript) commit از worktreeِ تمیز (فقط `public/index.html` + status + verification؛ `bc71bae`، push نشد). فقط فایلِ استاتیک عوض شد ⇒ **بدونِ build/restart/preflight** (public با no-cache سرو می‌شود). checksumِ prod پیش از deploy = commitِ پایه؛ پشتیبان `/root/backups/index.html-pre-tz-*`؛ scp ⇒ mv. پس از deploy: `https://feelia.ir/` sha1 (بدونِ `CR`) = commit؛ `/api/health` ok. نشستِ ادمین/تراپیستِ واقعی تست نشد؛ مالک: یک جلسهٔ تازه بسازد و ساعتِ شروع را با ساعتِ تهران مقایسه کند.
 
 ### 2026-10-01 — GIT + DEPLOY + TEST — commit `6f2e6d5` و deployِ پنلِ ادمین (زنده/صف/سلامت) رویِ production؛ push نشد
-- **git/deploy (مجوزِ مالک: «commit کن و deploy کن»):** به‌خاطرِ hunkهایِ نشستِ دیگر (final-transcript) commit از worktreeِ تمیز (فقط `public/index.html` + status + verification؛ `bc71bae`، push نشد). فقط فایلِ استاتیک عوض شد ⇒ **بدونِ build/restart/preflight** (public با no-cache سرو می‌شود). checksumِ prod پیش از deploy = commitِ پایه؛ پشتیبان `/root/backups/index.html-pre-tz-*`؛ scp ⇒ mv. پس از deploy: `https://feelia.ir/` sha1 (بدونِ `CR`) = commit؛ `/api/health` ok. نشستِ ادمین/تراپیستِ واقعی تست نشد؛ مالک: یک جلسهٔ تازه بسازد و ساعتِ شروع را با ساعتِ تهران مقایسه کند.
 - **مجوزِ مالک:** «اول بررسی کن همه‌چیز درست باشد، بقیه را من مجوز می‌دهم» ⇒ commit + deploy + بررسیِ پس از deploy. اجرایِ workerها رویِ dev عمداً انجام نشد (خطرِ auto-close/برداشتنِ jobِ جلسه‌هایِ واقعیِ DBِ مشترک).
 - **بررسیِ پیش از commit:** `tsc`، `test:arch|routes|docs|adm|up|ft|cf|tu|llm` سبز. `test:rt`: یک اجرا T45 را رد کرد (همزمان با اجراهایِ دیگر)، دو اجرایِ بعدی 102/0 و HEAD تمیز هم 102/0 ⇒ **flakyِ زمان‌بندی، بی‌ربط به این تغییر** (`feelia-rt.js` دست نخورد).
 - **git:** commit `6f2e6d5` (۳۷ فایل، فقط فایل‌هایِ همین کار؛ هیچ hunkِ نشستِ دیگر در working tree نبود)؛ push نشد.
