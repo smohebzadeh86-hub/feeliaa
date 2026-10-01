@@ -228,7 +228,7 @@ batch_status∈{done,failed}`؛ note → `!note_audio_pending`. سپس خوان�
 | Soniox | `finally` در `transcribeFileAsync` |
 | `data/session-audio` | ۳۰ روز — [subsystem 05](05-session-audio-archive-speaker-resolve.md) |
 
-**نتیجه‌ی واقعی:** صدای **هر** جلسه‌ی FeeliaRT (حتی کاملاً موفق) به سرور آپلود و ۱۴ روز آرشیو
+**نتیجه‌ی واقعی:** صدای **هر** جلسه‌ی FeeliaRT (حتی کاملاً موفق) به سرور آپلود و ۳۰ روز آرشیو
 می‌شود؛ صدایِ آفلاینِ بعدِ پایانِ جلسه هم دیگر گم نمی‌شود (late-transcript).
 
 ## ۹. تست
