@@ -14,5 +14,7 @@ export const treatmentUnits = new TreatmentUnitService(new SqlTreatmentUnitRepos
     maxTerms: envInt('SONIOX_CONTEXT_MAX_TERMS', 60),
     maxChars: envInt('SONIOX_CONTEXT_MAX_CHARS', 8000),
   },
+  // 0 ⇒ یادداشتِ پیش از جلسه واردِ contextِ رونویسی نشود
+  preNoteMaxChars: process.env.SONIOX_CONTEXT_PRE_NOTE === '0' ? 0 : envInt('SONIOX_CONTEXT_PRE_NOTE_MAX_CHARS', 2000),
   baseContext: SESSION_TRANSCRIPTION_CONTEXT,
 });

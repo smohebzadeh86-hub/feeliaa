@@ -34,6 +34,9 @@ import { hasStoredConsent, recordClientConsent } from '../clients/index.js';
 import { withUploadLock as withLock } from './uploadLocks.js';
 import { finalizeGroup } from './groupFinalize.js';
 import { createSessionAndJobForUpload } from './uploadSession.js';
+
+// سقفِ طولِ یادداشتِ پیش از جلسه (هم‌راستا با سقفِ یادداشتِ متنیِ جلسه‌ی زنده)
+const PRE_NOTE_MAX_CHARS = 4000;
 import {
   getOwnedUploadRow, getUploadRow, latestJobRowForSession, jobRowForUpload, jobRowById, ownedJobRow, listJobRows,
   getJobByUpload, listIdleUploadIds,
@@ -97,7 +100,7 @@ export async function audioUploadRoutes(app: FastifyInstance) {
   app.post('/api/uploads', async (request, reply) => {
     const b = (request.body || {}) as {
       client_id?: string; file_name?: string; size?: number; mime?: string;
-      fingerprint?: string; session_date?: string; consent?: boolean;
+      fingerprint?: string; session_date?: string; consent?: boolean; pre_note?: string;
       group_id?: string; part_index?: number; parts_total?: number;
     };
     const therapistId = request.therapistId!;
@@ -154,6 +157,9 @@ export async function audioUploadRoutes(app: FastifyInstance) {
         return { error: INVALID_DATE_ERROR };
       }
     }
+
+    // یادداشتِ متنیِ پیش از جلسه (2026-10-01): همراهِ آپلود می‌آید و هنگامِ ساختِ جلسه ذخیره می‌شود (پیش از رونویسی).
+    const preNote = typeof b.pre_note === 'string' && b.pre_note.trim() ? b.pre_note.trim().slice(0, PRE_NOTE_MAX_CHARS) : null;
 
     if (grouped) {
       // گروهی که بخشی از آن رد/لغو شده دیگر جلسه نمی‌سازد (بخشِ expired با آپلودِ تازه جایگزین‌پذیر است).
@@ -235,7 +241,7 @@ export async function audioUploadRoutes(app: FastifyInstance) {
     const chunksTotal = Math.ceil(size / CHUNK_SIZE);
     await insertUpload({
       id, therapistId, clientId: b.client_id, fingerprint, originalName: sanitizeName(b.file_name || ''),
-      mime: String(b.mime || '').slice(0, 100) || null, size, chunkSize: CHUNK_SIZE, chunksTotal, sessionDate, groupId, partIndex, partsTotal,
+      mime: String(b.mime || '').slice(0, 100) || null, size, chunkSize: CHUNK_SIZE, chunksTotal, sessionDate, preNote, groupId, partIndex, partsTotal,
     });
     ensureUploadDir(id);
     logEvent({ event: 'upload.created', therapistId, clientId: b.client_id, detail: { bytes: size, chunks: chunksTotal, ext, ...(grouped ? { seq: partIndex, count: partsTotal } : {}) } });

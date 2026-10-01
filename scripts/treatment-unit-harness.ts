@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { TreatmentUnitService } from '../server/src/features/treatment-unit/application/treatmentUnitService.js';
-import { buildSonioxContext } from '../server/src/features/treatment-unit/domain/sonioxContext.js';
+import { buildSonioxContext, withPreNote } from '../server/src/features/treatment-unit/domain/sonioxContext.js';
 import { memberLabels, normalizeMembers, speakerProfile } from '../server/src/features/treatment-unit/domain/rules.js';
 import { TreatmentUnitValidationError } from '../server/src/features/treatment-unit/domain/errors.js';
 import type { Catalog, Member } from '../server/src/features/treatment-unit/domain/types.js';
@@ -41,6 +41,7 @@ class FakeRepo implements TreatmentUnitRepo {
   clients = new Map<string, ClientUnitRow>();
   sessions = new Map<string, { clientId: string; attendees: string[] | null; therapistModalities: string[] }>();
   mods: string[] = [];
+  notes: string[] = [];
   fail = false;
   seq = 0;
   async loadCatalog() { if (this.fail) throw new Error('db down'); return catalog; }
@@ -51,12 +52,13 @@ class FakeRepo implements TreatmentUnitRepo {
     row.members = members.map((m, i) => ({ ...m, id: m.id ?? `m${++this.seq}`, sort: i })) as Member[];
   }
   async getSessionContextSource(id: string) { if (this.fail) throw new Error('db down'); return this.sessions.get(id) ?? null; }
+  async getSessionPreNotes() { if (this.fail) throw new Error('db down'); return this.notes; }
   async getTherapistModalities() { return this.mods; }
   async setTherapistModalities(_: string, c: string[]) { this.mods = c; }
 }
 const mk = () => {
   const repo = new FakeRepo();
-  return { repo, svc: new TreatmentUnitService(repo, { catalogTtlMs: 60_000, context: LIMITS, baseContext: BASE }) };
+  return { repo, svc: new TreatmentUnitService(repo, { catalogTtlMs: 60_000, context: LIMITS, preNoteMaxChars: 2000, baseContext: BASE }) };
 };
 
 (async () => {
@@ -165,6 +167,31 @@ const mk = () => {
     const { repo, svc } = mk();
     repo.fail = true;
     assert.deepEqual(await svc.sessionSttContext('s1'), BASE);
+  });
+  await t('یادداشتِ پیش از جلسه: به context.text می‌رود (با و بدونِ واحدِ درمان)، سقف و خاموشی', async () => {
+    const { repo, svc } = mk();
+    repo.notes = ['برادرش پدرام و همسرش شیواست', 'کلینیک آرمان'];
+    // جلسه‌ای که واحدِ درمانش معلوم نیست ⇒ contextِ پایه + text
+    const c0 = await svc.sessionSttContext('none');
+    assert.equal(c0.text, 'برادرش پدرام و همسرش شیواست\nکلینیک آرمان');
+    assert.deepEqual(c0.general, BASE.general);
+    // سقفِ طول
+    repo.notes = ['ا'.repeat(5000)];
+    assert.equal((await svc.sessionSttContext('none')).text!.length, 2000);
+    // بدونِ یادداشت ⇒ text نیست
+    repo.notes = [];
+    assert.equal((await svc.sessionSttContext('none')).text, undefined);
+    // خطایِ خواندنِ یادداشت ⇒ fail-open (contextِ پایه)
+    repo.fail = true;
+    assert.deepEqual(await svc.sessionSttContext('none'), BASE);
+  });
+  await t('withPreNote: خاموش (۰) ⇒ بدونِ تغییر؛ سقفِ سختِ ۹۵۰۰ کلِ context را رعایت می‌کند', () => {
+    assert.deepEqual(withPreNote(BASE, ['x'], 0), BASE);
+    const big = { general: [{ key: 'k', value: 'v'.repeat(9000) }] };
+    const out = withPreNote(big, ['ا'.repeat(2000)], 2000);
+    assert.ok(JSON.stringify(out).length <= 9500, 'سقفِ کل');
+    const huge = { general: [{ key: 'k', value: 'v'.repeat(9480) }] };
+    assert.equal(withPreNote(huge, ['abc'], 2000).text, undefined, 'جایی برایِ یادداشت نیست');
   });
   await t('سرویس: رویکردِ ناشناخته رد می‌شود', async () => {
     const { svc } = mk();

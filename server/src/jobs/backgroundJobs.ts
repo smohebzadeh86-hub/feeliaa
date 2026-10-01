@@ -12,7 +12,7 @@ import { autoCloseAbandonedSessions, AUTO_CLOSE_INTERVAL_MS } from '../features/
 import { sweepOldNotifications, notifyAdmins } from '../features/notifications/index.js';
 import { startFinalTranscriptWorker } from '../features/final-transcript/index.js';
 import { describeLlmConfig } from '../llm/config.js';
-import { onLlmHealth } from '../llm/jsonCall.js';
+import { onLlmHealth, onLlmCall } from '../llm/jsonCall.js';
 import { createLlmAlertTracker, THROTTLE_MS } from '../llm/healthAlert.js';
 
 export async function startBackgroundJobs(): Promise<void> {
@@ -61,4 +61,14 @@ export async function startBackgroundJobs(): Promise<void> {
     },
   });
   onLlmHealth((e) => llmAlerts.handle(e));
+  // ثبتِ هر فراخوانیِ LLM (موفق/ناموفق) در obs_events: رویدادِ `llm.call` — فقط متادیتا و عدد (LAW-001). گزارش: pnpm llm:usage
+  onLlmCall((e) => logEvent({
+    event: 'llm.call', source: 'job', severity: e.ok ? 'info' : 'warn', sessionId: e.ref?.sessionId, clientId: e.ref?.clientId,
+    therapistId: e.ref?.therapistId, code: e.ok ? undefined : String(e.status ?? 'network'), durationMs: e.durationMs,
+    detail: {
+      purpose: e.purpose, provider: e.provider, model: e.model, ok: e.ok, status: e.status, attempt: e.attempt, finish: e.finish,
+      llm_calls: 1, prompt_tokens: e.usage?.prompt_tokens, completion_tokens: e.usage?.completion_tokens,
+      reasoning_tokens: e.usage?.reasoning_tokens, cost_usd: e.usage?.cost_usd ?? undefined,
+    },
+  }));
 }

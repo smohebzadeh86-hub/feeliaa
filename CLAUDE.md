@@ -132,6 +132,7 @@ cd server && npx tsc --noEmit
 - `pnpm test:tu` = harness واحدِ درمان (`scripts/treatment-unit-harness.ts`) — دامنه/کاربرد/نگاشتِ مدالیته؛ بدونِ DB/شبکه.
 - `pnpm test:ft` = harness «متنِ نهایی» (`scripts/final-transcript-harness.ts`، 2026-09-27) — ماشینِ حالت، نگهبان‌ها و polish با LLMِ جعلی؛ بدونِ DB/شبکه.
 - `pnpm test:llm` = harness لایه‌ی LLMِ مستقل از provider (`scripts/llm-harness.ts`، 2026-09-28) — config هر provider (OpenAI/OpenRouter/متیس/DeepSeek/custom)، رگرسیونِ بدنه‌ی درخواست، حالت‌هایِ JSON، providerِ جایگزین؛ کلاینتِ جعلی، بدونِ شبکه.
+- `pnpm llm:usage` = گزارشِ مصرفِ LLMِ «متنِ نهایی» (`scripts/llm-usage-report.ts`، 2026-10-01) — فقط‌خواندنیِ DB: جمعِ روزانه، آمارِ هر ویرایش (توکن/هزینه/تکه) و بودجه‌ی امروز؛ `-- --days=N --sessions=N`. بدونِ متنِ بالینی.
 - `pnpm test:docs` = بهداشتِ مستندات (`scripts/check-docs.mjs`، LAW-027): پوششِ feature-index، documentation-map، لینک‌ها/مسیرها، routeها↔api-catalog، migrationها↔database-catalog، envها↔configuration-catalog، scriptها↔این بخش؛ بدونِ DB/شبکه.
 - `pnpm test:adm` = harness پنلِ ادمین (`scripts/admin-monitor-harness.ts`، 2026-10-01) — `liveHealth`، heartbeat و متریکِ HTTP (سطل/p95)؛ توابعِ خالص، بدونِ DB/شبکه.
 - `pnpm test:routes` = قراردادِ routeها (method/path + hookهایِ مؤثر مثلِ `requireAuth`/`requireAdmin` + bodyLimit) در برابرِ `scripts/route-snapshot.txt`؛ بدونِ DB. `-- --update` فقط وقتی route عمداً عوض شده.

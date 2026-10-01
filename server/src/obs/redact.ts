@@ -30,6 +30,8 @@ export const ALLOWED_DETAIL_KEYS = new Set([
   'role_fixes', 'role_reverts',
   // (2026-09-28) نگهبانِ نوبت‌به‌نوبت: کلِ نوبت‌ها و نوبت‌هایِ خام‌مانده — فقط شمارنده (retries بالاتر آمده)
   'turns', 'fallback_turns',
+  // (2026-10-01) مصرفِ LLMِ هر ویرایش — فقط عدد (تعدادِ فراخوانی، توکن، دلار)
+  'provider', 'finish', 'llm_calls', 'prompt_tokens', 'completion_tokens', 'reasoning_tokens', 'cost_usd',
 ]);
 
 function isFiniteNumber(v: unknown): v is number {

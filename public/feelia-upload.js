@@ -329,9 +329,13 @@
         // موفق؛ قبلاً هر resume/retry (حتی بعد از رفرش یا لغوِ رضایت) consent:true می‌فرستاد و رضایتِ لغوشده را
         // بی‌صدا دوباره ثبت می‌کرد. بعد از آن سرور به رضایتِ ثبت‌شده‌ی مراجع تکیه می‌کند.
         if (task.consent) body.consent = true;
+        // یادداشتِ متنیِ پیش از جلسه (2026-10-01): فقط در حافظه و فقط تا اولین پاسخِ موفق؛ سرور آن را همراهِ ساختِ جلسه ذخیره می‌کند
+        // (پیش از رونویسی). در گروه فقط بخشِ اول می‌فرستد.
+        if (task.preNote) body.pre_note = task.preNote;
         if (task.groupId) { body.group_id = task.groupId; body.part_index = task.partIndex; body.parts_total = task.partsTotal; }
         init = await jsonReq('POST', '/api/uploads', body);
         task.consent = false;
+        task.preNote = '';
         break;
       } catch (e) {
         if (task.canceled) return;
@@ -477,6 +481,7 @@
         sessionDate: opts.sessionDate || '', fileName: file.name, size: file.size, mime: file.type || '',
         file: file, state: 'hashing', createdAt: Date.now(), persistable: true, doneBytes: 0, inflightBytes: 0,
         consent: true, // فقط در حافظه (persist نمی‌شود) — شروعِ دستی بعد از تیکِ رضایت
+        preNote: String(opts.preNote || ''), // فقط در حافظه — به همراهِ اولین POST /api/uploads
       };
       var tmpKey = 'tmp-' + task.createdAt;
       task.key = tmpKey;
@@ -503,7 +508,7 @@
     // چند فایلِ یک جلسه (به همین ترتیب). opts: {files, clientId, clientLabel, sessionDate}
     startGroup: function (opts) {
       var files = opts.files || [];
-      if (files.length < 2) return FeeliaUpload.start({ file: files[0], clientId: opts.clientId, clientLabel: opts.clientLabel, sessionDate: opts.sessionDate });
+      if (files.length < 2) return FeeliaUpload.start({ file: files[0], clientId: opts.clientId, clientLabel: opts.clientLabel, sessionDate: opts.sessionDate, preNote: opts.preNote });
       var groupId = newUuid();
       var createdAt = Date.now();
       var list = files.map(function (file, i) {
@@ -513,6 +518,7 @@
           file: file, state: 'hashing', createdAt: createdAt, persistable: true, doneBytes: 0, inflightBytes: 0,
           groupId: groupId, partIndex: i, partsTotal: files.length,
           consent: true, // فقط در حافظه — شروعِ دستی بعد از تیکِ رضایت
+          preNote: i === 0 ? String(opts.preNote || '') : '', // فقط بخشِ اول
         };
         tasks[task.key] = task;
         return task;

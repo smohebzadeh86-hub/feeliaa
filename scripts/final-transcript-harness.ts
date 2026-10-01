@@ -660,6 +660,65 @@ await t('R3 اصلاحِ نقش: یک بخش؛ همه‌ی بخش‌هایِ ه�
   assert.deepEqual(allowedRoles(null, turns), ['درمانگر', 'مراجع', 'خانم', 'آقا']);
 });
 
+await t('briefing: یادداشتِ پیش از جلسه به هر دو گذر می‌رسد، سقف دارد، و بدونِ آن در پرامپت نیست', async () => {
+  const seen: string[] = [];
+  const llm: LlmJsonPort = {
+    model: 'fake',
+    async completeJson<T>(system: string, user: string): Promise<T> {
+      seen.push(user);
+      if (!system.includes('ویراستار')) return { speaker_map: [{ speaker: '۱', role: 'درمانگر' }, { speaker: '۲', role: 'مراجع' }], summary: 's', glossary: [] } as T;
+      return { turns: [
+        { src: [1], speaker_role: 'درمانگر', text: 'سلام، خوش اومدی.' },
+        { src: [2, 3], speaker_role: 'مراجع', text: 'من این هفته خیلی خسته بودم و نمی‌دونم چرا.' },
+        { src: [4], speaker_role: 'درمانگر', text: 'از کی شروع شد؟' },
+      ] } as T;
+    },
+  };
+  const roster = { unitLabel: 'فردی', speakers: ['مراجع'], terms: [] };
+  await polishTranscript(RAW4, roster, llm, { ...NCFG, briefing: 'مراجع از دعوا با پدرام می‌گوید. ' + 'ا'.repeat(5000) });
+  assert.equal(seen.length, 2);
+  for (const u of seen) {
+    assert.ok(u.includes('یادداشتِ درمانگر پیش از جلسه') && u.includes('پدرام'), 'briefing در پرامپت');
+    assert.ok(u.length < 6000, 'سقفِ طول');
+  }
+  seen.length = 0;
+  await polishTranscript(RAW4, roster, llm, { ...NCFG, briefing: '  ' });
+  await polishTranscript(RAW4, roster, llm, NCFG);
+  assert.ok(seen.every((u) => !u.includes('یادداشتِ درمانگر')), 'خالی ⇒ بلوک نیست');
+});
+
+await t('usage: آمارِ هر ویرایش — جمع = برداشتِ کلی + تکه‌ها، هر تکه یک ردیف با تعدادِ نوبت/نویسه', async () => {
+  const total = { calls: 0, prompt_tokens: 0, completion_tokens: 0, reasoning_tokens: 0, cost_usd: 0 as number | null };
+  const toLatin = (s: string) => s.replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+  const llm: LlmJsonPort = {
+    model: 'fake',
+    usage: () => ({ ...total }),
+    async completeJson<T>(system: string, user: string): Promise<T> {
+      total.calls++; total.prompt_tokens += 100; total.completion_tokens += 50; total.reasoning_tokens += 10; total.cost_usd = (total.cost_usd as number) + 0.001;
+      if (!system.includes('ویراستار')) return { speaker_map: [{ speaker: '۱', role: 'درمانگر' }, { speaker: '۲', role: 'مراجع' }], summary: 's', glossary: [] } as T;
+      const body = user.split('تکه‌ای که باید مرتب شود:')[1] || '';
+      const turns = [...body.matchAll(/^\[([0-9۰-۹]+)\] گوینده ([0-9۰-۹]+): (.*)$/gm)]
+        .map((m) => ({ src: [Number(toLatin(m[1]))], speaker_role: toLatin(m[2]) === '1' ? 'درمانگر' : 'مراجع', text: m[3] }));
+      return { turns } as T;
+    },
+  };
+  const raw = Array.from({ length: 6 }, (_, i) => `گوینده ${(i % 2) + 1}: این یک جمله‌ی آزمایشی شماره ${i} است برای سنجش مصرف`).join('\n\n');
+  const r = await polishTranscript(raw, { unitLabel: 'فردی', speakers: ['مراجع'], terms: [] }, llm, { ...NCFG, chunkChars: 130 });
+  const u = r.report.usage!;
+  assert.ok(u, 'report.usage هست');
+  assert.ok(u.chunks.length >= 2, 'چند تکه: ' + u.chunks.length);
+  assert.equal(u.overview.calls, 1);
+  assert.equal(u.total.calls, 1 + u.chunks.reduce((n, c) => n + c.calls, 0), 'جمع = برداشت + تکه‌ها');
+  assert.equal(u.total.prompt_tokens, u.overview.prompt_tokens + u.chunks.reduce((n, c) => n + c.prompt_tokens, 0));
+  assert.ok(Math.abs(u.total.cost_usd! - (u.overview.cost_usd! + u.chunks.reduce((n, c) => n + c.cost_usd!, 0))) < 1e-9);
+  assert.equal(u.chunks.reduce((n, c) => n + c.turns, 0), r.report.turns, 'نوبت‌هایِ تکه‌ها = کلِ نوبت‌ها');
+  assert.ok(u.chunks.every((c) => c.chars > 0));
+  // LLMِ بدونِ usage() (فیک‌هایِ قدیمی) ⇒ report.usage نیست و هیچ‌چیز نمی‌شکند
+  const plain = fakeLlm(() => ({ turns: [] }));
+  const r2 = await polishTranscript(RAW4, null, plain, NCFG).catch(() => null);
+  assert.ok(!r2 || r2.report.usage === undefined);
+});
+
 console.log(`\n${pass} pass, ${fail} fail`);
 process.exit(fail ? 1 : 0);
 })();

@@ -117,6 +117,13 @@ export class SqlTreatmentUnitRepository implements TreatmentUnitRepo {
     }
   }
 
+  async getSessionPreNotes(sessionId: string): Promise<string[]> {
+    const legacy = await query('SELECT pre_note FROM sessions WHERE id = ?', [sessionId]);
+    const notes = await query(
+      "SELECT text FROM session_notes WHERE session_id = ? AND type IN ('note_before','voice_before') ORDER BY created_at", [sessionId]);
+    return [String((legacy.rows[0] as any)?.pre_note || ''), ...notes.rows.map((r: any) => String(r.text || ''))].map((x) => x.trim()).filter(Boolean);
+  }
+
   async getSessionContextSource(sessionId: string) {
     const r = await query(
       `SELECT s.client_id, s.attendees, t.modalities

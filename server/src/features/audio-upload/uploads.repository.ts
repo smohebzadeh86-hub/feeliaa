@@ -140,15 +140,15 @@ export async function findSingleUploadByFingerprint(therapistId: string, clientI
 
 export async function insertUpload(u: {
   id: string; therapistId: string; clientId: string; fingerprint: string; originalName: string; mime: string | null;
-  size: number; chunkSize: number; chunksTotal: number; sessionDate: string | null;
+  size: number; chunkSize: number; chunksTotal: number; sessionDate: string | null; preNote: string | null;
   groupId: string | null; partIndex: number | null; partsTotal: number | null;
 }): Promise<void> {
   await query(
-    `INSERT INTO audio_uploads (id, therapist_id, client_id, fingerprint, original_name, mime, size_bytes, chunk_size, chunks_total, session_date,
+    `INSERT INTO audio_uploads (id, therapist_id, client_id, fingerprint, original_name, mime, size_bytes, chunk_size, chunks_total, session_date, pre_note,
          group_id, part_index, parts_total)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [u.id, u.therapistId, u.clientId, u.fingerprint, u.originalName, u.mime,
-      u.size, u.chunkSize, u.chunksTotal, u.sessionDate, u.groupId, u.partIndex, u.partsTotal]
+      u.size, u.chunkSize, u.chunksTotal, u.sessionDate, u.preNote, u.groupId, u.partIndex, u.partsTotal]
   );
 }
 

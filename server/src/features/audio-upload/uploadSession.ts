@@ -1,7 +1,19 @@
 // ساختِ اتمیکِ «جلسه + job + بستنِ آپلود» — یک تراکنش با FOR UPDATE رویِ ردیف‌هایِ آپلود و شماره‌ی جلسه (رفعِ M7:
 // تداخلِ شماره/deadlock ⇒ کلِ تراکنش دوباره). همان SQLِ قبلیِ uploads.routes (تک‌فایلی و چندبخشی)، بدونِ تغییر.
+import { randomUUID } from 'node:crypto';
 import { pool } from '../../db/connection.js';
 import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../sessions/index.js';
+
+// یادداشتِ متنیِ پیش از جلسه ⇒ session_notes(type='note_before') در همان تراکنشِ ساختِ جلسه (پیش از شروعِ job)
+// تا رونویسی و «متنِ نهایی» آن را ببینند. هرگز لاگ نمی‌شود (LAW-001).
+async function insertPreNote(conn: any, sessionId: string, text: unknown, time: string): Promise<void> {
+  const t = typeof text === 'string' ? text.trim() : '';
+  if (!t) return;
+  await conn.query(
+    `INSERT INTO session_notes (id, session_id, type, text, wall_clock) VALUES (?, ?, 'note_before', ?, ?)`,
+    [randomUUID(), sessionId, t, time]
+  );
+}
 
 // آپلودِ تک‌فایلی: 'closed' اگر آپلود دیگر در حالِ آپلود نیست (هم‌زمان بسته شد).
 export async function createSessionAndJobForUpload(
@@ -26,13 +38,14 @@ export async function createSessionAndJobForUpload(
          VALUES (?, ?, ?, ?, ?, true, 'completed', 'upload', 'upload', 'queued', ?)`,
         [sessionId, u.client_id, sessionNum, u.session_date || null, now.time, probe.durationMs]
       );
+      await insertPreNote(conn, sessionId, u.pre_note, now.time);
       await conn.query(
         `INSERT INTO audio_jobs (id, upload_id, therapist_id, client_id, session_id, stage, source_path, duration_ms)
          VALUES (?, ?, ?, ?, ?, 'queued', ?, ?)`,
         [jobId, u.id, therapistId, u.client_id, sessionId, sourcePath, probe.durationMs]
       );
       await conn.query(
-        `UPDATE audio_uploads SET status = 'complete', session_id = ?, completed_at = NOW() WHERE id = ?`, [sessionId, u.id]);
+        `UPDATE audio_uploads SET status = 'complete', session_id = ?, completed_at = NOW(), pre_note = NULL WHERE id = ?`, [sessionId, u.id]);
       await conn.commit();
       break;
     } catch (e) {
@@ -72,13 +85,15 @@ export async function createSessionAndJobForGroup(
          VALUES (?, ?, ?, ?, ?, true, 'completed', 'upload', 'upload', 'queued', ?)`,
         [sessionId, first.client_id, sessionNum, first.session_date || null, now.time, totalMs]
       );
+      // یادداشت روی هر بخشی که فرستاده شده بود (معمولاً بخشِ اول) — اولین غیرتهی به ترتیبِ بخش‌ها
+      await insertPreNote(conn, sessionId, parts.map((p) => p.pre_note).find((x) => typeof x === 'string' && x.trim()), now.time);
       await conn.query(
         `INSERT INTO audio_jobs (id, upload_id, therapist_id, client_id, session_id, stage, source_path, source_parts, duration_ms)
          VALUES (?, ?, ?, ?, ?, 'queued', ?, ?, ?)`,
         [jobId, first.id, therapistId, first.client_id, sessionId, sourceParts[0].path, JSON.stringify(sourceParts), totalMs]
       );
       await conn.query(
-        `UPDATE audio_uploads SET session_id = ? WHERE id IN (${parts.map(() => '?').join(',')})`, [sessionId, ...parts.map((p) => p.id)]);
+        `UPDATE audio_uploads SET pre_note = NULL, session_id = ? WHERE id IN (${parts.map(() => '?').join(',')})`, [sessionId, ...parts.map((p) => p.id)]);
       await conn.commit();
       break;
     } catch (e) {

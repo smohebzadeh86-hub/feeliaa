@@ -5325,10 +5325,6 @@ function flushUploadPreNotes(){
     const done=mine.filter(function(t){return t.sessionId&&(t.state==='done'||t.state==='duplicate');})[0];
     if(done){
       pendingUploadPreNotes.splice(i,1);
-      if(pn.text){
-        api('/api/sessions/'+done.sessionId+'/notes',{method:'POST',body:{type:'note_before',text:pn.text,wall_clock:nowClock()}})
-          .catch(function(){showBanner('error','یادداشتِ متنیِ پیش از جلسه‌ی آپلود ذخیره نشد.');});
-      }
       enqueuePreVoiceClips(done.sessionId,pn.clips);
     }else if(!mine.length){
       // کار لغو/پاک شد ⇒ یادداشت‌ها جایی برایِ رفتن ندارند
@@ -7169,6 +7165,7 @@ const FT_ERR={
   'llm-not-configured':'این قابلیت رویِ سرور آماده نیست',
   'llm-unavailable':'فعلاً ممکن نشد، کمی بعد دوباره امتحان کنید',
   'llm-failed':'فعلاً ممکن نشد، کمی بعد دوباره امتحان کنید',
+  'llm-budget':'سقفِ مصرفِ امروز پر شده؛ فردا دوباره امتحان کنید',
   'soniox-unavailable':'فعلاً ممکن نشد، کمی بعد دوباره امتحان کنید',
   'soniox-timeout':'بیش از حد طول کشید',
   'soniox-error':'فعلاً ممکن نشد، کمی بعد دوباره امتحان کنید',
@@ -9619,6 +9616,7 @@ async function startAudioUpload(){
     clientId:currentClient.id,
     clientLabel:currentClient.alias?(currentClient.alias+' ('+currentClient.code+')'):currentClient.code,
     sessionDate:audioUploadDateVal||'',
+    preNote:pre.text, // متنِ پیش از جلسه همراهِ خودِ آپلود می‌رود تا پیش از رونویسی ذخیره شود (به‌جایِ POST /notes بعد از ساختِ جلسه)
   };
   let started;
   if(audioUploadFiles.length>1){
@@ -9628,7 +9626,7 @@ async function startAudioUpload(){
     opts.file=audioUploadFiles[0].file;
     started=window.FeeliaUpload.start(opts);
   }
-  if(pre.text||pre.clips.length){
+  if(pre.clips.length){
     pendingUploadPreNotes.push(pre);
     Promise.resolve(started).then(function(t){pre.keys=[].concat(t||[]).map(function(x){return x&&x.key;}).filter(Boolean);flushUploadPreNotes();})
       .catch(function(){pre.keys=[];flushUploadPreNotes();});

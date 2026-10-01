@@ -69,6 +69,7 @@
 | `032_modality_dbt_pbt.sql` | seedِ مدالیته‌هایِ `dbt`/`pbt` + اصطلاحات |
 | `033_upload_audio_quality.sql` | `audio_jobs.audio_quality/quality_warning/low_conf_ratio` |
 | `034_final_transcript_turns.sql` | `final_transcripts.clean_turns` |
+| `035_upload_pre_note.sql` | `audio_uploads.pre_note` (TEXT NULL؛ یادداشتِ متنیِ پیش از جلسه‌ی آپلود تا لحظه‌ی ساختِ جلسه؛ بعد از آن NULL و در `session_notes(note_before)` است) |
 
 جدولِ سیستمی: `_migrations(id INT AUTO_INCREMENT PK, name VARCHAR(255) UNIQUE, applied_at DATETIME)` — ساخته‌شده در `server/src/db/migrate.ts`.
 

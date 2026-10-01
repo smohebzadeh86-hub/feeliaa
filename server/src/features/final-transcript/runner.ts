@@ -93,9 +93,11 @@ export const sqlFtStore: FtStore = {
       conn.release();
     }
     job.stage = 'done';
-    const rep = (report || {}) as { chunks?: number; fallback_chunks?: number; turns?: number; fallback_turns?: number; retries?: number; uncertain?: number; role_fixes?: number; role_reverts?: number };
+    const rep = (report || {}) as { usage?: { total?: { calls: number; prompt_tokens: number; completion_tokens: number; reasoning_tokens: number; cost_usd: number | null } }; chunks?: number; fallback_chunks?: number; turns?: number; fallback_turns?: number; retries?: number; uncertain?: number; role_fixes?: number; role_reverts?: number };
     logEvent({ event: 'final_transcript.done', sessionId: job.sessionId, therapistId: job.therapistId, source: 'job',
-      detail: { source: job.source, chunks: rep.chunks, fallback_chunks: rep.fallback_chunks, turns: rep.turns, fallback_turns: rep.fallback_turns, retries: rep.retries, uncertain: rep.uncertain, role_fixes: rep.role_fixes, role_reverts: rep.role_reverts } });
+      detail: { source: job.source, chunks: rep.chunks, fallback_chunks: rep.fallback_chunks, turns: rep.turns, fallback_turns: rep.fallback_turns, retries: rep.retries, uncertain: rep.uncertain, role_fixes: rep.role_fixes, role_reverts: rep.role_reverts,
+        llm_calls: rep.usage?.total?.calls, prompt_tokens: rep.usage?.total?.prompt_tokens, completion_tokens: rep.usage?.total?.completion_tokens,
+        reasoning_tokens: rep.usage?.total?.reasoning_tokens, cost_usd: rep.usage?.total?.cost_usd ?? undefined } });
   },
 
   async skip(job: FtJob, code: string) {
@@ -125,11 +127,60 @@ async function audioStateFor(sessionId: string): Promise<AudioState> {
   return d.audioStatus;
 }
 
+// یادداشت‌هایِ پیش از جلسه (note_before/voice_before + ستونِ قدیمیِ sessions.pre_note). fail-open: خطا ⇒ ''.
+// ⚠️ LAW-001: متن لاگ نمی‌شود. در مسیرِ آپلود، یادداشت بعد از ساختِ جلسه از مرورگر ثبت می‌شود؛ هرچه تا لحظه‌ی polish
+// ثبت شده باشد خوانده می‌شود (بعدی‌ها فقط با «ساختِ دوباره» اثر می‌گذارند).
+async function preSessionBriefing(sessionId: string): Promise<string> {
+  try {
+    const notes = await query(
+      "SELECT text FROM session_notes WHERE session_id = ? AND type IN ('note_before','voice_before') ORDER BY created_at", [sessionId]);
+    const legacy = await query('SELECT pre_note FROM sessions WHERE id = ?', [sessionId]);
+    const parts = [String(legacy.rows[0]?.pre_note || ''), ...notes.rows.map((r: any) => String(r.text || ''))]
+      .map((x) => x.trim()).filter(Boolean);
+    return parts.join('\n---\n');
+  } catch {
+    return '';
+  }
+}
+
+// سقفِ روزانه‌ی «متنِ نهایی» (روزِ UTC) با دو سقفِ مستقل: دلار (FINAL_TRANSCRIPT_DAILY_BUDGET_USD) و توکن
+// (FINAL_TRANSCRIPT_DAILY_BUDGET_TOKENS، ورودی+خروجی). هر کدام ۰ ⇒ خاموش. هر کدام پر شود ⇒ ویرایشِ تازه شروع نمی‌شود
+// (llm-budget). فقط ویرایش‌هایِ تمام‌شده شمرده می‌شوند (هزینه‌ی فراخوانی‌هایِ شکست‌خورده/نیمه‌کاره ثبت نمی‌شود). providerهایی که
+// هزینه نمی‌دهند (متیس/DeepSeek) فقط با سقفِ توکن محافظت می‌شوند مگر <P>_PRICE_IN_PER_M/OUT تنظیم شده باشد.
+export async function spentToday(): Promise<{ usd: number; tokens: number; edits: number }> {
+  const r = await query("SELECT polish_report FROM final_transcripts WHERE stage = 'done' AND finished_at >= UTC_DATE()");
+  let sum = 0;
+  let tokens = 0;
+  let edits = 0;
+  for (const row of r.rows as any[]) {
+    const rep = typeof row.polish_report === 'string' ? JSON.parse(row.polish_report) : row.polish_report;
+    const t = rep?.usage?.total;
+    if (!t) continue;
+    edits++;
+    tokens += (Number(t.prompt_tokens) || 0) + (Number(t.completion_tokens) || 0);
+    if (typeof t.cost_usd === 'number' && Number.isFinite(t.cost_usd)) sum += t.cost_usd;
+  }
+  return { usd: sum, tokens, edits };
+}
+const DEFAULT_DAILY_BUDGET_USD = 3;
+const DEFAULT_DAILY_BUDGET_TOKENS = 5_000_000;
+
 async function polishFor(sessionId: string, text: string, opts?: { trustDiarization: boolean }) {
   try {
-    const llm = createTranscriptLlm();
+    const capUsd = Number(process.env.FINAL_TRANSCRIPT_DAILY_BUDGET_USD ?? DEFAULT_DAILY_BUDGET_USD);
+    const capTok = Number(process.env.FINAL_TRANSCRIPT_DAILY_BUDGET_TOKENS ?? DEFAULT_DAILY_BUDGET_TOKENS);
+    if ((Number.isFinite(capUsd) && capUsd > 0) || (Number.isFinite(capTok) && capTok > 0)) {
+      const s = await spentToday();
+      if ((capUsd > 0 && s.usd >= capUsd) || (capTok > 0 && s.tokens >= capTok)) {
+        console.log(`[final-transcript] daily budget reached: usd=${s.usd.toFixed(4)}/${capUsd} tokens=${s.tokens}/${capTok} edits=${s.edits} ⇒ session=${sessionId} not polished`);
+        return { ok: false as const, transient: false, code: 'llm-budget' };
+      }
+    }
+    const llm = createTranscriptLlm(process.env, undefined, { sessionId });
     const roster = await treatmentUnits.sessionSpeakerRoster(sessionId);
+    const briefing = await preSessionBriefing(sessionId);
     const res = await polishTranscript(text, roster, llm, {
+      briefing,
       trustDiarization: !!opts?.trustDiarization,
       chunkChars: envInt('FINAL_TRANSCRIPT_CHUNK_CHARS', 4000),
       overviewChars: envInt('FINAL_TRANSCRIPT_OVERVIEW_CHARS', 60000),

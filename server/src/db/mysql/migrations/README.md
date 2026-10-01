@@ -1,6 +1,6 @@
 # MySQL migrations — یادداشتِ idempotency (LAW-007)
 
-این پوشه **تنها migrationِ زنده** است (001–034؛ MySQL). ۰۰۱–۰۱۴ معادلِ نسخه‌ی متروکِ Postgres (`server/src/db/migrations/`) هستند و شماره‌گذاریِ یکسان دارند؛ از 015 به بعد فقط MySQL. فهرستِ شرح‌دار: [database-catalog §۱](../../../../../docs/02-reference/database-catalog.md).
+این پوشه **تنها migrationِ زنده** است (001–035؛ MySQL). ۰۰۱–۰۱۴ معادلِ نسخه‌ی متروکِ Postgres (`server/src/db/migrations/`) هستند و شماره‌گذاریِ یکسان دارند؛ از 015 به بعد فقط MySQL. فهرستِ شرح‌دار: [database-catalog §۱](../../../../../docs/02-reference/database-catalog.md).
 
 **۱۳ یک فایلِ `.mjs` است، نه `.sql`** — چون داده‌تغییردهنده و شاملِ ریاضیِ تبدیلِ
 شمسی/میلادی است؛ به‌جایِ بازنویسیِ دستیِ آن ریاضی در SQLِ خام (ریسکِ خطا روی داده‌ی

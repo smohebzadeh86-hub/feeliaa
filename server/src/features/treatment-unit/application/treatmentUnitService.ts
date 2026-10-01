@@ -1,5 +1,5 @@
 // use-caseهایِ واحدِ درمان. به پورت وابسته است، نه به SQL — adapter در index پایین تزریق می‌شود.
-import { buildSonioxContext, type SonioxContext } from '../domain/sonioxContext.js';
+import { buildSonioxContext, withPreNote, type SonioxContext } from '../domain/sonioxContext.js';
 import {
   IMPLICIT_MEMBER_ID, findUnitType, implicitIndividualMember, memberLabels, normalizeMembers, resolveAttendees, speakerProfile,
 } from '../domain/rules.js';
@@ -10,6 +10,8 @@ import type { TreatmentUnitRepo } from '../ports/treatmentUnitRepo.port.js';
 export interface TreatmentUnitConfig {
   catalogTtlMs: number;
   context: { maxTerms: number; maxChars: number };
+  // سقفِ نویسه‌یِ یادداشتِ پیش از جلسه در context.text؛ ۰ ⇒ خاموش
+  preNoteMaxChars: number;
   // contextِ پایه/fallback (وقتی اطلاعاتِ واحد نیست یا خواندنش شکست خورد)
   baseContext: SonioxContext;
 }
@@ -106,6 +108,17 @@ export class TreatmentUnitService {
 
   // contextِ Soniox برایِ یک جلسه. هرگز پرتاب نمی‌کند (LAW-012 fail-open): در هر خطا contextِ پایه.
   async sessionSttContext(sessionId: string): Promise<SonioxContext> {
+    const ctx = await this.baseSessionContext(sessionId);
+    if (!(this.cfg.preNoteMaxChars > 0)) return ctx;
+    try {
+      return withPreNote(ctx, await this.repo.getSessionPreNotes(sessionId), this.cfg.preNoteMaxChars);
+    } catch (e) {
+      console.log(`[treatment-unit] pre-note context skipped session=${sessionId} err=${(e as Error)?.name || 'error'}`);
+      return ctx;
+    }
+  }
+
+  private async baseSessionContext(sessionId: string): Promise<SonioxContext> {
     try {
       const src = await this.repo.getSessionContextSource(sessionId);
       if (!src) return this.cfg.baseContext;

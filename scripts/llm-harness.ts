@@ -2,7 +2,7 @@
 // اجرا: pnpm test:llm
 import assert from 'node:assert/strict';
 import { resolveLlmConfig, resolveLlmFallbackConfig, reasoningBody, describeLlmConfig, LlmConfigError } from '../server/src/llm/config.js';
-import { buildRequest, completeJsonWith, createJsonCaller, LlmError, onLlmHealth, type ChatClient, type LlmHealthEvent } from '../server/src/llm/jsonCall.js';
+import { addUsage, emptyUsage, usageFromResponse, onLlmCall, type LlmCallEvent, buildRequest, completeJsonWith, createJsonCaller, LlmError, onLlmHealth, type ChatClient, type LlmHealthEvent } from '../server/src/llm/jsonCall.js';
 import { createLlmAlertTracker, FAIL_STREAK, THROTTLE_MS } from '../server/src/llm/healthAlert.js';
 import { ChatLlmAdapter } from '../server/src/features/case-file/adapters/llm/chatLlm.adapter.js';
 import { CaseFileGenerationError } from '../server/src/features/case-file/domain/errors.js';
@@ -51,6 +51,7 @@ await t('L1 رگرسیون: پرونده‌ی درمان رویِ OpenRouter ه�
     response_format: { type: 'json_schema', json_schema: CASE_FILE_JSON_SCHEMA },
     reasoning: { effort: 'low' },
     provider: { sort: 'latency', require_parameters: true, data_collection: 'deny' },
+    usage: { include: true }, // (2026-10-01) هزینه‌ی واقعی در پاسخ
     max_tokens: 32_768,
   });
   assert.equal(c.modelTag, 'openrouter:deepseek/deepseek-v4.1-flash');
@@ -68,6 +69,7 @@ await t('L2 رگرسیون: «متنِ نهایی» رویِ OpenRouter (مدل�
   assert.deepEqual(rest, {
     reasoning: { enabled: false },
     provider: { sort: 'latency', data_collection: 'deny' },
+    usage: { include: true },
     models: ['qwen/qwen3.8-27b:free', 'deepseek/deepseek-v4.1-flash', 'x/y'],
     max_tokens: 16_384,
   });
@@ -97,8 +99,8 @@ await t('L4 متیس: json_object، استدلالِ low در هر دو مسیر
   assert.equal(ft.baseURL, 'https://api.metisai.ir/deepseek/v1');
   assert.equal(ft.model, 'deepseek-v4-flash', 'FINAL_TRANSCRIPT_MODEL (qwen) نباید به متیس برود');
   assert.equal(ft.jsonMode, 'object');
-  assert.deepEqual(ft.body, { thinking: { type: 'enabled' }, reasoning_effort: 'low', max_tokens: 16_384 });
-  assert.deepEqual(resolveLlmConfig('final-transcript', { ...env, FINAL_TRANSCRIPT_REASONING_EFFORT: 'off' }).body.thinking, { type: 'disabled' });
+  assert.deepEqual(ft.body, { thinking: { type: 'disabled' }, max_tokens: 16_384 });
+  assert.deepEqual(resolveLlmConfig('final-transcript', { ...env, FINAL_TRANSCRIPT_REASONING_EFFORT: 'low' }).body, { thinking: { type: 'enabled' }, reasoning_effort: 'low', max_tokens: 16_384 });
   assert.equal(ft.headers, undefined);
   assert.ok(ft.warnings.some((w) => /FALLBACK_MODELS/.test(w)));
   const cf = resolveLlmConfig('case-file', env);
@@ -134,7 +136,7 @@ await t('L6 سوییچ: همان env با دو کلید — فقط LLM_PROVIDER 
   assert.deepEqual(resolveLlmConfig('final-transcript', prodLike).body.reasoning, { enabled: false });
   assert.equal(resolveLlmConfig('final-transcript', { ...prodLike, LLM_PROVIDER: 'metis' }).body.reasoning_effort, 'high');
   const noGlobal = { ...both, OPENROUTER_FINAL_TRANSCRIPT_REASONING_EFFORT: 'off', LLM_PROVIDER: 'metis' };
-  assert.equal(resolveLlmConfig('final-transcript', noGlobal).body.reasoning_effort, 'low');
+  assert.deepEqual(resolveLlmConfig('final-transcript', noGlobal).body.thinking, { type: 'disabled' }); // پیش‌فرضِ متیس برایِ «متنِ نهایی»: off (2026-10-01)
   assert.equal(resolveLlmConfig('case-file', noGlobal).body.reasoning_effort, 'low');
 });
 
@@ -250,8 +252,8 @@ await t('L15 «متنِ نهایی»: نبودِ کلید ⇒ FinalTranscriptCon
   const llm = createTranscriptLlm({ ...METIS, LLM_PROVIDER: 'metis' }, () => f.client);
   assert.equal(llm.model, 'metis:deepseek-v4-flash');
   assert.deepEqual(await llm.completeJson('S', 'U', SCHEMA), JSON.parse(OK));
-  assert.deepEqual(f.bodies[0].thinking, { type: 'enabled' });
-  assert.equal(f.bodies[0].reasoning_effort, 'low');
+  assert.deepEqual(f.bodies[0].thinking, { type: 'disabled' });
+  assert.equal(f.bodies[0].reasoning_effort, undefined);
 });
 
 await t('L16 لاگِ شروع: provider/مدل/حالت، هرگز کلید', () => {
@@ -297,6 +299,71 @@ await t('L18 هشدارِ ادمین: 402/401 فوری؛ خطایِ گذرا ف�
   assert.deepEqual(alerts, ['metis:unavailable']);
   fail(401);
   assert.deepEqual(alerts, ['metis:unavailable', 'metis:auth']);
+});
+
+// ——— مصرفِ توکن/هزینه (2026-10-01) ———
+await t('U1 usageFromResponse: هزینه‌ی provider ارجح؛ وگرنه قیمتِ env؛ وگرنه null', () => {
+  const orCfg = resolveLlmConfig('final-transcript', PROD_OR);
+  const r1 = usageFromResponse({ usage: { prompt_tokens: 1000, completion_tokens: 500, cost: 0.00042, completion_tokens_details: { reasoning_tokens: 120 } } }, orCfg);
+  assert.deepEqual(r1, { calls: 1, prompt_tokens: 1000, completion_tokens: 500, reasoning_tokens: 120, cost_usd: 0.00042 });
+  const priced = resolveLlmConfig('final-transcript', { ...METIS, LLM_PROVIDER: 'metis', METIS_PRICE_IN_PER_M: '0.2', METIS_PRICE_OUT_PER_M: '0.8' });
+  assert.ok(Math.abs(usageFromResponse({ usage: { prompt_tokens: 1_000_000, completion_tokens: 500_000 } }, priced).cost_usd! - 0.6) < 1e-9);
+  const unpriced = resolveLlmConfig('final-transcript', { ...METIS, LLM_PROVIDER: 'metis' });
+  assert.equal(usageFromResponse({ usage: { prompt_tokens: 10, completion_tokens: 5 } }, unpriced).cost_usd, null);
+  assert.equal(usageFromResponse({}, unpriced).prompt_tokens, 0);
+});
+await t('U2 addUsage: هزینه‌ی نامعلومِ یک فراخوانی جمع را نامعلوم می‌کند (نه «۰ دلار»)', () => {
+  const a = emptyUsage();
+  addUsage(a, { calls: 1, prompt_tokens: 10, completion_tokens: 5, cost_usd: 0.001 });
+  addUsage(a, { calls: 1, prompt_tokens: 20, completion_tokens: 5, cost_usd: 0.002 });
+  assert.equal(a.calls, 2); assert.equal(a.prompt_tokens, 30);
+  assert.ok(Math.abs(a.cost_usd! - 0.003) < 1e-12);
+  addUsage(a, { calls: 1, cost_usd: null });
+  assert.equal(a.cost_usd, null);
+  addUsage(a, { calls: 1, cost_usd: 0.5 });
+  assert.equal(a.cost_usd, null);
+});
+await t('U3 createJsonCaller: usage() جمعِ فراخوانی‌هاست، حتی پاسخِ JSONِ نامعتبر (توکنش خرج شده)', async () => {
+  const bodies: any[] = [];
+  const replies = [{ content: OK, usage: { prompt_tokens: 100, completion_tokens: 40, cost: 0.001 } }, { content: 'نه JSON', usage: { prompt_tokens: 100, completion_tokens: 10, cost: 0.0005 } }, { content: OK, usage: { prompt_tokens: 100, completion_tokens: 40, cost: 0.001 } }];
+  const client: ChatClient = { chat: { completions: { async create(b: any) { bodies.push(b); const r = replies[bodies.length - 1]; return { choices: [{ message: { content: r.content }, finish_reason: 'stop' }], usage: r.usage }; } } } };
+  const caller = createJsonCaller('final-transcript', { ...PROD_OR, FINAL_TRANSCRIPT_JSON_MODE: 'prompt' }, () => client);
+  assert.equal(caller.usage().calls, 0);
+  await caller.complete('s', 'u', SCHEMA);
+  assert.equal(caller.usage().calls, 1);
+  await caller.complete('s', 'u', SCHEMA); // پاسخِ اول نامعتبر ⇒ تلاشِ دوم؛ هر دو شمرده می‌شوند
+  const u = caller.usage();
+  assert.equal(u.calls, 3);
+  assert.equal(u.prompt_tokens, 300);
+  assert.ok(Math.abs(u.cost_usd! - 0.0025) < 1e-12);
+});
+
+await t('U4 onLlmCall: هر درخواستِ HTTP (موفق، نامعتبر، شکست) یک رویداد با ref و بدونِ متن', async () => {
+  const seen: LlmCallEvent[] = [];
+  onLlmCall((e) => seen.push(e));
+  try {
+    const replies: any[] = [{ content: OK, usage: { prompt_tokens: 10, completion_tokens: 5, cost: 0.0001 } }, { err: 402 }, { content: 'نه JSON', usage: { prompt_tokens: 7, completion_tokens: 3 } }, { content: OK, usage: { prompt_tokens: 7, completion_tokens: 3 } }];
+    let i = 0;
+    const client: ChatClient = { chat: { completions: { async create() {
+      const r = replies[i++];
+      if (r.err) throw Object.assign(new Error('Payment Required'), { status: r.err });
+      return { choices: [{ message: { content: r.content }, finish_reason: 'stop' }], usage: r.usage };
+    } } } };
+    const caller = createJsonCaller('final-transcript', { ...PROD_OR, FINAL_TRANSCRIPT_JSON_MODE: 'prompt' }, () => client, { sessionId: 'sess-1' });
+    await caller.complete('s', 'u', SCHEMA);
+    await assert.rejects(caller.complete('s', 'u', SCHEMA), (e: any) => e.status === 402);
+    await caller.complete('s', 'u', SCHEMA); // پاسخِ اول نامعتبر ⇒ تلاشِ دوم
+    assert.equal(seen.length, 4);
+    assert.deepEqual(seen.map((e) => e.ok), [true, false, true, true]);
+    assert.deepEqual(seen.map((e) => e.attempt), [0, 0, 0, 1]);
+    assert.equal(seen[1].status, 402);
+    assert.ok(seen.every((e) => e.ref?.sessionId === 'sess-1' && e.purpose === 'final-transcript' && e.provider === 'openrouter'));
+    assert.ok(!JSON.stringify(seen).includes('نه JSON'), 'هیچ متنی در رویداد نیست');
+    // شنونده‌ی خراب فراخوانی را نمی‌شکند
+    onLlmCall(() => { throw new Error('boom'); });
+    i = 3;
+    assert.deepEqual(await createJsonCaller('final-transcript', { ...PROD_OR, FINAL_TRANSCRIPT_JSON_MODE: 'prompt' }, () => client).complete('s', 'u', SCHEMA), JSON.parse(OK));
+  } finally { onLlmCall(null); }
 });
 
 console.log(`\n${pass} PASS, ${fail} FAIL`);

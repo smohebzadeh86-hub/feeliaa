@@ -60,7 +60,7 @@
 | `forbidden` (متنِ نهایی) | 403 | همان | قابلیت برایِ درمانگر خاموش است | همان |
 | `PATCH …/final-transcript/roles` | 400 / 409 | `features/final-transcript` | `bad-role` (نقش بیرون از حاضرین)، `bad-index`، `not-editable`، `conflict` (هم‌زمان دوباره ساخته شد) — 2026-09-28 | UI: بنرِ خطا |
 | (ستونِ `notifications.error_code` برایِ `llm_unavailable`) | — | `server/src/llm/healthAlert.ts` | `credit` (402)، `auth` (401/403)، `unavailable` (۳ خطایِ پیاپیِ دیگر) — 2026-09-28 | UI: `LLM_ALERT` در index.html |
-| (ستونِ `final_transcripts.error_code`) | — | `features/final-transcript` | `llm-not-configured`، `llm-unavailable` (گذرا)، `llm-failed`، `soniox-unavailable`، `soniox-timeout`، `soniox-error`، `soniox-lost`، `no-ffmpeg`، `internal-error`، `audio-syncing` (فقط در حالِ انتظار)، `no-text` (skipped) | UI: `FT_ERR` در index.html + «تلاشِ دوباره» |
+| (ستونِ `final_transcripts.error_code`) | — | `features/final-transcript` | `llm-not-configured`، `llm-unavailable` (گذرا)، `llm-failed`، `llm-budget` (سقفِ روزانه‌ی هزینه/توکن پر شد؛ بدونِ فراخوانیِ LLM)، `soniox-unavailable`، `soniox-timeout`، `soniox-error`، `soniox-lost`، `no-ffmpeg`، `internal-error`، `audio-syncing` (فقط در حالِ انتظار)، `no-text` (skipped) | UI: `FT_ERR` در index.html + «تلاشِ دوباره» |
 | `obs-bad-payload` | 400 | `POST /api/obs/events` | بدنه/آرایه‌ی `events` نامعتبر (خالی، >۲۰۰ عضو، یا شکلِ اشتباه) | `feelia-obs.js`: این batch دور ریخته می‌شود (بدونِ retry فوری، منتظرِ flushِ بعدی) |
 | `obs-rate-limited` | 429 | `POST /api/obs/events` | >۲۰ درخواست یا >۱۵۰۰ رویداد/دقیقه به‌ازایِ تراپیست | `feelia-obs.js`: بافر خالی می‌شود + backoff |
 

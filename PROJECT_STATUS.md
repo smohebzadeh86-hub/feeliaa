@@ -222,6 +222,48 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — CODE + TEST + DOCS — ثبتِ «هر فراخوانیِ LLM» در obs_events (`llm.call`) + گزارشِ کامل؛ commit/deploy نشد
+- **درخواستِ مالک:** هر استفاده ثبت شود. پیش‌تر فقط ویرایش‌هایِ موفقِ «متنِ نهایی» (`polish_report.usage`) ثبت می‌شد؛ شکست‌ها، تلاش‌هایِ دوباره و پرونده‌ی درمان نه.
+- **تغییر:** `llm/jsonCall.ts` ⇒ `onLlmCall`/`LlmCallEvent` برایِ هر درخواستِ HTTP (موفق/ناموفق، `attempt`)، `createJsonCaller(..., ref)` با `sessionId`؛ `jobs/backgroundJobs.ts` آن را به `logEvent('llm.call')` وصل می‌کند (`obs/redact.ts`: `provider`، `finish`). بدونِ migration (جدولِ `obs_events`، نگهداری ۱۸۰ روز). `pnpm llm:usage` حالا بخشِ «همه‌ی فراخوانی‌ها» را هم دارد.
+- **تست:** `test:llm` ۲۲/۰ (U4: رویداد برایِ موفق/نامعتبر/شکست، `ref`، بدونِ متن، شنونده‌ی خراب بی‌اثر)؛ تستِ واقعی با Metis: یک فراخوانیِ موفق (۱۱۱ توکنِ ورودی/۶ خروجی/۱۲۷۹ms) و یک فراخوانیِ ناموفق (مدلِ ناموجود ⇒ 400) هر دو در `obs_events` نشستند (ردیف‌هایِ تست پاک شد).
+- **توجه:** ثبت فقط در پروسه‌ای فعال است که `startBackgroundJobs` را اجرا کرده؛ سرورِ dev/prod بعد از deploy ری‌استارت لازم دارد. پرونده‌ی درمان `sessionId` ندارد (فقط purpose/model).
+
+### 2026-10-01 — CODE + TEST + DOCS — آمارِ مصرفِ LLM برایِ هر ویرایشِ «متنِ نهایی»، سقفِ بودجه‌ی روزانه و پیش‌فرضِ ارزان‌ترِ استدلال؛ commit/deploy نشد
+- **درخواستِ مالک:** بعد از شارژ: مدلِ بسیار ارزان، مصرفِ زودهنگام نشود، آمارِ هر ادیت در دسترس باشد.
+- **آمار:** `llm/jsonCall.ts` (`LlmUsage`، `usageFromResponse`، `JsonCaller.usage()`) توکنِ ورودی/خروجی/استدلال و هزینه را می‌خواند (OpenRouter: `usage:{include:true}`؛ متیس/DeepSeek هزینه نمی‌دهند ⇒ `<P>_PRICE_IN_PER_M/OUT` یا null). `polishTranscript` ⇒ `polish_report.usage = {total, overview, chunks[]}` (بدونِ migration؛ فقط عدد). رویدادِ `final_transcript.done` فیلدهایِ عددیِ جدید (allowlistِ `obs/redact.ts`). `pnpm llm:usage` = گزارشِ فقط‌خواندنیِ روزانه/هر ویرایش/بودجه (`scripts/llm-usage-report.ts`).
+- **سقف:** `runner.ts#polishFor` پیش از LLM: `FINAL_TRANSCRIPT_DAILY_BUDGET_USD` (۳) و `…_TOKENS` (۵M)، روزِ UTC؛ پر شدن ⇒ `llm-budget` بدونِ فراخوانی (+ پیامِ UI). فقط ویرایش‌هایِ موفق شمرده می‌شوند.
+- **ارزان‌سازی (سنجشِ واقعی، متیس):** استدلالِ `low` ≈ ۷۵٪ توکنِ خروجی بود؛ `off` با کیفیتِ برابر (۲۲–۲۴ از ۲۸ خطایِ کاشته‌شده) ~۴× خروجیِ کمتر و ۲٫۶× سریع‌تر ⇒ پیش‌فرضِ «متنِ نهایی» رویِ متیس `off` شد. جزئیات: `verification/2026-10-01-llm-cost-reasoning.md`. مدل `deepseek-v4-flash` ماند (قیمتِ متیس در دسترس نیست).
+- **FINDING:** OpenRouter از شبکه‌ی dev با 403 Cloudflare («Access denied by security policy») بسته است؛ مصرفِ ۲۳٫۵ از ۲۵ دلارِ اعتبار از کلیدهایِ دیگرِ همان حساب بود (کلیدِ dev فقط ۱٫۶۶). اگر prod با OpenRouter و `reasoning=low` کار کند، همان `low` احتمالاً عاملِ اصلیِ مصرف است ⇒ پیشنهاد: `FINAL_TRANSCRIPT_REASONING_EFFORT=off` در `.env`ِ prod پس از تأیید.
+- **تست:** `test:llm` ۲۱/۰ (۳ تستِ مصرف؛ رگرسیونِ بدنه‌ی OpenRouter با `usage` و پیش‌فرضِ متیس off به‌روز)، `test:ft` ۶۱/۰، `test:tu`، `test:up`، `test:cf`، `test:routes`، `test:arch`، `test:docs`، `tsc` سبز. E2E با Metisِ واقعی رویِ DBِ لوکال (fixture پاک شد): usage ثبت، گزارش، و ردِ سقفِ توکن تأیید شد.
+
+### 2026-10-01 — MIGRATION + TEST — اعمالِ migration 035 رویِ DBِ لوکال و E2Eِ کاملِ آپلود با Sonioxِ واقعی (مجوزِ صریحِ مالک)؛ commit/deploy نشد
+- **migration 035** رویِ MySQLِ لوکالِ dev (`localhost/feelia`) با `runMigrations` اعمال شد (ستونِ `audio_uploads.pre_note TEXT NULL` تأیید شد). prod دست‌نخورده؛ قبل از deployِ این کد باید اعمال شود.
+- **E2E (fixtureِ canary، `app.inject`، Sonioxِ واقعی، workerهایِ آپلود+متنِ نهایی):** یادداشتِ همراهِ آپلود پیش از شروعِ job ذخیره شد (تک‌فایلی و گروهی)، `pre_note` NULL شد، context.text ساخته شد؛ رونویسیِ خام با یادداشت ۷/۷ نام در برابرِ ۵/۷ بدونِ آن. جزئیات و جدول: `verification/2026-10-01-pre-note-stt-context.md`. fixture و فایل‌ها پاک شدند؛ Soniox ۰ باقی‌مانده.
+- **FINDING (محیطی):** اعتبارِ **Metis تمام شده** (`402 Payment Required`) و **OpenRouter فقط ~۷۱۰۰ توکن** (۴۰۲ با سقفِ ۱۶۳۸۴). «متنِ نهایی» با providerهایِ فعلی شکست می‌خورد/در backoff می‌ماند تا شارژ. نیازِ اقدامِ مالک: شارژِ حساب.
+- **تغییرِ مستندات:** `migrations/README.md` ⇒ تا ۰۳۵.
+
+### 2026-10-01 — CODE + MIGRATION + TEST + DOCS — یادداشتِ متنیِ پیش از جلسه همراهِ آپلود + context رونویسیِ Soniox؛ commit/deploy و migration رویِ DBِ dev اعمال نشد
+- **سنجش (Soniox واقعی، گفتارِ ساختگیِ TTS):** نام‌هایِ کم‌رایج ۵/۷ ⇒ ۷/۷ با context (`terms` یا `text`ِ آزاد؛ حتی در صدایِ نویزی)؛ نام‌هایِ رایج بی‌اثر. جزئیات: `verification/2026-10-01-pre-note-stt-context.md`.
+- **migration 035:** `audio_uploads.pre_note TEXT NULL` (additive). ⚠️ رویِ DBِ مشترکِ dev/prod **اعمال نشده**؛ تا اعمال، `POST /api/uploads` با `pre_note` خطای ستون می‌دهد.
+- **آپلود:** `POST /api/uploads` فیلدِ `pre_note` (سقف ۴۰۰۰) ⇒ `audio_uploads.pre_note` ⇒ `uploadSession.ts#insertPreNote` در همان تراکنشِ ساختِ جلسه (پیش از job) `session_notes(note_before)` می‌نویسد و ستون را NULL می‌کند (تک‌فایلی و گروهی). فرانت (`feelia-upload.js`، `index.html#startAudioUpload`): متن همراهِ اولین POST می‌رود؛ `flushUploadPreNotes` دیگر متن را جدا نمی‌فرستد (فقط صوت).
+- **context رونویسی:** `treatmentUnits.sessionSttContext` ⇒ `withPreNote` (`context.text`، سقفِ `SONIOX_CONTEXT_PRE_NOTE_MAX_CHARS`=2000 و سقفِ سخت ۹۵۰۰ نویسه‌ی کل)؛ همه‌ی مسیرهایِ مصرف‌کننده (زنده/batch/آپلود/متنِ نهایی/speakerResolve) بدونِ تغییر. خاموش‌کردن: `SONIOX_CONTEXT_PRE_NOTE=0`. fail-open. LAW-001 برایِ `buildSonioxContext` سر جاست؛ یادداشت جدا و آگاهانه اضافه می‌شود (ریسکِ R19: متنِ یادداشت به Soniox هم می‌رود؛ متنِ رضایت دست‌نخورده).
+- **تست:** `tsc`، `test:up` ۵۴/۰، `test:ft` ۶۰/۰، `test:tu` ۱۹/۰ (۲ تستِ جدید)، `test:routes`، `test:arch`، `test:docs` سبز. **انجام نشد:** E2Eِ آپلود با DB (نیازمندِ migration + مجوز)، تستِ مرورگری، و `withPreNote` رویِ مسیرِ آپلودِ کامل.
+- **محدودیت:** آپلودِ تکراریِ فایل (جلسه‌ی موجود) یادداشتِ تازه را نمی‌گیرد؛ یادداشتِ صوتی هنوز بعد از ساختِ جلسه می‌آید.
+
+### 2026-10-01 — TEST — تستِ واقعیِ یادداشتِ پیش از جلسه با LLMِ واقعی (Metis/DeepSeek `deepseek-v4-flash`)؛ دادهٔ ساختگی
+- **روش:** اسکریپتِ موقتِ بیرون از repo رویِ `polishTranscript` + `createTranscriptLlm` (provider از `server/.env`، کلید چاپ نشد)؛ ۶ نوبتِ ساختگی با نام‌هایِ عمداً بدشنیده («بدرام»، «ارمان»). بدونِ DB/Soniox/دادهٔ مراجع.
+- **نتیجه:** بدونِ یادداشت «بدرام» می‌ماند (و «ارمان»)؛ با یادداشتِ «برادرش پدرام …» ⇒ «پدرام» در هر دو جا درست شد. `fallback_turns=0/6`، بدونِ ردِ نگهبان.
+- **نبودِ تزریقِ محتوا:** یادداشتِ دوم (قرصِ اضطراب، سابقه‌ی افسردگی، سن ۴۰) هیچ‌کدام وارد متن نشد.
+- **محدودیت:** یک نمونه‌ی کوچک؛ «آرمان» بدونِ ذکر در یادداشت هم درست شد (اصلاحِ خودِ مدل) ⇒ اثرِ یادداشت فقط برایِ نامِ «پدرام» قطعی است. مسیرِ DB (`preSessionBriefing`) و آپلودِ واقعی تست نشد.
+
+### 2026-10-01 — CODE + TEST + DOCS — یادداشتِ پیش از جلسه وارد «متنِ نهایی» شد (هر دو مسیرِ زنده و آپلود)؛ commit/deploy نشد
+- **درخواستِ مالک:** polishِ متنِ نهایی از توضیحاتِ پیش از جلسه (مثلاً نامِ «پدرام») دسترسی داشته باشد. پیش‌تر (بررسیِ همین روز) فقط حاضرین + واژه‌هایِ رویکرد به polish می‌رسید.
+- **تغییر:** `final-transcript/runner.ts#preSessionBriefing` (`session_notes` از نوعِ `note_before`/`voice_before` + ستونِ قدیمیِ `sessions.pre_note`؛ fail-open، بدونِ لاگِ متن) ⇒ `polishTranscript(cfg.briefing)`؛ در هر دو گذر (برداشتِ کلی و تکه‌ها) به‌صورتِ بلوکِ «فقط زمینه» (سقفِ ۳۰۰۰ نویسه) می‌آید؛ `prompts.ts` صراحتاً می‌گوید فقط برایِ املایِ نام‌ها/موضوع/glossary و نگاشتِ نقش، نه افزودنِ محتوا. نگهبان‌هایِ قطعی همان‌طور رویِ متنِ خام‌اند ⇒ یادداشت نمی‌تواند محتوا بسازد.
+- **محدودیتِ شناخته‌شده (آپلود):** یادداشتِ پیش از جلسه‌ی آپلود بعد از ساختِ جلسه از مرورگر ثبت می‌شود؛ polish هرچه تا آن لحظه ثبت شده باشد می‌خواند. یادداشتِ دیرتر (مثلاً صوتیِ در صفِ رونویسی) فقط با «ساختِ دوباره» اثر می‌گذارد. Sonioxِ رونویسی هنوز یادداشت را نمی‌بیند.
+- **ریسک:** متنِ یادداشتِ بالینی هم به providerِ LLM می‌رود (R19؛ متنِ رضایت دست‌نخورده).
+- **تست:** `pnpm test:ft` ۶۰/۰ (تستِ جدیدِ `briefing`: حضور در هر دو پرامپت، سقف، نبودنِ بلوک وقتی خالی)، `tsc` و `test:arch` سبز. با LLM/DBِ واقعی تست نشد.
+- **سند:** `docs/07-subsystems/07-final-transcript.md` به‌روز شد.
+
 ### 2026-10-01 — DEPLOY (production) — نگهداریِ صدا ۳۰ روز
 - **انجام شد با مجوزِ صریحِ مالک:** فقط تغییرِ «۱۴ ⇒ ۳۰ روز» (`archive/store.ts`، `uploadStore.ts`، متنِ `public/index.html` و کامنت‌ها) از worktreeِ تمیزِ `0a04829` ساخته و deploy شد؛ کارِ نیمه‌تمامِ نشستِ دیگر (pre-note، migration 035، STT context) در working tree **نرفت**. پیش از deploy checksumِ `server/src`+`public` با HEAD مقایسه شد: تنها اختلافِ production با پایه همین ۷ فایل بود.
 - Preflight (§5.1): GO (همه‌ی شمارنده‌ها ۰). پشتیبانِ کد: `/root/backups/code-pre-ret30-<ts>.tar.gz`. `pnpm install --frozen-lockfile`، build، `pm2 restart feelia-mysql` ⇒ بدونِ migrationِ جدید (آخرین 034)، `/api/health` = ok/connected؛ `dist` و `index.html` روی سرور شاملِ مقدارِ ۳۰ روز تأیید شد. تست‌هایِ پیش از deploy: `test:up` 54/54، `test:routes` OK، `tsc` OK.

@@ -8,7 +8,7 @@ import {
   chunkTurns, parseTurns, renderClean, sampleForOverview, toFaDigits, type CleanTurn, type Turn,
 } from '../domain/transcriptText.js';
 import { checkPolishedChunk, uncertainCount, type GuardFailure, type GuardLimits } from '../domain/polishGuards.js';
-import type { LlmJsonPort, SpeakerRoster } from '../ports.js';
+import type { LlmJsonPort, LlmUsageSnapshot, SpeakerRoster } from '../ports.js';
 import { OVERVIEW_SCHEMA, CHUNK_SCHEMA, OVERVIEW_SYSTEM_PROMPT, CHUNK_SYSTEM_PROMPT } from './prompts.js';
 
 export interface PolishConfig {
@@ -18,6 +18,9 @@ export interface PolishConfig {
   // متن از یک گذرِ diarizationِ async رویِ کلِ صداست (هر شماره‌ی گوینده در کلِ متن یک نفر است) ⇒ نگهبانِ برگشتِ نقش
   // مجاز است. متنِ realtime (شماره‌گذاری با هر reconnect از نو) یا متنِ الحاقی ⇒ false.
   trustDiarization?: boolean;
+  // یادداشت‌هایِ درمانگر پیش از جلسه (متنی/صوتی، بدونِ برچسب). فقط «زمینه»: املایِ نام‌ها و موضوع. به LLM داده می‌شود
+  // ولی هرگز منبعِ محتوایِ متن نیست و نگهبان‌هایِ قطعی همان‌طور رویِ متنِ خام کار می‌کنند.
+  briefing?: string;
 }
 
 export interface Overview {
@@ -43,7 +46,12 @@ export interface PolishReport {
   role_fixes: number;
   // تکه‌هایی که نقش‌هایشان به نگاشتِ برداشتِ کلی برگشت (LLM بیشترِ نقش‌ها را برخلافِ تفکیکِ سالمِ Soniox عوض کرده بود)
   role_reverts: number;
+  usage?: PolishUsage;
 }
+
+// مصرفِ هر ویرایش (2026-10-01): جمع، گذرِ برداشتِ کلی، و هر تکه (هر تکه = یک «ادیت»). فقط عدد، هرگز متن.
+export interface ChunkUsage extends LlmUsageSnapshot { turns: number; chars: number; }
+export interface PolishUsage { total: LlmUsageSnapshot; overview: LlmUsageSnapshot; chunks: ChunkUsage[]; }
 
 export interface PolishResult { text: string; report: PolishReport; turns: CleanTurn[]; }
 
@@ -52,6 +60,14 @@ function rosterText(r: SpeakerRoster | null): string {
   const lines = [`نوعِ جلسه: ${r.unitLabel}`, 'حاضرین (نامِ نقش را دقیقاً همین‌طور بنویس):', '- درمانگر'];
   for (const s of r.speakers) lines.push(`- ${s}`);
   return lines.join('\n');
+}
+
+// سقفِ طولِ یادداشت‌هایِ پیش از جلسه در پرامپت (هزینه + جلوگیری از غلبه‌ی زمینه بر متن)
+export const BRIEFING_MAX_CHARS = 3000;
+function briefingText(b?: string): string {
+  const t = (b || '').trim();
+  if (!t) return '';
+  return `یادداشتِ درمانگر پیش از جلسه (فقط زمینه: املایِ درستِ نام‌ها و موضوعِ جلسه؛ هیچ چیزِ آن را به متن اضافه نکن و گفته‌ای را بر اساسِ آن عوض نکن):\n${t.slice(0, BRIEFING_MAX_CHARS)}`;
 }
 
 function roleFor(speaker: string | null, map: Map<string, string>, fallback: string): string {
@@ -75,12 +91,36 @@ export async function polishTranscript(
   // نقش‌هایِ مجاز: فقط وقتی فهرستِ حاضرین معلوم است. نقشِ بیرون از فهرست (مثلاً «مراجع» در جلسه‌ی زوج، یا «گوینده ۳»)
   // نامِ نمایشیِ نادرست می‌سازد ⇒ با نقشِ نگاشت‌شده‌ی همان نوبت (اگر هم‌تراز است) یا نقشِ قبلی جایگزین می‌شود.
   const allowed = roster && roster.speakers.length ? new Set(['درمانگر', ...roster.speakers.map((s) => s.trim())]) : null;
+  // مصرفِ توکن/هزینه: اختلافِ شمارنده‌یِ تجمیعیِ llm بینِ دو نقطه (فیک‌هایِ بدونِ usage ⇒ گزارش نمی‌شود)
+  const startUsage = llm.usage?.() ?? null;
+  let lastUsage = startUsage;
+  const takeUsage = (): LlmUsageSnapshot | null => {
+    const now = llm.usage?.() ?? null;
+    if (!now || !lastUsage) return null;
+    const dlt: LlmUsageSnapshot = {
+      calls: now.calls - lastUsage.calls, prompt_tokens: now.prompt_tokens - lastUsage.prompt_tokens,
+      completion_tokens: now.completion_tokens - lastUsage.completion_tokens, reasoning_tokens: now.reasoning_tokens - lastUsage.reasoning_tokens,
+      cost_usd: now.cost_usd === null || lastUsage.cost_usd === null ? null : Math.round((now.cost_usd - lastUsage.cost_usd) * 1e8) / 1e8,
+    };
+    lastUsage = now;
+    return dlt;
+  };
+  const chunkUsage: ChunkUsage[] = [];
+  let overviewUsage: LlmUsageSnapshot | null = null;
+  let openChunk: { turns: number; chars: number } | null = null;
+  const closeChunk = () => {
+    if (!openChunk) return;
+    const u = takeUsage();
+    if (u) chunkUsage.push({ ...u, ...openChunk });
+    openChunk = null;
+  };
   const bump = (k: GuardFailure | 'llm-error') => { report.fallback_reasons[k] = (report.fallback_reasons[k] || 0) + 1; };
 
   // ——— گذرِ ۱: برداشتِ کلی ———
   let overview: Overview = { speaker_map: [], summary: '', glossary: [] };
   const overviewUser = [
     rosterText(roster),
+    briefingText(cfg.briefing),
     roster?.terms.length ? `واژه‌هایِ تخصصیِ رویکردِ درمانگر: ${roster.terms.join('، ')}` : '',
     'متنِ خامِ جلسه:',
     sampleForOverview(rawText, cfg.overviewChars),
@@ -95,6 +135,7 @@ export async function polishTranscript(
     throw e;
   }
   report.overview_ok = true;
+  overviewUsage = takeUsage();
   const map = new Map<string, string>();
   for (const m of overview.speaker_map || []) {
     const sp = String(m.speaker || '').replace(/[^0-9۰-۹]/g, '').replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[+d]);
@@ -132,10 +173,13 @@ export async function polishTranscript(
     const speechTurns = chunk.filter((t) => !t.marker);
     if (!speechTurns.length) { out.push(...fallback()); continue; }
     report.turns += speechTurns.length;
+    closeChunk();
+    openChunk = { turns: speechTurns.length, chars: speechTurns.reduce((n, t) => n + t.text.length, 0) };
 
     const prev = out.filter((t) => !t.marker).slice(-2).map((t) => `${t.role}: ${t.text}`).join('\n');
     const user = [
       rosterText(roster),
+      briefingText(cfg.briefing),
       `برداشتِ کلی از جلسه:\n${overview.summary || '—'}`,
       map.size ? `نگاشتِ پیشنهادیِ گوینده‌ها: ${Array.from(map).map(([k, v]) => `گوینده ${k} = ${v}`).join('، ')}` : '',
       overview.glossary?.length ? `واژه‌نامه: ${overview.glossary.join('، ')}` : '',
@@ -250,6 +294,19 @@ export async function polishTranscript(
   // بیش از نیمِ تکه‌ها با خطایِ گذرا خام ماندند ⇒ نتیجه عملاً ویرایش‌نشده است؛ job بعداً دوباره تلاش می‌کند.
   if (transientChunkFailures * 2 > chunks.length) {
     throw Object.assign(new Error(`بیش از نیمِ تکه‌ها با خطایِ گذرایِ LLM خام ماندند (${transientChunkFailures}/${chunks.length})`), { transient: true, code: 'llm-failed' });
+  }
+  closeChunk();
+  if (startUsage && overviewUsage) {
+    const sum = llm.usage!();
+    report.usage = {
+      total: {
+        calls: sum.calls - startUsage.calls, prompt_tokens: sum.prompt_tokens - startUsage.prompt_tokens,
+        completion_tokens: sum.completion_tokens - startUsage.completion_tokens, reasoning_tokens: sum.reasoning_tokens - startUsage.reasoning_tokens,
+        cost_usd: sum.cost_usd === null || startUsage.cost_usd === null ? null : Math.round((sum.cost_usd - startUsage.cost_usd) * 1e8) / 1e8,
+      },
+      overview: overviewUsage,
+      chunks: chunkUsage,
+    };
   }
   return { text: renderClean(out), report, turns: out };
 }

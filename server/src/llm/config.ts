@@ -58,9 +58,10 @@ const PROFILES: Record<string, ProviderProfile> = {
   metis: {
     label: 'Metis', envPrefix: 'METIS', baseURL: 'https://api.metisai.ir/deepseek/v1',
     jsonModes: ['object', 'prompt'], reasoningStyle: 'deepseek', tokenParam: 'max_tokens',
-    // «متنِ نهایی» با low (سنجش 2026-09-28، ۸ متنِ ساختگی): off ۴–۸ث ولی ۲/۸ بدتر از خام و نقش ۹۶٫۱٪؛ low ۱۲–۳۷ث،
-    // ۸/۸ ≤ خام، نقش ≥۹۸٫۷٪. (ردِ قبلیِ «off» مالِ مدلِ دیگری رویِ OpenRouter بود با ۱۲k توکنِ استدلال.)
-    defaultReasoning: { 'case-file': 'low', 'final-transcript': 'low' },
+    // «متنِ نهایی»: سنجشِ 2026-09-28 (۸ متنِ ساختگی، پیش از نگهبانِ نوبت‌به‌نوبت) low را برگزید؛ سنجشِ 2026-10-01 (۳ متنِ ساختگی،
+    // ۲۸ خطایِ کاشته‌شده، با نگهبان‌هایِ فعلی، سه مدلِ flashِ متیس): off ۲۲–۲۴/۲۸ ≈ low ۲۴/۲۸ ولی ~۴ برابر توکنِ خروجیِ کمتر
+    // (استدلال ≈۷۵٪ خروجیِ low بود) و ۲٫۶ برابر سریع‌تر ⇒ پیش‌فرضِ «متنِ نهایی» off. پرونده‌ی درمان همان low.
+    defaultReasoning: { 'case-file': 'low', 'final-transcript': 'off' },
   },
   // APIِ مستقیمِ DeepSeek — همان قراردادِ متیس (سنجیده‌نشده؛ فقط برایِ سوییچِ آماده).
   deepseek: {
@@ -115,6 +116,12 @@ export function reasoningBody(style: ReasoningStyle, level: ReasoningLevel): Rec
   }
 }
 
+function priceFor(env: NodeJS.ProcessEnv, X: string): { inPerM: number; outPerM: number } | null {
+  const i = Number(env[`${X}_PRICE_IN_PER_M`]);
+  const o = Number(env[`${X}_PRICE_OUT_PER_M`]);
+  return Number.isFinite(i) && Number.isFinite(o) && (i > 0 || o > 0) ? { inPerM: i, outPerM: o } : null;
+}
+
 export interface LlmConfig {
   provider: string;
   label: string;
@@ -129,6 +136,9 @@ export interface LlmConfig {
   maxTokens?: number;
   timeoutMs: number;
   headers?: Record<string, string>;
+  // قیمتِ هر یک میلیون توکن (دلار) — فقط وقتی provider خودش هزینه را در پاسخ نمی‌دهد (OpenRouter می‌دهد؛ متیس/DeepSeek نه).
+  // env: <P>_PRICE_IN_PER_M / <P>_PRICE_OUT_PER_M. بدونِ آن هزینه‌ی تخمینی null می‌ماند (فقط توکن‌ها شمرده می‌شوند).
+  prices: { inPerM: number; outPerM: number } | null;
   // پارامترهایِ بدنه‌ی درخواست به‌جز model/messages/response_format
   body: Record<string, unknown>;
   warnings: string[];
@@ -190,6 +200,8 @@ export function resolveLlmConfig(purpose: LlmPurpose, env: NodeJS.ProcessEnv = p
     // sort:'latency' = سریع‌ترین عرضه‌کننده‌ی همان مدل. data_collection:'deny' ⇒ متنِ بالینی به عرضه‌کننده‌ای که داده را
     // نگه می‌دارد/با آن آموزش می‌دهد نمی‌رود (LAW-001). require_parameters فقط با json_schema معنا دارد (بعضی عرضه‌کننده‌ها
     // schema را نادیده می‌گیرند)؛ در حالتِ prompt عرضه‌کننده‌هایِ بی‌پشتیبانی از max_tokens را هم بی‌دلیل حذف می‌کرد.
+    // usage.include ⇒ هزینه‌ی واقعیِ هر فراخوانی (دلار) در پاسخ می‌آید (آمارِ هر ویرایش، سقفِ بودجه)
+    body.usage = { include: true };
     body.provider = jsonMode === 'schema'
       ? { sort: 'latency', require_parameters: true, data_collection: 'deny' }
       : { sort: 'latency', data_collection: 'deny' };
@@ -208,6 +220,7 @@ export function resolveLlmConfig(purpose: LlmPurpose, env: NodeJS.ProcessEnv = p
     provider, label: profile.label, purpose, apiKey, baseURL, model,
     modelTag: `${provider}:${model}`.slice(0, 64),
     jsonMode, reasoning, maxTokens, timeoutMs, headers: profile.headers?.(purpose), body, warnings,
+    prices: priceFor(env, X),
   };
 }
 
