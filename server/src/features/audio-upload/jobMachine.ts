@@ -14,6 +14,7 @@
 import type { ProbeResult, NormalizeResult } from './media.js';
 import { MAX_DURATION_MS } from './media.js';
 import type { AudioQuality } from './quality.js';
+import { computeTranscriptMetrics, type TimedToken, type TranscriptMetrics } from './transcriptMetrics.js';
 
 export type JobStage = 'queued' | 'normalizing' | 'transcribing' | 'case_file' | 'done' | 'failed';
 export type CaseFileJobStatus = 'not_applicable' | 'skipped' | 'done' | 'failed' | 'busy_gave_up';
@@ -77,12 +78,16 @@ export interface TranscriptResult {
   lowConfRatio: number | null;
   // همان متن با ⟦…؟⟧ دورِ واژه‌هایِ کم‌اطمینان — فقط ورودیِ «متنِ نهایی»، هرگز در sessions.transcript
   markedText?: string;
+  // توکن‌هایِ زمان‌دار برایِ «کیفیت به عدد» (transcriptMetrics.ts) — فقط در حافظه، هرگز ذخیره نمی‌شوند.
+  tokens?: TimedToken[];
 }
 
 export interface TranscriptMeta {
   lowConfRatio: number | null;
   qualityWarning: 'low_confidence' | null;
   markedText: string | null;
+  // فقط عدد/پرچم (LAW-001) ⇒ audio_jobs.transcript_metrics. null ⇒ سنجیده نشد (fail-open).
+  metrics?: TranscriptMetrics | null;
 }
 
 // پلنِ B بخشِ ۳: هشدار فقط از confidenceِ Soniox (تنها پیش‌بینی‌کننده در فاز ۰B)، نه از سنجه‌هایِ سطحِ صدا.
@@ -134,6 +139,8 @@ export interface JobDeps {
   normalizedOutBase(job: AudioJob): string;
   // آستانه‌ی هشدارِ «کم‌اطمینان» (UPLOAD_LOW_CONF_RATIO)؛ نبودن ⇒ ۰٫۰۸ (فاز ۰B).
   lowConfWarnRatio?: number;
+  // تعدادِ حاضرینِ جلسه شاملِ درمانگر (واحدِ درمان) برایِ مقایسه با گوینده‌هایِ پیدا‌شده؛ نبودن/null ⇒ نامعلوم.
+  expectedSpeakers?(sessionId: string): Promise<number | null>;
   removeUploadDir(uploadId: string): void;
   now(): number;
   log(msg: string): void;
@@ -284,6 +291,21 @@ async function measureQuality(filePath: string, durationMs: number | null, deps:
   }
 }
 
+// «کیفیت به عدد» (Session Data Engine): fail-open — هر خطا ⇒ null و ثبتِ متن بی‌تغییر ادامه می‌یابد.
+async function measureTranscript(job: AudioJob, got: TranscriptResult, deps: JobDeps): Promise<TranscriptMetrics | null> {
+  if (!got.tokens) return null;
+  try {
+    const expected = deps.expectedSpeakers ? await deps.expectedSpeakers(job.sessionId).catch(() => null) : null;
+    return computeTranscriptMetrics({
+      tokens: got.tokens, speechSpans: job.audioQuality?.speech_spans ?? null, durationMs: job.durationMs,
+      lowConfRatio: got.lowConfRatio, expectedSpeakers: expected,
+    });
+  } catch (e) {
+    deps.log(`[audio-job] transcript metrics failed (ignored): ${String((e as Error)?.message || e).slice(0, 120)}`);
+    return null;
+  }
+}
+
 async function stepTranscribe(job: AudioJob, deps: JobDeps): Promise<StepResult> {
   if (!job.normalizedPath || !deps.fileExists(job.normalizedPath)) return permanent(job, deps, 'audio-expired');
 
@@ -361,9 +383,10 @@ async function stepTranscribe(job: AudioJob, deps: JobDeps): Promise<StepResult>
     lowConfRatio: got.lowConfRatio,
     qualityWarning: text.trim() ? qualityWarningFor(got.lowConfRatio, deps.lowConfWarnRatio ?? 0.08) : null,
     markedText: got.markedText ?? null,
+    metrics: await measureTranscript(job, got, deps),
   };
   const res = await deps.store.applyTranscriptOnce(job, text, (await deps.caseFileAfterUpload(job)) ? 'case_file' : 'done', meta);
-  deps.log(`[audio-job] ${job.id} transcript ${res} chars=${text.trim().length}${meta.qualityWarning ? ' warning=' + meta.qualityWarning : ''}`);
+  deps.log(`[audio-job] ${job.id} transcript ${res} chars=${text.trim().length}${meta.qualityWarning ? ' warning=' + meta.qualityWarning : ''}${meta.metrics ? ' metrics=' + (meta.metrics.flags.join(',') || 'ok') : ''}`);
   // متن ذخیره شد (یا قبلاً شده بود) ⇒ صدا/متن رویِ Soniox دیگر لازم نیست (حریمِ خصوصی).
   await cleanupRemote(job, deps);
   if (res === 'gone') return WAIT; // جلسه/job حذف شده

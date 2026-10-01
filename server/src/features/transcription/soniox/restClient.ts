@@ -234,7 +234,7 @@ export function listSonioxTranscriptions(): Promise<SonioxTranscriptionInfo[]> {
 }
 
 // confidence: Soniox برایِ هر توکن برمی‌گرداند (۰..۱)؛ اختیاری چون پاسخ/fixtureِ قدیمی ممکن است نداشته باشد.
-export interface AsyncToken { text: string; speaker?: number | string; start_ms?: number; confidence?: number; }
+export interface AsyncToken { text: string; speaker?: number | string; start_ms?: number; end_ms?: number; confidence?: number; }
 
 // ————— اطمینانِ رونویسی (پلنِ B، فاز ۰B: verification/2026-09-28-upload-audio-quality-phase0b.md) —————
 // تنها سیگنالی که متنِ واقعاً خراب را پیش‌بینی کرد confidenceِ خودِ Soniox بود (سهمِ توکنِ زیرِ ۰٫۷: بی‌آسیب ≤ ۰٫۰۳۸،

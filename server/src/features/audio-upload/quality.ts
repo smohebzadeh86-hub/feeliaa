@@ -21,6 +21,9 @@ export interface AudioQuality {
   windows: number;
   flagged_windows: Partial<Record<QualityFlag, number>>;
   flags: QualityFlag[];
+  // بازه‌هایِ «صدادار» [شروع، پایان] به ms (VADِ انرژی، speechSpans) — ورودیِ پوششِ متن در transcriptMetrics.ts.
+  // null/نبود ⇒ نامعلوم (فایلِ قدیمی، یا گفتار از نویز قابلِ تفکیک نبود). فقط زمان، بدونِ هیچ صدا/متن. به UI نمی‌رود.
+  speech_spans?: Array<[number, number]> | null;
 }
 
 // آستانه‌ها: همان ضبطِ زنده، به‌جز too_quiet که فاز ۰B نشان داد −45 مثبتِ کاذب دارد (فایلِ −30dB و −40dB بی‌آسیب
@@ -39,7 +42,35 @@ export const QUALITY = {
   MIN_WINDOW_SHARE: 0.3,
   // پنجره‌ی آخرِ کوتاه‌تر از این سهم از یک پنجره قضاوت نمی‌شود.
   MIN_WINDOW_FILL: 1 / 3,
+  // VADِ انرژی برایِ «پوششِ متن» (Session Data Engine، 2026-10-01): قابِ صدادار = بلندتر از کفِ نویز (p10) + این مقدار
+  // و دست‌کم VAD_MIN_DB. اگر p95 − p10 کمتر از VAD_MIN_RANGE_DB باشد گفتار از نویز جدا نمی‌شود ⇒ بازه‌ها نامعلوم (null).
+  VAD_ABOVE_FLOOR_DB: 10,
+  VAD_MIN_DB: -70,
+  VAD_MIN_RANGE_DB: 12,
+  // مکث‌هایِ کوتاه‌تر از این بخشی از همان بازه‌اند؛ بازه‌هایِ کوتاه‌تر از VAD_MIN_SPAN_MS (تق/کلیک) دور ریخته می‌شوند.
+  VAD_BRIDGE_MS: 1000,
+  VAD_MIN_SPAN_MS: 250,
 } as const;
+
+// بازه‌هایِ صدادار از dBِ هر قاب (خالص؛ harness مستقیم تستش می‌کند).
+export function speechSpans(frameDb: ArrayLike<number>, frameMs: number, p10: number, p95: number): Array<[number, number]> | null {
+  if (!frameDb.length || p95 - p10 < QUALITY.VAD_MIN_RANGE_DB) return null;
+  const thr = Math.max(p10 + QUALITY.VAD_ABOVE_FLOOR_DB, QUALITY.VAD_MIN_DB);
+  const raw: Array<[number, number]> = [];
+  let start = -1;
+  for (let i = 0; i <= frameDb.length; i++) {
+    const on = i < frameDb.length && frameDb[i] >= thr;
+    if (on && start < 0) start = i;
+    else if (!on && start >= 0) { raw.push([start * frameMs, i * frameMs]); start = -1; }
+  }
+  const out: Array<[number, number]> = [];
+  for (const s of raw) {
+    const last = out[out.length - 1];
+    if (last && s[0] - last[1] < QUALITY.VAD_BRIDGE_MS) last[1] = s[1];
+    else out.push([s[0], s[1]]);
+  }
+  return out.filter((s) => s[1] - s[0] >= QUALITY.VAD_MIN_SPAN_MS);
+}
 
 const FRAME = Math.round((QUALITY.SAMPLE_RATE * QUALITY.FRAME_MS) / 1000);
 const FRAMES_PER_WINDOW = Math.round((QUALITY.WINDOW_S * 1000) / QUALITY.FRAME_MS);
@@ -69,6 +100,9 @@ export class FileQualityMeter {
   private frameBuf = new Float32Array(FRAME);
   private frameFill = 0;
   private windowIssues: Array<QualityFlag | null> = [];
+  // dBِ گردشده‌ی هر قاب برایِ speechSpans (۱ بایت در هر ۵۰ms ⇒ ۷۲KB برایِ ۱ ساعت).
+  private frameDb = new Int8Array(4096);
+  private nFrames = 0;
 
   push(samples: Float32Array): void {
     let i = 0;
@@ -87,6 +121,12 @@ export class FileQualityMeter {
     for (let j = 0; j < f.length; j++) { const v = f[j]; sum += v * v; const a = v < 0 ? -v : v; if (a > peak) peak = a; }
     const db = 10 * Math.log10(sum / f.length + 1e-12);
     const bin = Math.max(0, Math.min(100, Math.round(db) + 100));
+    if (this.nFrames === this.frameDb.length) {
+      const grown = new Int8Array(this.frameDb.length * 2);
+      grown.set(this.frameDb);
+      this.frameDb = grown;
+    }
+    this.frameDb[this.nFrames++] = bin - 100;
     for (const h of [this.whole, this.win]) {
       h.bins[bin]++;
       h.frames++;
@@ -124,7 +164,8 @@ export class FileQualityMeter {
       const f = classifyWindow(p10, p95, clipFrac);
       if (f) flags.push(f);
     }
-    return { p10_db: p10, p95_db: p95, clip_frac: Math.round(clipFrac * 1000) / 1000, windows: nWin, flagged_windows: counts, flags };
+    const speech_spans = speechSpans(this.frameDb.subarray(0, this.nFrames), QUALITY.FRAME_MS, p10, p95);
+    return { p10_db: p10, p95_db: p95, clip_frac: Math.round(clipFrac * 1000) / 1000, windows: nWin, flagged_windows: counts, flags, speech_spans };
   }
 }
 

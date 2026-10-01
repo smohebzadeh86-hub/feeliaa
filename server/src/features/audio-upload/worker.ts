@@ -59,13 +59,18 @@ export function productionDeps(): JobDeps {
       // علامت نسبت به صدایِ جلسه‌ی زنده است، نه فایلِ آپلودی، و علائمِ جلسه‌ی زنده از قبل در بخشِ زنده‌ی متن هستند.
       getText: async (id) => {
         const tokens = await getTranscriptTokens(id);
-        return { text: buildTextFromAsyncTokens(tokens), lowConfRatio: lowConfidenceRatio(tokens), markedText: markedTextFromTokens(tokens) };
+        return { text: buildTextFromAsyncTokens(tokens), lowConfRatio: lowConfidenceRatio(tokens), markedText: markedTextFromTokens(tokens), tokens };
       },
       deleteTranscription,
       deleteFile,
     },
     media: { probe: probeMedia, normalize: normalizeAudio, quality: measureAudioQuality },
     lowConfWarnRatio: lowConfidenceWarnRatio(),
+    // حاضرینِ جلسه + درمانگر؛ واحدِ درمانِ تعریف‌نشده ⇒ null (fail-open داخلِ sessionSpeakerRoster).
+    expectedSpeakers: async (sessionId) => {
+      const roster = await treatmentUnits.sessionSpeakerRoster(sessionId);
+      return roster && roster.speakers.length ? roster.speakers.length + 1 : null;
+    },
     archive: (sessionId, filePath, mime, runId) => archiveAudioFileForAdmin(sessionId, filePath, mime, runId),
     caseFile: (clientId, therapistId, ctx) => maybeAutoGenerateCaseFile(clientId, therapistId, {
       notify: { jobId: ctx.jobId, sessionId: ctx.sessionId }, retryTransient: !ctx.lastAttempt,

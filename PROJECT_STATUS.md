@@ -222,6 +222,32 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-01 — CODE + MIGRATION + DOCS + TEST — «کیفیت به عدد» برایِ جلسه‌ی آپلودی (Session Data Engine، فاز Q-U)
+- **چه شد:** به دستورِ مالک («اجرا کن»). برایِ هر jobِ آپلودی، از توکن‌هایِ async ِSoniox (قبلاً دور ریخته می‌شدند) + بازه‌هایِ صدادارِ ffmpeg + حاضرینِ واحدِ درمان، متریک‌هایِ عددی ساخته و در `audio_jobs.transcript_metrics` ذخیره می‌شود: پوششِ متن، حفره‌هایِ وسط/ابتدا/انتها، گوینده‌هایِ پیدا‌شده در برابرِ حاضرین، نوبت‌هایِ تکه‌تکه، اطمینان. کارتِ «تشخیصِ جلسه»ی ادمین آن‌ها را نشان می‌دهد. بدونِ تماسِ اضافه با Soniox؛ fail-open؛ فقط عدد (LAW-001). جلساتِ قدیمی متریک ندارند (backfill انجام نشد).
+- **فایل‌ها:** `server/src/features/audio-upload/{transcriptMetrics.ts (جدید), quality.ts, jobMachine.ts, worker.ts, jobStore.sql.ts}`، `server/src/features/transcription/soniox/restClient.ts` (فقط `end_ms` در تایپ)، `server/src/features/admin/{diagnosis.ts, admin.repository.ts}`، `server/src/db/mysql/migrations/036_upload_transcript_metrics.sql`، `scripts/upload-harness.ts` (H54–H62).
+- **اسنادِ به‌روزشده:** subsystem 06 §11، database-catalog (036 + ستون)، configuration-catalog (`QUALITY` VAD، `METRICS`)، [verification](verification/2026-10-01-upload-transcript-metrics.md).
+- **تست / تأیید:** `pnpm test:up` 63/63؛ `tsc` تمیز؛ `test:arch` OK؛ `test:routes` OK (135)؛ `test:docs` OK؛ `test:ft` 61/61؛ `test:tu` 19/19؛ ffmpegِ واقعی رویِ فایلِ ساختگی (صدا/سکوت/صدا) بازه‌ها را درست داد. DBِ واقعی، Sonioxِ واقعی و UIِ ادمین در مرورگر تست نشدند.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** commit/deploy نشده (منتظرِ دستور). آستانه‌ها از دادهٔ ساختگی‌اند ⇒ بعد از چند جلسه‌ی واقعیِ پدرام بازبینی (R20). migration 036 در startupِ بعدی اجرا می‌شود.
+- **FINDING (نشستِ دیگر، کشف‌شده همین زمان):** نشستِ هم‌زمانی «نظرِ دوم» (Shenava، `features/transcription/secondOpinion/`، `STT_SECOND_OPINION`) را در همان `jobMachine.ts`/`worker.ts` اضافه می‌کند. دست زده نشد؛ دو تغییر سازگارند (متریک‌ها از توکن‌هایِ اصلیِ Soniox، نه خروجیِ نظرِ دوم). روی وضعیتِ ترکیبی: `tsc` تمیز، `test:up` 63/63، `test:arch` OK؛ `test:docs` فقط یک خطایِ متعلق به آن نشست دارد: `D8 script در CLAUDE.md نیست: test:so`. در commit فقط فایل‌هایِ این کار جدا شوند (آن نشست هم همین دو فایل را عوض کرده ⇒ نیازمندِ `git add -p`).
+
+
+### 2026-10-01 — DECISION + FINDING — اولویتِ «کیفیت به عدد» با مسیرِ آپلود
+- **چه شد:** مالک: «الان برای پدرام بیشتر جلسات آپلودی هستن» ⇒ پلنِ Session Data Engine بازاولویت‌بندی شد: اول متریک‌هایِ کیفیتِ مسیرِ آپلود (فاز Q-U). پیاده‌سازی نشده.
+- **یافته (کد):** مسیرِ آپلود یک بار Soniox async می‌زند و «متنِ نهایی» همان متن را بازاستفاده می‌کند (`server/src/features/audio-upload/jobStore.sql.ts:129`) ⇒ اندازه‌گیری هزینه‌ی Sonioxِ اضافه ندارد. ولی توکن‌هایِ زمان‌دار/گوینده/confidence در `worker.ts:60-63` فقط به متن + `lowConfRatio` تبدیل و دور ریخته می‌شوند و transcription در Soniox حذف می‌شود ⇒ برایِ جلساتِ گذشته پوشش/حفره قابلِ محاسبه نیست مگر با رونویسیِ دوباره.
+- **فایل‌ها:** فقط همین ورودی؛ پلن خارج از repo. **تست:** اجرا نشد (بدونِ تغییرِ کد). **عامل:** این نشست + مالک.
+- **کارِ باز:** دستورِ اجرا؛ تصمیمِ backfillِ جلساتِ قدیمی (هزینه‌ی یک async برایِ هر جلسه).
+
+
+### 2026-10-01 — FINDING (audit فقط‌خواندنی) — «Session Data Engine»: کارنامه‌ی ۵ محورِ Core + پلنِ فازبندی‌شده
+- **چه شد:** به درخواستِ مالک، زنجیره‌ی جلسه→صدا→ذخیره→رونویسی→گوینده→متنِ نهایی در برابرِ ۵ محور (durabilityِ صدا، کامل‌بودنِ متن، تفکیکِ گوینده، نسخه‌بندیِ متن، کیفیتِ عددی) بررسی شد. هیچ کد/سندِ دیگری تغییر نکرد؛ پلن فقط ارائه شد (پیاده‌سازی منتظرِ دستورِ صریح).
+- **یافته‌هایِ تأییدشده با خواندنِ کد:** (A1) رکوردِ IndexedDB شناسه‌ی تراپیست ندارد و 404 ⇒ حذفِ محلی (`public/feelia-rt.js:325`) ⇒ در مرورگرِ مشترک صدایِ آپلودنشده‌ی تراپیستِ دیگر حذف می‌شود؛ (A2) `checkSeqContiguous` رویِ `seq`ِ سرور (`MAX+1`، `archiveWrite.ts:44`) کار می‌کند ⇒ سگمنتی که هرگز نرسید دیده نمی‌شود (`archive/listing.ts:66-74`). **INFERRED از گزارشِ agent (خطوط بازبینیِ مستقیم نشد):** (A3) ضبطِ durable تا پایانِ اتصال شروع نمی‌شود (تا ~۱۰ث بی‌ضبط)؛ (T1) سگمنتِ لحظه‌ی قطع `archive` می‌شود ⇒ دُمِ قطع رونویسی نمی‌شود؛ (T2) timeoutِ finalize در جلسه‌ی reliable ⇒ دُمِ جلسه رونویسی نمی‌شود؛ (T3) نسخه‌بندیِ متن وجود ندارد و resolve-speakers/PUTِ بدونِ CAS/legacy/اجرای دوباره‌ی متنِ نهایی بازنویسیِ مخرب‌اند؛ `navigator.storage.persist()` صدا زده نمی‌شود؛ sweepِ ۲۴ساعته `.prenote.` را `kind='session'` آرشیو می‌کند؛ هیچ متریکِ پوشش/duplicate و هیچ corpusِ ارزیابی در repo نیست. R4 (فایل‌هایِ یتیم) در Master Reference احتمالاً کهنه است (subsystem 05 آن را رفع‌شده می‌داند).
+- **فایل‌ها:** فقط همین ورودی. پلن: `~/.claude/plans/pasted-content-id-4b1b-jolly-valley.md` (خارج از repo).
+- **اسنادِ به‌روزشده:** هیچ (Master Reference §22 تا دستورِ مالک به‌روز نشد).
+- **تست / تأیید:** اجرا نشد — audit فقط‌خواندنی.
+- **عامل:** این نشست.
+- **کارِ باز / پیامد:** تصمیم‌هایِ مالک: متنِ رضایت (R1/R18/R19)، batchِ کاملِ خودکارِ هر جلسه (هزینه‌ی Soniox ×۲)، اجباری‌کردنِ CAS، حذفِ مسیرهایِ legacy. پیشنهادِ ترتیب: فاز ۰ (بستنِ حفره‌ها) → ۱ (Audio Ledger) → ۵ (corpusِ ارزیابی) → ۲ (transcript_versions) → ۳ (session_quality) → ۴ (validationِ گوینده).
+
 ### 2026-10-01 — GIT + DEPLOY (production) — فیکسِ دکمه‌ی «کپیِ کلِ متن» (`4caad76`): push و deploy
 - **مجوزِ مالک:** «فیکس رو push و deploy کن». push `ff85efe..4caad76`. checksumِ CR-stripped: تنها `public/index.html` با production فرق داشت؛ فقط همین فایل جایگزین شد (فایلِ ایستا ⇒ بدونِ restart/build/migration/preflight). پشتیبان: `/root/backups/index-pre-copyfix-*.html`.
 - **تأیید:** sha1 سرور = sha1 محلی (`3e025f63926c`)؛ صفحه‌ی سرو‌شده نشانگرِ fallback را دارد؛ `GET /` 200؛ `/api/health` ok/connected. رفتارِ فیکس در مرورگرِ واقعی (Browser pane + mock) پیش‌تر تأیید شده بود؛ رویِ prod با حسابِ واقعی امتحان نشد.

@@ -15,7 +15,9 @@ import {
 import {
   pollTimeoutForBytes, lowConfidenceRatio, markUncertainTokens, markedTextFromTokens, buildTextFromAsyncTokens, type AsyncToken,
 } from '../server/src/features/transcription/soniox/restClient.js';
-import { FileQualityMeter, classifyWindow, measureAudioQuality, parseAudioQuality, QUALITY, type AudioQuality } from '../server/src/features/audio-upload/quality.js';
+import { FileQualityMeter, classifyWindow, measureAudioQuality, parseAudioQuality, speechSpans, QUALITY, type AudioQuality } from '../server/src/features/audio-upload/quality.js';
+import { computeTranscriptMetrics, parseTranscriptMetrics, METRICS, type TimedToken } from '../server/src/features/audio-upload/transcriptMetrics.js';
+import { metricsFindings } from '../server/src/features/admin/diagnosis.js';
 import { parseProbe, probeMedia, normalizeAudio, sniffObviouslyNotAudio, extensionOf, ACCEPTED_EXTENSIONS, MAX_DURATION_MS } from '../server/src/features/audio-upload/media.js';
 import { expectedChunkBytes } from '../server/src/features/audio-upload/uploadStore.js';
 import { isPreNoteFile, isNoteFile, isArchiveFile, isNoteArchiveFile, isLateFile, seqFromFilename, runIdFromFilename, mimeFromFilename, sessionIdFromFilename } from '../server/src/features/transcription/batch/queueFiles.js';
@@ -100,6 +102,8 @@ interface SonioxScript {
   // پلنِ B: اگر داده شود getText شیِ TranscriptResult برمی‌گرداند (مثلِ productionDeps)
   lowConfRatio?: number | null;
   markedText?: string;
+  // Session Data Engine: توکن‌هایِ زمان‌دار ⇒ getText شیِ کامل با tokens برمی‌گرداند (مثلِ productionDeps)
+  tokens?: TimedToken[];
 }
 
 function makeDeps(w: World, script: SonioxScript = {}, extra: Partial<JobDeps> = {}): JobDeps & { clock: { t: number } } {
@@ -123,6 +127,7 @@ function makeDeps(w: World, script: SonioxScript = {}, extra: Partial<JobDeps> =
       async getText() {
         w.sonioxCalls.push('text'); if (texts++ < (script.textFails || 0)) throw new Error('503');
         const text = script.text ?? 'گوینده ۱: سلام';
+        if (script.tokens) return { text, lowConfRatio: script.lowConfRatio ?? null, tokens: script.tokens };
         return script.lowConfRatio !== undefined ? { text, lowConfRatio: script.lowConfRatio, markedText: script.markedText } : text;
       },
       async deleteTranscription(id) { w.sonioxCalls.push('delT:' + id); },
@@ -900,6 +905,133 @@ async function main() {
     assert.equal(buildTextFromAsyncTokens(noSpeaker), 'سلام امروز دیرتر می‌آید.');
     const withSpeaker = [{ text: 'سلام', speaker: 1 }, { text: ' خوبید؟', speaker: 1 }, { text: 'بله', speaker: 2 }] as AsyncToken[];
     assert.equal(buildTextFromAsyncTokens(withSpeaker), 'گوینده ۱: سلام خوبید؟\n\nگوینده ۲: بله');
+  });
+
+  // ——— Session Data Engine، فاز Q-U: «کیفیت به عدد» (2026-10-01) ———
+  // توکنِ ساختگی هر stepms یک «واژه»؛ گوینده هر turnWords واژه عوض می‌شود.
+  const toks = (from: number, to: number, o: { speakers?: number[]; every?: number; turnWords?: number; conf?: number } = {}) => {
+    const out: TimedToken[] = []; const sp = o.speakers || [1, 2]; const step = o.every || 400; const tw = o.turnWords || 8;
+    let i = 0;
+    for (let at = from; at < to; at += step, i++) out.push({ text: ' واژه', speaker: sp[Math.floor(i / tw) % sp.length], start_ms: at, end_ms: at + 300, confidence: o.conf ?? 0.95 });
+    return out;
+  };
+  const FULL: Array<[number, number]> = [[0, 120_000]];
+
+  await t('H54 metrics: پوششِ کامل ⇒ ۱، بدونِ پرچم، ۲ گوینده = حاضرین', () => {
+    const m = computeTranscriptMetrics({ tokens: toks(0, 120_000), speechSpans: FULL, durationMs: 120_000, lowConfRatio: 0.01, expectedSpeakers: 2 });
+    assert.equal(m.coverage, 1, JSON.stringify(m));
+    assert.deepEqual(m.flags, []);
+    assert.equal(m.speakers_found, 2); assert.equal(m.speakers_expected, 2);
+    assert.equal(m.words, 300); assert.equal(m.words_per_min, 150);
+    assert.equal(m.short_turn_ratio, 0);
+    assert.equal(m.head_gap_ms, 0); assert.equal(m.tail_gap_ms, 0); assert.equal(m.uncovered_gaps, 0);
+  });
+
+  await t('H55 metrics: حفره‌ی ۳۰ثانیه‌ایِ وسط ⇒ uncovered_gap + low_coverage؛ سر و ته سالم', () => {
+    const m = computeTranscriptMetrics({ tokens: [...toks(0, 40_000), ...toks(70_000, 120_000)], speechSpans: FULL, durationMs: 120_000, lowConfRatio: null });
+    assert.deepEqual(m.flags.sort(), ['low_coverage', 'uncovered_gap'], JSON.stringify(m));
+    assert.equal(m.uncovered_gaps, 1);
+    assert.ok(m.longest_uncovered_ms! > 28_000 && m.longest_uncovered_ms! < 30_000, String(m.longest_uncovered_ms));
+    assert.ok(m.coverage! > 0.74 && m.coverage! < 0.77, String(m.coverage));
+    assert.equal(m.head_gap_ms, 0); assert.equal(m.tail_gap_ms, 0);
+    // حفره‌ی کوتاه (۸ث) ⇒ نه پرچمِ حفره، نه low_coverage
+    const s = computeTranscriptMetrics({ tokens: [...toks(0, 60_000), ...toks(68_000, 120_000)], speechSpans: FULL, durationMs: 120_000, lowConfRatio: null });
+    assert.deepEqual(s.flags, [], JSON.stringify(s));
+    // سکوتِ واقعی (بدونِ صدا) بینِ دو بخش حفره نیست
+    const q = computeTranscriptMetrics({ tokens: [...toks(0, 40_000), ...toks(70_000, 120_000)], speechSpans: [[0, 40_000], [70_000, 120_000]], durationMs: 120_000, lowConfRatio: null });
+    assert.deepEqual(q.flags, [], JSON.stringify(q)); assert.equal(q.coverage, 1);
+  });
+
+  await t('H56 metrics: ابتدا/انتهایِ بدونِ متن ⇒ head_gap/tail_gap (نه uncovered_gap)', () => {
+    const m = computeTranscriptMetrics({ tokens: toks(20_000, 100_000), speechSpans: FULL, durationMs: 120_000, lowConfRatio: null });
+    assert.ok(m.flags.includes('head_gap') && m.flags.includes('tail_gap'), JSON.stringify(m));
+    assert.ok(!m.flags.includes('uncovered_gap'));
+    assert.ok(m.head_gap_ms! > 19_000 && m.tail_gap_ms! > 19_000);
+  });
+
+  await t('H57 metrics: گوینده‌ی ادغام‌شده/اضافه در برابرِ حاضرین؛ برچسبِ تصادفیِ کم‌سهم شمرده نمی‌شود؛ نوبت‌هایِ تکه‌تکه', () => {
+    const stray: TimedToken[] = [{ text: ' واژه', speaker: 3, start_ms: 50_000, end_ms: 50_300 }, { text: ' واژه', speaker: 3, start_ms: 50_400, end_ms: 50_700 }];
+    const merged = computeTranscriptMetrics({ tokens: [...toks(0, 120_000), ...stray].sort((a, b) => a.start_ms! - b.start_ms!), speechSpans: FULL, durationMs: 120_000, lowConfRatio: null, expectedSpeakers: 3 });
+    assert.equal(merged.speakers_found, 2); assert.equal(merged.speakers_raw, 3);
+    assert.ok(merged.flags.includes('speakers_merged'), JSON.stringify(merged.flags));
+    const extra = computeTranscriptMetrics({ tokens: toks(0, 120_000, { speakers: [1, 2, 3] }), speechSpans: FULL, durationMs: 120_000, lowConfRatio: null, expectedSpeakers: 2 });
+    assert.ok(extra.flags.includes('speakers_extra'));
+    const unknown = computeTranscriptMetrics({ tokens: toks(0, 120_000, { speakers: [1] }), speechSpans: FULL, durationMs: 120_000, lowConfRatio: null });
+    assert.ok(!unknown.flags.some((f) => f.startsWith('speakers_')), 'حاضرینِ نامعلوم ⇒ قضاوت نمی‌شود');
+    const frag = computeTranscriptMetrics({ tokens: toks(0, 120_000, { turnWords: 1 }), speechSpans: FULL, durationMs: 120_000, lowConfRatio: null });
+    assert.ok(frag.flags.includes('fragmented_turns')); assert.equal(frag.short_turn_ratio, 1);
+  });
+
+  await t('H58 metrics: بازه‌هایِ نامعلوم/توکنِ بی‌زمان ⇒ پوشش null؛ صدا بدونِ هیچ متن ⇒ پوشش ۰؛ واژه‌هایِ نامطمئن شمرده می‌شوند', () => {
+    const a = computeTranscriptMetrics({ tokens: toks(0, 60_000), speechSpans: null, durationMs: 60_000, lowConfRatio: null });
+    assert.equal(a.coverage, null); assert.equal(a.speech_ms, null); assert.deepEqual(a.flags, []);
+    const b = computeTranscriptMetrics({ tokens: toks(0, 60_000).map((x) => ({ text: x.text, speaker: x.speaker })), speechSpans: FULL, durationMs: 120_000, lowConfRatio: null });
+    assert.equal(b.coverage, null);
+    const c = computeTranscriptMetrics({ tokens: [], speechSpans: FULL, durationMs: 120_000, lowConfRatio: null });
+    assert.equal(c.coverage, 0); assert.ok(c.flags.includes('low_coverage'));
+    const d = computeTranscriptMetrics({ tokens: toks(0, 4_000, { conf: 0.4 }), speechSpans: null, durationMs: 4_000, lowConfRatio: 1 });
+    assert.equal(d.uncertain_words, 10); assert.equal(d.low_conf_ratio, 1);
+    assert.ok(METRICS.LOW_COVERAGE > 0 && METRICS.LOW_COVERAGE < 1);
+  });
+
+  await t('H59 speechSpans (VAD) خالص: مکثِ کوتاه پل می‌شود، تقِ ۱۰۰ms حذف، نویزِ غالب ⇒ null', () => {
+    const frames = new Array(400).fill(-60);
+    for (let i = 0; i < 40; i++) frames[i] = -30;        // 0–2s
+    for (let i = 50; i < 80; i++) frames[i] = -30;       // 2.5–4s (مکثِ ۵۰۰ms)
+    frames[200] = frames[201] = -30;                     // تقِ ۱۰۰ms
+    assert.deepEqual(speechSpans(frames, 50, -60, -30), [[0, 4000]]);
+    assert.equal(speechSpans(frames, 50, -40, -35), null, 'p95 − p10 < 12dB');
+    assert.equal(speechSpans([], 50, -60, -30), null);
+  });
+
+  await t('H60 FileQualityMeter ⇒ speech_spans: سکوتِ ۳۰ث در میانه بدونِ بازه‌ی صدادار؛ تکه‌بندیِ ورودی بی‌اثر', () => {
+    const SR = QUALITY.SAMPLE_RATE;
+    let seed = 11; const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296 * 2 - 1; };
+    const a = new Float32Array(120 * SR);
+    for (let i = 0; i < a.length; i++) { const tt = i / SR; a[i] = (tt >= 30 && tt < 60 ? 0 : 0.25 * Math.sin(2 * Math.PI * 220 * tt)) + 0.0015 * rnd(); }
+    const run = (step: number) => { const m = new FileQualityMeter(); for (let i = 0; i < a.length; i += step) m.push(a.subarray(i, i + step)); return m.finish()!; };
+    const q = run(4321);
+    const spans = q.speech_spans!;
+    assert.ok(spans && spans.length >= 2, JSON.stringify(spans));
+    assert.ok(!spans.some(([s, e]) => s < 59_000 && e > 31_000), 'میانه‌یِ ساکت صدادار نیست: ' + JSON.stringify(spans));
+    const tot = spans.reduce((x, [s, e]) => x + e - s, 0);
+    assert.ok(tot > 85_000 && tot <= 90_100, String(tot));
+    assert.deepEqual(run(997).speech_spans, spans);
+  });
+
+  await t('H61 ماشینِ حالت: متریک از توکن + بازه‌هایِ صدادار + حاضرین ⇒ meta.metrics؛ خطایِ حاضرین fail-open؛ بدونِ توکن ⇒ null', async () => {
+    const q: AudioQuality = { p10_db: -60, p95_db: -20, clip_frac: 0, windows: 2, flagged_windows: {}, flags: [], speech_spans: [[0, 60_000]] };
+    const w = newWorld(); const base = makeDeps(w);
+    const deps = makeDeps(w, { tokens: toks(0, 30_000) }, { media: { ...base.media, quality: async () => q }, expectedSpeakers: async () => 3, caseFileAfterUpload: () => false });
+    const job = newJob(w); await drive(w, deps, job.id);
+    const m = w.metas.get(job.id)?.metrics!;
+    assert.ok(m, 'metrics ثبت شد');
+    assert.equal(m.speakers_expected, 3);
+    assert.ok(m.flags.includes('speakers_merged') && m.flags.includes('tail_gap') && m.flags.includes('low_coverage'), JSON.stringify(m.flags));
+    assert.equal(w.jobs.get(job.id)!.stage, 'done');
+    assert.equal(w.transcripts.get('se-1'), 'گوینده ۱: سلام', 'متن بی‌تغییر');
+    // حاضرین throw ⇒ متریک با حاضرینِ نامعلوم
+    const w2 = newWorld(); const b2 = makeDeps(w2);
+    const d2 = makeDeps(w2, { tokens: toks(0, 30_000) }, { media: { ...b2.media, quality: async () => q }, expectedSpeakers: async () => { throw new Error('db'); } });
+    const j2 = newJob(w2); await drive(w2, d2, j2.id);
+    assert.equal(w2.metas.get(j2.id)?.metrics?.speakers_expected, null);
+    assert.equal(w2.jobs.get(j2.id)!.stage, 'done');
+    // getText رشته (بدونِ توکن) ⇒ metrics null
+    const w3 = newWorld(); const d3 = makeDeps(w3); const j3 = newJob(w3); await drive(w3, d3, j3.id);
+    assert.equal(w3.metas.get(j3.id)?.metrics, null);
+  });
+
+  await t('H62 کارتِ تشخیصِ ادمین: یافته‌ها از متریک؛ null ⇒ هیچ؛ JSONِ ذخیره‌شده roundtrip، نامعتبر ⇒ null', () => {
+    assert.deepEqual(metricsFindings(null), []);
+    const m = computeTranscriptMetrics({ tokens: [...toks(0, 40_000), ...toks(70_000, 120_000)], speechSpans: FULL, durationMs: 120_000, lowConfRatio: 0.02, expectedSpeakers: 3 });
+    const f = metricsFindings(parseTranscriptMetrics(JSON.stringify(m)));
+    assert.ok(f.some((x) => x.level === 'error' && x.text.startsWith('پوششِ متن')), JSON.stringify(f));
+    assert.ok(f.some((x) => x.level === 'warn' && x.text.includes('وسطِ جلسه')));
+    assert.ok(f.some((x) => x.level === 'warn' && x.text.includes('کمتر از حاضرین')));
+    assert.equal(parseTranscriptMetrics('{bad'), null);
+    assert.equal(parseTranscriptMetrics({ v: 2, flags: [] }), null);
+    const unknownCov = metricsFindings(computeTranscriptMetrics({ tokens: toks(0, 10_000), speechSpans: null, durationMs: 10_000, lowConfRatio: null }));
+    assert.ok(unknownCov[0].text.includes('سنجیده نشد'));
   });
 
   console.log(`\n${pass} PASS / ${fail} FAIL`);

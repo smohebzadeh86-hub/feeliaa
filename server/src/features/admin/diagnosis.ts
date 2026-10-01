@@ -22,6 +22,44 @@ const minsBetween = (a: unknown, b: unknown) => Math.max(0, Math.round((new Date
 const JOB_STAGE_FA: Record<string, string> = { queued: 'در صف', normalizing: 'آماده‌سازیِ فایل', transcribing: 'رونویسی', case_file: 'ساختِ پرونده' };
 const FT_STAGE_FA: Record<string, string> = { waiting_audio: 'منتظرِ صدا', transcribing: 'رونویسیِ دوباره', polishing: 'مرتب‌سازی' };
 
+// audio_jobs.transcript_metrics (migration 036، audio-upload/transcriptMetrics.ts) — فقط عدد/پرچم. نامعتبر ⇒ null.
+function parseMetrics(raw: unknown): any | null {
+  if (!raw) return null;
+  try {
+    const v = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return v && v.v === 1 && Array.isArray(v.flags) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+const pctFa = (x: number) => `${Math.round(x * 100)}٪`;
+const secFa = (ms: number) => `${Math.round(ms / 1000)}ث`;
+
+// «کیفیت به عدد»ِ جلسه‌ی آپلودی ⇒ یافته‌هایِ کارتِ تشخیص (Session Data Engine، فاز Q-U).
+export function metricsFindings(m: any | null): Array<{ level: 'ok' | 'warn' | 'error'; text: string }> {
+  if (!m) return [];
+  const out: Array<{ level: 'ok' | 'warn' | 'error'; text: string }> = [];
+  const flags: string[] = m.flags;
+  if (m.coverage !== null && m.coverage !== undefined) {
+    const lvl = flags.includes('low_coverage') ? 'error' : 'ok';
+    out.push({ level: lvl, text: `پوششِ متن: ${pctFa(m.coverage)} از صدایِ گفتاری (${secFa(m.speech_ms)}) متن دارد؛ ${secFa(m.uncovered_speech_ms)} بدونِ متن (بلندترین تکه ${secFa(m.longest_uncovered_ms)}).` });
+  } else {
+    out.push({ level: 'ok', text: 'پوششِ متن سنجیده نشد (گفتار از نویز قابلِ تفکیک نبود یا فایل پیش از این سنجه پردازش شده).' });
+  }
+  if (flags.includes('head_gap')) out.push({ level: 'warn', text: `ابتدایِ فایل ${secFa(m.head_gap_ms)} صدا دارد ولی متن ندارد.` });
+  if (flags.includes('tail_gap')) out.push({ level: 'warn', text: `انتهایِ فایل ${secFa(m.tail_gap_ms)} صدا دارد ولی متن ندارد.` });
+  if (flags.includes('uncovered_gap')) out.push({ level: 'warn', text: `${m.uncovered_gaps} تکه‌ی بلند (≥۱۵ث) وسطِ جلسه صدا دارد ولی متن ندارد.` });
+  const shares = (m.speaker_shares || []).map((s: number) => pctFa(s)).join('، ');
+  const exp = m.speakers_expected ? ` (حاضرینِ جلسه: ${m.speakers_expected})` : '';
+  const spLvl = flags.includes('speakers_merged') || flags.includes('speakers_extra') ? 'warn' : 'ok';
+  out.push({ level: spLvl, text: `گوینده‌هایِ تفکیک‌شده: ${m.speakers_found}${exp}${shares ? ' — سهم: ' + shares : ''}.` });
+  if (flags.includes('speakers_merged')) out.push({ level: 'warn', text: 'تعدادِ گوینده‌ها کمتر از حاضرینِ جلسه است — احتمالاً صدایِ دو نفر یکی شده؛ نقش‌ها را با «متنِ خام» چک کنید.' });
+  if (flags.includes('fragmented_turns')) out.push({ level: 'warn', text: `${pctFa(m.short_turn_ratio)} از ${m.turns} نوبت ≤۳ واژه‌اند — تفکیکِ گوینده ناپایدار است.` });
+  if (m.low_conf_ratio !== null && m.low_conf_ratio !== undefined) out.push({ level: 'ok', text: `اطمینانِ رونویسی: ${pctFa(m.low_conf_ratio)} از توکن‌ها زیرِ ۰٫۷، ${m.uncertain_words} واژه‌ی نامطمئن (زیرِ ۰٫۵)؛ ${m.words} واژه، ${m.words_per_min ?? '—'} واژه در دقیقه.` });
+  return out;
+}
+
 export function diagnoseSession({ s, audioRows, pendingCount, ev, ui, uploadJobs = [], finalTranscript = null }: DiagnosisInput) {
   const audioMs = audioRows.reduce((a, r) => a + (Number(r.duration_ms) || 0), 0);
   const audioBytes = audioRows.reduce((a, r) => a + (Number(r.bytes) || 0), 0);
@@ -98,6 +136,7 @@ export function diagnoseSession({ s, audioRows, pendingCount, ev, ui, uploadJobs
         if (Number(j.transcript_chars) === 0) findings.push({ level: 'warn', text: 'در فایل گفتاری تشخیص داده نشد — متنی ذخیره نشد.' });
       } else if (!doneAt) findings.push({ level: 'warn', text: `فایل هنوز در حالِ پردازش است (مرحله: ${JOB_STAGE_FA[j.stage] || j.stage}، تلاشِ ${j.attempts || 0}).` });
       if (j.quality_warning) findings.push({ level: 'warn', text: `هشدارِ کیفیتِ فایل: بخشی از متن کم‌اطمینان است (${j.quality_warning}).` });
+      findings.push(...metricsFindings(parseMetrics(j.transcript_metrics)));
     }
   }
   // «متنِ نهایی» (هر نوع جلسه، اگر برایش صف شده باشد).
@@ -116,7 +155,8 @@ export function diagnoseSession({ s, audioRows, pendingCount, ev, ui, uploadJobs
       transcript_chars: text.length, speaker_paragraphs: paras.length, short_paragraphs: shortParas,
       updated_at: s.updated_at, created_at: s.created_at,
       upload_jobs: uploadJobs.map((j) => ({ stage: j.stage, duration_ms: j.duration_ms, error_code: j.error_code, upload_started_at: j.upload_started_at,
-        upload_completed_at: j.upload_completed_at, transcript_applied_at: j.transcript_applied_at, finished_at: j.finished_at })),
+        upload_completed_at: j.upload_completed_at, transcript_applied_at: j.transcript_applied_at, finished_at: j.finished_at,
+        transcript_metrics: parseMetrics(j.transcript_metrics) })),
       final_transcript: finalTranscript ? { stage: finalTranscript.stage, error_code: finalTranscript.error_code, finished_at: finalTranscript.finished_at } : null,
     },
     findings,

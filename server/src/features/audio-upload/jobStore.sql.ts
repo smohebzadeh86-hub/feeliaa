@@ -73,6 +73,7 @@ export const sqlJobStore: JobStore = {
     const text = (rawText || '').trim();
     const warning = text ? meta?.qualityWarning ?? null : null;
     const lowConf = meta?.lowConfRatio ?? null;
+    const metrics = meta?.metrics ? JSON.stringify(meta.metrics) : null;
     let polishInput: string | null = null;
     const conn = await pool.getConnection();
     try {
@@ -101,15 +102,15 @@ export const sqlJobStore: JobStore = {
         if (nextStage === 'case_file') {
           await conn.query(
             `UPDATE audio_jobs SET transcript_applied_at = NOW(), transcript_chars = ?, stage = 'case_file', attempts = 0,
-               error_code = NULL, next_attempt_at = NOW(), quality_warning = ?, low_conf_ratio = ? WHERE id = ?`,
-            [text.length, warning, lowConf, job.id]
+               error_code = NULL, next_attempt_at = NOW(), quality_warning = ?, low_conf_ratio = ?, transcript_metrics = ? WHERE id = ?`,
+            [text.length, warning, lowConf, metrics, job.id]
           );
         } else {
           // پایانِ مسیر با ذخیره‌ی متن (تصمیمِ مالک 2026-09-24) — پرونده عمداً ساخته نمی‌شود.
           await conn.query(
             `UPDATE audio_jobs SET transcript_applied_at = NOW(), transcript_chars = ?, stage = 'done', finished_at = NOW(),
-               case_file_status = 'disabled', attempts = 0, error_code = NULL, quality_warning = ?, low_conf_ratio = ? WHERE id = ?`,
-            [text.length, warning, lowConf, job.id]
+               case_file_status = 'disabled', attempts = 0, error_code = NULL, quality_warning = ?, low_conf_ratio = ?, transcript_metrics = ? WHERE id = ?`,
+            [text.length, warning, lowConf, metrics, job.id]
           );
         }
         // پلنِ B بخشِ ۳: متن در هر حال ذخیره شد؛ فقط نوعِ اعلان صادقانه‌تر است.
@@ -120,7 +121,7 @@ export const sqlJobStore: JobStore = {
           `UPDATE sessions SET stt_mode = 'upload', batch_status = 'done', updated_at = NOW() WHERE id = ?`, [job.sessionId]);
         await conn.query(
           `UPDATE audio_jobs SET transcript_applied_at = NOW(), transcript_chars = 0, stage = 'done', finished_at = NOW(),
-             case_file_status = 'not_applicable', error_code = NULL WHERE id = ?`, [job.id]);
+             case_file_status = 'not_applicable', error_code = NULL, transcript_metrics = ? WHERE id = ?`, [metrics, job.id]);
         await createNotification({ therapistId: job.therapistId, kind: 'transcript_empty', clientId: job.clientId, sessionId: job.sessionId, jobId: job.id }, conn);
       }
       await conn.commit();
