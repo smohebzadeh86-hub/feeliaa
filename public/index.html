@@ -1063,6 +1063,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>
       <input type="text" id="adminSearchInput" placeholder="جست‌وجوی نام یا شماره…" oninput="searchAdminTherapists()">
     </div>
+    <div id="adminSortTher" class="admin-sort"></div>
     <div id="adminTherapistsList"></div>
     <div class="empty" id="adminEmpty" hidden><p>تراپیستی یافت نشد</p></div>
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminPanel()">بازگشت</button>
@@ -1073,6 +1074,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <h2 id="adminTherapistTitle"></h2>
       <p id="adminTherapistMeta"></p>
     </div>
+    <div id="adminSortCli" class="admin-sort"></div>
     <div id="adminTherapistClients"></div>
     <div class="empty" id="adminTherapistEmpty" hidden><p>این تراپیست هنوز مراجعی ندارد</p></div>
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminTherapistDetail()">بازگشت به پنل ادمین</button>
@@ -1082,8 +1084,9 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
   <section id="screenAdminSessions" class="card screen" data-clarity-mask="true" hidden>
     <div class="card-head">
       <h2 id="adminSessionsTitle"></h2>
-      <p>صدا فقط برایِ بازبینیِ فنی نگه داشته می‌شود — حداکثر ۳۰ روز.</p>
+      <p>صدا برایِ بازبینیِ فنی نگه داشته می‌شود و به‌صورتِ خودکار حذف نمی‌شود.</p>
     </div>
+    <div id="adminSortSes" class="admin-sort"></div>
     <div id="adminSessionsList"></div>
     <div class="empty" id="adminSessionsEmpty" hidden><p>این مراجع هنوز جلسه‌ای ندارد</p></div>
     <button class="btn btn-ghost btn-block" style="margin-top:14px" onclick="closeAdminSessions()">بازگشت</button>
@@ -1126,6 +1129,22 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
           <option value="24">۲۴ ساعتِ اخیر</option>
           <option value="168" selected>۷ روزِ اخیر</option>
           <option value="720">۳۰ روزِ اخیر</option>
+        </select>
+        <select id="adminRecentSortKey" onchange="loadAdminRecentSessions()" aria-label="مرتب‌سازی بر اساس">
+          <option value="activity" selected>مرتب: آخرین فعالیت</option>
+          <option value="recording">آخرین ضبط</option>
+          <option value="created">زمان ساختِ جلسه</option>
+          <option value="updated">آخرین نوشتن</option>
+          <option value="date">تاریخِ جلسه</option>
+          <option value="num">شمارهٔ جلسه</option>
+          <option value="duration">مدتِ صدا</option>
+          <option value="transcript">طولِ متن</option>
+          <option value="therapist">نامِ تراپیست</option>
+          <option value="client">کدِ مراجع</option>
+        </select>
+        <select id="adminRecentSortDir" onchange="loadAdminRecentSessions()" aria-label="جهتِ مرتب‌سازی">
+          <option value="desc" selected>نزولی (تازه‌ترین/بیشترین)</option>
+          <option value="asc">صعودی (قدیمی‌ترین/کمترین)</option>
         </select>
       </div>
       <div id="adminRecentSessionsList"></div>
@@ -3374,7 +3393,7 @@ async function loadAdminRecentSessions(){
   try{
     const status=$('adminRecentStatusFilter').value;
     const sinceHours=$('adminRecentSinceFilter').value;
-    const data=await api('/api/admin/sessions/recent?status='+encodeURIComponent(status)+'&since_hours='+encodeURIComponent(sinceHours));
+    const data=await api('/api/admin/sessions/recent?status='+encodeURIComponent(status)+'&since_hours='+encodeURIComponent(sinceHours)+'&sort='+encodeURIComponent($('adminRecentSortKey').value)+'&dir='+encodeURIComponent($('adminRecentSortDir').value));
     renderAdminRecentSessions(data.sessions||[]);
   }catch(e){showBanner('error',e.message);}
 }
@@ -3991,8 +4010,8 @@ async function loadAdminAudio(append){
       adminStatTile('جلسه‌ی دارایِ صدا',toFa(t.sessions||0))+
       adminStatTile('مدتِ کل',fmtDur(t.audio_ms))+
       adminStatTile('حجمِ کل',fmtBytes(t.bytes))+
-      adminStatTile('حذف تا ۲ روزِ دیگر',toFa(t.expiring_2d||0),(t.expiring_2d||0)>0);
-    if(data.retention_days)$('adminAudioSubtitle').textContent='صدایِ جلسات فقط برایِ بازبینیِ فنی نگه داشته می‌شود و بعد از '+toFa(data.retention_days)+' روز خودکار حذف می‌شود. پخش، دانلود و حذف ثبت می‌شوند.';
+      (data.retention_days?adminStatTile('حذف تا ۲ روزِ دیگر',toFa(t.expiring_2d||0),(t.expiring_2d||0)>0):'');
+    $('adminAudioSubtitle').textContent=data.retention_days?'صدایِ جلسات فقط برایِ بازبینیِ فنی نگه داشته می‌شود و بعد از '+toFa(data.retention_days)+' روز خودکار حذف می‌شود. پخش و دانلود ثبت می‌شوند.':'صدایِ جلسات حذف نمی‌شود (بدونِ حذفِ خودکار). پخش و دانلود ثبت می‌شوند.';
     const list=$('adminAudioList');
     if(!append)list.innerHTML='';
     (data.items||[]).forEach(function(it){list.appendChild(renderAdminAudioRow(it));});
@@ -4013,12 +4032,12 @@ function renderAdminAudioRow(it){
   if(!it.complete)badges.appendChild(adminBadge('bad','ناقص — '+toFa((it.missing_segments||[]).length)+' بخش گمشده'));
   if(it.pending_count>0)badges.appendChild(adminBadge('warn','در صفِ پردازش'));
   if(!it.silent&&it.complete&&!it.pending_count)badges.appendChild(adminBadge('ok','کامل'));
-  if(it.days_left<=2)badges.appendChild(adminBadge('warn',it.days_left?'حذف تا '+toFa(it.days_left)+' روزِ دیگر':'امروز حذف می‌شود'));
+  if(it.days_left!==null&&it.days_left!==undefined&&it.days_left<=2)badges.appendChild(adminBadge('warn',it.days_left?'حذف تا '+toFa(it.days_left)+' روزِ دیگر':'امروز حذف می‌شود'));
   head.appendChild(title);head.appendChild(badges);
   const meta=document.createElement('div');meta.className='admin-row-meta';
   meta.textContent=fmtDur(it.audio_ms)+' صدا · '+fmtBytes(it.bytes)+
     (it.audio_kbps!==null&&it.audio_kbps!==undefined?' · '+toFa(it.audio_kbps)+' kbps':'')+
-    ' · '+toFa(it.segments)+' بخش · '+(it.source==='upload'?'زمانِ آپلود ':'آخرین ضبط ')+fmtDateTime(it.last_at)+' · '+toFa(it.days_left)+' روز تا حذف';
+    ' · '+toFa(it.segments)+' بخش · '+(it.source==='upload'?'زمانِ آپلود ':'آخرین ضبط ')+fmtDateTime(it.last_at)+(it.days_left!==null&&it.days_left!==undefined?' · '+toFa(it.days_left)+' روز تا حذف':'');
   const actions=document.createElement('div');actions.className='admin-row-actions';
   const url='/api/admin/sessions/'+encodeURIComponent(it.session_id)+'/audio/full';
   let player=null;
@@ -4133,11 +4152,50 @@ function renderAdminVoiceNoteGroup(it){
   return row;
 }
 
+// ——— مرتب‌سازیِ فهرست‌هایِ ادمین (2026-10-03) ———
+// «آخرین فعالیت» = آخرین ضبطِ صدا (وگرنه ساختِ جلسه) — نه تاریخِ شروعِ جلسه. مقدارهایِ خالی همیشه ته‌یِ فهرست.
+const adminSort={ther:{key:'activity',dir:'desc'},cli:{key:'activity',dir:'desc'},ses:{key:'activity',dir:'desc'}};
+const adminTs=function(v){const n=v?Date.parse(v):NaN;return isNaN(n)?null:n;};
+const ADMIN_SORT_DEFS={
+  ther:[['activity','آخرین فعالیت',function(t){return adminTs(t.last_activity_at);}],['recording','آخرین ضبط',function(t){return adminTs(t.last_recording_at);}],['created','تاریخِ ثبت‌نام',function(t){return adminTs(t.created_at);}],['name','نام',function(t){return t.name||null;}],['clients','تعدادِ مراجع',function(t){return Number(t.client_count||0);}],['sessions','تعدادِ جلسه',function(t){return Number(t.session_count||0);}]],
+  cli:[['activity','آخرین فعالیت',function(c){return adminTs(c.last_activity_at);}],['recording','آخرین ضبط',function(c){return adminTs(c.last_recording_at);}],['created','تاریخِ ساخت',function(c){return adminTs(c.created_at);}],['code','کدِ مراجع',function(c){return c.code||null;}],['sessions','تعدادِ جلسه',function(c){return Number(c.session_count||0);}]],
+  ses:[['activity','آخرین فعالیت',function(s){return adminTs(s.last_activity_at);}],['recording','آخرین ضبط',function(s){return adminTs(s.last_recording_at);}],['created','زمان ساختِ جلسه',function(s){return adminTs(s.created_at);}],['date','تاریخِ جلسه',function(s){return s.date||null;}],['num','شمارهٔ جلسه',function(s){return Number(s.session_num||0);}],['duration','مدت',function(s){return Number(s.duration_ms||0);}],['transcript','طولِ متن',function(s){return Number(s.transcript_len||0);}]]
+};
+function adminSortList(kind,list){
+  const st=adminSort[kind];const def=ADMIN_SORT_DEFS[kind].find(function(d){return d[0]===st.key;})||ADMIN_SORT_DEFS[kind][0];
+  const m=st.dir==='asc'?1:-1;const g=def[2];
+  return list.slice().sort(function(a,b){
+    const x=g(a),y=g(b);const xn=x===null||x===undefined,yn=y===null||y===undefined;
+    if(xn&&yn)return 0;if(xn)return 1;if(yn)return -1;
+    if(typeof x==='string')return m*x.localeCompare(y,'fa');
+    return m*(x<y?-1:x>y?1:0);
+  });
+}
+function mountAdminSortBar(kind,boxId,onChange){
+  const box=$(boxId);if(!box)return;box.innerHTML='';
+  box.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px';
+  const sel=document.createElement('select');sel.setAttribute('aria-label','مرتب‌سازی بر اساس');
+  ADMIN_SORT_DEFS[kind].forEach(function(d){const o=document.createElement('option');o.value=d[0];o.textContent='مرتب: '+d[1];sel.appendChild(o);});
+  sel.value=adminSort[kind].key;
+  const dir=document.createElement('select');dir.setAttribute('aria-label','جهتِ مرتب‌سازی');
+  [['desc','نزولی (تازه‌ترین/بیشترین)'],['asc','صعودی (قدیمی‌ترین/کمترین)']].forEach(function(d){const o=document.createElement('option');o.value=d[0];o.textContent=d[1];dir.appendChild(o);});
+  dir.value=adminSort[kind].dir;
+  sel.onchange=dir.onchange=function(){adminSort[kind].key=sel.value;adminSort[kind].dir=dir.value;onChange();};
+  box.appendChild(sel);box.appendChild(dir);
+}
+// «آخرین …» برایِ مراجع/تراپیست: تاریخ‌وساعتِ آخرین ضبط (نه فقط روزِ شروعِ جلسه)
+function adminLastLabel(x){
+  if(x.last_recording_at)return 'آخرین ضبط: '+fmtDateTime(x.last_recording_at);
+  if(x.last_activity_at)return 'آخرین فعالیت: '+fmtDateTime(x.last_activity_at);
+  return '';
+}
+
 async function loadAdminTherapists(q){
   try{
     const url='/api/admin/therapists'+(q?('?q='+encodeURIComponent(q)):'');
     const data=await api(url);
     adminTherapists=data.therapists||[];
+    mountAdminSortBar('ther','adminSortTher',function(){renderAdminTherapists(adminTherapists);});
     renderAdminTherapists(adminTherapists);
   }catch(e){showBanner('error',e.message);}
 }
@@ -4150,6 +4208,7 @@ function searchAdminTherapists(){
 }
 
 function renderAdminTherapists(list){
+  list=adminSortList('ther',list);
   const box=$('adminTherapistsList');
   box.innerHTML='';
   $('adminEmpty').hidden=list.length>0;
@@ -4171,7 +4230,7 @@ function renderAdminTherapists(list){
 
     const meta=document.createElement('div');
     meta.className='client-meta';
-    meta.textContent=(t.specialty?t.specialty+' · ':'')+toFa(t.client_count||0)+' مراجع · '+toFa(t.session_count||0)+' جلسه'+(t.email?' · '+t.email:'')+(!t.active?' · غیرفعال':'');
+    meta.textContent=(t.specialty?t.specialty+' · ':'')+toFa(t.client_count||0)+' مراجع · '+toFa(t.session_count||0)+' جلسه'+(t.email?' · '+t.email:'')+(!t.active?' · غیرفعال':'')+(adminLastLabel(t)?' · '+adminLastLabel(t):'');
     div.appendChild(meta);
 
     const row=document.createElement('div');
@@ -4300,7 +4359,8 @@ async function openAdminTherapistDetail(id){
     const box=$('adminTherapistClients');
     box.innerHTML='';
     $('adminTherapistEmpty').hidden=data.clients.length>0;
-    data.clients.forEach(function(c){
+    mountAdminSortBar('cli','adminSortCli',function(){openAdminTherapistDetail(id);});
+    adminSortList('cli',data.clients).forEach(function(c){
       const div=document.createElement('div');
       div.className='session-item';
       const head=document.createElement('div');
@@ -4326,7 +4386,7 @@ async function openAdminTherapistDetail(id){
       const date=document.createElement('div');
       date.className='session-date';
       const catLabel=clientBadgeLabel(c);
-      date.textContent=toFa(c.session_count||0)+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'')
+      date.textContent=toFa(c.session_count||0)+' جلسه'+(adminLastLabel(c)?' · '+adminLastLabel(c):'')
         +(catLabel?' · '+catLabel:'')
         +(c.status==='inactive'?' · غیرفعال'+(c.status_reason?' ('+c.status_reason+')':''):'');
       div.appendChild(date);
@@ -4350,7 +4410,8 @@ async function openAdminClientSessions(clientId,title){
     const box=$('adminSessionsList');
     box.innerHTML='';
     $('adminSessionsEmpty').hidden=data.sessions.length>0;
-    for(const s of data.sessions){
+    mountAdminSortBar('ses','adminSortSes',function(){openAdminClientSessions(clientId,title);});
+    for(const s of adminSortList('ses',data.sessions)){
       const div=document.createElement('div');
       div.className='session-item';
       div.style.cursor='default';

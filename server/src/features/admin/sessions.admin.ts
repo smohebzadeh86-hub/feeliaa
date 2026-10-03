@@ -9,7 +9,7 @@ import { diagnoseSession } from './diagnosis.js';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { liveHealth, LIVE_WINDOW_HOURS } from './liveHealth.js';
 import {
-  getSessionWithTranscript, listSessionNotesForAdmin, listRecentSessions, getSessionForDiagnosis, listSessionEventsBrief,
+  getSessionWithTranscript, listSessionNotesForAdmin, listRecentSessions, RECENT_SORTS, getSessionForDiagnosis, listSessionEventsBrief,
   listSessionUiEventsBrief, listUploadJobsForDiagnosis, getFinalTranscriptForDiagnosis, getSessionTimelineHead, listSessionEvents, listSessionUiEvents, listSessionNotesMeta, listLiveSessions, restoreDeletedSession } from './admin.repository.js';
 
 export async function sessionsAdminRoutes(app: FastifyInstance) {
@@ -73,7 +73,7 @@ export async function sessionsAdminRoutes(app: FastifyInstance) {
   app.get('/api/admin/sessions/recent', async (request, reply) => {
     const q = request.query as {
       status?: string; since_hours?: string; therapist_id?: string;
-      has_transcript?: string; limit?: string; offset?: string; deleted?: string;
+      has_transcript?: string; limit?: string; offset?: string; deleted?: string; sort?: string; dir?: string;
     };
     const status = q.status === 'completed' || q.status === 'canceled' || q.status === 'all' ? q.status : 'in_progress';
     const sinceHoursRaw = Number(q.since_hours);
@@ -83,7 +83,8 @@ export async function sessionsAdminRoutes(app: FastifyInstance) {
     const offsetRaw = Number(q.offset);
     const offset = Number.isFinite(offsetRaw) && offsetRaw >= 0 ? Math.floor(offsetRaw) : 0;
 
-    const conditions: string[] = ['s.updated_at >= DATE_SUB(NOW(), INTERVAL ? HOUR)'];
+    // پنجره‌ی زمانی رویِ «آخرین فعالیت» (نوشتن یا ضبط)، نه فقط updated_at — جلسه‌ای که تازه ضبط شده نباید از فهرست بیفتد.
+    const conditions: string[] = ["GREATEST(s.updated_at, COALESCE((SELECT MAX(a.created_at) FROM session_audio a WHERE a.session_id = s.id AND a.kind = 'session'), s.updated_at)) >= DATE_SUB(NOW(), INTERVAL ? HOUR)"];
     const params: unknown[] = [sinceHours];
     if (status !== 'all') { conditions.push('s.status = ?'); params.push(status); }
     if (q.therapist_id) { conditions.push('t.id = ?'); params.push(q.therapist_id); }
@@ -93,7 +94,8 @@ export async function sessionsAdminRoutes(app: FastifyInstance) {
     if (q.has_transcript === 'true') conditions.push('CHAR_LENGTH(s.transcript) > 0');
     else if (q.has_transcript === 'false') conditions.push('(s.transcript IS NULL OR CHAR_LENGTH(s.transcript) = 0)');
 
-    return { sessions: await listRecentSessions(conditions, params, limit, offset) };
+    const sort = q.sort && q.sort in RECENT_SORTS ? q.sort : 'activity';
+    return { sessions: await listRecentSessions(conditions, params, limit, offset, sort, q.dir === 'asc' ? 'asc' : 'desc') };
   });
 
   // POST /api/admin/sessions/:id/restore — بازگردانیِ جلسه‌یِ حذف‌شده (حذفِ نرمِ تراپیست، migration 042) به فهرستِ خودِ تراپیست

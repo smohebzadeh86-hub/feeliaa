@@ -8,6 +8,7 @@ import {
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
 import { sendFileWithRange } from '../../shared/httpRange.js';
+import { hardDeleteAllowed } from '../../shared/retention.js';
 import { audioFilters, pageParams, SILENT_KBPS } from './filters.js';
 import {
   getSessionSttState, sessionExists, audioArchiveBase, listAudioArchivePage, listSessionSeqs, audioArchiveTotals,
@@ -132,6 +133,7 @@ export async function audioAdminRoutes(app: FastifyInstance) {
     const q = request.query as Record<string, string | undefined>;
     const f = audioFilters(q, { therapist: 'c.therapist_id', client: 's.client_id', ts: 'a.created_at' });
     const { limit, offset } = pageParams(q);
+    const retentionActive = hardDeleteAllowed();
     const retentionSec = Math.floor(SESSION_AUDIO_RETENTION_MS / 1000);
     const base = audioArchiveBase(f);
     const pageRows = await listAudioArchivePage(base, f, retentionSec, limit, offset);
@@ -156,7 +158,8 @@ export async function audioAdminRoutes(app: FastifyInstance) {
         silent: kbps !== null && audioMs > 20000 && kbps < SILENT_KBPS,
         complete, missing_segments: missing, pending_count: pending,
         first_at: x.first_at, last_at: x.last_at,
-        days_left: Math.max(0, Math.ceil(Number(x.expires_in_sec) / 86400)),
+        // سقفِ ۳۰روزه فقط وقتی ALLOW_HARD_DELETE=1 است اجرا می‌شود (سیاستِ «هیچ چیز هارد دیلیت نشود»)؛ وگرنه شمارشِ معکوس دروغ است.
+        days_left: retentionActive ? Math.max(0, Math.ceil(Number(x.expires_in_sec) / 86400)) : null,
       };
     });
     const tot = await audioArchiveTotals(base, f);
@@ -168,9 +171,9 @@ export async function audioAdminRoutes(app: FastifyInstance) {
         sessions: Number(tot?.sessions || 0),
         bytes: Number(tot?.bytes || 0),
         audio_ms: Number(tot?.audio_ms || 0),
-        expiring_2d: Number(exp?.n || 0),
+        expiring_2d: retentionActive ? Number(exp?.n || 0) : 0,
       },
-      retention_days: Math.round(SESSION_AUDIO_RETENTION_MS / 86400000),
+      retention_days: retentionActive ? Math.round(SESSION_AUDIO_RETENTION_MS / 86400000) : null,
     };
   });
 

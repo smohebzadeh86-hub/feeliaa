@@ -15,19 +15,30 @@ export async function getStats(): Promise<any> {
   return result.rows[0];
 }
 
+// (2026-10-03) «آخرین فعالیت» = تازه‌ترین ضبطِ صدایِ جلسه (kind='session')، وگرنه زمانِ ساختِ جلسه — نه s.date (تاریخِ شروعِ جلسه که
+// با ادامه‌یِ همان جلسه در روزِ بعد عقب می‌ماند) و نه updated_at (ویرایش/پردازش آن را جابه‌جا می‌کند). مالکِ تعریف: همین SQL.
+const SESSION_ACTIVITY_SQL = `
+  SELECT s.id AS session_id,
+         (SELECT MAX(a.created_at) FROM session_audio a WHERE a.session_id = s.id AND a.kind = 'session') AS rec_at,
+         GREATEST(s.created_at, COALESCE((SELECT MAX(a.created_at) FROM session_audio a WHERE a.session_id = s.id AND a.kind = 'session'), s.created_at)) AS activity_at
+    FROM sessions s`;
+
 export async function listTherapistsWithStats(search: string | null): Promise<any[]> {
   const result = await query(`
       SELECT
         t.id, t.phone, t.email, t.name, t.specialty, t.is_admin, t.active, t.created_at, t.final_transcript_enabled,
         COUNT(DISTINCT c.id) as client_count,
         COUNT(DISTINCT s.id) as session_count,
-        MAX(s.created_at) as last_session_at
+        MAX(s.created_at) as last_session_at,
+        MAX(sa.rec_at) as last_recording_at,
+        MAX(sa.activity_at) as last_activity_at
       FROM therapists t
       LEFT JOIN clients c ON c.therapist_id = t.id
       LEFT JOIN sessions s ON s.client_id = c.id
+      LEFT JOIN (${SESSION_ACTIVITY_SQL}) sa ON sa.session_id = s.id
       WHERE ? IS NULL OR t.phone LIKE CONCAT('%', ?, '%') OR t.name LIKE CONCAT('%', ?, '%') OR t.email LIKE CONCAT('%', ?, '%')
       GROUP BY t.id
-      ORDER BY t.created_at DESC
+      ORDER BY (MAX(sa.activity_at) IS NULL), MAX(sa.activity_at) DESC, t.created_at DESC
     `, [search, search, search, search]);
   return result.rows;
 }
@@ -40,12 +51,15 @@ export async function listClientsOfTherapistWithStats(therapistId: string): Prom
   const clients = await query(`
       SELECT c.id, c.code, c.alias, c.status, c.status_reason, c.category, c.gender, c.created_at, c.deleted_at,
         COUNT(s.id) as session_count,
-        MAX(s.date) as last_session_date
+        MAX(s.date) as last_session_date,
+        MAX(sa.rec_at) as last_recording_at,
+        MAX(sa.activity_at) as last_activity_at
       FROM clients c
       LEFT JOIN sessions s ON s.client_id = c.id
+      LEFT JOIN (${SESSION_ACTIVITY_SQL}) sa ON sa.session_id = s.id
       WHERE c.therapist_id = ?
       GROUP BY c.id
-      ORDER BY c.created_at DESC
+      ORDER BY (MAX(sa.activity_at) IS NULL), MAX(sa.activity_at) DESC, c.created_at DESC
     `, [therapistId]);
   return clients.rows;
 }
@@ -60,12 +74,13 @@ export async function listSessionsOfClient(clientId: string): Promise<any[]> {
       SELECT s.id, s.session_num, s.date, s.start_time, s.duration_ms, s.status, s.source, s.consent, s.deleted_at,
         s.created_at, s.updated_at, s.batch_status, s.auto_closed_at, s.realtime_reliable, CHAR_LENGTH(COALESCE(s.transcript, '')) as transcript_len,
         COUNT(a.id) as audio_count,
-        MAX(CASE WHEN a.kind = 'session' THEN a.created_at END) AS last_recording_at
+        MAX(CASE WHEN a.kind = 'session' THEN a.created_at END) AS last_recording_at,
+        GREATEST(s.created_at, COALESCE(MAX(CASE WHEN a.kind = 'session' THEN a.created_at END), s.created_at)) AS last_activity_at
       FROM sessions s
       LEFT JOIN session_audio a ON a.session_id = s.id
       WHERE s.client_id = ?
       GROUP BY s.id
-      ORDER BY COALESCE(MAX(CASE WHEN a.kind = 'session' THEN a.created_at END), s.created_at) DESC, s.session_num DESC
+      ORDER BY last_activity_at DESC, s.session_num DESC
     `, [clientId]);
   return sessions.rows;
 }
@@ -156,7 +171,21 @@ export async function getSessionSttState(id: string): Promise<any> {
 }
 
 // conditions/params را route ساخته؛ خودِ متنِ transcript هرگز SELECT نمی‌شود — فقط CHAR_LENGTH.
-export async function listRecentSessions(conditions: string[], params: unknown[], limit: number, offset: number): Promise<any[]> {
+// ترتیب‌هایِ مجاز (whitelist — هرگز مستقیم از ورودیِ کاربر در SQL نمی‌رود).
+export const RECENT_SORTS: Record<string, string> = {
+  activity: 'last_activity_at',
+  recording: '(last_recording_at IS NULL), last_recording_at',
+  created: 's.created_at',
+  updated: 's.updated_at',
+  date: 's.date',
+  num: 's.session_num',
+  duration: 'audio_duration_ms',
+  transcript: 'transcript_len',
+  therapist: 't.name',
+  client: 'c.code',
+};
+export async function listRecentSessions(conditions: string[], params: unknown[], limit: number, offset: number, sort = 'activity', dir: 'asc' | 'desc' = 'desc'): Promise<any[]> {
+  const orderBy = `${RECENT_SORTS[sort] ?? RECENT_SORTS.activity} ${dir === 'asc' ? 'ASC' : 'DESC'}, s.updated_at DESC`;
   const rows = await query(
     `SELECT s.id, s.session_num, s.date, s.start_time, s.status, s.source, s.deleted_at, s.deleted_by,
               s.created_at, s.updated_at, s.batch_status, s.realtime_reliable, s.stt_mode,
@@ -167,12 +196,13 @@ export async function listRecentSessions(conditions: string[], params: unknown[]
               (SELECT COALESCE(SUM(a.bytes), 0) FROM session_audio a WHERE a.session_id = s.id) AS audio_bytes,
               (SELECT COALESCE(SUM(a.duration_ms), 0) FROM session_audio a WHERE a.session_id = s.id) AS audio_duration_ms,
               (SELECT COUNT(*) FROM session_notes n WHERE n.session_id = s.id) AS note_count,
-              (SELECT MAX(a.created_at) FROM session_audio a WHERE a.session_id = s.id AND a.kind = 'session') AS last_recording_at
+              (SELECT MAX(a.created_at) FROM session_audio a WHERE a.session_id = s.id AND a.kind = 'session') AS last_recording_at,
+              GREATEST(s.created_at, COALESCE((SELECT MAX(a.created_at) FROM session_audio a WHERE a.session_id = s.id AND a.kind = 'session'), s.created_at)) AS last_activity_at
        FROM sessions s
        JOIN clients c ON c.id = s.client_id
        JOIN therapists t ON t.id = c.therapist_id
        WHERE ${conditions.join(' AND ')}
-       ORDER BY COALESCE(last_recording_at, s.created_at) DESC, s.updated_at DESC
+       ORDER BY ${orderBy}
        LIMIT ? OFFSET ?`,
     [...params, limit, offset]
   );
