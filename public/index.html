@@ -91,6 +91,11 @@ label{display:block;font-size:13px;font-weight:600;color:var(--ink-2);margin-bot
 input,textarea{width:100%;padding:13px 15px;border:1.5px solid var(--line);border-radius:var(--r-md);font-family:inherit;font-size:15px;background-color:var(--field);color:var(--ink);margin-bottom:14px}
 input:focus,textarea:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 4px rgba(62,107,94,.13)}
 textarea{min-height:100px;resize:vertical}
+/* select هایِ سراسریِ سایت: ظاهرِ هم‌خانواده‌یِ input (به‌جایِ select بومیِ مرورگر) + شورونِ سفارشی */
+select{-webkit-appearance:none;appearance:none;font-family:inherit;font-size:13px;line-height:1.4;padding:9px 12px;padding-inline-end:34px;border:1.5px solid var(--line);border-radius:var(--r-md);background-color:var(--field);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a9a93' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 11px center;background-size:14px;color:var(--ink);cursor:pointer;max-width:100%;transition:border-color .2s,box-shadow .2s}
+select:hover{border-color:var(--sage)}
+select:focus{outline:none;border-color:var(--sage);box-shadow:0 0 0 4px rgba(62,107,94,.13)}
+select option{background:var(--card);color:var(--ink)}
 
 /* ⭐ بازطراحیِ کاملِ انتخابگرِ تاریخِ شمسی (گزارشِ مالک: «به‌جایِ سه‌تا select یک تقویمِ
    واقعی می‌خواهم») — سه <select>ِ روز/ماه/سال با یک پاپ‌آورِ تقویمِ گرید-محورِ SVG جایگزین
@@ -726,7 +731,7 @@ input::-ms-reveal{display:none}
 .case-file-doc .cf-move>summary::-webkit-details-marker{display:none}
 .case-file-doc .cf-move>summary:hover,.case-file-doc .cf-move[open]>summary{color:var(--cf-teal)}
 .case-file-doc .cf-move-panel{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 2px;padding:8px;background:var(--cf-soft);border:1px solid var(--cf-line);border-radius:10px}
-.case-file-doc .cf-move-panel select{font-family:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--cf-line);border-radius:8px;background:var(--cf-card);color:var(--cf-ink);max-width:100%}
+.case-file-doc .cf-move-panel select{font-family:inherit;font-size:12px;padding:5px 8px;padding-inline-end:28px;border:1px solid var(--cf-line);border-radius:8px;background-color:var(--cf-card);color:var(--cf-ink);max-width:100%}
 .case-file-doc .cf-rich-s{position:relative;padding-right:14px;margin-bottom:4px;color:var(--cf-ink)}
 .case-file-doc .cf-rich-s::before{content:"";position:absolute;right:2px;top:.95em;width:5px;height:5px;border-radius:50%;background:var(--cf-teal);opacity:.55}
 .case-file-doc .cf-rich-s:last-child{margin-bottom:0}
@@ -1004,7 +1009,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
 .admin-row-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .admin-row audio{width:100%;margin-top:10px;display:block}
 .admin-filters{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
-.admin-filters select{font-family:inherit;font-size:13px;padding:8px 12px;border:1.5px solid var(--line);border-radius:var(--r-md);background:var(--field);color:var(--ink);min-width:150px}
+.admin-filters select{min-width:150px}
 .admin-sub{font-size:12.5px;font-weight:700;color:var(--ink-2);margin:10px 0 4px}
 .vn-item{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-top:1px solid var(--line-soft);font-size:12.5px;color:var(--ink-2)}
 .vn-text{white-space:pre-wrap;background:var(--sage-mist);border-radius:var(--r-md);padding:10px 12px;margin-top:6px;font-size:13px;color:var(--ink);width:100%}
