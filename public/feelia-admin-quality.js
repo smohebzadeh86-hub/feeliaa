@@ -98,6 +98,33 @@
     var vs = (d && d.versions) || [];
     if (!vs.length) return;
     var card = document.createElement('div'); card.className = 'card';
+
+    // سوییچِ «متنِ خام / متنِ نهایی» رویِ باکسِ اصلیِ جلسه. نسخه‌ی جاری = بالاترین نسخه (هر نوشتنِ final_transcripts نسخه می‌گذارد).
+    var tBox = $('adminSessionDetailTranscript');
+    if (tBox) {
+      var rawText = tBox.textContent, showingFinal = false, finalText = null;
+      var sw = document.createElement('div'); sw.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px';
+      var swLabel = document.createElement('span'); swLabel.textContent = 'متنِ نمایش‌داده‌شده: متنِ خام';
+      var swBtn = adminBtn('نمایشِ متنِ نهایی', 'btn-primary', async function () {
+        try {
+          if (!showingFinal) {
+            if (finalText === null) {
+              var t = await api('/api/admin/sessions/' + encodeURIComponent(sessionId) + '/final-transcript/versions/' + vs[0].version);
+              finalText = t.clean_text || '';
+            }
+            if ($('adminSessionDetailTranscript') !== tBox || box.hidden) return;
+            tBox.textContent = finalText; showingFinal = true;
+            swLabel.textContent = 'متنِ نمایش‌داده‌شده: متنِ نهایی (نسخه‌ی ' + toFa(vs[0].version) + ')'; swBtn.textContent = 'نمایشِ متنِ خام';
+          } else {
+            tBox.textContent = rawText; showingFinal = false;
+            swLabel.textContent = 'متنِ نمایش‌داده‌شده: متنِ خام'; swBtn.textContent = 'نمایشِ متنِ نهایی';
+          }
+          attachTranscriptExpander(tBox, tBox.textContent, null, null);
+        } catch (e) { showBanner('error', e.message); }
+      });
+      sw.appendChild(swLabel); sw.appendChild(swBtn); card.appendChild(sw);
+    }
+
     var h = document.createElement('strong'); h.textContent = 'تاریخچه‌ی متنِ نهایی (' + toFa(vs.length) + ' نسخه)';
     card.appendChild(h);
     vs.forEach(function (v, i) {
