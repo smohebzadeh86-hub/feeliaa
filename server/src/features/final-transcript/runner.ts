@@ -17,6 +17,7 @@ import {
 import { polishTranscript } from './application/polishTranscript.js';
 import { DEFAULT_GUARD_LIMITS } from './domain/polishGuards.js';
 import { createTranscriptLlm } from './adapters/llmJson.js';
+import { envWithReasoning, REASONING_LEVELS, type ReasoningLevel } from '../../llm/config.js';
 import { lockCurrent, snapshotBaselineIfMissing, appendCurrentAsVersion } from './adapters/versionStore.js';
 
 const LEASE_SECONDS = 20 * 60;
@@ -172,6 +173,23 @@ export async function spentToday(): Promise<{ usd: number; tokens: number; edits
 const DEFAULT_DAILY_BUDGET_USD = 3;
 const DEFAULT_DAILY_BUDGET_TOKENS = 5_000_000;
 
+// داورِ مرزِ نوبت (فقط ثبت، 2026-10-03): پیش‌فرض روشن؛ FINAL_TRANSCRIPT_BOUNDARY_JUDGE=0 خاموش. با استدلالِ مستقل از polish
+// (پیش‌فرض low — بدونِ استدلال کور بود). هر خطایِ ساختن ⇒ بدونِ داور.
+function boundaryJudgeFor(sessionId: string) {
+  if (process.env.FINAL_TRANSCRIPT_BOUNDARY_JUDGE === '0') return undefined;
+  const wanted = String(process.env.FINAL_TRANSCRIPT_BOUNDARY_JUDGE_REASONING || 'low').trim() as ReasoningLevel;
+  const level: ReasoningLevel = (REASONING_LEVELS as readonly string[]).includes(wanted) ? wanted : 'low';
+  try {
+    return {
+      llm: createTranscriptLlm(envWithReasoning('final-transcript', process.env, level), undefined, { sessionId }),
+      maxItems: envInt('FINAL_TRANSCRIPT_BOUNDARY_JUDGE_MAX', 120),
+      budgetMs: envInt('FINAL_TRANSCRIPT_BOUNDARY_JUDGE_BUDGET_MS', 6 * 60_000),
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 async function polishFor(sessionId: string, text: string, opts?: { trustDiarization: boolean }) {
   try {
     const capUsd = Number(process.env.FINAL_TRANSCRIPT_DAILY_BUDGET_USD ?? DEFAULT_DAILY_BUDGET_USD);
@@ -189,6 +207,7 @@ async function polishFor(sessionId: string, text: string, opts?: { trustDiarizat
     // نقش‌هایِ تأییدشده‌ی درمانگر (ویرایشِ قبلی) فقط وقتی معتبرند که شماره‌گذاریِ گوینده‌ها یک گذرِ کاملِ async باشد (F7).
     const confirmedRoles = opts?.trustDiarization ? confirmedRolesFromEntries(await getRoles(sessionId).catch(() => ({}))) : {};
     const res = await polishTranscript(text, roster, llm, {
+      boundaryJudge: opts?.trustDiarization ? boundaryJudgeFor(sessionId) : undefined,
       briefing,
       confirmedRoles,
       trustDiarization: !!opts?.trustDiarization,

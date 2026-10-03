@@ -7,9 +7,11 @@ import {
   stepFinalTranscript, BACKOFF_MS, MAX_ATTEMPTS, AUDIO_RECHECK_MS,
   type FtJob, type FtDeps, type FtPatch, type AudioState, type FullAudio, type PolishOutcome,
 } from '../server/src/features/final-transcript/domain/jobMachine.js';
+import type { CleanTurn } from '../server/src/features/final-transcript/domain/transcriptText.js';
 import { parseTurns, chunkTurns, renderClean, sampleForOverview, UPLOAD_LABEL, appendUploadForPolish, maxSpeakerNumber } from '../server/src/features/final-transcript/domain/transcriptText.js';
 import { checkPolishedChunk, negationCount, numberBag, DEFAULT_GUARD_LIMITS } from '../server/src/features/final-transcript/domain/polishGuards.js';
 import { polishTranscript } from '../server/src/features/final-transcript/application/polishTranscript.js';
+import { judgeBoundaries, boundaryCandidates } from '../server/src/features/final-transcript/application/boundaryJudge.js';
 import { applyRoleEdit, allowedRoles, roleNameToEntry, confirmedRolesFromEntries } from '../server/src/features/final-transcript/domain/roleEdit.js';
 import type { LlmJsonPort } from '../server/src/features/final-transcript/ports.js';
 
@@ -768,6 +770,104 @@ await t('B22 (F7) پلِ نقش: نامِ نقش ⇄ رکوردِ canonical (enu
   assert.deepEqual(roleNameToEntry('مراجع'), { role: 'client', label: null });
   assert.deepEqual(roleNameToEntry('آقا'), { role: 'member', label: 'آقا' });
   assert.deepEqual(confirmedRolesFromEntries({ '1': { role: 'therapist', label: null }, '2': { role: 'member', label: 'خانم' }, x: { role: 'client', label: null } }), { '۱': 'درمانگر', '۲': 'خانم' });
+});
+
+const ROSTER1 = { unitLabel: 'فردی', speakers: ['مراجع'], terms: [] as string[] };
+// ——— داورِ مرزِ نوبت (فقط ثبت) ———
+const T = (role: string, text: string): CleanTurn => ({ role, text });
+const BJ_TURNS: CleanTurn[] = [
+  T('درمانگر', 'من فکر می‌کنم این الگو از کودکی شروع شده و تا امروز ادامه داشته است.'), // 0
+  T('مراجع', 'درسته. من هم همین‌طور فکر می‌کنم چون همیشه همین‌طوری بوده و عوض نشده.'),     // 1  مرز 0: جمله‌یِ لبه‌یِ بعد کوتاه ⇒ کاندید
+  T('درمانگر', 'خب همین موضوع را بیشتر باز کنیم و ببینیم از کجا آمده و چه چیزی بوده است ولی نه الان.'), // 2  مرز 1: لبه‌ها بلندند ⇒ کاندید نیست؟ (آخرین جمله‌یِ قبل بلند، اولین جمله‌یِ بعد بلند)
+  { role: '', text: '[علامت · ۰۱:۰۰ — گریه]', marker: true },                                     // 3
+  T('مراجع', 'آره.'),                                                                           // 4  مرز 3→4 نشانگر ⇒ حذف
+  T('مراجع', 'بله دقیقاً.'),                                                                     // 5  هم‌نقش ⇒ حذف
+  T('درمانگر', 'تموم شد، آره.'),                                                                 // 6  مرز 5 ⇒ کاندید
+];
+function bjLlm(score: (ids: number[]) => Array<{ id: number; a: number; b: number }> | 'throw' | 'garbage') {
+  const o = { calls: 0 } as { calls: number };
+  return Object.assign(o, {
+    model: 'fake',
+    async completeJson<X>(_system: string, user: string): Promise<X> {
+      o.calls++;
+      const ids = Array.from(user.matchAll(/^\[(\d+)\]$/gm)).map((m) => Number(m[1]));
+      const v = score(ids);
+      if (v === 'throw') throw new Error('boom');
+      if (v === 'garbage') return { items: [{ id: 99, a: 90, b: 90 }, { id: 'x', a: 1, b: 1 }, { id: 1, a: 'hi', b: 5 }] } as X;
+      return { items: v } as X;
+    },
+  }) as unknown as LlmJsonPort & { calls: number };
+}
+
+await t('BJ1 کاندیدها: فقط تعویضِ نقشِ بدونِ نشانگر با جمله‌یِ لبه‌یِ ≤۶ واژه', () => {
+  const c = boundaryCandidates(BJ_TURNS);
+  assert.deepEqual(c.map((x) => x.i), [0, 5], JSON.stringify(c.map((x) => x.i)));
+  assert.ok(c[0].text.includes('قبل (درمانگر):') && c[0].text.includes('بعد (مراجع): (1) درسته.'), c[0].text);
+});
+await t('BJ2 نمره‌ها: ثبتِ مرتب‌شده (نزولی) با کلمپ؛ نوبت‌ها هرگز تغییر نمی‌کنند', async () => {
+  const copy = JSON.parse(JSON.stringify(BJ_TURNS));
+  const llm = bjLlm((ids) => ids.map((id) => ({ id, a: id === 1 ? 30 : 200, b: id === 1 ? 20 : -5 })));
+  const r = await judgeBoundaries(BJ_TURNS, { llm, minScore: 50 });
+  assert.deepEqual(BJ_TURNS, copy, 'ورودی دست‌نخورده');
+  assert.equal(r.report.candidates, 2);
+  assert.equal(r.report.checked, 2);
+  assert.deepEqual(r.report.flagged, [[5, 100, 0]]);
+});
+await t('BJ3 خطایِ LLM ⇒ پرتاب نمی‌شود؛ failed_batches شمرده می‌شود', async () => {
+  const r = await judgeBoundaries(BJ_TURNS, { llm: bjLlm(() => 'throw') });
+  assert.equal(r.report.failed_batches, 1);
+  assert.equal(r.report.checked, 0);
+  assert.deepEqual(r.report.flagged, []);
+});
+await t('BJ4 پاسخِ مخرب (idِ بیرون از بازه/غیرعددی/نمره‌یِ غیرعددی) نادیده گرفته می‌شود', async () => {
+  const r = await judgeBoundaries(BJ_TURNS, { llm: bjLlm(() => 'garbage') });
+  assert.equal(r.report.checked, 0);
+  assert.deepEqual(r.report.flagged, []);
+});
+await t('BJ5 سقفِ تعداد و سقفِ زمان', async () => {
+  const llm = bjLlm((ids) => ids.map((id) => ({ id, a: 90, b: 0 })));
+  const r = await judgeBoundaries(BJ_TURNS, { llm, maxItems: 1 });
+  assert.equal(r.report.candidates, 2);
+  assert.equal(r.report.truncated, 1);
+  assert.equal(r.report.checked, 1);
+  const llm2 = bjLlm((ids) => ids.map((id) => ({ id, a: 90, b: 0 })));
+  const r2 = await judgeBoundaries(BJ_TURNS, { llm: llm2, budgetMs: -1 });
+  assert.equal(r2.report.timed_out, true);
+  assert.equal(llm2.calls, 0);
+});
+
+const BJ_RAW = [
+  'گوینده ۱: من فکر می‌کنم این الگو از کودکی شروع شده است',
+  'گوینده ۲: درسته من هم همین‌طور فکر می‌کنم',
+  'گوینده ۱: پس باید روی آن کار کنیم، خب ادامه بده لطفاً بگو',
+  'گوینده ۲: آره.',
+].join('\n\n');
+function idPolishLlm(): LlmJsonPort {
+  return {
+    model: 'fake',
+    async completeJson<X>(system: string, user: string): Promise<X> {
+      if (system.includes('بازبینِ')) throw new Error('judge-not-here');
+      if (!system.includes('ویراستار')) return { speaker_map: [{ speaker: '۱', role: 'درمانگر' }, { speaker: '۲', role: 'مراجع' }], summary: 'خلاصه', glossary: [] } as X;
+      const items = user.split(/\n\n/).map((b) => /\[([۰-۹]+)\] گوینده ([۰-۹]+): ([\s\S]*)/.exec(b)).filter(Boolean) as RegExpExecArray[];
+      return { turns: items.map((m, i) => ({ src: [i + 1], speaker_role: m[2] === '۱' ? 'درمانگر' : 'مراجع', text: m[3].trim() })) } as X;
+    },
+  };
+}
+await t('BJ6 در polish: گزارش ثبت می‌شود، متن/نقش‌ها با و بدونِ داور یکسان‌اند؛ بدونِ trustDiarization اجرا نمی‌شود؛ خطایِ داور polish را نمی‌شکند', async () => {
+  const base = await polishTranscript(BJ_RAW, ROSTER1, idPolishLlm(), { ...PCFG, trustDiarization: true });
+  const llm = bjLlm((ids) => ids.map((id) => ({ id, a: 80, b: 10 })));
+  const r = await polishTranscript(BJ_RAW, ROSTER1, idPolishLlm(), { ...PCFG, trustDiarization: true, boundaryJudge: { llm } });
+  assert.ok(r.report.boundary_judge && r.report.boundary_judge.checked >= 1, JSON.stringify(r.report.boundary_judge));
+  assert.equal(r.report.boundary_judge!.flagged[0][1], 80);
+  assert.equal(r.text, base.text);
+  assert.deepEqual(r.turns, base.turns);
+  const llm2 = bjLlm(() => [{ id: 1, a: 99, b: 99 }]);
+  const r2 = await polishTranscript(BJ_RAW, ROSTER1, idPolishLlm(), { ...PCFG, trustDiarization: false, boundaryJudge: { llm: llm2 } });
+  assert.equal(llm2.calls, 0);
+  assert.equal(r2.report.boundary_judge, undefined);
+  const r3 = await polishTranscript(BJ_RAW, ROSTER1, idPolishLlm(), { ...PCFG, trustDiarization: true, boundaryJudge: { llm: bjLlm(() => 'throw') } });
+  assert.equal(r3.text, base.text);
+  assert.equal(r3.report.boundary_judge!.failed_batches >= 1, true);
 });
 
 console.log(`\n${pass} pass, ${fail} fail`);

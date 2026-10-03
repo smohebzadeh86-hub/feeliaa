@@ -10,6 +10,7 @@ import {
 import { checkPolishedChunk, uncertainCount, type GuardFailure, type GuardLimits } from '../domain/polishGuards.js';
 import type { LlmJsonPort, LlmUsageSnapshot, SpeakerRoster } from '../ports.js';
 import { OVERVIEW_SCHEMA, CHUNK_SCHEMA, OVERVIEW_SYSTEM_PROMPT, CHUNK_SYSTEM_PROMPT } from './prompts.js';
+import { judgeBoundaries, type BoundaryJudgeConfig, type BoundaryJudgeReport } from './boundaryJudge.js';
 
 export interface PolishConfig {
   chunkChars: number;
@@ -24,6 +25,9 @@ export interface PolishConfig {
   // نقش‌هایِ تأییدشده‌ی درمانگر (برچسبِ گوینده با ارقامِ فارسی ⇒ نامِ نقش، مثلاً {'۲': 'مراجع'}) از رکوردِ canonical. این نقش‌ها پین‌اند:
   // نه LLM می‌تواند عوضشان کند و نه نگاشتِ برداشتِ کلی؛ «ساختِ دوباره» ویرایشِ نقشِ درمانگر را بازنویسی نمی‌کند (F7).
   confirmedRoles?: Record<string, string>;
+  // داورِ مرزِ نوبت — فقط ثبت (فقط وقتی trustDiarization): مرزهایِ مشکوکِ تعویضِ گوینده را نمره می‌دهد و در report.boundary_judge
+  // می‌گذارد؛ هرگز متن یا نقشِ نوبت‌ها را تغییر نمی‌دهد. llm باید با سطحِ استدلالِ کافی ساخته شود (بدونِ استدلال کور است).
+  boundaryJudge?: BoundaryJudgeConfig;
 }
 
 export interface Overview {
@@ -51,12 +55,14 @@ export interface PolishReport {
   role_reverts: number;
   // نوبت‌هایی که LLM نقششان را برخلافِ نگاشت/تأییدِ درمانگر نوشت (پین‌شده‌ها برگردانده شدند) — فقط شمارنده
   role_overrides: number;
+  // داورِ مرزِ نوبت (فقط ثبت): اندیس و نمره‌یِ مرزهایِ مشکوک، بدونِ متن
+  boundary_judge?: BoundaryJudgeReport;
   usage?: PolishUsage;
 }
 
 // مصرفِ هر ویرایش (2026-10-01): جمع، گذرِ برداشتِ کلی، و هر تکه (هر تکه = یک «ادیت»). فقط عدد، هرگز متن.
 export interface ChunkUsage extends LlmUsageSnapshot { turns: number; chars: number; }
-export interface PolishUsage { total: LlmUsageSnapshot; overview: LlmUsageSnapshot; chunks: ChunkUsage[]; }
+export interface PolishUsage { total: LlmUsageSnapshot; overview: LlmUsageSnapshot; chunks: ChunkUsage[]; boundary_judge?: LlmUsageSnapshot; }
 
 export interface PolishResult { text: string; report: PolishReport; turns: CleanTurn[]; }
 
@@ -312,16 +318,26 @@ export async function polishTranscript(
     throw Object.assign(new Error(`بیش از نیمِ تکه‌ها با خطایِ گذرایِ LLM خام ماندند (${transientChunkFailures}/${chunks.length})`), { transient: true, code: 'llm-failed' });
   }
   closeChunk();
+  let judgeUsage: LlmUsageSnapshot | null = null;
+  if (cfg.boundaryJudge && cfg.trustDiarization) {
+    try {
+      const j = await judgeBoundaries(out, cfg.boundaryJudge);
+      report.boundary_judge = j.report;
+      judgeUsage = j.usage;
+    } catch { /* فقط ثبت: هر خطایِ پیش‌بینی‌نشده هرگز polish را نمی‌شکند */ }
+  }
   if (startUsage && overviewUsage) {
     const sum = llm.usage!();
     report.usage = {
+      // مصرفِ داورِ مرز هم در جمع می‌آید (سقفِ بودجه‌یِ روزانه آن را هم می‌شمارد)
       total: {
-        calls: sum.calls - startUsage.calls, prompt_tokens: sum.prompt_tokens - startUsage.prompt_tokens,
-        completion_tokens: sum.completion_tokens - startUsage.completion_tokens, reasoning_tokens: sum.reasoning_tokens - startUsage.reasoning_tokens,
-        cost_usd: sum.cost_usd === null || startUsage.cost_usd === null ? null : Math.round((sum.cost_usd - startUsage.cost_usd) * 1e8) / 1e8,
+        calls: sum.calls - startUsage.calls + (judgeUsage?.calls ?? 0), prompt_tokens: sum.prompt_tokens - startUsage.prompt_tokens + (judgeUsage?.prompt_tokens ?? 0),
+        completion_tokens: sum.completion_tokens - startUsage.completion_tokens + (judgeUsage?.completion_tokens ?? 0), reasoning_tokens: sum.reasoning_tokens - startUsage.reasoning_tokens + (judgeUsage?.reasoning_tokens ?? 0),
+        cost_usd: sum.cost_usd === null || startUsage.cost_usd === null || (judgeUsage && judgeUsage.cost_usd === null) ? null : Math.round((sum.cost_usd - startUsage.cost_usd + (judgeUsage?.cost_usd ?? 0)) * 1e8) / 1e8,
       },
       overview: overviewUsage,
       chunks: chunkUsage,
+      ...(judgeUsage ? { boundary_judge: judgeUsage } : {}),
     };
   }
   return { text: renderClean(out), report, turns: out };

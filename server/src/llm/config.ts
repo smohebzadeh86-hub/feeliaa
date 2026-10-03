@@ -150,6 +150,15 @@ function providerFor(purpose: LlmPurpose, env: NodeJS.ProcessEnv, fallback: bool
   return (env[`${P}_LLM_PROVIDER`] || env.LLM_PROVIDER || 'openai').trim().toLowerCase();
 }
 
+// نسخه‌ای از env که سطحِ استدلالِ یک purpose را برایِ providerِ اصلی مشخص می‌کند (بالاترین اولویتِ <X>_<P>_REASONING_EFFORT).
+// برایِ فراخوانی‌هایی که استدلالِ بیشتر/کمترِ پیش‌فرضِ purpose می‌خواهند (مثلاً داورِ مرزِ «متنِ نهایی»: بدونِ استدلال کور است).
+export function envWithReasoning(purpose: LlmPurpose, env: NodeJS.ProcessEnv, level: ReasoningLevel): NodeJS.ProcessEnv {
+  const provider = providerFor(purpose, env, false)!;
+  const profile = provider === 'custom' ? customProfile(env) : PROFILES[provider];
+  if (!profile) return env;
+  return { ...env, [`${profile.envPrefix}_${PURPOSE_ENV[purpose]}_REASONING_EFFORT`]: level };
+}
+
 export function resolveLlmConfig(purpose: LlmPurpose, env: NodeJS.ProcessEnv = process.env, provider = providerFor(purpose, env, false)!): LlmConfig {
   const profile = provider === 'custom' ? customProfile(env) : PROFILES[provider];
   if (!profile) throw new LlmConfigError(`LLM_PROVIDER نامعتبر: ${provider} (${LLM_PROVIDERS.join('|')})`);
