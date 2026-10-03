@@ -246,6 +246,15 @@
 - **تغییرِ کد/داده:** هیچ. **کارِ باز:** پیشنهاد — backfillِ baseline برایِ جلسه‌هایِ بدونِ تاریخچه + محاسبه‌یِ transcript_metrics برایِ jobهایِ قدیمی؛ منتظرِ تصمیمِ مالک.
 - **عامل:** این نشست.
 
+### 2026-10-03 — GIT + DEPLOY (production) — Core/حذفِ نرم/دسترسیِ ادمین (`3d8d3f2`، `208332c`)؛ migrationهایِ 038–044
+- **مجوزِ مالک (در همین گفتگو):** «commit و deploy کن».
+- **GIT:** دو commit رویِ `feat/clarity` (push نشد): `3d8d3f2` (کلِ working tree: ممیزیِ Core فازهایِ ۱–۶ این نشست + «Session Data Engine»ِ نشستِ قبلی که commit/deployنشده بود و تغییراتشان در فایل‌هایِ مشترک درهم‌تنیده و وابسته به migrationهایِ 038–041 بود) و `208332c` (`CURRENT_UI_STATE.md` که documentation-map به آن لینک می‌داد). ناشناخته/رهاشده commit نشد: `.claude/`، tarها، `server-deploy/`، `package-lock.json`، `soniox.html`.
+- **تأییدِ پیش از deploy (worktreeِ تمیز رویِ `208332c`):** tsc، rt 114، ft 65، cf 115، adm 9، hist 11، up 71، tu 19، llm 22 — 0 FAIL؛ routes 182، arch، docs OK؛ build OK.
+- **PRODUCTION:** pm2 `feelia-mysql` (cwd `/root/feeliaa-mysql`). ۱) پشتیبانِ DB پیش از migration: `/root/backups/feelia-pre-core-2026-10-03.sql.gz` (۱MB، «Dump completed»، chmod 600). ۲) tar (`server/ public/ package.json pnpm-lock.yaml pnpm-workspace.yaml`، بدونِ `.env`/`node_modules`/`data`) ⇒ extract ⇒ `pnpm install --frozen-lockfile` ⇒ `pm2 restart --update-env`. ۳) **migrationهایِ 038–044 اعمال شدند** (additive). ۴) تأیید: `/api/health` 200 (database connected)، routeهایِ جدید 401 بدونِ نشست، sha `public/index.html` = commit، بدونِ خطا در لاگ پس از restart؛ دیسک ۲۱٪.
+- **قبل از deploy:** prod index.html نسخه‌یِ قدیمیِ دکمه‌یِ کپی بود (پیش از `375c0f7`) — چیزِ prod-only از دست نرفت.
+- **⚠️ پیامدهایِ این deploy:** (۱) جاروب‌هایِ نگهداری خاموش‌اند ⇒ صدا/آپلود/رصد/ممیزی بی‌سقف می‌مانند (دیسک را پایش کنید؛ `ALLOW_HARD_DELETE=1` فقط اضطراری)؛ (۲) CAS اجباری روی `PUT /api/sessions/:id`؛ (۳) **متنِ رضایت (LAW-009/R1) هنوز اصلاح نشده** در حالی که نگهداریِ صدا/توکن‌ها گسترش یافت — تصمیمِ مالک لازم؛ (۴) backupِ زمان‌بندی‌شده تعریف نشده (`pnpm backup` دستی)؛ (۵) rollback: بازگردانیِ tar قبلی لازم است + migrationها additive‌اند (rollbackِ کد بدونِ rollbackِ DB امن است)؛ dump بالا برایِ بازیابیِ DB.
+- **عامل:** این نشست.
+
 ### 2026-10-02 — CODE + TEST + DOCS — دسترسیِ کاملِ ادمین به همه‌یِ داده + پشتیبانِ فقط‌افزودنی
 - **درخواستِ مالک:** «اضافه کن؛ می‌خواهم به همه دیتا دسترسی داشته باشم و هیچی هارد دیلیت نشه».
 - **ادمین (`features/admin/dataAccess.admin.ts`، جدید):** `GET /api/admin/deleted`، `POST /api/admin/notes/:id/restore`، تاریخچه‌یِ متنِ جلسه/یادداشت (فهرست + متن)، پروندهٔ درمان + نسخه‌ها؛ هر خواندنِ متن audit. UI: کارتِ «داده‌هایِ حذف‌شده» (بازگردانی) در «سلامتِ سیستم» و «تاریخچه‌یِ ویرایشِ متن» در جزئیاتِ جلسه. **export → schema_version 3:** شاملِ حذف‌شده‌ها (`deleted_at`) + `transcript_revisions`/`note_revisions`/`case_file`/`case_file_versions`.
