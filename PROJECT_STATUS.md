@@ -220,6 +220,12 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-10-03 — DEPLOY — ادمین: آخرین فعالیت/مرتب‌سازی + اصلاحِ شمارشِ معکوسِ نگهداریِ صدا (commit `75aede4`)
+- **چه شد:** commit `75aede4` (worktreeِ تمیز؛ hunkهایِ نشستِ دیگر در index.html/PROJECT_STATUS لمس نشد) روی production deploy شد. پیش از آن checksumِ `server/src`+`public` prod با `4776486` یکسان بود (۲۳۴ فایل، بدونِ تفاوت). preflight = GO (همه ۰). پشتیبانِ کد: `/root/backups/code-pre-admin-sort-*.tar.gz`. بدونِ migration.
+- **تست / تأیید:** `tsc`، `test:arch/routes/docs/adm/up/cf` در worktree سبز؛ build سبز؛ prod: `pm2 restart` بدونِ خطا، `/api/health` ok، SELECTهایِ جدید رویِ DBِ prod (فقط شمارش) درست و مرتب، index.html سرو‌شده شاملِ انتخابگرِ مرتب‌سازی. تستِ بصریِ UI با حسابِ واقعی انجام نشد.
+- **عامل:** این نشست
+- **کارِ باز / پیامد:** push به origin انجام نشد. پشتیبانِ `.tar.gz` و `/root/feelia-75aede4.tgz` رویِ سرور باقی است.
+
 ### 2026-10-03 — CODE — ادمین: «آخرین فعالیت» واقعی + مرتب‌سازیِ انتخابیِ فهرست‌ها
 - **چه شد:** فهرستِ تراپیست‌ها/مراجعینِ هر تراپیست بر اساسِ `created_at` مرتب بود و «آخرین» مراجع از `MAX(sessions.date)` (روزِ شروعِ جلسه) می‌آمد؛ ضبطِ ادامه‌یافته در روزِ بعد (۱۱ام) دیده نمی‌شد (۸ام). اکنون `last_activity_at = GREATEST(created_at، آخرین ضبطِ kind='session')` و `last_recording_at` برایِ تراپیست/مراجع/جلسه محاسبه و پیش‌فرضِ ترتیب (نزولی، خالی‌ها ته) است؛ UI تاریخ‌وساعتِ آخرین ضبط را نشان می‌دهد. سه فهرستِ ادمین (تراپیست‌ها، مراجعین، جلساتِ مراجع) و «جلسات اخیر» انتخابگرِ مرتب‌سازی (فیلد + صعودی/نزولی) دارند؛ `/sessions/recent` پارامترِ whitelistشده‌ی `sort`/`dir` گرفت و پنجره‌ی زمانی‌اش رویِ آخرین فعالیت است.
 - **فایل‌ها:** server/src/features/admin/admin.repository.ts، sessions.admin.ts، public/index.html
