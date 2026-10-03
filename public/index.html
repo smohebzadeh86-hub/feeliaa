@@ -55,7 +55,7 @@ body{font-family:'Vazirmatn',Tahoma,sans-serif;background:radial-gradient(900px 
 .app-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;padding:0 2px}
 .brand{display:flex;align-items:center;gap:13px}
 .brand-mark{flex:none;width:47px;height:47px}
-.brand-eyebrow{font-size:11px;font-weight:600;color:var(--sage);margin-bottom:1px}
+.brand-eyebrow{font-size:11px;font-weight:600;color:var(--sage);margin-top:1px}
 .brand-text h1{margin:0;font-size:17.5px;font-weight:800;color:var(--ink)}
 .icon-btn{width:44px;height:44px;border-radius:14px;background:var(--card);border:1.5px solid var(--line);color:var(--muted);cursor:pointer;display:grid;place-items:center}
 .icon-btn:hover{color:var(--sage-deep);border-color:var(--sage)}
@@ -131,16 +131,34 @@ button.btn:disabled{cursor:not-allowed;opacity:.55}
 .btn-primary:hover:not(:disabled){background:var(--sage-hover)}
 .btn-danger{background:var(--clay);color:#fff;box-shadow:0 8px 22px var(--glow-clay)}
 .btn-danger:hover:not(:disabled){background:var(--clay-hover)}
-.btn-secondary{background:var(--sage-mist);color:var(--sage-deep);border:1.5px solid var(--sage-soft)}
-.btn-secondary:hover{background:var(--sage-soft)}
+/* سلسله‌مراتبِ دکمه‌ها (2026-10-03): primary = عملِ اصلی (سبزِ پر + glow)، secondary = «tonal» = عملِ مهمِ دوم
+   (پرکننده‌ی سبزِ ملایم + متنِ سبزِ عمیق؛ رنگی است ولی وزنش کمتر از primary)، ghost = عملِ سوم (فقط کانتور).
+   قبلاً secondary تقریباً هم‌رنگِ پس‌زمینه بود و آپلودِ صوت روی کارتِ مراجع ghost (خاکستری) بود ⇒ کم‌رنگ دیده می‌شد. */
+/* حلقه با inset box-shadow است نه border: `button.btn{border:none}` از `.btn-secondary` تخصیصی‌تر است و border هرگز اعمال نمی‌شد (علتِ ظاهرِ گل‌آلودِ قبلی). */
+button.btn.btn-secondary{background:color-mix(in srgb,var(--sage) 9%,var(--card));color:var(--sage-deep);box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--sage) 55%,transparent)}
+.btn-secondary svg{stroke-width:2.1}
+button.btn.btn-secondary:hover:not(:disabled){background:color-mix(in srgb,var(--sage) 16%,var(--card));box-shadow:inset 0 0 0 1.5px var(--sage)}
+.btn-secondary:focus-visible,.btn-primary:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
 .btn-ghost{background:transparent;color:var(--ink-2);border:1.5px solid var(--line)}
 .btn-ghost:hover{border-color:var(--sage);color:var(--sage-deep);background:var(--sage-mist)}
 .btn-block{width:100%}
 button.btn.btn-xl{padding:17px 22px;font-size:16px;border-radius:17px}
 .btn-row{display:flex;gap:10px;margin-top:4px}
 .btn-row>button{flex:1;min-width:0}
-button.btn.btn-sm{padding:9px 14px;font-size:13px;border-radius:var(--r-md);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:none}
+button.btn.btn-sm{padding:9px 14px;font-size:13px;border-radius:var(--r-md);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button.btn.btn-sm:not(.btn-secondary){box-shadow:none}
 button.btn svg{width:18px;height:18px;flex:none}
+.setup-actions{display:flex;gap:8px;margin-top:4px}
+.setup-actions>button{min-width:0;white-space:nowrap}
+button.btn.btn-lg{padding:13px 16px;font-size:15px;border-radius:15px}
+.setup-actions{gap:10px}
+.setup-actions>.btn-primary{flex:1 1 auto;background:linear-gradient(180deg,color-mix(in srgb,var(--sage) 86%,#fff),var(--sage));box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 8px 16px -8px var(--glow-sage)}
+.setup-actions>.btn-primary:hover:not(:disabled){background:linear-gradient(180deg,var(--sage),var(--sage-hover))}
+.setup-actions>button.btn-lg{min-height:54px;border-radius:16px}
+.setup-actions>.btn-secondary{flex:0 0 auto}
+.setup-back{display:block;margin:6px auto 0;padding:6px 14px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-2);cursor:pointer;border-radius:var(--r-sm)}
+.setup-back:hover{color:var(--sage-deep);background:var(--sage-mist)}
+@media(max-width:380px){.setup-actions>.btn-secondary span{display:none}.setup-actions>.btn-secondary{padding:13px 14px}}
 
 .search-box{position:relative;margin-bottom:16px}
 .search-box input{padding:12px 40px 12px 15px;margin-bottom:0;font-size:14px}
@@ -288,6 +306,20 @@ input::-ms-reveal{display:none}
 [data-theme="dark"] .rec-dot.paused{background:#4a534d}
 .rec-dot.paused::before,.rec-dot.paused::after{animation:none;opacity:0}
 .timer{font-size:47px;font-weight:300;color:var(--ink);direction:ltr;font-variant-numeric:tabular-nums;letter-spacing:1px;margin:0 0 4px;line-height:1.3}
+.rec-ready{display:flex;align-items:center;justify-content:center;gap:8px;width:fit-content;min-height:32px;margin:0 auto 12px;padding:6px 14px;border-radius:99px;font-size:13px;font-weight:600;max-width:100%;box-sizing:border-box;transition:background .35s,color .35s,opacity .6s,transform .35s}
+.rec-ready .rr-ic{flex:none;width:8px;height:8px;border-radius:50%}
+.rec-ready[data-state="connecting"]{background:var(--gold-soft);color:var(--gold-deep)}
+.rec-ready[data-state="connecting"] .rr-ic{width:12px;height:12px;border:2px solid currentColor;border-top-color:transparent;animation:spin .8s linear infinite}
+.rec-ready[data-state="ready"]{background:var(--sage-soft);color:var(--sage-deep);animation:rrIn .35s ease-out}
+.rec-ready[data-state="ready"] .rr-ic{background:var(--sage);animation:rrPulse 1.4s ease-out infinite}
+.rec-ready[data-state="listening"]{background:transparent;color:var(--sage-deep);opacity:0;pointer-events:none}
+.rec-ready[data-state="listening"] .rr-ic{background:var(--sage)}
+.rec-ready[data-state="warn"]{background:var(--clay-soft);color:var(--clay-deep)}
+.rec-ready[data-state="warn"] .rr-ic{background:var(--clay)}
+.rec-ready[data-state="paused"]{background:transparent;color:var(--muted)}
+.rec-ready[data-state="paused"] .rr-ic{background:#adb8b2}
+@keyframes rrIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+@keyframes rrPulse{0%{box-shadow:0 0 0 0 rgba(62,107,94,.45)}100%{box-shadow:0 0 0 7px rgba(62,107,94,0)}}
 .rec-status{font-size:13.5px;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:8px;min-height:22px}
 .rec-status::before{content:'';flex:none;width:7px;height:7px;border-radius:50%;background:var(--sage)}
 .rec-status.warn{color:var(--clay-deep);font-weight:700}
@@ -317,10 +349,11 @@ input::-ms-reveal{display:none}
 .signs-area{border-top:1px dashed var(--line);margin-top:18px;padding-top:16px;text-align:right}
 .signs-label{font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:9px;display:flex;align-items:center;gap:7px}
 .signs-label svg{width:15px;height:15px;color:var(--sage);flex:none}
-.signs-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
-.sign-chip{padding:8px 14px;border-radius:99px;border:1.5px solid var(--sage-soft);background:var(--sage-mist);color:var(--sage-deep);font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .15s,transform .1s}
-.sign-chip:hover{background:var(--sage-soft)}
-.sign-chip:active{transform:scale(.95)}
+.signs-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.sign-chip{display:flex;align-items:center;justify-content:center;min-height:38px;padding:5px 6px;border-radius:var(--r-sm);border:1.5px solid var(--sage-soft);background:var(--sage-mist);color:var(--sage-deep);font-family:inherit;font-size:12px;font-weight:600;line-height:1.35;text-align:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s,border-color .15s,transform .1s}
+.sign-chip:hover{background:var(--sage-soft);border-color:var(--sage)}
+.sign-chip:active{transform:scale(.96)}
+.sign-chip:focus-visible{outline:2px solid var(--sage);outline-offset:2px}
 .sign-chip.logged{background:var(--sage)!important;color:#fff!important;border-color:var(--sage)}
 .signs-log{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;min-height:8px}
 .sign-log-item{display:inline-flex;align-items:center;gap:6px;background:var(--gold-soft);border-radius:99px;padding:4px 6px 4px 12px;font-size:12px;font-weight:600;color:var(--gold-deep)}
@@ -329,9 +362,32 @@ input::-ms-reveal{display:none}
 .sign-log-item .sign-rm{background:none;border:none;color:var(--gold-deep);cursor:pointer;padding:0 4px;display:grid;place-items:center;opacity:.55;transition:opacity .15s}
 .sign-log-item .sign-rm:hover{opacity:1}
 .sign-log-item .sign-rm svg{width:11px;height:11px}
-.qn-row{display:flex;gap:8px}
-.qn-row input{flex:1;margin-bottom:0;font-size:13.5px;padding:11px 13px}
-.qn-row .btn{flex:none;padding:11px 16px;font-size:13.5px}
+/* یادداشتِ سریعِ حینِ جلسه: دکمه‌هایِ ویرایش (قلم) و حذف (سطل — روی hover قرمز)، هم‌سبکِ .job-del */
+.note-log-item .note-act{flex:none;width:26px;height:26px;border-radius:8px;border:0;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;padding:0;transition:background .15s,color .15s}
+.note-log-item .note-act svg{width:15px;height:15px}
+.note-log-item .note-act.edit:hover{background:var(--sage-soft);color:var(--sage-deep)}
+.note-log-item .note-act.edit.ok{background:var(--sage-soft);color:var(--sage-deep)}
+.note-log-item .note-act.cancel:hover{background:var(--clay-soft);color:var(--clay-deep)}
+.note-log-item .note-act.del:hover{background:var(--clay-soft);color:var(--clay-deep)}
+.note-log-item .note-act:disabled{opacity:.35;cursor:default;pointer-events:none}
+.note-log-item .note-edit-input{flex:1;min-width:0;margin:0;height:30px;font-size:12.5px;padding:0 10px;border-radius:8px}
+/* یادداشت سریع (2026-10-03): فیلدِ pill با دکمه‌ی ارسالِ آیکونیِ داخلش — یک ردیفِ ۴۲px به‌جایِ فیلد + دکمه‌ی جدا.
+   syncQuickNoteBtn همان کلاس‌های btn-primary/btn-secondary را می‌چرخاند (JS بدونِ تغییر). */
+.qn-row{position:relative;display:flex;align-items:center}
+.qn-row input{flex:1;margin-bottom:0;font-size:13.5px;height:42px;padding:0 14px 0 50px;border-radius:999px}
+.qn-row .btn{position:absolute;left:5px;top:50%;transform:translateY(-50%);width:32px;height:32px;padding:0;border-radius:50%;box-shadow:none}
+.qn-row .btn:active{transform:translateY(-50%) scale(.92)}
+.qn-row .btn svg{width:16px;height:16px;transform:scaleX(-1)}
+.qn-row button.btn.btn-secondary{background:var(--sage-mist);color:var(--ink-3,var(--ink-2));box-shadow:none}
+/* نوارِ کنترلِ جلسه: [پایان] [توقف/ادامه] [لغو] در یک ردیف */
+.live-dock{display:flex;align-items:center;gap:8px;margin-top:12px}
+.live-dock .btn{height:46px;padding:0 14px;font-size:14px;border-radius:14px;white-space:nowrap}
+.live-dock .ld-end{flex:1.5 1 0;min-width:0}
+.live-dock .ld-pause{flex:1 1 0;min-width:0}
+.live-dock .ld-cancel{flex:none;height:46px;padding:0 10px;border:none;background:none;color:var(--ink-2);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;border-radius:12px}
+.live-dock .ld-cancel:hover{color:var(--clay);background:color-mix(in srgb,var(--clay) 8%,transparent)}
+.live-dock .ld-cancel:focus-visible{outline:2px solid var(--clay);outline-offset:2px}
+.live-dock button[hidden]{display:none}
 .notes-log{margin-bottom:14px}
 .note-log-item{background:var(--sage-mist);border-right:3px solid var(--sage);padding:8px 12px;margin:6px 0;border-radius:8px;font-size:12.5px;color:var(--ink-2);display:flex;align-items:center;gap:8px}
 .note-log-time{color:var(--muted);font-size:10px;flex:none;direction:ltr}
@@ -366,6 +422,28 @@ input::-ms-reveal{display:none}
 .note-item p{margin:0;font-size:14px;line-height:2;white-space:pre-wrap;color:var(--ink)}
 
 .sub-panel{border-top:1px dashed var(--line);padding-top:20px;margin-top:16px}
+/* صفحه‌ی «تکمیل جلسه»: بخش‌های عنوان‌دار، دکمه‌های افزودنِ جمع‌وجور، اکشنِ اصلی در انتها */
+.wr-sec{margin-bottom:20px}
+.wr-title{font-size:13px;font-weight:700;color:var(--ink-2);margin-bottom:10px}
+.wr-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.wr-head .wr-title{margin:0}
+.wr-add{display:flex;gap:8px;flex:none}
+.wr-add button.btn.btn-sm{padding:8px 14px;min-height:38px}
+.wr-add button.btn svg{width:15px;height:15px}
+.wr-live{display:none}
+.wr-live:has(div:not(:empty)){display:block}
+.wr-live #wrapupSignsLog{margin-bottom:6px}
+.wr-empty{font-size:12.5px;color:var(--muted);line-height:1.9;padding:12px 14px;border:1px dashed var(--line);border-radius:var(--r-md);text-align:center}
+#notesList:not(:empty)~.wr-empty{display:none}
+.wr-actions{display:flex;flex-direction:column;align-items:stretch;gap:6px;margin-top:8px;padding-top:16px;border-top:1px solid var(--line-soft)}
+.wr-actions>.btn-primary{min-height:50px;font-size:15.5px}
+.wr-exit{background:none;border:none;font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;padding:10px;border-radius:var(--r-md)}
+.wr-exit:hover{color:var(--ink);background:var(--sage-mist)}
+@media(min-width:640px){
+  .wr-actions{flex-direction:row-reverse;align-items:center;justify-content:space-between}
+  .wr-actions>.btn-primary{min-width:220px}
+}
+@media(max-width:380px){.wr-head{flex-wrap:wrap}}
 #voiceNoteBox{text-align:center}
 /* ⭐ حالتِ بازبینیِ متنِ صوتی قبل از ذخیره — read-only تا ویرایش را صریح بزنند */
 #archiveTextNoteInput.readonly-preview{background:var(--field-dim,var(--field));border-style:dashed;cursor:default}
@@ -551,17 +629,16 @@ input::-ms-reveal{display:none}
      که طبقِ اصلِ راهنما (درخواستِ مالک) باید حذف بشه. همه با همون توکن‌ها/کلاس‌های
      موجودِ سیستمِ طراحی (--card, --line-soft, --r-lg, --shadow, .btn-*) ثابت
      می‌شوند؛ فقط در همین مدیاکوئری فعال است — دسکتاپ دست‌نخورده می‌ماند. */
-  #screenLive .rec-stage{padding-bottom:158px}
+  #screenLive .rec-stage{padding-bottom:92px}
   /* ⭐ left+width به‌جایِ left+right: در سندِ RTL، وقتی هر دوِ left/right همزمان
      روی یک عنصرِ fixed ست بشن، طبقِ اسپکِ CSS مرورگر با توجه به direction یکی رو
      نادیده می‌گیره (اینجا left) — عنصر از سمتِ چپِ صفحه بیرون می‌زد. با anchorِ
      تکی (left) + عرضِ صریح (calc)، این ابهام اصلاً پیش نمی‌آد. */
-  #liveControls{position:fixed;left:12px;width:calc(100% - 24px);bottom:12px;z-index:40;background:var(--card);border:1px solid var(--line-soft);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:12px 14px 14px}
-  #liveControls .btn-row{margin:0 0 10px}
-  #liveControls #btnEndSession{margin-top:0}
+  #liveControls{position:fixed;left:12px;width:calc(100% - 24px);bottom:12px;z-index:40;background:var(--card);border:1px solid var(--line-soft);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:8px 10px}
+  #liveControls .live-dock{margin-top:0}
 
   #screenSetup{padding-bottom:86px}
-  #screenSetup #btnStartSession{position:fixed;left:12px;width:calc(100% - 24px);bottom:12px;z-index:40;margin:0}
+  #screenSetup .setup-actions{position:fixed;left:12px;width:calc(100% - 24px);bottom:12px;z-index:40;margin:0}
 
   #screenClients{padding-bottom:80px}
   #screenClients #btnNewClient{position:fixed;left:12px;width:calc(100% - 24px);bottom:12px;z-index:40;margin:0;background:var(--card);box-shadow:var(--shadow)}
@@ -947,8 +1024,8 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
         </svg>
       </div>
       <div class="brand-text">
-        <div class="brand-eyebrow">دستیار درمانگر</div>
         <h1>فیلیا</h1>
+        <div class="brand-eyebrow">دستیار درمانگر</div>
       </div>
     </div>
     <div style="display:flex;gap:8px">
@@ -1448,17 +1525,20 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
         <li>اگر هشدارِ کیفیتِ صدا دیدید، جایِ دستگاه را عوض کنید.</li>
       </ul>
     </details>
-    <button class="btn btn-primary btn-xl btn-block" id="btnStartSession" disabled onclick="startSession()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
-      شروع جلسه و رونویسی
-    </button>
-    <!-- (تستِ واقعی 2026-09-24) بعد از ساختِ مراجع، اپ مستقیم به این صفحه می‌آید و دکمه‌ی آپلود فقط در پرونده بود؛
-         تراپیستی که فایلِ ضبط‌شده داشت یک جلسه‌ی زنده‌ی خالیِ چندثانیه‌ای می‌ساخت تا به پرونده برسد. -->
-    <button class="btn btn-secondary btn-block" id="setupUploadBtn" style="margin-top:10px" onclick="openAudioUploadFromSetup()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-      آپلود فایل صوتی
-    </button>
-    <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="goBackToClients()">بازگشت</button>
+    <!-- (2026-10-03) بازطراحیِ فشرده: شروعِ جلسه + آپلود در یک ردیف، «بازگشت» لینکِ کم‌ارتفاع -->
+    <div class="setup-actions">
+      <button class="btn btn-primary btn-lg" id="btnStartSession" disabled onclick="startSession()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+        شروع جلسه و رونویسی
+      </button>
+      <!-- (تستِ واقعی 2026-09-24) بعد از ساختِ مراجع، اپ مستقیم به این صفحه می‌آید و دکمه‌ی آپلود فقط در پرونده بود؛
+           تراپیستی که فایلِ ضبط‌شده داشت یک جلسه‌ی زنده‌ی خالیِ چندثانیه‌ای می‌ساخت تا به پرونده برسد. -->
+      <button class="btn btn-secondary btn-lg" id="setupUploadBtn" title="آپلود فایل صوتی" aria-label="آپلود فایل صوتی" onclick="openAudioUploadFromSetup()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        <span>آپلود صوت</span>
+      </button>
+    </div>
+    <button class="setup-back" onclick="goBackToClients()">بازگشت</button>
   </section>
 
   <section id="screenLive" class="card screen" hidden>
@@ -1466,7 +1546,8 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <div id="liveConnBanner" data-clarity-mask="true"></div>
     <div id="recHealthBanner" role="alert" data-clarity-mask="true"></div>
     <div class="rec-stage">
-      <div class="rec-dot" id="recDot">
+      <div class="rec-ready" id="recReady" data-state="connecting" role="status" aria-live="polite"><span class="rr-ic" aria-hidden="true"></span><span class="rr-text" id="recReadyText">در حال اتصال… هنوز صحبت نکنید</span></div>
+      <div class="rec-dot paused" id="recDot">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round">
           <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
         </svg>
@@ -1483,16 +1564,16 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           علائم بدنی
         </div>
-        <div class="signs-row" id="signsRow" data-clarity-mask="true">
-          <button class="sign-chip" data-sign="گریان">گریان</button>
-          <button class="sign-chip" data-sign="لرزش">لرزش</button>
-          <button class="sign-chip" data-sign="تنش عضلانی">تنش</button>
-          <button class="sign-chip" data-sign="سکوت طولانی">سکوت</button>
-          <button class="sign-chip" data-sign="خشم">خشم</button>
-          <button class="sign-chip" data-sign="پرخاشگری">پرخاش</button>
-          <button class="sign-chip" data-sign="اتصال چشمی گریزان">گریز چشمی</button>
-          <button class="sign-chip" data-sign="خواب‌آلودگی">خواب‌آلودگی</button>
-          <button class="sign-chip" data-sign="بی‌قراری">بی‌قراری</button>
+        <div class="signs-row" id="signsRow" role="group" aria-label="علائم بدنی" data-clarity-mask="true">
+          <button type="button" class="sign-chip" data-sign="گریان">گریان</button>
+          <button type="button" class="sign-chip" data-sign="لرزش">لرزش</button>
+          <button type="button" class="sign-chip" data-sign="تنش عضلانی">تنش عضلانی</button>
+          <button type="button" class="sign-chip" data-sign="سکوت طولانی">سکوت طولانی</button>
+          <button type="button" class="sign-chip" data-sign="خشم">خشم</button>
+          <button type="button" class="sign-chip" data-sign="پرخاشگری">پرخاشگری</button>
+          <button type="button" class="sign-chip" data-sign="اتصال چشمی گریزان">اتصال چشمی گریزان</button>
+          <button type="button" class="sign-chip" data-sign="خواب‌آلودگی">خواب‌آلودگی</button>
+          <button type="button" class="sign-chip" data-sign="بی‌قراری">بی‌قراری</button>
         </div>
         <div class="signs-log" id="signsLog" data-clarity-mask="true"></div>
         <div class="signs-label" style="margin-top:14px">
@@ -1502,7 +1583,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
         <div class="notes-log" id="notesLog" data-clarity-mask="true"></div>
         <div class="qn-row" data-clarity-mask="true">
           <input type="text" id="quickNoteInput" placeholder="یادداشت… (Enter)">
-          <button class="btn btn-secondary" onclick="addQuickNote()">ثبت</button>
+          <button class="btn btn-secondary" id="quickNoteBtn" onclick="addQuickNote()" aria-label="ثبت یادداشت" title="ثبت (Enter)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
         </div>
       </div>
       <!-- ⭐ فیکسِ باگِ واقعی (UI-22): در موبایل این کنترل‌ها بعدِ علائم/یادداشت‌ها
@@ -1510,13 +1591,13 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
            هیچ فرقی نمی‌کند (فقط در مدیاکوئریِ ≤480px ثابت می‌شود)؛ در موبایل این
            جعبه (نه «لغو جلسه») پایینِ صفحه می‌چسبد، هم‌سبکِ .card با همان توکن‌ها. -->
       <div id="liveControls">
-        <div class="btn-row" style="margin:10px 0">
-          <button class="btn btn-secondary" id="btnPauseLive" onclick="pauseSessionLive()">توقف موقت</button>
-          <button class="btn btn-secondary" id="btnResumeLive" onclick="resumeSessionLive()" hidden>ادامه</button>
+        <div class="live-dock">
+          <button class="btn btn-danger ld-end" id="btnEndSession" onclick="endSession()">پایان جلسه</button>
+          <button class="btn btn-secondary ld-pause" id="btnPauseLive" onclick="pauseSessionLive()"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>توقف</button>
+          <button class="btn btn-secondary ld-pause" id="btnResumeLive" onclick="resumeSessionLive()" hidden><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10-6.5a1 1 0 0 0 0-1.8l-10-6.5A1 1 0 0 0 8 5.5z"/></svg>ادامه</button>
+          <button class="ld-cancel" onclick="showCancelModal()">لغو جلسه</button>
         </div>
-        <button class="btn btn-danger btn-xl btn-block" id="btnEndSession" style="margin-top:18px" onclick="endSession()">پایان جلسه</button>
       </div>
-      <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="showCancelModal()">لغو جلسه</button>
     </div>
   </section>
 
@@ -1527,19 +1608,27 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     </div>
     <div class="session-summary" id="wrapupChips" data-clarity-mask="true"></div>
     <div id="wrapupPreNotes" class="pre-notes" data-clarity-mask="true" hidden></div>
-    <div id="wrapupSignsLog" data-clarity-mask="true" style="margin-bottom:14px"></div>
-    <div id="wrapupNotesLog" data-clarity-mask="true" style="margin-bottom:14px"></div>
-    <div id="notesList" data-clarity-mask="true"></div>
-    <div class="btn-row" style="margin-bottom:12px">
-      <button class="btn btn-secondary" onclick="startVoiceNote()" id="voiceNoteBtn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
-        یادداشت صوتی
-      </button>
-      <button class="btn btn-secondary" id="textNoteBtn" onclick="showTextInput()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-        یادداشت متنی
-      </button>
+    <div class="wr-sec wr-live">
+      <div class="wr-title">ثبت‌شده در حین جلسه</div>
+      <div id="wrapupSignsLog" data-clarity-mask="true"></div>
+      <div id="wrapupNotesLog" data-clarity-mask="true"></div>
     </div>
+    <div class="wr-sec">
+      <div class="wr-head">
+        <div class="wr-title">یادداشت پس از جلسه</div>
+        <div class="wr-add">
+          <button class="btn btn-secondary btn-sm" onclick="startVoiceNote()" id="voiceNoteBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 2a4 4 0 0 0-4 4v5a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4z"/><path d="M5 11a7 7 0 0 0 14 0"/><path d="M12 18v3"/></svg>
+            صوتی
+          </button>
+          <button class="btn btn-secondary btn-sm" id="textNoteBtn" onclick="showTextInput()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+            متنی
+          </button>
+        </div>
+      </div>
+      <div id="notesList" data-clarity-mask="true"></div>
+      <div class="wr-empty">هنوز یادداشتی ثبت نشده. با «صوتی» یا «متنی» اضافه کنید؛ اختیاری است.</div>
     <div id="voiceNoteBox" class="sub-panel" data-clarity-mask="true" hidden>
       <div class="timer" id="voiceTimer" style="font-size:26px;margin:4px 0 2px">۰۰:۰۰</div>
       <div class="rec-status" id="voiceStatus">آماده…</div>
@@ -1556,11 +1645,14 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
         <button class="btn btn-secondary" onclick="addTextNote()">افزودن</button>
       </div>
     </div>
-    <button class="btn btn-primary btn-xl btn-block" style="margin-top:20px" onclick="finishSession()">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>
-      ذخیره و پایان
-    </button>
-    <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="showExitWarning()">بازگشت بدون ذخیره</button>
+    </div>
+    <div class="wr-actions">
+      <button class="btn btn-primary" onclick="finishSession()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8"/><path d="M7 3v5h8"/></svg>
+        ذخیره و پایان
+      </button>
+      <button class="wr-exit" onclick="showExitWarning()">بازگشت بدون ذخیره</button>
+    </div>
   </section>
 
   <section id="screenClientDetail" class="card screen" hidden>
@@ -2485,7 +2577,7 @@ async function startDirectLive(){
   }
   try{
     await SonioxDirect.connect(cred,{
-      onStatus:function(){wsConnected=true;$('recDot').classList.remove('paused');$('recStatus').textContent='در حال رونویسیِ زنده…';$('recStatus').classList.remove('warn');clearLiveConnBanner();startTimer();lastPreviewAt=Date.now();},
+      onStatus:function(){wsConnected=true;$('recDot').classList.remove('paused');setRecReady('ready');$('recStatus').textContent='در حال رونویسیِ زنده…';$('recStatus').classList.remove('warn');clearLiveConnBanner();startTimer();lastPreviewAt=Date.now();},
       onResult:function(r){
         lastPreviewAt=Date.now();
         directFinalText=cleanDirectText(r.final);
@@ -2547,7 +2639,7 @@ async function fallbackToProxy(reason){
   try{SonioxDirect.close();}catch(e){}
   directActive=false;wsConnected=false;
   setLiveConnBanner('warn','<b>اتصال قطع شد.</b><br>در حال اتصالِ مجدد — ضبط ادامه دارد و متن تا اینجا حفظ شده.');
-  $('recStatus').textContent='در حال اتصالِ مجدد…';
+  $('recStatus').textContent='در حال اتصالِ مجدد…';setRecReady('connecting');
   try{await connectWS();}catch(e){}
 }
 async function endDirectLive(){
@@ -2909,6 +3001,7 @@ async function postNoteReliably(sessionId,body,local,onChange){
   try{
     const r=await api('/api/sessions/'+sessionId+'/notes',{method:'POST',body:body,timeoutMs:20000});
     if(r&&r.note)local.dbId=r.note.id;
+    if(onChange&&!local.removed)onChange(); // دکمه‌ی ویرایش به dbId وابسته است ⇒ بعد از ثبت باید دوباره رندر شود
     return true;
   }catch(e){
     if(isPermanentNoteError(e)){
@@ -4750,6 +4843,7 @@ async function liveResumeSession(sessionId){
     showScreen('Live');
     clearLiveConnBanner();
     $('recStatus').textContent='در حال اتصال…';
+    $('recDot').classList.add('paused');setRecReady('connecting');
     resetTimer();
     if(sess.duration_ms&&sess.duration_ms>0){elapsedMs=sess.duration_ms;renderTimer();}
     $('liveText').hidden=true;
@@ -6046,7 +6140,7 @@ function buildClientCard(c){
     // آپلودِ فایلِ صوتیِ جلسه — مستقیم رویِ کارتِ هر دو تب (گزارشِ مالک 2026-09-24: دکمه فقط داخلِ صفحه‌ی
     // مراجع بود و پیدا نمی‌شد). همان مودالِ openAudioUploadModal؛ برایِ فعال و غیرفعال یکسان.
     const upBtn=document.createElement('button');
-    upBtn.className='btn btn-ghost btn-sm card-upload-btn';
+    upBtn.className='btn btn-secondary btn-sm card-upload-btn';
     upBtn.title='آپلودِ فایلِ صوتیِ جلسه';
     upBtn.setAttribute('aria-label','آپلودِ فایلِ صوتیِ جلسه');
     upBtn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>آپلود صوت</span>';
@@ -8174,6 +8268,7 @@ async function startSession(){
     showScreen('Live');
     clearLiveConnBanner();
     $('recStatus').textContent='در حال اتصال…';
+    $('recDot').classList.add('paused');setRecReady('connecting');
     resetTimer();
     $('liveText').hidden=true;
     $('chkLiveText').checked=false;
@@ -8273,6 +8368,7 @@ async function startNewRTSession(){
     onHealth:rtOnHealth
   });
   $('recStatus').textContent='در حال برقراریِ اتصال…';
+  $('recDot').classList.add('paused');setRecReady('connecting');
   let ok=false;
   try{ok=await rtSession.start();}catch(e){
     ok=false;
@@ -8396,6 +8492,16 @@ function showAudioQualityHint(issue){
   }
 }
 
+// نشانگرِ بزرگِ «آماده‌ی صحبت؟» — فقط وقتی ACTIVE/RECOVERED شد «آماده‌ی صحبت» نشان می‌دهد.
+var recReadyTimer=null;
+function setRecReady(kind,text){
+  var el=$('recReady'),tx=$('recReadyText');if(!el||!tx)return;
+  if(recReadyTimer){clearTimeout(recReadyTimer);recReadyTimer=null;}
+  var T={connecting:'در حال اتصال… هنوز صحبت نکنید',ready:'آماده‌اید؛ می‌توانید صحبت کنید',listening:'در حال شنیدن…',
+    warn:text||'اتصال قطع — صدا ذخیره می‌شود',paused:'متوقف شد'};
+  el.setAttribute('data-state',kind);tx.textContent=(kind==='warn'||kind==='paused'?text:null)||T[kind]||'';
+  if(kind==='ready')recReadyTimer=setTimeout(function(){setRecReady('listening');},3500);
+}
 function rtOnState(st,snap){
   if(!currentSession)return;
   snap=snap||{};
@@ -8410,6 +8516,11 @@ function rtOnState(st,snap){
     FAILED:'رونویسیِ زنده ناموفق — صدا به‌صورتِ محلی ذخیره می‌شود'
   };
   if(map[st])$('recStatus').textContent=map[st];
+  if(st==='STARTING'){$('recDot').classList.add('paused');setRecReady('connecting');}
+  else if(st==='ACTIVE'||st==='RECOVERED')setRecReady('ready');
+  else if(st==='MANUAL_PAUSED')setRecReady('paused');
+  else if(st==='RECONNECTING'||st==='NETWORK_PAUSED'||st==='FAILED')setRecReady('warn',map[st]);
+  else if(st==='FINALIZING')setRecReady('paused','در حال نهایی‌سازی…');
   if(st==='ACTIVE'||st==='RECOVERED'){
     wsConnected=true;$('recDot').classList.remove('paused');
     $('recStatus').classList.remove('warn');clearLiveConnBanner();startTimer();
@@ -8498,6 +8609,7 @@ async function rtResumeLive(){
   if(!rtSession)return;
   manualPaused=false;updatePauseUI();
   $('recStatus').textContent='در حال اتصال…';
+  setRecReady('connecting');
   let ok=false;
   try{ok=await rtSession.resume();}catch(e){ok=false;}
   if(!ok){manualPaused=true;updatePauseUI();$('recStatus').textContent='ادامه اعمال نشد — دوباره «ادامه» بزنید';}
@@ -8899,9 +9011,19 @@ async function addQuickNote(){
   sessionNotes.push(nd);
   renderNotesLog();
   input.value='';
+  syncQuickNoteBtn();
   const body={type:nd.type,text:nd.text,offset_ms:nd.offset_ms,wall_clock:nd.wall_clock};
   await postNoteReliably(currentSession.id,body,nd,function(){renderNotesLog();renderWrapupNotesLog();});
 }
+// دکمه‌ی «ثبت» وقتی متنی نوشته شد پررنگ (primary) می‌شود، وگرنه کم‌رنگ می‌ماند.
+function syncQuickNoteBtn(){
+  const b=$('quickNoteBtn'),i=$('quickNoteInput');
+  if(!b||!i)return;
+  const has=!!i.value.trim();
+  b.classList.toggle('btn-primary',has);
+  b.classList.toggle('btn-secondary',!has);
+}
+ $('quickNoteInput').addEventListener('input',syncQuickNoteBtn);
  $('quickNoteInput').addEventListener('keydown',function(e){
   if(e.key==='Enter'){
     e.preventDefault();
@@ -8932,16 +9054,64 @@ function renderNotesLog(){
     txt.textContent=n.text;
     el.appendChild(txt);
     const um=unsavedMark(n);if(um)el.appendChild(um);
+    const ed=document.createElement('button');
+    ed.type='button';ed.className='note-act edit';
+    ed.title='ویرایش';ed.setAttribute('aria-label','ویرایش یادداشت');
+    ed.innerHTML=IC_PEN;
+    ed.disabled=!n.dbId; // تا ثبت در سرور (یا وقتی در صفِ ارسال است) ویرایش‌پذیر نیست
+    ed.addEventListener('click',function(e){
+      e.stopPropagation();
+      editQuickNote(n,el,txt);
+    });
+    el.appendChild(ed);
     const btn=document.createElement('button');
-    btn.className='sign-rm';
-    btn.title='حذف';
-    btn.innerHTML=IC_X;
+    btn.type='button';btn.className='note-act del';
+    btn.title='حذف';btn.setAttribute('aria-label','حذف یادداشت');
+    btn.innerHTML=IC_TRASH;
     btn.addEventListener('click',function(e){
       e.stopPropagation();
       removeQuickNote(i);
     });
     el.appendChild(btn);
     log.appendChild(el);
+  });
+}
+// ویرایشِ درجا: متن با input عوض می‌شود؛ Enter ذخیره، Esc انصراف (PATCH /api/notes/:id؛ متنِ قبلی در تاریخچه می‌ماند).
+function editQuickNote(n,el,txt){
+  if(!n.dbId)return;
+  const inp=document.createElement('input');
+  inp.type='text';inp.className='note-edit-input';inp.value=n.text||'';inp.maxLength=20000;
+  txt.replaceWith(inp);
+  inp.focus();
+  let busy=false;
+  // حالتِ ویرایش: قلم ⇒ تیکِ «ثبت»، سطل ⇒ ضربدرِ «انصراف» (Enter/Esc هم کار می‌کنند).
+  const ed=el.querySelector('.note-act.edit'),del=el.querySelector('.note-act.del');
+  async function save(){
+    if(busy)return;
+    const text=inp.value.trim();
+    if(!text){showBanner('error','متنِ یادداشت خالی است — برایِ پاک‌کردن، انصراف را بزنید و سطل را بزنید.');return;}
+    if(text===n.text){renderNotesLog();return;}
+    busy=true;inp.disabled=true;ed.disabled=true;
+    try{
+      const d=await api('/api/notes/'+n.dbId,{method:'PATCH',body:{text:text}});
+      n.text=(d&&d.note&&d.note.text)||text;
+      renderNotesLog();renderWrapupNotesLog();
+    }catch(err){
+      busy=false;inp.disabled=false;ed.disabled=false;inp.focus();
+      showBanner('error','ذخیره‌ی ویرایش ناموفق بود: '+escapeHtml(err.message||''));
+    }
+  }
+  function cancel(){if(!busy)renderNotesLog();}
+  const ed2=ed.cloneNode(false),del2=del.cloneNode(false); // cloneNode: handlerهایِ قبلی (ویرایش/حذف) برداشته می‌شوند
+  ed2.className='note-act edit ok';ed2.title='ثبتِ ویرایش';ed2.setAttribute('aria-label','ثبتِ ویرایش');ed2.innerHTML=IC_CHECK;
+  del2.className='note-act cancel';del2.title='انصراف';del2.setAttribute('aria-label','انصراف از ویرایش');del2.innerHTML=IC_X;
+  ed2.addEventListener('click',function(e){e.stopPropagation();save();});
+  del2.addEventListener('click',function(e){e.stopPropagation();cancel();});
+  ed.replaceWith(ed2);del.replaceWith(del2);
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Escape'){e.preventDefault();cancel();return;}
+    if(e.key!=='Enter')return;
+    e.preventDefault();save();
   });
 }
 
@@ -9022,13 +9192,14 @@ async function resumeDirectLive(){
   directPauseEpoch+=1;
   updatePauseUI();
   $('recStatus').textContent='در حال اتصال…';
+  setRecReady('connecting');
   const prefix=directPrefix||directFinalText||'';
   let cred;
   try{cred=await SonioxDirect.mint(currentSession.id);}
   catch(e){$('recStatus').textContent='ادامه اعمال نشد — دوباره «ادامه» بزنید';manualPaused=true;updatePauseUI();return;}
   try{
     await SonioxDirect.connect(cred,{
-      onStatus:function(){$('recDot').classList.remove('paused');$('recStatus').textContent='در حال رونویسیِ زنده…';startTimer();lastPreviewAt=Date.now();},
+      onStatus:function(){$('recDot').classList.remove('paused');setRecReady('ready');$('recStatus').textContent='در حال رونویسیِ زنده…';startTimer();lastPreviewAt=Date.now();},
       onResult:function(r){
         lastPreviewAt=Date.now();
         const fresh=cleanDirectText(r.final);
@@ -9095,6 +9266,7 @@ async function resumeSessionLive(){
   manualPaused=false;
   updatePauseUI();
   $('recStatus').textContent='در حال اتصال…';
+  setRecReady('connecting');
   clearP1AckTimers();
   resumePending=true;
   if(!ws||ws.readyState!==WebSocket.OPEN){
