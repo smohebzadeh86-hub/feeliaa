@@ -938,6 +938,35 @@ input::-ms-reveal{display:none}
 .up-consent input{width:18px;height:18px;margin:4px 0 0;flex:none;accent-color:var(--sage)}
 .up-note{font-size:12px;color:var(--muted);line-height:1.9;margin:-4px 0 14px}
 .up-err{white-space:pre-line;font-size:12.5px;color:var(--clay-deep);background:var(--clay-soft);border-radius:var(--r-md);padding:9px 12px;margin-bottom:12px}
+.up-modal{display:flex;flex-direction:column;padding:0;max-height:calc(100vh - 36px);max-height:calc(100dvh - 36px);overflow:hidden;max-width:460px}
+.up-head{display:flex;align-items:center;gap:12px;padding:18px 20px 14px;border-bottom:1px solid var(--line);flex:none}
+.up-head-ic{flex:none;width:42px;height:42px;border-radius:13px;background:var(--sage-soft);color:var(--sage-deep);display:grid;place-items:center}
+.up-head-ic svg{width:22px;height:22px}
+.up-head-tx{flex:1;min-width:0}
+.up-modal .up-head h3{margin:0;font-size:16.5px}
+.up-modal .up-head p{margin:2px 0 0;font-size:12.5px;color:var(--muted);line-height:1.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.up-x{flex:none;width:34px;height:34px;border:0;border-radius:10px;background:transparent;color:var(--muted);display:grid;place-items:center;cursor:pointer;padding:0}
+.up-x svg{width:18px;height:18px}
+.up-x:hover{background:var(--sage-mist);color:var(--ink)}
+.up-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:16px 20px 6px}
+.up-foot{flex:none;padding:12px 20px 18px;border-top:1px solid var(--line);background:var(--card)}
+.up-foot .up-note{margin:0 0 10px;font-size:11.5px;line-height:1.8}
+.up-foot .modal-actions{margin-top:0}
+.up-modal .up-drop{padding:22px 16px;gap:6px}
+.up-modal .up-drop span{font-size:12.5px;color:var(--ink-2);direction:ltr;unicode-bidi:plaintext}
+.up-modal .up-drop em{font-style:normal;font-size:11.5px;color:var(--muted);line-height:1.8}
+.up-tip{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.8;color:var(--muted);margin:0 0 14px}
+.up-tip svg{flex:none;width:16px;height:16px;margin-top:3px;color:var(--sage)}
+.up-field{margin-bottom:14px}
+.up-modal label small,.up-more summary small{font-weight:500;color:var(--muted);font-size:11.5px}
+.up-hint{font-size:11.5px;color:var(--muted);line-height:1.8;margin-top:6px}
+.up-more{border:1px solid var(--line);border-radius:var(--r-md);margin-bottom:14px;background:var(--field)}
+.up-more summary{cursor:pointer;list-style:none;padding:12px 14px;font-size:13px;font-weight:700;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+.up-more summary::-webkit-details-marker{display:none}
+.up-more summary::after{content:"";margin-inline-start:auto;width:8px;height:8px;border-inline-end:2px solid var(--muted);border-bottom:2px solid var(--muted);transform:rotate(45deg);transition:transform .2s}
+.up-more[open] summary::after{transform:rotate(-135deg)}
+.up-more .pre-note-area{padding:0 14px 12px}
+.up-modal .up-consent{margin:0 0 12px}
 .session-status.processing{background:var(--gold-soft);color:var(--gold-deep)}
 .session-status.failed{background:var(--clay-soft);color:var(--clay-deep)}
 #uploadJobPanel{margin-bottom:14px}
@@ -1805,42 +1834,52 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
 </div>
 
 <div class="modal-back" id="audioUploadModal" data-clarity-mask="true">
-  <div class="modal">
-    <h3>آپلودِ فایلِ صوتیِ جلسه</h3>
-    <p id="audioUploadFor" style="margin-bottom:14px"></p>
-    <input type="file" id="audioUploadInput" hidden
-      accept="audio/*,video/mp4,video/quicktime,video/3gpp,.mp3,.m4a,.mp4,.aac,.wav,.ogg,.oga,.opus,.webm,.weba,.flac,.amr,.3gp,.3gpp,.3ga,.wma,.asf,.aif,.aiff,.caf,.mkv,.mka,.mov,.m4b,.wv"
-      multiple onchange="onAudioUploadPicked(this.files);this.value=''">
-    <div class="up-drop" id="audioUploadDrop" onclick="$('audioUploadInput').click()" role="button" tabindex="0">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-      <strong>انتخابِ فایل یا رهاکردنش همین‌جا</strong>
-      <span>هر فرمتِ رایج: m4a، mp3، wav، ogg، amr، ویدیوی mp4 و …<br>اگر ضبطِ جلسه چند تکه شده، همه‌ی تکه‌ها را با هم انتخاب کنید<br>هر فایل تا ۱ گیگابایت؛ کلِ جلسه تا ۵ ساعت</span>
+  <div class="modal up-modal" role="dialog" aria-labelledby="audioUploadTitle">
+    <div class="up-head">
+      <div class="up-head-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></div>
+      <div class="up-head-tx"><h3 id="audioUploadTitle">آپلودِ صدایِ جلسه</h3><p id="audioUploadFor"></p></div>
+      <button type="button" class="up-x" aria-label="بستن" onclick="closeAudioUploadModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
-    <!-- پلنِ B: بدترین حالت در فاز ۰B صدایِ گفت‌وگویِ دیگران/تلویزیون بود، نه نویزِ پنکه/کولر -->
-    <div class="up-note" id="audioUploadQualityTip" style="margin:10px 0 0">برایِ متنِ دقیق‌تر: گوشی را نزدیکِ وسطِ جمع بگذارید، دور از صدایِ تلویزیون یا گفت‌وگویِ دیگران، و با برنامه‌ی ضبطِ صدا ضبط کنید، نه تماس.</div>
-    <!-- فهرستِ فایل‌هایِ انتخاب‌شده (چند تکه‌ی یک جلسه، به همین ترتیب) — renderAudioUploadFiles -->
-    <div class="up-files" id="audioUploadFiles" hidden></div>
-    <div class="up-err" id="audioUploadErr" hidden></div>
-    <label>تاریخِ جلسه (اختیاری)</label>
-    <div id="audioUploadDate"></div>
-    <div id="audioUploadDateHint" style="font-size:12px;color:var(--muted);margin-top:6px" hidden></div>
-    <div style="margin-bottom:14px"></div>
-    <label>یادداشتِ پیش از جلسه (اختیاری)</label>
-    <div class="pre-note-area" style="margin-bottom:14px" data-clarity-mask="true">
-      <textarea id="upPreNoteInput" maxlength="2000" placeholder="توضیحی درباره‌ی این جلسه، متنی یا صوتی…"></textarea>
-      <div class="pre-voice-list" id="upPreVoiceList"></div>
-      <div class="pre-voice-live" id="upPreVoiceLive" hidden></div>
-      <div class="pre-voice-rec" id="upPreVoiceRec" hidden><span class="pre-voice-dot"></span><span>در حال ضبط</span><span id="upPreVoiceTimer">۰۰:۰۰</span>
-        <span class="pv-rec-btns"><button type="button" class="btn btn-ghost btn-sm" onclick="preVoiceUpload.cancel()">انصراف</button>
-        <button type="button" class="btn btn-primary btn-sm" onclick="preVoiceUpload.stop()">پایان ضبط</button></span></div>
-      <div class="pre-note-actions"><button type="button" class="btn btn-secondary btn-sm" id="upPreVoiceBtn" onclick="preVoiceUpload.start()">ضبطِ یادداشتِ صوتی</button></div>
-      <div class="pre-note-hint">یادداشت‌ها بعد از «دریافت شد» به همین جلسه اضافه می‌شوند. صدای ضبط‌شده در این مرورگر ذخیره می‌شود؛ ولی فایل‌هایِ انتخاب‌شده و متنِ تایپ‌شده نه — تا آن موقع صفحه را نبندید.</div>
+    <div class="up-body">
+      <input type="file" id="audioUploadInput" hidden
+        accept="audio/*,video/mp4,video/quicktime,video/3gpp,.mp3,.m4a,.mp4,.aac,.wav,.ogg,.oga,.opus,.webm,.weba,.flac,.amr,.3gp,.3gpp,.3ga,.wma,.asf,.aif,.aiff,.caf,.mkv,.mka,.mov,.m4b,.wv"
+        multiple onchange="onAudioUploadPicked(this.files);this.value=''">
+      <div class="up-drop" id="audioUploadDrop" onclick="$('audioUploadInput').click()" role="button" tabindex="0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+        <strong>فایل را انتخاب کنید یا اینجا رها کنید</strong>
+        <span>mp3 · m4a · wav · ogg · mp4 و …</span>
+        <em>تا ۱ گیگابایت برای هر فایل · حداکثر ۵ ساعت · ضبطِ چندتکه را با هم انتخاب کنید</em>
+      </div>
+      <div class="up-files" id="audioUploadFiles" hidden></div>
+      <div class="up-err" id="audioUploadErr" hidden></div>
+      <!-- پلنِ B: بدترین حالت در فاز ۰B صدایِ گفت‌وگویِ دیگران/تلویزیون بود، نه نویزِ پنکه/کولر -->
+      <div class="up-tip" id="audioUploadQualityTip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v5h1"/></svg><span>برای متنِ دقیق‌تر: گوشی را وسطِ جمع و دور از تلویزیون بگذارید و با برنامه‌ی ضبطِ صدا ضبط کنید، نه تماس.</span></div>
+      <div class="up-field">
+        <label>تاریخِ جلسه <small>(اختیاری)</small></label>
+        <div id="audioUploadDate"></div>
+        <div class="up-hint" id="audioUploadDateHint" hidden></div>
+      </div>
+      <details class="up-more" id="upPreNoteBox">
+        <summary>یادداشتِ پیش از جلسه <small>(اختیاری)</small></summary>
+        <div class="pre-note-area" data-clarity-mask="true">
+          <textarea id="upPreNoteInput" maxlength="2000" placeholder="توضیحی درباره‌ی این جلسه، متنی یا صوتی…"></textarea>
+          <div class="pre-voice-list" id="upPreVoiceList"></div>
+          <div class="pre-voice-live" id="upPreVoiceLive" hidden></div>
+          <div class="pre-voice-rec" id="upPreVoiceRec" hidden><span class="pre-voice-dot"></span><span>در حال ضبط</span><span id="upPreVoiceTimer">۰۰:۰۰</span>
+            <span class="pv-rec-btns"><button type="button" class="btn btn-ghost btn-sm" onclick="preVoiceUpload.cancel()">انصراف</button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="preVoiceUpload.stop()">پایان ضبط</button></span></div>
+          <div class="pre-note-actions"><button type="button" class="btn btn-secondary btn-sm" id="upPreVoiceBtn" onclick="preVoiceUpload.start()">ضبطِ یادداشتِ صوتی</button></div>
+          <div class="pre-note-hint">تا «دریافت شد» صفحه را نبندید؛ متنِ تایپ‌شده و فایل‌هایِ انتخابی ذخیره نمی‌شوند.</div>
+        </div>
+      </details>
+      <label class="up-consent" id="audioUploadConsentLabel"><input type="checkbox" id="audioUploadConsent" onchange="updateAudioUploadButton()"> مراجع به ضبط و رونویسیِ این جلسه رضایت داده است.</label>
     </div>
-    <label class="up-consent" id="audioUploadConsentLabel"><input type="checkbox" id="audioUploadConsent" onchange="updateAudioUploadButton()"> مراجع به ضبط و رونویسیِ این جلسه رضایت داده است.</label>
-    <div class="up-note">بعد از شروع، آپلود در پس‌زمینه ادامه پیدا می‌کند و اگر اینترنت قطع شود از همان‌جا ادامه می‌دهد. وقتی «دریافت شد» را دیدید، دیگر لازم نیست صفحه باز بماند — تبدیل به متن رویِ سرور انجام می‌شود و خبرتان می‌کنیم.</div>
-    <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeAudioUploadModal()">انصراف</button>
-      <button class="btn btn-primary" id="audioUploadStartBtn" style="flex:2" disabled onclick="startAudioUpload()">شروعِ آپلود</button>
+    <div class="up-foot">
+      <div class="up-note">آپلود در پس‌زمینه ادامه می‌یابد و بعد از قطعِ اینترنت از همان‌جا ادامه می‌دهد. پس از «دریافت شد» می‌توانید صفحه را ببندید؛ تبدیل به متن رویِ سرور انجام می‌شود.</div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="closeAudioUploadModal()">انصراف</button>
+        <button class="btn btn-primary" id="audioUploadStartBtn" style="flex:2" disabled onclick="startAudioUpload()">شروعِ آپلود</button>
+      </div>
     </div>
   </div>
 </div>
@@ -10213,6 +10252,7 @@ function openAudioUploadFromSetup(){
   if(preVoiceSetup.isRecording())preVoiceSetup.stop().then(function(){preVoiceUpload.put(preVoiceSetup.take());});
   else preVoiceUpload.put(preVoiceSetup.take());
   $('upPreNoteInput').value=$('preNoteInput').value;
+  if($('upPreNoteInput').value||$('upPreVoiceList').children.length)$('upPreNoteBox').open=true;
 }
 function openAudioUploadModal(){
   if(!currentClient)return;
@@ -10222,7 +10262,8 @@ function openAudioUploadModal(){
   audioUploadDateTouched=false;
   preVoiceUpload.clear();
   $('upPreNoteInput').value='';
-  $('audioUploadFor').textContent='جلسه‌ی تازه برایِ '+currentClient.code+(currentClient.alias?' — '+currentClient.alias:'')+' ساخته می‌شود؛ متنِ فایل با تفکیکِ گوینده در آن ثبت می‌شود.';
+  $('audioUploadFor').textContent='جلسه‌ی تازه برایِ '+currentClient.code+(currentClient.alias?' — '+currentClient.alias:'');
+  $('upPreNoteBox').open=false;
   $('audioUploadErr').hidden=true;
   $('audioUploadConsent').checked=false;
   renderAudioUploadConsent();
@@ -10338,7 +10379,7 @@ function suggestAudioUploadDate(){
   audioUploadDateVal=jalaliDayTehran(new Date(Math.min.apply(null,ts)));
   renderJalaliPicker($('audioUploadDate'),audioUploadDateVal,function(v){audioUploadDateVal=v||'';audioUploadDateTouched=true;hint.hidden=true;},{allowEmpty:true});
   // رفعِ M6: تاریخِ فایل برایِ فایلی که از واتس‌اپ/تلگرام/دانلود آمده تاریخِ دریافت است، نه تاریخِ جلسه — صریح گفته شود.
-  hint.textContent='این تاریخ از رویِ تاریخِ فایل پیشنهاد شد. اگر فایل را از پیام‌رسان یا دانلود گرفته‌اید، ممکن است تاریخِ دریافت باشد نه تاریخِ جلسه — بررسی کنید.';
+  hint.textContent='تاریخ از رویِ فایل پیشنهاد شد؛ اگر فایل از پیام‌رسان یا دانلود آمده، ممکن است تاریخِ دریافت باشد — بررسی کنید.';
   hint.hidden=false;
 }
 function renderAudioUploadConsent(){
