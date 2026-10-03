@@ -223,6 +223,11 @@ input::-ms-reveal{display:none}
 .sort-btn svg{width:16px;height:16px}
 .sort-drop{position:absolute;left:0;top:44px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);box-shadow:var(--shadow);padding:5px;min-width:170px;display:none;z-index:6}
 .sort-menu.open .sort-drop{display:block}
+.sort-menu.start .sort-drop{left:auto;right:0}
+.admin-sort-bar{display:flex;align-items:center;gap:10px;margin:8px 0 12px}
+.admin-sort-label{font-size:12px;color:var(--muted)}
+.admin-sort-label b{color:var(--sage-deep);font-weight:700}
+.sort-drop .sort-dir{font-size:13px;color:var(--sage-deep)}
 .sort-drop button{width:100%;text-align:right;background:none;border:none;padding:9px 11px;border-radius:8px;font-family:inherit;font-size:12.5px;color:var(--ink-2);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px}
 .sort-drop button:hover{background:var(--sage-mist);color:var(--sage-deep)}
 .sort-drop button.active{color:var(--sage-deep);font-weight:700}
@@ -1212,22 +1217,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
           <option value="168" selected>۷ روزِ اخیر</option>
           <option value="720">۳۰ روزِ اخیر</option>
         </select>
-        <select id="adminRecentSortKey" onchange="loadAdminRecentSessions()" aria-label="مرتب‌سازی بر اساس">
-          <option value="activity" selected>مرتب: آخرین فعالیت</option>
-          <option value="recording">آخرین ضبط</option>
-          <option value="created">زمان ساختِ جلسه</option>
-          <option value="updated">آخرین نوشتن</option>
-          <option value="date">تاریخِ جلسه</option>
-          <option value="num">شمارهٔ جلسه</option>
-          <option value="duration">مدتِ صدا</option>
-          <option value="transcript">طولِ متن</option>
-          <option value="therapist">نامِ تراپیست</option>
-          <option value="client">کدِ مراجع</option>
-        </select>
-        <select id="adminRecentSortDir" onchange="loadAdminRecentSessions()" aria-label="جهتِ مرتب‌سازی">
-          <option value="desc" selected>نزولی (تازه‌ترین/بیشترین)</option>
-          <option value="asc">صعودی (قدیمی‌ترین/کمترین)</option>
-        </select>
+        <div id="adminSortRec" class="admin-sort-bar" style="margin:0"></div>
       </div>
       <div id="adminRecentSessionsList"></div>
       <div class="empty" id="adminRecentSessionsEmpty" hidden><p>جلسه‌ای یافت نشد</p></div>
@@ -3489,9 +3479,10 @@ function adminActivityTab(tab){
 
 async function loadAdminRecentSessions(){
   try{
+    if(!$('adminSortRec').firstChild)mountAdminSortBar('rec','adminSortRec',loadAdminRecentSessions);
     const status=$('adminRecentStatusFilter').value;
     const sinceHours=$('adminRecentSinceFilter').value;
-    const data=await api('/api/admin/sessions/recent?status='+encodeURIComponent(status)+'&since_hours='+encodeURIComponent(sinceHours)+'&sort='+encodeURIComponent($('adminRecentSortKey').value)+'&dir='+encodeURIComponent($('adminRecentSortDir').value));
+    const data=await api('/api/admin/sessions/recent?status='+encodeURIComponent(status)+'&since_hours='+encodeURIComponent(sinceHours)+'&sort='+encodeURIComponent(adminSort.rec.key)+'&dir='+encodeURIComponent(adminSort.rec.dir));
     renderAdminRecentSessions(data.sessions||[]);
   }catch(e){showBanner('error',e.message);}
 }
@@ -4269,17 +4260,41 @@ function adminSortList(kind,list){
     return m*(x<y?-1:x>y?1:0);
   });
 }
+const ADMIN_SORT_ASC_FIRST={name:1,code:1,date:1,therapist:1,client:1};
+ADMIN_SORT_DEFS.rec=[['activity','آخرین فعالیت'],['recording','آخرین ضبط'],['created','زمان ساختِ جلسه'],['updated','آخرین نوشتن'],['date','تاریخِ جلسه'],['num','شمارهٔ جلسه'],['duration','مدتِ صدا'],['transcript','طولِ متن'],['therapist','نامِ تراپیست'],['client','کدِ مراجع']];
+adminSort.rec={key:'activity',dir:'desc'};
+// همان الگویِ .sort-menu/.sort-btn/.sort-drop صفحه‌یِ مراجعین: دکمه‌یِ آیکن + منویِ کشویی.
+// کلیک روی گزینه‌یِ فعال جهت را برعکس می‌کند؛ گزینه‌یِ دیگر با جهتِ پیش‌فرضِ خودش انتخاب می‌شود.
 function mountAdminSortBar(kind,boxId,onChange){
   const box=$(boxId);if(!box)return;box.innerHTML='';
-  box.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px';
-  const sel=document.createElement('select');sel.setAttribute('aria-label','مرتب‌سازی بر اساس');
-  ADMIN_SORT_DEFS[kind].forEach(function(d){const o=document.createElement('option');o.value=d[0];o.textContent='مرتب: '+d[1];sel.appendChild(o);});
-  sel.value=adminSort[kind].key;
-  const dir=document.createElement('select');dir.setAttribute('aria-label','جهتِ مرتب‌سازی');
-  [['desc','نزولی (تازه‌ترین/بیشترین)'],['asc','صعودی (قدیمی‌ترین/کمترین)']].forEach(function(d){const o=document.createElement('option');o.value=d[0];o.textContent=d[1];dir.appendChild(o);});
-  dir.value=adminSort[kind].dir;
-  sel.onchange=dir.onchange=function(){adminSort[kind].key=sel.value;adminSort[kind].dir=dir.value;onChange();};
-  box.appendChild(sel);box.appendChild(dir);
+  if(box.classList.contains('admin-sort'))box.classList.add('admin-sort-bar');
+  const defs=ADMIN_SORT_DEFS[kind];const st=adminSort[kind];
+  const menu=document.createElement('div');menu.className='sort-menu start';
+  const btn=document.createElement('button');btn.type='button';btn.className='sort-btn';btn.title='ترتیبِ نمایش';
+  btn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h10M3 12h7M3 18h4"/><path d="M17 4v16M17 4l-4 4M17 4l4 4"/></svg>';
+  const drop=document.createElement('div');drop.className='sort-drop';
+  btn.onclick=function(e){e.stopPropagation();const was=menu.classList.contains('open');closeAllClientMenus();if(!was)menu.classList.add('open');};
+  const label=document.createElement('span');label.className='admin-sort-label';
+  function refresh(){
+    drop.innerHTML='';
+    defs.forEach(function(d){
+      const b=document.createElement('button');b.type='button';b.dataset.sort=d[0];
+      const active=d[0]===st.key;if(active)b.classList.add('active');
+      const t=document.createElement('span');t.textContent=d[1];b.appendChild(t);
+      if(active){const a=document.createElement('span');a.className='sort-dir';a.textContent=st.dir==='asc'?'↑':'↓';b.appendChild(a);}
+      b.onclick=function(){
+        if(st.key===d[0])st.dir=st.dir==='asc'?'desc':'asc';
+        else{st.key=d[0];st.dir=ADMIN_SORT_ASC_FIRST[d[0]]?'asc':'desc';}
+        refresh();onChange();
+      };
+      drop.appendChild(b);
+    });
+    const cur=defs.find(function(d){return d[0]===st.key;})||defs[0];
+    label.innerHTML='مرتب‌شده بر اساس <b></b> '+(st.dir==='asc'?'(صعودی)':'(نزولی)');
+    label.querySelector('b').textContent=cur[1];
+  }
+  refresh();
+  menu.appendChild(btn);menu.appendChild(drop);box.appendChild(menu);box.appendChild(label);
 }
 // «آخرین …» برایِ مراجع/تراپیست: تاریخ‌وساعتِ آخرین ضبط (نه فقط روزِ شروعِ جلسه)
 function adminLastLabel(x){
