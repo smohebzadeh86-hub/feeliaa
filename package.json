@@ -10,6 +10,8 @@
     "test:up": "pnpm --filter server exec tsx ../scripts/upload-harness.ts",
     "test:tu": "pnpm --filter server exec tsx ../scripts/treatment-unit-harness.ts",
     "test:ft": "pnpm --filter server exec tsx ../scripts/final-transcript-harness.ts",
+    "backup": "node scripts/backup-data.mjs",
+    "test:hist": "pnpm --filter server exec tsx ../scripts/session-history-harness.ts",
     "test:adm": "pnpm --filter server exec tsx ../scripts/admin-monitor-harness.ts",
     "test:llm": "pnpm --filter server exec tsx ../scripts/llm-harness.ts",
     "llm:usage": "pnpm --filter server exec tsx ../scripts/llm-usage-report.ts",

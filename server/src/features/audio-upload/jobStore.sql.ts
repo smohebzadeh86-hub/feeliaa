@@ -5,6 +5,7 @@ import { logEvent } from '../../obs/eventLog.js';
 import { createNotification } from '../notifications/index.js';
 import { enqueueFinalTranscript, appendUploadForPolish } from '../final-transcript/index.js';
 import { parseAudioQuality } from './quality.js';
+import { saveCanonicalRecord } from '../session-record/index.js';
 import type { AudioJob, JobPatch, JobStore, CaseFileJobStatus, SourcePart } from './jobMachine.js';
 
 export const UPLOAD_TRANSCRIPT_LABEL_PREFIX = '[متنِ فایلِ صوتیِ آپلودشده]';
@@ -82,7 +83,7 @@ export const sqlJobStore: JobStore = {
       const jrow = (jr as any[])[0];
       if (!jrow) { await conn.commit(); return 'gone'; }
       if (jrow.transcript_applied_at) { await conn.commit(); return 'already'; }
-      const [sr] = await conn.query('SELECT transcript FROM sessions WHERE id = ? FOR UPDATE', [job.sessionId]);
+      const [sr] = await conn.query('SELECT transcript, transcript_version FROM sessions WHERE id = ? FOR UPDATE', [job.sessionId]);
       const srow = (sr as any[])[0];
       if (!srow) { await conn.commit(); return 'gone'; }
       if (text) {
@@ -113,6 +114,14 @@ export const sqlJobStore: JobStore = {
             [text.length, warning, lowConf, metrics, job.id]
           );
         }
+        // توکن‌هایِ زمان‌دار (تصمیمِ مالک 2026-10-01: بعد از پاکسازیِ صدا می‌مانند). fail-open: شکستِ این بخش متن را نمی‌اندازد
+        // (در MySQL خطایِ یک statement تراکنش را نمی‌شکند). INSERT IGNORE + UNIQUE(job_id) ⇒ exactly-once.
+        // رکوردِ canonical (توکن + نوبت‌هایِ گوینده، فاز ۳): covers_full فقط وقتی جلسه پیش از این متن نداشت (وگرنه این گذر فقط بخشِ
+        // آپلودی است و نباید جایگزینِ کلِ متنِ جلسه شود). source_version = نسخه‌ی متنِ جلسه پس از همین نوشتن.
+        await saveCanonicalRecord(conn, {
+          sessionId: job.sessionId, jobKey: job.id, source: 'upload', tokens: meta?.tokens,
+          coversFull: !String(srow.transcript ?? '').trim(), sourceVersion: Number(srow.transcript_version || 0) + 1,
+        });
         // پلنِ B بخشِ ۳: متن در هر حال ذخیره شد؛ فقط نوعِ اعلان صادقانه‌تر است.
         await createNotification({ therapistId: job.therapistId, kind: warning ? 'transcript_low_quality' : 'transcript_ready', clientId: job.clientId, sessionId: job.sessionId, jobId: job.id }, conn);
       } else {

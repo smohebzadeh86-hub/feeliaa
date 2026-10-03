@@ -1101,6 +1101,56 @@ const field = (r: ReturnType<typeof finalizeCouple>, key: string) => r.draft.cou
     assert.ok(txt.includes('یادداشت (note_after): بعد از جلسه') && txt.includes('یادداشت (voice): صوتی بعد از جلسه'), 'برچسبِ نوع‌هایِ قدیمی تغییر نکرده');
   });
 
+  // ---------- ردیابی و عینیِ نقل (F3، 2026-10-02) ----------
+  await t('T1 (F3) هر یافته شماره‌ی جلساتِ منبعش را از شناسه‌هایِ digest می‌گیرد (مرتب، بدونِ تکرار)؛ یافته‌یِ بدونِ ارجاع نمی‌گیرد', () => {
+    const raw = mkRaw(group([
+      { key: 'interaction', label: 'الگوی تعامل', items: [
+        F('الگوی بحث', 'همسر شب‌ها دیر به خانه می‌آید و بحث بالا می‌گیرد', [factId(2, 1), factId(1, 0), factId(1, 0)]),
+        F('بدونِ ارجاع', 'گزاره‌یِ دلخواه', []),
+      ] },
+    ]));
+    const r = finalizeCouple(raw, digest);
+    const items = field(r, 'interaction').items!;
+    assert.deepEqual(items[0].sessions, [1, 2]);
+    assert.equal(items[1].sessions, undefined);
+    const axis = r.draft.axes.find((a) => a.items!.some((i) => i.label === 'بی‌خوابی'))!;
+    assert.deepEqual(axis.items![0].sessions, [1]);
+  });
+  await t('T2 (F3) نقل: verifier پاسخ بدهد ⇒ quoteVerified (true/false)؛ بدونِ verifier فیلد نیست', () => {
+    const mk = () => mkRaw(group([{ key: 'quotes', label: 'نقل‌ها', items: [F('', 'شوهر سوارت می‌شه', [quoteId(1, 0)]), F('', 'دیگه نمی‌تونم ادامه بدم', [quoteId(1, 1)])] }]));
+    const none = finalizeCouple(mk(), digest);
+    assert.equal(field(none, 'quotes').items![0].quoteVerified, undefined);
+    const seen: Array<[number, string]> = [];
+    const r = finalizeCouple(mk(), digest, { verifyQuote: (n, text) => { seen.push([n, text]); return text.startsWith('شوهر'); } });
+    const q = field(r, 'quotes').items!;
+    assert.equal(q[0].quoteVerified, true);
+    assert.equal(q[1].quoteVerified, false);
+    assert.deepEqual(seen.map((x) => x[0]), [1, 1]);
+    assert.deepEqual(q[0].sessions, [1]);
+  });
+  await t('T3 (F3) quoteVerifierFor: نرمال‌سازیِ نیم‌فاصله/نشانه‌گذاری؛ جلسه‌یِ دیگر و متنِ ساختگی رد؛ یادداشت هم منبع است', async () => {
+    const { quoteVerifierFor } = await import('../server/src/features/case-file/application/corpusQuality.js');
+    const corpus = { clientId: 'c', latestSessionId: 's2', corpusSignature: '', sessions: [
+      { id: 's1', sessionNum: 1, date: null, source: 'live', transcript: 'مراجع: شوهر سوارت می‌شه و من دیگه نمی‌تونم', notes: [] },
+      { id: 's2', sessionNum: 2, date: null, source: 'live', transcript: null, notes: [{ type: 'note_after', text: 'گفت: «خیلی خسته‌ام»', createdAt: '' }] },
+    ] };
+    const v = quoteVerifierFor(corpus as never);
+    assert.equal(v(1, 'شوهر سوارت میشه'), true);                 // نیم‌فاصله/املا در حدِ cmpNorm
+    assert.equal(v(1, 'دیگه نمی‌تونم'), true);
+    assert.equal(v(1, 'متنِ کاملاً ساختگی'), false);
+    assert.equal(v(2, 'شوهر سوارت می‌شه'), false);               // نقل از جلسه‌یِ دیگر
+    assert.equal(v(2, 'خیلی خسته‌ام'), true);                     // یادداشت
+    assert.equal(v(9, 'شوهر'), false);                            // جلسه‌یِ ناموجود
+    assert.equal(v(1, ''), false);
+  });
+  await t('T4 (F3) composeWithRepair verifier را به finalize می‌رساند (مسیرِ کاملِ تولید)', async () => {
+    const llm = { model: 'fake', digestCorpus: async () => digest, generateCaseFile: async () => mkRaw(group([{ key: 'quotes', label: 'نقل‌ها', items: [F('', 'شوهر سوارت می‌شه', [quoteId(1, 0)])] }])) };
+    const draft = await composeWithRepair(llm as never, { corpusText: '' } as never, digest, { startedAt: Date.now() }, '', (n) => n === 1);
+    const q = draft.coupleRelationship!.fields.find((f) => f.key === 'quotes')!.items![0];
+    assert.equal(q.quoteVerified, true);
+    assert.deepEqual(q.sessions, [1]);
+  });
+
   console.log(`\n${pass} PASS / ${fail} FAIL`);
   process.exit(fail ? 1 : 0);
 })();

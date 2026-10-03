@@ -95,6 +95,7 @@ flowchart TB
 یک جلسه‌ی سالم تا پایان فقط در IndexedDB بود (best-effort؛ مرورگر زیرِ فشارِ فضا می‌تواند پاکش کند) و پایانِ یک جلسه‌ی
 ۱ساعته ~۲۴۰ آپلودِ پشتِ‌سرِهم داشت (تستِ واقعیِ 2026-09-24: ۳۰ سگمنت در ۲۵ ثانیه بعد از «پایان»). حالا `startAutosave`
 یک تایمرِ `ARCHIVE_DRAIN_MS=60s` هم می‌گذارد که در state=ACTIVE `drainQueuedAudioInBackground` را صدا می‌زند (هر رکورد
+> **به‌روزرسانی 2026-10-02 («همه‌چیز برایِ ادمین ذخیره شود، حتی بدونِ پایانِ جلسه»):** `ARCHIVE_DRAIN_MS=20s` (قبلاً ۶۰ث) و تایمر در *هر* stateِ غیرِ پایانی (قطعِ اتصال، توقفِ دستی، FAILED) و فقط وقتی `navigator.onLine !== false` کار می‌کند (قبلاً فقط ACTIVE)؛ علاوه بر آن `drainSoon()` ~۱ث پس از ذخیره‌یِ هر سگمنت در IndexedDB آپلود را شروع می‌کند. پیامد: اگر تب بمیرد، حداکثر سگمنتِ در حالِ ضبط (≤۱۵ث) + سگمنتِ در حالِ آپلود در صفِ محلی می‌ماند (و `sweepOrphanedAudioQueue` در بازشدنِ بعدی می‌فرستد). متنِ زنده هم هر ≤۱۵ث autosave و در hidden/pagehide فوراً flush می‌شود. تست: `test:rt` T38، T68.
 با intentِ خودش؛ همان قفل و گاردِ `_draining`)؛ `clearTimers` (finish/abort) پاکش می‌کند. تست: `T38`.
 
 **رفعِ باگِ 2026-09-22:** قبلاً شرط `self.unreliable ||` هم داشت. چون `unreliable` یک‌طرفه و
@@ -303,3 +304,11 @@ batch_status∈{done,failed}`؛ note → `!note_audio_pending`. سپس خوان�
 - **timeoutِ آپلودِ سگمنت:** `uploadQueuedSegment` با `AbortController` و `SEGMENT_UPLOAD_TIMEOUT_MS` (۶۰ث)؛ قبلاً fetchِ معلق قفلِ سراسریِ صفِ جلسه را برایِ همیشه نگه می‌داشت. در timeout رکورد می‌ماند. تست: `T43`.
 - **ذخیره‌ی نهاییِ ناموفق:** `finish` → `persistFinal` (۳ تلاش)؛ در شکستِ نهایی `requeueUnsavedAudio` سگمنت‌هایِ archiveِ همین run را که بعد از آخرین ذخیره‌ی موفق بسته شده‌اند به `transcript` برمی‌گرداند و نتیجه `reliable:false`/`batch-pending` است. تست: `T45`.
 - **علامت/یادداشت:** شکستِ گذرایِ POST در `feelia_note_outbox` (localStorage) صف و «ذخیره نشده» نمایش داده می‌شود ([configuration-catalog](../02-reference/configuration-catalog.md)).
+
+## تصحیح و تکمیلِ ممیزیِ Core (2026-10-01)
+
+- **تصحیحِ ادعایِ «gap-check verified» (2026-09-22):** آن تست gapِ عمدی را در `seq`ِ *سرور* ساخته بود؛ در عمل `seq` را سرور زیرِ قفل `MAX+1` می‌گذارد ⇒ همیشه پیوسته ⇒ سگمنتی که هرگز نرسید هیچ‌وقت «ناقص» نمی‌داد. **رفع:** `checkSeqContiguous(rows, skips)` حالا شماره‌یِ خودِ کلاینت (`client_seq`، migration 027) را در هر `run_id` می‌سنجد. سگمنتِ *خالی* (شماره‌اش مصرف شده ولی چیزی برایِ آپلود نیست، یا ≤۱۰۰ بایت) را کلاینت همراهِ سگمنتِ واقعیِ بعدی با `?empty=3,7` گزارش می‌کند و در `session_audio_skips` (migration 039) می‌نشیند؛ `missing` = شماره‌هایی که نه رسیده‌اند و نه خالی گزارش شده‌اند. ردیفِ بدونِ `client_seq` (قدیمی/آپلودی) بررسی نمی‌شود. تست: `test:up` H68، `test:rt` T58، E2Eِ واقعی رویِ MySQLِ dev.
+- **دفترِ کامل‌بودن برایِ تراپیست:** `GET /api/sessions/:id/audio-status` + خطِ «صدا: X از Y دقیقه ذخیره شد · N بخش هنوز روی این دستگاه است» در صفحه‌یِ جلسه (`renderSessionAudioStatus`).
+- **بستنِ مسیرهایِ گم‌شدنِ بی‌صدا:** `navigator.storage.persist()` در ساختِ هر RTSession (`rt.storage_persist_denied` اگر رد شد)؛ `fsync` پیش از پاسخِ 202 در `enqueueBatch`؛ جاروبِ ۲۴ساعته‌یِ batch-queue فایلِ *آرشیوِ ناموفق* را نگه می‌دارد (تا ۷ روز، بعد حذف با `audio.archive_lost` severity=error)؛ شکستِ IndexedDB پیامِ جدای از «حافظه پر» دارد (`AudioQueueDB.lastFailure`)؛ هشدارِ ۵روزه پیش از حذفِ ۷روزه‌یِ صدایِ محلی (`rt.local_audio_expiring`)؛ سگمنتِ بی‌محتوا placeholderِ «در حالِ بازیابی» نمی‌گیرد.
+- **۱۴ روز ← ۳۰ روز:** هر اشاره‌یِ «۱۴ روز» به نگهداریِ آرشیوِ صدا منسوخ است؛ مرجع `RETENTION_MS` در `archive/store.ts` (۳۰ روز، تصمیمِ مالک 2026-10-01).
+

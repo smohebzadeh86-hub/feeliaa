@@ -5,8 +5,10 @@ import { logEvent } from '../../obs/eventLog.js';
 import { beat } from '../../obs/heartbeat.js';
 import { createNotification } from '../notifications/index.js';
 import { treatmentUnits } from '../treatment-unit/index.js';
+import { saveCanonicalRecordStandalone, getRoles } from '../session-record/index.js';
+import { confirmedRolesFromEntries } from './domain/roleEdit.js';
 import {
-  getFullSessionAudio, listSessionAudio, deriveSessionStatus, pendingAudiosFor, uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens, markedTextFromTokens, deleteTranscription, deleteFile, type SignMark,
+  getFullSessionAudio, listSessionAudio, listSkips, deriveSessionStatus, pendingAudiosFor, uploadFileFromPath, createTranscription, pollTranscriptionStatus, getTranscriptTokens, markedTextFromTokens, deleteTranscription, deleteFile, type SignMark,
 } from '../transcription/index.js';
 import {
   stepFinalTranscript, giveUp, DEFAULT_FT_CONFIG,
@@ -98,9 +100,9 @@ export const sqlFtStore: FtStore = {
       conn.release();
     }
     job.stage = 'done';
-    const rep = (report || {}) as { usage?: { total?: { calls: number; prompt_tokens: number; completion_tokens: number; reasoning_tokens: number; cost_usd: number | null } }; chunks?: number; fallback_chunks?: number; turns?: number; fallback_turns?: number; retries?: number; uncertain?: number; role_fixes?: number; role_reverts?: number };
+    const rep = (report || {}) as { usage?: { total?: { calls: number; prompt_tokens: number; completion_tokens: number; reasoning_tokens: number; cost_usd: number | null } }; chunks?: number; fallback_chunks?: number; turns?: number; fallback_turns?: number; retries?: number; uncertain?: number; role_fixes?: number; role_reverts?: number; role_overrides?: number };
     logEvent({ event: 'final_transcript.done', sessionId: job.sessionId, therapistId: job.therapistId, source: 'job',
-      detail: { source: job.source, chunks: rep.chunks, fallback_chunks: rep.fallback_chunks, turns: rep.turns, fallback_turns: rep.fallback_turns, retries: rep.retries, uncertain: rep.uncertain, role_fixes: rep.role_fixes, role_reverts: rep.role_reverts,
+      detail: { source: job.source, chunks: rep.chunks, fallback_chunks: rep.fallback_chunks, turns: rep.turns, fallback_turns: rep.fallback_turns, retries: rep.retries, uncertain: rep.uncertain, role_fixes: rep.role_fixes, role_reverts: rep.role_reverts, role_overrides: rep.role_overrides,
         llm_calls: rep.usage?.total?.calls, prompt_tokens: rep.usage?.total?.prompt_tokens, completion_tokens: rep.usage?.total?.completion_tokens,
         reasoning_tokens: rep.usage?.total?.reasoning_tokens, cost_usd: rep.usage?.total?.cost_usd ?? undefined } });
   },
@@ -124,7 +126,7 @@ async function audioStateFor(sessionId: string): Promise<AudioState> {
   const rows = await listSessionAudio(sessionId);
   const pending = pendingAudiosFor(sessionId, 'transcript').length + pendingAudiosFor(sessionId, 'late-transcript').length
     + pendingAudiosFor(sessionId, 'archive').length;
-  const d = deriveSessionStatus(rows, pending, s.rows[0]);
+  const d = deriveSessionStatus(rows, pending, s.rows[0], (await listSkips([sessionId])).get(sessionId) ?? []);
   // رونویسیِ batchِ جلسه هنوز در جریان است ⇒ متنِ realtime هم هنوز نهایی نیست. فقط batch_statusِ واقعی ملاک است:
   // transcriptStatus='pending' برایِ جلسه‌ی زنده‌ی realtime_reliable=false همیشه pending می‌ماند و ۳۰ دقیقه بیهوده منتظر می‌ماند.
   const bs = s.rows[0].batch_status;
@@ -138,7 +140,7 @@ async function audioStateFor(sessionId: string): Promise<AudioState> {
 async function preSessionBriefing(sessionId: string): Promise<string> {
   try {
     const notes = await query(
-      "SELECT text FROM session_notes WHERE session_id = ? AND type IN ('note_before','voice_before') ORDER BY created_at", [sessionId]);
+      "SELECT text FROM session_notes WHERE session_id = ? AND deleted_at IS NULL AND type IN ('note_before','voice_before') ORDER BY created_at", [sessionId]);
     const legacy = await query('SELECT pre_note FROM sessions WHERE id = ?', [sessionId]);
     const parts = [String(legacy.rows[0]?.pre_note || ''), ...notes.rows.map((r: any) => String(r.text || ''))]
       .map((x) => x.trim()).filter(Boolean);
@@ -184,8 +186,11 @@ async function polishFor(sessionId: string, text: string, opts?: { trustDiarizat
     const llm = createTranscriptLlm(process.env, undefined, { sessionId });
     const roster = await treatmentUnits.sessionSpeakerRoster(sessionId);
     const briefing = await preSessionBriefing(sessionId);
+    // نقش‌هایِ تأییدشده‌ی درمانگر (ویرایشِ قبلی) فقط وقتی معتبرند که شماره‌گذاریِ گوینده‌ها یک گذرِ کاملِ async باشد (F7).
+    const confirmedRoles = opts?.trustDiarization ? confirmedRolesFromEntries(await getRoles(sessionId).catch(() => ({}))) : {};
     const res = await polishTranscript(text, roster, llm, {
       briefing,
+      confirmedRoles,
       trustDiarization: !!opts?.trustDiarization,
       chunkChars: envInt('FINAL_TRANSCRIPT_CHUNK_CHARS', 4000),
       overviewChars: envInt('FINAL_TRANSCRIPT_OVERVIEW_CHARS', 60000),
@@ -224,13 +229,25 @@ export function productionFtDeps(): FtDeps {
       // ورودیِ polish: واژه‌هایِ کم‌اطمینانِ Soniox از پیش ⟦…؟⟧ می‌خورند (پلنِ B بخشِ ۴) و نگهبانِ 'uncertain' حفظشان
       // را اجباری می‌کند. این متن فقط در final_transcripts.async_text است — sessions.transcript دست نمی‌خورد.
       getText: async (tid, sessionId) => {
-        const signs = await query("SELECT sign_type, offset_ms FROM session_notes WHERE session_id = ? AND type = 'sign'", [sessionId]);
-        return markedTextFromTokens(await getTranscriptTokens(tid), signs.rows as SignMark[]);
+        const signs = await query("SELECT sign_type, offset_ms FROM session_notes WHERE session_id = ? AND deleted_at IS NULL AND type = 'sign'", [sessionId]);
+        const tokens = await getTranscriptTokens(tid);
+        // رکوردِ canonical (فاز ۳): همین گذرِ کاملِ صدا توکن‌ها و نوبت‌هایِ گوینده را هم ذخیره می‌کند. fail-open و idempotent (کلیدِ
+        // گذر = شناسه‌ی transcription). source_version = نسخه‌ی متنِ جلسه در این لحظه ⇒ ویرایشِ بعدیِ تراپیست آن را کهنه می‌کند.
+        const ver = await query('SELECT transcript_version FROM sessions WHERE id = ?', [sessionId]);
+        await saveCanonicalRecordStandalone({
+          sessionId, jobKey: 'ft:' + tid, source: 'async', tokens, coversFull: true,
+          sourceVersion: ver.rows[0] ? Number(ver.rows[0].transcript_version || 0) : null,
+        });
+        return markedTextFromTokens(tokens, signs.rows as SignMark[]);
       },
       deleteTranscription,
       deleteFile,
     },
     polish: polishFor,
+    polishWanted: async (sessionId) => {
+      const r = await query('SELECT t.final_transcript_enabled FROM sessions s JOIN clients c ON c.id = s.client_id JOIN therapists t ON t.id = c.therapist_id WHERE s.id = ?', [sessionId]);
+      return !!r.rows[0]?.final_transcript_enabled;
+    },
     config: {
       audioWaitMs: envInt('FINAL_TRANSCRIPT_AUDIO_WAIT_MS', DEFAULT_FT_CONFIG.audioWaitMs),
       settleMs: envInt('FINAL_TRANSCRIPT_SETTLE_MS', DEFAULT_FT_CONFIG.settleMs),
@@ -245,6 +262,11 @@ export function productionFtDeps(): FtDeps {
 // در صف می‌رود که متنِ جلسه از آن زمان تغییر کرده باشد (مثلاً جلسه ادامه داده و دوباره پایان یافت).
 // opts.asyncText: متنِ asyncِ آماده (مسیرِ آپلود) ⇒ بدونِ رونویسیِ دوباره مستقیم به polishing.
 // هرگز پرتاب نمی‌کند (fire-and-forget از مسیرهایِ پایانِ جلسه).
+// هزینه‌ی Soniox تقریباً ۲برابر و صدا دوباره به Soniox می‌رود ⇒ پیش‌فرض خاموش (فقط تصمیمِ صریحِ مالک + متنِ رضایتِ اصلاح‌شده، R1).
+export function canonicalPassEnabled(): boolean {
+  return process.env.CANONICAL_PASS === '1';
+}
+
 export async function enqueueFinalTranscript(sessionId: string, opts: { asyncText?: string } = {}): Promise<boolean> {
   try {
     const r = await query(
@@ -252,7 +274,8 @@ export async function enqueueFinalTranscript(sessionId: string, opts: { asyncTex
          FROM sessions s JOIN clients c ON c.id = s.client_id JOIN therapists t ON t.id = c.therapist_id
         WHERE s.id = ?`, [sessionId]);
     const row = r.rows[0];
-    if (!row || !row.final_transcript_enabled) return false;
+    // گذرِ canonical (CANONICAL_PASS=1): برایِ هر جلسه‌ی زنده‌ی پایان‌یافته رونویسیِ asyncِ کامل برایِ رکورد؛ مرتب‌سازی فقط اگر درمانگر خواسته.
+    if (!row || !(row.final_transcript_enabled || canonicalPassEnabled())) return false;
     const version = Number(row.transcript_version || 0);
     const pre = opts.asyncText && opts.asyncText.trim()
       ? { stage: 'polishing', source: 'async', text: opts.asyncText.trim() }

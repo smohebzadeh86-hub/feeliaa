@@ -63,8 +63,8 @@ export async function archiveAudioForAdmin(
       );
     } catch (e) {
       // (A4) همان الگویِ M4ِ نسخه‌ی فایل‌محور: فایلِ بدونِ ردیف نماند (جلسه وسطِ کار حذف شد / خطایِ DB).
-      try { rmSync(filePath, { force: true }); } catch {}
-      try { if (readdirSync(dir).length === 0) rmSync(dir, { recursive: true, force: true }); } catch {}
+      // ⭐ «هیچ چیزی هارد دیلیت نشود» (2026-10-02): فایلِ بدونِ ردیف پاک نمی‌شود؛ کنارش با پسوندِ .unrecorded نگه داشته می‌شود
+      try { renameSync(filePath, filePath + '.unrecorded'); } catch {}
       throw e;
     }
   });
@@ -115,8 +115,8 @@ export async function archiveAudioFileForAdmin(
     } catch (e) {
       // ⭐ رفعِ M4 (audit 2026-09-24): جلسه وسطِ نرمال‌سازی حذف شد (INSERT با FK شکست می‌خورد) یا ثبت ناموفق بود ⇒
       // فایلِ جابه‌جاشده بدونِ ردیف می‌ماند و sweepOldSessionAudio (که فقط ردیف‌ها را می‌بیند) هرگز پاکش نمی‌کرد (LAW-010).
-      try { rmSync(filePath, { force: true }); } catch {}
-      try { if (readdirSync(dir).length === 0) rmSync(dir, { recursive: true, force: true }); } catch {}
+      // ⭐ «هیچ چیزی هارد دیلیت نشود» (2026-10-02): فایلِ بدونِ ردیف پاک نمی‌شود؛ کنارش با پسوندِ .unrecorded نگه داشته می‌شود
+      try { renameSync(filePath, filePath + '.unrecorded'); } catch {}
       throw e;
     }
   });

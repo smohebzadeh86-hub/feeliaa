@@ -2,7 +2,7 @@
 // تداخلِ شماره/deadlock ⇒ کلِ تراکنش دوباره). همان SQLِ قبلیِ uploads.routes (تک‌فایلی و چندبخشی)، بدونِ تغییر.
 import { randomUUID } from 'node:crypto';
 import { pool } from '../../db/connection.js';
-import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from '../sessions/index.js';
+import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause, snapshotSessionUnit } from '../sessions/index.js';
 
 // یادداشتِ متنیِ پیش از جلسه ⇒ session_notes(type='note_before') در همان تراکنشِ ساختِ جلسه (پیش از شروعِ job)
 // تا رونویسی و «متنِ نهایی» آن را ببینند. هرگز لاگ نمی‌شود (LAW-001).
@@ -38,6 +38,7 @@ export async function createSessionAndJobForUpload(
          VALUES (?, ?, ?, ?, ?, true, 'completed', 'upload', 'upload', 'queued', ?)`,
         [sessionId, u.client_id, sessionNum, u.session_date || null, now.time, probe.durationMs]
       );
+      await snapshotSessionUnit(sessionId, conn);
       await insertPreNote(conn, sessionId, u.pre_note, now.time);
       await conn.query(
         `INSERT INTO audio_jobs (id, upload_id, therapist_id, client_id, session_id, stage, source_path, duration_ms)
@@ -85,6 +86,7 @@ export async function createSessionAndJobForGroup(
          VALUES (?, ?, ?, ?, ?, true, 'completed', 'upload', 'upload', 'queued', ?)`,
         [sessionId, first.client_id, sessionNum, first.session_date || null, now.time, totalMs]
       );
+      await snapshotSessionUnit(sessionId, conn);
       // یادداشت روی هر بخشی که فرستاده شده بود (معمولاً بخشِ اول) — اولین غیرتهی به ترتیبِ بخش‌ها
       await insertPreNote(conn, sessionId, parts.map((p) => p.pre_note).find((x) => typeof x === 'string' && x.trim()), now.time);
       await conn.query(

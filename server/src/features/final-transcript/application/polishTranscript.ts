@@ -21,6 +21,9 @@ export interface PolishConfig {
   // یادداشت‌هایِ درمانگر پیش از جلسه (متنی/صوتی، بدونِ برچسب). فقط «زمینه»: املایِ نام‌ها و موضوع. به LLM داده می‌شود
   // ولی هرگز منبعِ محتوایِ متن نیست و نگهبان‌هایِ قطعی همان‌طور رویِ متنِ خام کار می‌کنند.
   briefing?: string;
+  // نقش‌هایِ تأییدشده‌ی درمانگر (برچسبِ گوینده با ارقامِ فارسی ⇒ نامِ نقش، مثلاً {'۲': 'مراجع'}) از رکوردِ canonical. این نقش‌ها پین‌اند:
+  // نه LLM می‌تواند عوضشان کند و نه نگاشتِ برداشتِ کلی؛ «ساختِ دوباره» ویرایشِ نقشِ درمانگر را بازنویسی نمی‌کند (F7).
+  confirmedRoles?: Record<string, string>;
 }
 
 export interface Overview {
@@ -46,6 +49,8 @@ export interface PolishReport {
   role_fixes: number;
   // تکه‌هایی که نقش‌هایشان به نگاشتِ برداشتِ کلی برگشت (LLM بیشترِ نقش‌ها را برخلافِ تفکیکِ سالمِ Soniox عوض کرده بود)
   role_reverts: number;
+  // نوبت‌هایی که LLM نقششان را برخلافِ نگاشت/تأییدِ درمانگر نوشت (پین‌شده‌ها برگردانده شدند) — فقط شمارنده
+  role_overrides: number;
   usage?: PolishUsage;
 }
 
@@ -87,7 +92,7 @@ export async function polishTranscript(
   cfg: PolishConfig
 ): Promise<PolishResult> {
   const turns = parseTurns(rawText);
-  const report: PolishReport = { model: llm.model, chunks: 0, fallback_chunks: 0, turns: 0, fallback_turns: 0, retries: 0, fallback_reasons: {}, uncertain: 0, overview_ok: false, role_fixes: 0, role_reverts: 0 };
+  const report: PolishReport = { model: llm.model, chunks: 0, fallback_chunks: 0, turns: 0, fallback_turns: 0, retries: 0, fallback_reasons: {}, uncertain: 0, overview_ok: false, role_fixes: 0, role_reverts: 0, role_overrides: 0 };
   // نقش‌هایِ مجاز: فقط وقتی فهرستِ حاضرین معلوم است. نقشِ بیرون از فهرست (مثلاً «مراجع» در جلسه‌ی زوج، یا «گوینده ۳»)
   // نامِ نمایشیِ نادرست می‌سازد ⇒ با نقشِ نگاشت‌شده‌ی همان نوبت (اگر هم‌تراز است) یا نقشِ قبلی جایگزین می‌شود.
   const allowed = roster && roster.speakers.length ? new Set(['درمانگر', ...roster.speakers.map((s) => s.trim())]) : null;
@@ -140,6 +145,12 @@ export async function polishTranscript(
   for (const m of overview.speaker_map || []) {
     const sp = String(m.speaker || '').replace(/[^0-9۰-۹]/g, '').replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[+d]);
     if (sp && m.role) map.set(sp, String(m.role).trim());
+  }
+  // نقش‌هایِ تأییدشده‌ی درمانگر: روی نگاشت می‌نشینند و پین می‌شوند (فقط اگر نقش در فهرستِ مجاز باشد).
+  const pinned = new Set<string>();
+  for (const [sp, role] of Object.entries(cfg.confirmedRoles || {})) {
+    const r = String(role || '').trim();
+    if (r && (!allowed || allowed.has(r))) { map.set(sp, r); pinned.add(sp); }
   }
   // نگهبانِ «نقشِ مجاز ولی غلط» (2026-09-28، ریسکِ R20): نگاشتِ برداشتِ کلی فقط وقتی مبنایِ قابلِ‌اتکاست که تفکیکِ Soniox
   // ادغام‌نشده باشد — هر برچسبِ گوینده به نقشی مجاز نگاشت شده و این نقش‌ها همه‌ی حاضرین را پوشش می‌دهند. در این حالت
@@ -239,6 +250,11 @@ export async function polishTranscript(
     }
     // نقشِ نوبتِ مرتب‌شده: اگر در فهرست نیست ⇒ نقشِ نگاشت‌شده‌ی نوبتِ خامِ متناظر (اگر معلوم است) یا نقشِ قبلی
     const roleOf = (t: LlmTurn, sp: string | null | undefined): string => {
+      if (sp && pinned.has(sp)) {
+        const llmRole = String(t.speaker_role || '').trim();
+        if (llmRole && llmRole !== map.get(sp)) report.role_overrides++;
+        return map.get(sp)!;
+      }
       if (revert && sp && map.has(sp)) return map.get(sp)!;
       const r = String(t.speaker_role || '').trim();
       if (r && (!allowed || allowed.has(r))) return r;
@@ -344,10 +360,21 @@ function evaluateAttempt(polished: LlmTurn[], speech: Turn[], guards: GuardLimit
   let fallbackChars = 0;
   for (const g of groups) {
     const raw = speech.slice(g.start, g.end);
-    g.fail = checkPolishedChunk(plain(raw), g.out.map((t) => String(t.text || '')).join('\n'), guards);
+    g.fail = g.out.length === 1 && mergesSpeakers(raw) ? 'speakers' : checkPolishedChunk(plain(raw), g.out.map((t) => String(t.text || '')).join('\n'), guards);
     if (g.fail) fallbackChars += raw.reduce((s, t) => s + t.text.length, 0);
   }
   return { groups, fallbackChars };
+}
+
+// ادغامِ نوبت‌هایِ دو گویندهٔ متفاوت در یک خروجی (F7): فقط وقتی مجاز است که گویندهٔ کم‌حرف‌تر حداکثر ۲ واژه گفته باشد (همهمه/تأییدِ
+// کوتاه مثلِ «آره»)؛ وگرنه گفته‌هایِ یک نفر به نقشِ دیگری نسبت داده می‌شود.
+const BACKCHANNEL_MAX_WORDS = 2;
+function mergesSpeakers(raw: Turn[]): boolean {
+  const by = new Map<string, number>();
+  for (const t of raw) if (t.speaker) by.set(t.speaker, (by.get(t.speaker) || 0) + t.text.split(/\s+/).filter(Boolean).length);
+  if (by.size < 2) return false;
+  const counts = Array.from(by.values()).sort((a, b) => b - a);
+  return counts.slice(1).some((n) => n > BACKCHANNEL_MAX_WORDS);
 }
 
 const FAIL_HINT: Record<GuardFailure, string> = {
@@ -358,6 +385,7 @@ const FAIL_HINT: Record<GuardFailure, string> = {
   marker: 'نشانگرِ علامت جابه‌جا یا حذف شده بود',
   uncertain: 'علامتِ ⟦…؟⟧ برداشته شده بود',
   empty: 'متنِ نوبت خالی مانده بود',
+  speakers: 'نوبت‌هایِ دو گویندهٔ متفاوت در یک خروجی ادغام شده بود (هر گوینده باید نوبتِ جدا بماند)',
 };
 
 function retryFeedback(a: Attempt): string {

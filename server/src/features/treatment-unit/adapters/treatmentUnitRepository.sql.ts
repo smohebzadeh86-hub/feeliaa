@@ -73,7 +73,7 @@ export class SqlTreatmentUnitRepository implements TreatmentUnitRepo {
     const c = await query('SELECT unit_type, category, gender FROM clients WHERE id = ?', [clientId]);
     const row = c.rows[0] as any;
     if (!row) return null;
-    const m = await query('SELECT * FROM client_members WHERE client_id = ? ORDER BY sort, created_at', [clientId]);
+    const m = await query('SELECT * FROM client_members WHERE client_id = ? AND deleted_at IS NULL ORDER BY sort, created_at', [clientId]);
     return { unitType: row.unit_type || 'individual', category: row.category ?? null, gender: row.gender ?? null, members: (m.rows as any[]).map(rowToMember) };
   }
 
@@ -99,7 +99,8 @@ export class SqlTreatmentUnitRepository implements TreatmentUnitRepo {
         }
       }
       for (const id of existingIds) {
-        if (!keep.has(id)) await conn.query('DELETE FROM client_members WHERE id = ? AND client_id = ?', [id, clientId]);
+        // حذفِ نرم (043): عضوِ حذف‌شده از واحدِ درمان می‌ماند ولی دیده نمی‌شود
+        if (!keep.has(id)) await conn.query('UPDATE client_members SET deleted_at = NOW() WHERE id = ? AND client_id = ?', [id, clientId]);
       }
       // فردی: ستون‌هایِ قدیمیِ clients هم هم‌گام می‌مانند تا بقیه‌ی سیستم (badge، فیلتر، پرونده) بدونِ تغییر کار کند.
       if (unitType === 'individual' && members[0]) {
@@ -120,7 +121,7 @@ export class SqlTreatmentUnitRepository implements TreatmentUnitRepo {
   async getSessionPreNotes(sessionId: string): Promise<string[]> {
     const legacy = await query('SELECT pre_note FROM sessions WHERE id = ?', [sessionId]);
     const notes = await query(
-      "SELECT text FROM session_notes WHERE session_id = ? AND type IN ('note_before','voice_before') ORDER BY created_at", [sessionId]);
+      "SELECT text FROM session_notes WHERE session_id = ? AND deleted_at IS NULL AND type IN ('note_before','voice_before') ORDER BY created_at", [sessionId]);
     return [String((legacy.rows[0] as any)?.pre_note || ''), ...notes.rows.map((r: any) => String(r.text || ''))].map((x) => x.trim()).filter(Boolean);
   }
 

@@ -102,6 +102,12 @@ export class SqlCaseFileRepository implements CaseFileRepository {
         throw e;
       }
     } else {
+      // ⭐ «همه‌چیز قابلِ بازیابی باشد» (2026-10-02): محتوایِ فعلی پیش از بازنویسی در client_case_file_versions می‌ماند (INSERT IGNORE: UNIQUE(client_id, content_version))
+      await query(
+        `INSERT IGNORE INTO client_case_file_versions (client_id, content_version, content, status, model)
+         SELECT client_id, content_version, CAST(content AS CHAR), status, model FROM client_case_file WHERE client_id = ? AND JSON_LENGTH(content) > 0`,
+        [clientId]
+      ).catch(() => { /* fail-open: نبودنِ جدول/خطا مانعِ ذخیره نمی‌شود */ });
       const fields: string[] = ['content = ?', 'content_version = content_version + 1'];
       const values: unknown[] = [JSON.stringify(patch.content)];
       if (patch.status !== undefined) { fields.push('status = ?'); values.push(patch.status); }
@@ -126,4 +132,18 @@ export class SqlCaseFileRepository implements CaseFileRepository {
     const result = await query('SELECT * FROM client_case_file WHERE client_id = ?', [clientId]);
     return rowToRecord(result.rows[0]);
   }
+}
+
+// نسخه‌هایِ قبلیِ پرونده (فقط متادیتا) و یک نسخه؛ بازگردانی از مسیرِ upsert انجام می‌شود (نسخه‌یِ فعلی هم خودکار ذخیره می‌شود).
+export async function listCaseFileVersions(clientId: string): Promise<Array<{ id: number; content_version: number; status: string | null; model: string | null; created_at: string; chars: number }>> {
+  const r = await query('SELECT id, content_version, status, model, created_at, CHAR_LENGTH(content) AS chars FROM client_case_file_versions WHERE client_id = ? ORDER BY id DESC LIMIT 100', [clientId]);
+  return (r.rows as any[]).map((x) => ({ id: Number(x.id), content_version: Number(x.content_version), status: x.status ?? null, model: x.model ?? null, created_at: new Date(x.created_at).toISOString(), chars: Number(x.chars || 0) }));
+}
+
+export async function getCaseFileVersionContent(clientId: string, id: number): Promise<unknown | null> {
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const r = await query('SELECT content FROM client_case_file_versions WHERE client_id = ? AND id = ?', [clientId, id]);
+  const x = (r.rows as any[])[0];
+  if (!x) return null;
+  try { return typeof x.content === 'string' ? JSON.parse(x.content) : x.content; } catch { return null; }
 }

@@ -4,6 +4,7 @@ import { FastifyInstance } from 'fastify';
 import { getOwnedSession } from '../../db/ownership.js';
 import {
   enqueueBatch, processBatchQueue, pendingAudioFor, validateAudioBuffer, type BatchPurpose, getResolveJob, startResolveSpeakers, listSessionAudio,
+  parseEmptySeqs, recordSkippedSegments, listSkips, deriveSessionStatus, pendingAudiosFor, SESSION_AUDIO_RETENTION_MS,
 } from '../transcription/index.js';
 import { logEvent } from '../../obs/eventLog.js';
 
@@ -76,12 +77,45 @@ export async function sessionBatchRoutes(app: FastifyInstance) {
     const mime = typeof file.mimetype === 'string' && file.mimetype ? file.mimetype : 'audio/webm';
 
     const { baseVersion } = await enqueueBatch(id, buffer, purpose, seq, runId, mime);
+    // سگمنت‌هایِ خالیِ پیش از این سگمنت (کلاینت شماره‌شان را مصرف کرده ولی چیزی برایِ آپلود نداشته) — ورودیِ چکِ «گم نشده».
+    // fail-open: شکستِ ثبت هرگز پذیرشِ صدا را رد نمی‌کند.
+    if (purpose === 'transcript' || purpose === 'archive' || purpose === 'late-transcript') {
+      try { await recordSkippedSegments(id, runId, parseEmptySeqs(q?.empty)); } catch (e) { console.log('[batch] skip record failed (ignored):', String(e).slice(0, 120)); }
+    }
     logEvent({ event: 'audio.segment_received', sessionId: id, therapistId: request.therapistId, detail: { bytes: buffer.length, seq, purpose } });
     // پردازش ناهمگام؛ اگر egress قطع باشد queued می‌ماند و با retry بعدی جلو می‌رود
     processBatchQueue(id, purpose).catch(() => {});
 
     reply.code(202);
     return { status: 'queued', purpose, message: 'صوت در صف رونویسی قرار گرفت', base_version: baseVersion };
+  });
+
+  // «دفترِ کامل‌بودنِ» صدایِ یک جلسه برایِ خودِ تراپیست (ممیزیِ Core 2026-10-01): فقط عدد و وضعیت، هیچ متن/مسیر/نامِ فایل.
+  // archived_ms = جمعِ مدتِ سگمنت‌هایِ آرشیوشده؛ expected_ms = مدتِ ثبت‌شده‌یِ جلسه (می‌تواند null باشد)؛
+  // missing_count = سگمنت‌هایی که هرگز نرسیده‌اند (checkSeqContiguous با client_seq)؛ pending_count = هنوز در صفِ سرور.
+  // expired = صدا طبقِ سیاستِ ۳۰روزه پاک شده ⇒ «نبودنِ صدا» هشدار نیست.
+  app.get('/api/sessions/:id/audio-status', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const owned = await getOwnedSession(id, request.therapistId!);
+    if (!owned) {
+      reply.code(404);
+      return { error: 'جلسه یافت نشد' };
+    }
+    const rows = (await listSessionAudio(id)).filter((r) => r.kind === 'session');
+    const pending = pendingAudiosFor(id, 'transcript').length + pendingAudiosFor(id, 'late-transcript').length + pendingAudiosFor(id, 'archive').length;
+    const skips = (await listSkips([id])).get(id) ?? [];
+    const d = deriveSessionStatus(rows, pending, owned, skips);
+    const createdMs = owned.created_at ? new Date(owned.created_at).getTime() : NaN;
+    return {
+      source: owned.source ?? null,
+      audio_status: d.audioStatus,
+      archived_ms: rows.reduce((a, r) => a + (Number(r.duration_ms) || 0), 0),
+      expected_ms: owned.duration_ms ? Number(owned.duration_ms) : null,
+      missing_count: d.audioMissingSegments.length,
+      pending_count: pending,
+      transcript_status: d.transcriptStatus,
+      expired: Number.isFinite(createdMs) && Date.now() - createdMs > SESSION_AUDIO_RETENTION_MS,
+    };
   });
 
   app.get('/api/sessions/:id/batch-status', async (request, reply) => {

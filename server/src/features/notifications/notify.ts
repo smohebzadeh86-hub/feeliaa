@@ -2,6 +2,7 @@
 // هرگز از کلاینت. متنِ نمایشی اینجا ذخیره نمی‌شود (فقط kind + شناسه‌ها)؛ UI متنِ فارسی را از kind
 // می‌سازد، پس هیچ داده‌ی بالینی (LAW-001) در این جدول نیست.
 import { randomUUID } from 'node:crypto';
+import { hardDeleteAllowed } from '../../shared/retention.js';
 import type { PoolConnection } from 'mysql2/promise';
 import { query } from '../../db/connection.js';
 
@@ -48,6 +49,7 @@ export async function notifyAdmins(kind: NotificationKind, errorCode: string, de
 
 const RETENTION_DAYS = 30;
 export async function sweepOldNotifications(): Promise<void> {
+  if (!hardDeleteAllowed()) return; // «هیچ چیزی هارد دیلیت نشود» (2026-10-02)
   try {
     await query('DELETE FROM notifications WHERE created_at < (NOW() - INTERVAL ? DAY)', [RETENTION_DAYS]);
   } catch (e) {

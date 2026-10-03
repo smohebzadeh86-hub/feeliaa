@@ -206,3 +206,6 @@ DOTENV_CONFIG_PATH=/root/feeliaa-mysql/.env node server/_preflight.mjs; rm -f se
 
 ## ۷. CI/CD
 وجود ندارد. تست‌ها دستی و بدونِ DB/شبکه: `pnpm test:rt|cf|up|tu|ft|llm|routes|arch|docs` و `cd server && npx tsc --noEmit` (فهرست: `CLAUDE.md` §8)؛ `test:api` فقط با مجوزِ مالک.
+
+## پشتیبان‌گیری (2026-10-02 — «همه‌چیز قابلِ بازیابی باشد»)
+`pnpm backup` ([scripts/backup-data.mjs](../../scripts/backup-data.mjs)): فقط SELECT از DB و کپیِ فقط‌افزودنیِ `server/data/{session-audio,uploads,batch-queue}` به mirror؛ هیچ‌چیز پاک/بازنویسی نمی‌شود. **UNVERIFIED:** زمان‌بندیِ خودکار (cron/systemd روی VPS) و مقصدِ خارج از سرور هنوز تعریف نشده — فقط اسکریپت آماده است. خروجی حاویِ دادهٔ بالینی است؛ دسترسی محدود و خارج از git.

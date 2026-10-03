@@ -2,6 +2,7 @@
 // دیگری اینجا نیست. تنها مسیرِ نوشتن: caseFileRepo (یک‌طرفه، هرگز sessions/session_notes
 // را تغییر نمی‌دهد — پرونده‌ی سنتزشده از دیتایِ خام کاملاً جدا است).
 import { aggregateClientCorpus } from './aggregateClientCorpus.js';
+import { quoteVerifierFor } from './corpusQuality.js';
 import { buildCaseFilePrompt, buildAnsweredQuestionsBlock } from '../prompts/userPrompts.js';
 import { mergeCaseFileDraft } from './mergeTherapistEdits.js';
 import { digestWithRepair, composeWithRepair } from './repairLoop.js';
@@ -83,7 +84,7 @@ export async function generateCaseFile(
     const digest = corpus.sessions.length ? await digestWithRepair(llmProvider, promptInput, corpus, hooks) : null;
     // مرحله‌ی ۲: چیدنِ پرونده از رویِ digest (با اصلاحِ یک‌باره در صورتِ تخلفِ ساختار/حفظِ فکت).
     // پاسخ‌هایِ ثبت‌شده مستقیماً اینجا چسبانده می‌شوند (نه به ورودیِ مرحله‌ی ۱ — نگاه کنید به buildAnsweredQuestionsBlock).
-    const draft = await composeWithRepair(llmProvider, promptInput, digest, hooks, buildAnsweredQuestionsBlock(answeredQuestions));
+    const draft = await composeWithRepair(llmProvider, promptInput, digest, hooks, buildAnsweredQuestionsBlock(answeredQuestions), quoteVerifierFor(corpus));
     enforceCaseFileRules(draft);
 
     // ⭐ رفعِ F6 (lost update): تولید چند دقیقه طول می‌کشد و تراپیست در این فاصله ممکن است فیلدی را
@@ -96,6 +97,16 @@ export async function generateCaseFile(
       if (attempt > 0) base = await caseFileRepo.get(clientId);
       const baseContent = base && base.content && Object.keys(base.content).length ? base.content : null;
       const content = mergeCaseFileDraft(opts.force ? null : baseContent, draft, corpus, baseContent?.answeredQuestions);
+      // «هیچ چیزی هارد دیلیت نشود»: بایگانیِ ردیف‌هایِ حذف‌شده و نسخه‌یِ پیش از force منتقل/ثبت می‌شود
+      if (baseContent) {
+        if (baseContent.removedItems?.length) content.removedItems = baseContent.removedItems;
+        const prevForced = baseContent.previousForced ?? [];
+        if (opts.force) {
+          const { previousForced: _p, ...snapshot } = baseContent as unknown as Record<string, unknown>;
+          void _p;
+          content.previousForced = [...prevForced, { at: new Date().toISOString(), content: snapshot }];
+        } else if (prevForced.length) content.previousForced = prevForced;
+      }
       record = await caseFileRepo.upsert(clientId, {
         content,
         status: 'ready',

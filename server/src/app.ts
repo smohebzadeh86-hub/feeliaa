@@ -22,6 +22,7 @@ import { flushObsQueue } from './obs/eventLog.js';
 import { audioUploadRoutes, registerUploadChunkParser } from './features/audio-upload/uploads.routes.js';
 import { notificationRoutes } from './features/notifications/notifications.routes.js';
 import { finalTranscriptRoutes } from './features/final-transcript/index.js';
+import { sessionRecordRoutes } from './features/session-record/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -89,6 +90,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     await uploadScope.register(notificationRoutes);
   });
   await app.register(finalTranscriptRoutes);
+  await app.register(sessionRecordRoutes);
 
   // Serve static (فرانت)
   const publicDir = path.join(__dirname, '..', '..', 'public');

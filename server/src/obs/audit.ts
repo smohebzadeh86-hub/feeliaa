@@ -19,7 +19,12 @@ export const AUDIT_ACTIONS = [
   'admin.voice_note_text_view', // نمایشِ متنِ یادداشتِ صوتی (B3)
   'admin.flag_granted',         // ادمین‌شدنِ خودکار با ADMIN_PHONE (ensureAdminFlag)
   'therapist.client_delete',
-  'therapist.session_delete',
+  'therapist.session_delete',   // حذفِ نرم (042)؛ detail.soft=true
+  'therapist.session_restore',  // بازگردانیِ جلسه‌یِ حذف‌شده توسطِ تراپیست
+  'admin.session_restore',      // بازگردانیِ جلسه‌یِ حذف‌شده توسطِ ادمین
+  'therapist.client_restore',   // بازگردانیِ مراجعِ حذف‌شده (043)
+  'admin.client_restore',
+  'admin.hard_delete_blocked',  // تلاش برایِ حذفِ سخت که سیاستِ «هیچ چیزی هارد دیلیت نشود» رد کرد
   'consent.recorded',
   'consent.revoked',
   'session.auto_closed',

@@ -14,7 +14,7 @@ export async function getUploadRow(id: string): Promise<any> {
 // ————— نمایِ job (سینیِ پردازش) —————
 const JOB_SELECT = `SELECT j.id, j.stage, j.attempts, j.error_code, j.duration_ms, j.case_file_status,
     j.transcript_applied_at, j.transcript_chars, j.created_at, j.updated_at, j.finished_at, j.next_attempt_at,
-    j.audio_quality, j.quality_warning,
+    j.audio_quality, j.quality_warning, j.transcript_metrics,
     j.session_id, j.client_id, j.upload_id, s.session_num, c.code AS client_code, c.alias AS client_alias, c.status AS client_status,
     u.original_name, u.parts_total, t.name AS therapist_name, t.id AS therapist_id, t.case_file_enabled AS t_case_file_enabled, t.case_file_auto_generate AS t_case_file_auto_generate
   FROM audio_jobs j

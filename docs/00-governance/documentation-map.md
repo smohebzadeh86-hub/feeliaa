@@ -31,6 +31,7 @@
 | [`PROJECT_MASTER_REFERENCE.md`](../../PROJECT_MASTER_REFERENCE.md) | تصویرِ کل + وضعیت + ریسک | ACTIVE-CANONICAL | HIGH | HAS-INFERRED | کلِ پروژه | همه‌ی لایه‌ها | تغییرِ وضعیت/ریسک/ماژول |
 | [`docs/README.md`](../README.md) | فهرستِ لایه‌ها | ACTIVE-SUPPORTING | MEDIUM | COMPLETE | docs/ | — | افزودنِ لایه |
 | [project-laws.md](project-laws.md) | قوانین LAW-xxx | ACTIVE-CANONICAL | HIGHEST | COMPLETE | کلِ پروژه | تصمیم‌های مالک | قانونِ جدید/تغییرِ violation |
+| [product-thesis.md](product-thesis.md) | Value thesis، Core Functional Job، Core/Non-Core، فیلترِ تصمیمِ feature، metricها (جهتِ محصول؛ 2026-10-02) | ACTIVE (نوشته‌ی مالک؛ جهت نه وضعیتِ کد) | HIGH برای اولویت‌بندی | HAS-INFERRED (§۱۶ تفسیرِ نگارنده) | کلِ محصول | تصمیمِ مالک | تغییرِ جهتِ محصول با تصمیمِ مالک |
 | [source-of-truth.md](source-of-truth.md) | حلِ تعارض | ACTIVE-CANONICAL | HIGH | COMPLETE | کلِ پروژه | laws | تغییرِ سلسله‌مراتب |
 | [ai-agent-reading-guide.md](ai-agent-reading-guide.md) | workflow agent | ACTIVE-CANONICAL | HIGH | COMPLETE | agentها | laws، module-map | درسِ جدید از خطا |
 | [documentation-map.md](documentation-map.md) | همین فهرست | ACTIVE-CANONICAL | HIGH | COMPLETE | docs | همه | هر سندِ جدید/تغییرِ وضعیت |
@@ -82,6 +83,7 @@
 | [05-session-audio-archive-speaker-resolve](../07-subsystems/05-session-audio-archive-speaker-resolve.md) | آرشیو و resolve | ACTIVE-CANONICAL | HIGH | HAS-INFERRED | آرشیو/ffmpeg |
 | [06-audio-upload-pipeline](../07-subsystems/06-audio-upload-pipeline.md) | آپلودِ فایلِ صوتی | ACTIVE-CANONICAL | HIGH | COMPLETE | audio-upload |
 | [07-final-transcript](../07-subsystems/07-final-transcript.md) | متنِ نهایی | ACTIVE-CANONICAL | HIGH | COMPLETE | final-transcript |
+| [08-session-record](../07-subsystems/08-session-record.md) | رکوردِ canonicalِ جلسه (توکن، نوبتِ گوینده، نقش، تاریخچه) | ACTIVE-CANONICAL | HIGH | COMPLETE | session-record |
 | [master-implementation-plan](../05-plans/master-implementation-plan.md) | ترتیبِ کارها | **PROPOSED** | MEDIUM | COMPLETE | تصمیمِ مالک/پیشرفت |
 | [ui-ux-audit-2026-09-14](../05-plans/ui-ux-audit-2026-09-14.md) | بررسیِ کاملِ UI: باگ‌ها (با شاهدِ اجرا/کد و ستونِ production) + پیشنهادهای بهبود و نقشه‌ی اجرا | یافته‌ها: EVIDENCE (2026-09-14) · پیشنهادها: **PROPOSED** | MEDIUM | HAS-INFERRED | رفعِ هر UI-xx یا تصمیمِ مالک |
 | [ux-audit-2026-09-14/UX_AUDIT_REPORT](../05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) (+ [UX_FINDINGS](../05-plans/ux-audit-2026-09-14/UX_FINDINGS.md)، [USER_JOURNEYS](../05-plans/ux-audit-2026-09-14/USER_JOURNEYS.md)، [UX_OPEN_QUESTIONS](../05-plans/ux-audit-2026-09-14/UX_OPEN_QUESTIONS.md)، [UX_PRIORITY_ROADMAP](../05-plans/ux-audit-2026-09-14/UX_PRIORITY_ROADMAP.md)) | UX audit از دیدِ پژوهشِ تجربه‌ی کاربر: ۴۲ یافته UX-xx، مسیرهای کاربر، سناریوهای شکست، حریمِ خصوصی، دسترس‌پذیری، محتوای فارسی، سؤالاتِ باز، نقشه‌ی اولویت | یافته‌ها: EVIDENCE (2026-09-14) · راه‌حل‌ها و roadmap: **PROPOSED** · مدلِ ذهنی: ASSUMPTION | MEDIUM | HAS-INFERRED | رفعِ هر UX-xx، تحقیقِ کاربر، یا تصمیمِ مالک |

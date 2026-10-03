@@ -25,3 +25,14 @@ export function mergeRecoveredSegment(currentText: string, text: string, key: st
   const segment = head ? `${head}\n${text}` : text;
   return currentText ? currentText + '\n\n' + segment : segment;
 }
+
+// ⭐ (2026-10-02، فاز ۶ ممیزیِ Core) بازه‌ای که هرگز رونویسی نمی‌شود (فایلِ نامعتبر/drop یا پاک‌سازیِ ۲۴ساعتهٔ صف) نباید «⏳ در حالِ
+// بازیابی» برایِ همیشه در متن بماند: placeholder با نشانگرِ صادقانه جایگزین می‌شود (کلیدِ همان بازه حفظ است تا کلاینت
+// بازه را «حل‌شده» ببیند). صدایِ همان بازه در آرشیوِ ادمین می‌ماند. placeholder نبود ⇒ null (چیزی عوض نمی‌شود).
+export const RECOVERY_LOST_LABEL = 'بازه‌ی قطعی — متنِ این بخش بازیابی نشد (صدا در آرشیو است)';
+export function mergeRecoveryLost(currentText: string, key: string | undefined): string | null {
+  if (!key) return null;
+  const re = recoveryPlaceholderRe(key);
+  if (!re.test(currentText)) return null;
+  return currentText.replace(re, () => `[${RECOVERY_LOST_LABEL} · #${key}]`);
+}

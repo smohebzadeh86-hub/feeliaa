@@ -278,6 +278,8 @@ export function removeCaseFileItem(content: CaseFileContent, kind: AddableKind, 
   if (idx < 0) throw new CaseFileValidationError('ردیف یافت نشد');
   // فقط ردیفِ دستی حذف می‌شود؛ ردیفِ AI با regenerate برمی‌گشت و حذفش گمراه‌کننده بود
   if (!list[idx].addedByTherapist) throw new CaseFileValidationError('فقط ردیفِ افزوده‌شده‌ی دستی قابلِ حذف است');
-  list.splice(idx, 1);
+  // حذفِ نرم: ردیف در content.removedItems می‌ماند (تصمیمِ مالک: هیچ چیزی هارد دیلیت نشود)
+  const [removed] = list.splice(idx, 1);
+  next.removedItems = [...(next.removedItems ?? []), { kind, item: removed, removedAt: new Date().toISOString() }];
   return next;
 }

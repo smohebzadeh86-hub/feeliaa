@@ -3,7 +3,7 @@
 import { FastifyInstance } from 'fastify';
 import { statSync } from 'node:fs';
 import {
-  listSessionAudio, getSessionAudioRow, deriveSessionStatus, checkSeqContiguous, getFullSessionAudio, deleteSessionAudioDirs, SESSION_AUDIO_RETENTION_MS, pendingAudiosFor,
+  listSessionAudio, getSessionAudioRow, deriveSessionStatus, checkSeqContiguous, listSkips, getFullSessionAudio, deleteSessionAudioDirs, SESSION_AUDIO_RETENTION_MS, pendingAudiosFor,
 } from '../transcription/index.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
@@ -11,7 +11,7 @@ import { sendFileWithRange } from '../../shared/httpRange.js';
 import { audioFilters, pageParams, SILENT_KBPS } from './filters.js';
 import {
   getSessionSttState, sessionExists, audioArchiveBase, listAudioArchivePage, listSessionSeqs, audioArchiveTotals,
-  countAudioExpiringSoon, sessionAudioTotals, deleteSessionAudioRows, listVoiceNoteSessionsPage, listSessionsInfo,
+  countAudioExpiringSoon, sessionAudioTotals, listVoiceNoteSessionsPage, listSessionsInfo,
   listVoiceNotesMeta, listNoteAudio, getVoiceNoteText,
 } from './admin.repository.js';
 
@@ -41,7 +41,7 @@ export async function audioAdminRoutes(app: FastifyInstance) {
     // (فازِ ۱ِ رصد/حسابرسی، 2026-09-22: همین منطق در deriveSessionStatus استخراج شد
     // تا GET /api/admin/sessions/recent هم بتواند از آن استفاده کند.)
     const row = session as { batch_status: string | null; realtime_reliable: boolean | null; stt_mode: string | null };
-    const derived = deriveSessionStatus(rows, pendingCount, row);
+    const derived = deriveSessionStatus(rows, pendingCount, row, (await listSkips([id])).get(id) ?? []);
     return {
       audio: rows.map((r) => ({
         id: r.id, seq: r.seq, bytes: r.bytes, mime: r.mime, source: r.source, kind: r.kind,
@@ -138,6 +138,7 @@ export async function audioAdminRoutes(app: FastifyInstance) {
     const rows = pageRows.slice(0, limit) as any[];
     const ids = rows.map((x) => x.session_id);
     const seqs = new Map<string, any[]>();
+    const skipMap = ids.length ? await listSkips(ids) : new Map();
     if (ids.length) {
       const sr = await listSessionSeqs(ids);
       for (const x of sr) { if (!seqs.has(x.session_id)) seqs.set(x.session_id, []); seqs.get(x.session_id)!.push(x); }
@@ -146,7 +147,7 @@ export async function audioAdminRoutes(app: FastifyInstance) {
       const audioMs = Number(x.audio_ms) || 0;
       const bytes = Number(x.bytes) || 0;
       const kbps = audioMs > 0 ? Math.round((bytes * 8) / audioMs * 10) / 10 : null;
-      const { complete, missing } = checkSeqContiguous(seqs.get(x.session_id) || []);
+      const { complete, missing } = checkSeqContiguous(seqs.get(x.session_id) || [], skipMap.get(x.session_id) || []);
       const pending = pendingAudiosFor(x.session_id, 'transcript').length + pendingAudiosFor(x.session_id, 'late-transcript').length + pendingAudiosFor(x.session_id, 'archive').length;
       return {
         session_id: x.session_id, session_num: x.session_num, date: x.date, status: x.status, source: x.source,
@@ -173,27 +174,17 @@ export async function audioAdminRoutes(app: FastifyInstance) {
     };
   });
 
-  // DELETE /api/admin/sessions/:id/audio — فقط صدایِ یک جلسه (نه خودِ جلسه/متن). صدایی که هنوز در صفِ رونویسی است
-  // حذف نمی‌شود (409) تا متنی که فقط از همان صدا بازیابی‌پذیر است گم نشود. LAW-010 + ممیزی.
+  // DELETE /api/admin/sessions/:id/audio — ⭐ (2026-10-02، تصمیمِ مالک «هیچ چیزی هارد دیلیت نشود») حذفِ صدا غیرفعال است؛ صدا فقط
+  // نگه‌داری می‌شود. (قبلاً: حذفِ ردیف‌ها و فایل‌هایِ آرشیوِ یک جلسه، با ممیزی.) تلاش audit می‌شود.
   app.delete('/api/admin/sessions/:id/audio', async (request, reply) => {
     const { id } = request.params as { id: string };
     if (!(await sessionExists(id))) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
-    const pending = pendingAudiosFor(id, 'transcript').length + pendingAudiosFor(id, 'late-transcript').length + pendingAudiosFor(id, 'note').length + pendingAudiosFor(id, 'pre-note').length;
-    if (pending > 0) {
-      reply.code(409);
-      return { error: 'بخشی از صدایِ این جلسه هنوز در صفِ رونویسی است — بعد از پایانِ پردازش دوباره امتحان کنید', code: 'audio-pending', pending_count: pending };
-    }
-    const cnt = await sessionAudioTotals(id);
-    const n = Number(cnt?.n || 0);
-    const b = Number(cnt?.b || 0);
-    await deleteSessionAudioRows(id);
-    deleteSessionAudioDirs([id]);
-    logEvent({ event: 'admin.delete', therapistId: request.therapistId, sessionId: id, detail: { kind: 'session_audio', count: n } });
-    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.session_audio_delete', targetType: 'session', targetId: id, detail: { count: n, bytes: b } });
-    return { deleted: n, bytes: b };
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.hard_delete_blocked', targetType: 'session', targetId: id, detail: { kind: 'session_audio' } });
+    reply.code(409);
+    return { error: 'حذفِ صدا غیرفعال است (هیچ داده‌ای پاک نمی‌شود).', code: 'hard-delete-disabled' };
   });
 
   // ————————————————— B3 (2026-09-26): یادداشت‌هایِ صوتی —————————————————

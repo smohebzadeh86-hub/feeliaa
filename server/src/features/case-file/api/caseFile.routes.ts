@@ -5,6 +5,8 @@ import { requireAuth, requireCaseFileAccess } from '../../../auth/guard.js';
 import { getOwnedClient } from '../../../db/ownership.js';
 import { generateCaseFile } from '../application/generateCaseFile.js';
 import { computeTreatmentRhythm } from '../application/computeTreatmentRhythm.js';
+import { corpusQualityIssues } from '../application/corpusQuality.js';
+import { listCaseFileVersions, getCaseFileVersionContent } from '../adapters/repository/caseFileRepository.sql.js';
 import { applyFieldPatch, addCaseFileItem, removeCaseFileItem, dropGhostMedication, migrateAnsweredQuestions, type FieldPatchAction, type AddableKind } from '../application/applyFieldPatch.js';
 import { upgradeLegacyContent } from '../application/upgradeLegacyContent.js';
 import { writeCaseFileWithCas } from '../application/writeCaseFileWithCas.js';
@@ -28,7 +30,26 @@ export async function caseFileRoutes(app: FastifyInstance) {
     const record = await caseFileRepo.get(id);
     if (record) { dropGhostMedication(record.content); migrateAnsweredQuestions(record.content); }
     const treatment_rhythm = await computeTreatmentRhythm(id);
-    return { case_file: record, treatment_rhythm };
+    // جلساتِ کم‌کیفیت (F3): تولیدِ خودکار برایشان نگه داشته می‌شود؛ UI هشدار می‌دهد. فقط شماره‌جلسه و نامِ پرچم.
+    const quality = (await corpusQualityIssues(id).catch(() => [])).map((q) => ({ session_num: q.sessionNum, flags: q.flags }));
+    return { case_file: record, treatment_rhythm, quality };
+  });
+
+  // GET /api/clients/:id/case-file/versions — نسخه‌هایِ قبلیِ پرونده (فقط متادیتا؛ «همه‌چیز قابلِ بازیابی باشد»، 2026-10-02)
+  app.get('/api/clients/:id/case-file/versions', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!(await getOwnedClient(id, request.therapistId!))) { reply.code(404); return { error: 'مراجع یافت نشد' }; }
+    return { versions: await listCaseFileVersions(id) };
+  });
+
+  // POST /api/clients/:id/case-file/versions/:vid/restore — بازگردانیِ یک نسخه؛ نسخه‌یِ فعلی هم پیش از جایگزینی ذخیره می‌شود (برگشت‌پذیر)
+  app.post('/api/clients/:id/case-file/versions/:vid/restore', async (request, reply) => {
+    const { id, vid } = request.params as { id: string; vid: string };
+    if (!(await getOwnedClient(id, request.therapistId!))) { reply.code(404); return { error: 'مراجع یافت نشد' }; }
+    const content = await getCaseFileVersionContent(id, Number(vid));
+    if (!content) { reply.code(404); return { error: 'نسخه یافت نشد' }; }
+    const record = await caseFileRepo.upsert(id, { content: content as any, status: 'ready', therapistEditedAt: new Date() });
+    return { case_file: record };
   });
 
   // POST /api/clients/:id/case-file/regenerate — تنها راهِ trigger در فازِ ۱ (دستی، بدونِ auto-trigger)

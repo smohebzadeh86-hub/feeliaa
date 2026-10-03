@@ -2,7 +2,7 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-09-30 — آخرین رویداد: **پلنِ مستندات کامل شد (فازهایِ ۰–۷ + bannerهایِ فرانت) و commit شد؛ تست‌هایِ رفتاریِ همه‌ی harnessها و `test:api` سبز؛ push/deploy نشد.** سابقه‌ی زنجیره‌ی «قبل‌ترش»ها: [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md).
+> **آخرین به‌روزرسانی:** 2026-10-02 — آخرین رویداد: **Product Thesis به‌عنوانِ سندِ governance افزوده شد (DOCS؛ بدونِ تغییرِ کد).** رویدادِ قبلی: **پلنِ مستندات کامل شد (فازهایِ ۰–۷ + bannerهایِ فرانت) و commit شد؛ تست‌هایِ رفتاریِ همه‌ی harnessها و `test:api` سبز؛ push/deploy نشد.** سابقه‌ی زنجیره‌ی «قبل‌ترش»ها: [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md).
 > **مالکِ:** Event Log و وضعیتِ انطباق با ساختار. factهای جزئی مالکِ خودشان را دارند (لینک‌ها)؛ در تعارض، سندِ مالک برنده است ([source-of-truth](docs/00-governance/source-of-truth.md)).
 
 ---
@@ -222,6 +222,151 @@
 
 > ورودی‌هایِ 2026-09-28 و قدیمی‌تر به [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md) منتقل شده‌اند (2026-09-30، فاز ۷). Event Logِ زنده از 2026-09-29 است.
 
+### 2026-10-03 — GIT + DEPLOY (production) — commit `375c0f7`: سوییچِ متنِ خام/نهایی در جزئیاتِ جلسه‌یِ ادمین
+- **چه شد:** `git commit --only` فقط `public/feelia-admin-quality.js` (بدونِ stage شدنِ تغییراتِ نشست‌هایِ دیگر؛ `PROJECT_STATUS.md` عمداً commit نشد چون hunkِ بیگانه دارد). پیش از deploy: sha1ِ (بدونِ CR) فایلِ production برابرِ HEAD بود. فقط همین یک فایلِ استاتیک با `scp` جایگزین شد؛ پشتیبان: `/root/feelia-admin-quality.js.bak-2026-10-03`. build/ری‌استارت لازم نبود (فایلِ استاتیک).
+- **تأیید:** sha1ِ سرور = sha1ِ محلی؛ `curl` رویِ `https://feelia.ir/feelia-admin-quality.js` کدِ سوییچ را سرو می‌کند. push نشد. تستِ UI در مرورگرِ واقعی انجام نشد.
+- **عامل:** این نشست.
+
+### 2026-10-03 — CODE + TEST — سوییچِ «متنِ خام / متنِ نهایی» در جزئیاتِ جلسه‌یِ ادمین
+- **چه شد:** در `renderFtHistory` یک سوییچ بالایِ کارتِ تاریخچه افزوده شد؛ باکسِ اصلیِ جلسه بینِ متنِ خام و نسخه‌یِ جاریِ (بالاترین) متنِ نهایی جابه‌جا می‌شود. بدونِ endpoint یا migrationِ جدید (از `GET …/final-transcript/versions[/:v]` استفاده می‌کند؛ مشاهده ممیزی می‌شود). جلسه‌ای که نسخه ندارد سوییچ ندارد.
+- **فایل‌ها:** `public/feelia-admin-quality.js`.
+- **تست / تأیید:** `node --check` OK؛ تستِ stub-DOM (خام→نهایی→خام→نهایی) درست؛ `pnpm test:docs` OK. در مرورگرِ واقعی دیده نشد (حسابِ ادمین ندارم). commit/deploy نشده.
+- **عامل:** این نشست.
+
+### 2026-10-03 — DATA (production) + FINDING — backfillِ baselineِ تاریخچه‌یِ «متنِ نهایی» (به دستورِ مالک)
+- **چه شد:** INSERT…SELECTِ تک‌تراکنشی (با rollback در صورتِ ناهم‌خوانی) به `final_transcript_versions`: برایِ هر `final_transcripts` با `stage=done` و بدونِ هیچ نسخه، `version=1, kind='baseline'` (همان SQLِ `snapshotBaselineIfMissing`). **۷ ردیف درج شد؛ مانده ۰؛ جمعِ نسخه‌ها ۸.** هیچ ردیفِ موجود تغییر/حذف نشد؛ متنی چاپ نشد؛ اسکریپتِ موقت از سرور حذف شد.
+- **انجام نشد:** backfillِ `audio_jobs.transcript_metrics` — محاسبه‌اش به توکن‌هایِ Soniox در لحظه‌یِ job نیاز دارد که برایِ jobهایِ قدیمی ذخیره نیست؛ بازسازی = فراخوانیِ دوباره‌یِ Soniox (کلیدِ مشترکِ dev/prod) و منتظرِ تصمیمِ مالک.
+- **FINDING:** متنِ نهایی در جزئیاتِ جلسه‌یِ ادمین فقط داخلِ کارتِ کوچکِ «تاریخچه‌یِ متنِ نهایی» (دکمه‌یِ «نمایش») است، نه در نمایشِ اصلی؛ کدِ جلسه‌یِ `3bb0da7b` باید از قبل کارت را نشان می‌داد — گزارشِ مالک مبنی بر «دسترسی ندارم» در UIِ واقعی تأیید/ریشه‌یابی نشد.
+- **عامل:** این نشست.
+
+### 2026-10-03 — AUDIT (production، فقط‌خواندنی) + FINDING — «متنِ نهایی» سه جلسه‌یِ جدیدِ پدرام و دیده‌شدنِ آن‌ها در پنلِ ادمین
+- **چه شد:** SELECTِ فقط‌خواندنی رویِ prod (فقط طول/شمارنده، بدونِ متن؛ اسکریپتِ موقت پس از اجرا حذف شد). از `5dbb946c` به بعد ۳ آپلودِ جدید: `1d621be5` (09-29)، `9d79792d` (09-30)، `3bb0da7b` (10-03). هر سه `final_transcripts.stage=done` با `clean_text` و `clean_turns` ذخیره‌شده (طولِ clean ≈ ۹۴–۹۸٪ async؛ turns با گزارشِ polish هم‌خوان؛ `1d621be5` یک نوبت کمتر).
+- **کیفیتِ polish:** `3bb0da7b` (Metis/DeepSeek): fallback ۷ از ۴۷۸ نوبت (uncertain)، coverage ۰٫۹۹۵، پرچمِ `speakers_extra` (۳ گوینده به‌جای ۲؛ سهمِ سوم ۳٫۶٪). `1d621be5`: fallback ۱۳۷ از ۵۱۴ نوبت (۴ chunk با llm-error) ⇒ کامل ولی بخشی بدونِ polish. `9d79792d`: fallback ۱.
+- **FINDING (شکاف در پنلِ ادمین):** `transcript_metrics` فقط برایِ `3bb0da7b` پر است (قدیمی‌ها NULL ⇒ در «کیفیت به عدد» عددی ندارند). `final_transcript_versions` فقط برایِ `3bb0da7b` ردیف دارد؛ `1d621be5`، `9d79792d`، `5dbb946c` صفر نسخه ⇒ `renderFtHistory` (public/feelia-admin-quality.js) کارت را پنهان می‌کند و ادمین راهی برایِ دیدنِ متنِ نهاییِ فعلیِ آن‌ها ندارد؛ export هم `final_transcripts` را شامل نمی‌شود.
+- **تغییرِ کد/داده:** هیچ. **کارِ باز:** پیشنهاد — backfillِ baseline برایِ جلسه‌هایِ بدونِ تاریخچه + محاسبه‌یِ transcript_metrics برایِ jobهایِ قدیمی؛ منتظرِ تصمیمِ مالک.
+- **عامل:** این نشست.
+
+### 2026-10-02 — CODE + TEST + DOCS — دسترسیِ کاملِ ادمین به همه‌یِ داده + پشتیبانِ فقط‌افزودنی
+- **درخواستِ مالک:** «اضافه کن؛ می‌خواهم به همه دیتا دسترسی داشته باشم و هیچی هارد دیلیت نشه».
+- **ادمین (`features/admin/dataAccess.admin.ts`، جدید):** `GET /api/admin/deleted`، `POST /api/admin/notes/:id/restore`، تاریخچه‌یِ متنِ جلسه/یادداشت (فهرست + متن)، پروندهٔ درمان + نسخه‌ها؛ هر خواندنِ متن audit. UI: کارتِ «داده‌هایِ حذف‌شده» (بازگردانی) در «سلامتِ سیستم» و «تاریخچه‌یِ ویرایشِ متن» در جزئیاتِ جلسه. **export → schema_version 3:** شاملِ حذف‌شده‌ها (`deleted_at`) + `transcript_revisions`/`note_revisions`/`case_file`/`case_file_versions`.
+- **پشتیبان:** `pnpm backup` (`scripts/backup-data.mjs`): NDJSON هر جدول + schema.sql + manifest با sha256، و mirrorِ پایدارِ فایل‌هایِ صدا/آپلود که هرگز حذف/بازنویسی نمی‌شود (تست: حذفِ منبع ⇒ mirror ماند). `backups/` در `.gitignore`. **UNVERIFIED:** زمان‌بندیِ خودکار روی VPS و مقصدِ بیرونی تعریف نشده.
+- **تست:** یکپارچه‌یِ DB (canary) ۱۱ ادعا PASS (دیدِ ادمین رویِ مراجع/جلسه/یادداشتِ حذف‌شده، تاریخچه‌ها، پرونده+نسخه، export v3 کامل، restoreها، ۴۰۳ برایِ غیرادمین)؛ اجرایِ واقعیِ backup (dry-run روی DBِ dev: ۲۸ جدول؛ اجرایِ کامل فقط روی `_migrations` + دایرکتوریِ ساختگیِ فایل). canary پاک شد.
+- **اسناد:** api-catalog، PRDِ ادمین، deployment-operations، CLAUDE.md §8.
+
+### 2026-10-02 — CODE + MIGRATION + TEST + DOCS — «همه‌چیز قابلِ بازیابی باشد» (تاریخچه‌یِ ویرایش یادداشت/پرونده)
+- **درخواستِ مالک:** «همه‌چیز قابلِ بازیابی باشد، هیچی هارد دیلیت نشود» (تعمیمِ تصمیمِ قبلی).
+- **MIGRATION 044 (additive، روی DBِ dev اعمال شد؛ ⚠️ در deploy خودکار):** `session_note_revisions`، `client_case_file_versions`.
+- **کد:** `PATCH /api/notes/:id` متنِ قبلی را ذخیره می‌کند + `GET/POST /api/notes/:id/revisions…`؛ هر بازنویسیِ پرونده (`SqlCaseFileRepository.upsert`) محتوایِ قبلی را در `client_case_file_versions` می‌گذارد + `GET/POST /api/clients/:id/case-file/versions…` (بازگردانی خودش برگشت‌پذیر است).
+- **تست:** یکپارچه‌یِ DB ۱۰ ادعا PASS (۲ نسخه‌یِ یادداشت، restore و برگشت‌پذیری، ۳ نسخه‌یِ پرونده، ۴۰۴ها). canary پاک شد.
+- **DB-level:** triggerِ ضدِ DELETE از خودِ اپ ممکن نیست (`ER_BINLOG_CREATE_ROUTINE_NEED_SUPER`: کاربرِ اپ SUPER ندارد، binlog روشن) ⇒ `scripts/db-guard-triggers.sql` برایِ DBA آماده است (اختیاری؛ نیاز به `log_bin_trust_function_creators=1`).
+- **باقی‌مانده:** backupِ DB/دیسک در مخزن تعریف نشده؛ ویرایشِ alias/تاریخِ جلسه/دسته‌بندی تاریخچه ندارد. جزئیات: LAW-010 («نقشه‌یِ بازیابی»).
+
+### 2026-10-02 — CODE + MIGRATION + DECISION + TEST + DOCS — «هیچ چیزی هارد دیلیت نشود» (سیاستِ سراسری)
+- **تصمیمِ مالک:** «هیچ چیزی نباید هارد دیلیت بشه». ممیزیِ کد (`DELETE FROM`/`rmSync`/cascade) ⇒ همه‌ی مسیرهایِ حذفِ داده‌یِ کاربر بسته یا نرم شد.
+- **MIGRATION 043 (additive، روی DBِ dev اعمال شد؛ ⚠️ در deploy خودکار):** `clients.deleted_at/deleted_by`، `session_notes.deleted_at/deleted_by`، `client_members.deleted_at`.
+- **حذفِ نرم:** مراجع (تراپیست و ادمین) + `GET /api/deleted-clients` + `POST /api/clients/:id/restore` + `POST /api/admin/clients/:id/restore`؛ یادداشت (`DELETE /api/notes/:id`)؛ عضوِ واحدِ درمان؛ ردیفِ دستیِ پرونده (`content.removedItems`) و نسخه‌یِ پیش از force (`content.previousForced`). فیلترِ `deleted_at IS NULL` در `getOwnedClient/Session`، لیست‌هایِ تراپیست، corpusِ پرونده، متنِ نهایی (علائم/یادداشتِ پیش از جلسه)، speakerResolve، پایشِ زنده، autoClose.
+- **مسدود:** `DELETE /api/admin/therapists/:id` و `DELETE /api/admin/sessions/:id/audio` ⇒ 409 `hard-delete-disabled` (+audit `admin.hard_delete_blocked`)؛ دکمه‌هایِ UI برداشته شد.
+- **جاروب‌هایِ نگهداری خاموش** (`shared/retention.ts#hardDeleteAllowed`، `ALLOW_HARD_DELETE=1` کلیدِ اضطراری): آرشیوِ صدا (۳۰ روز)، یتیم‌جاروبیِ آرشیو، حذفِ وابسته به purge، صفِ batchِ بی‌آرشیو/نامشخص، پوشه‌یِ آپلود، رصد/ممیزی، اعلان؛ شکستِ نوشتنِ آرشیو فایل را `.unrecorded` نگه می‌دارد نه پاک.
+- **تست:** یکپارچه‌یِ DB (canary) ۱۹ ادعا PASS: ماندنِ ردیف/فایل/صدا، ۴۰۴ برایِ تراپیست، دیدِ ادمین، restore، جاروب‌هایِ ۴۰۰روزه no-op، ۴۰۹ ادمین، و اثباتِ اینکه `ALLOW_HARD_DELETE=1` همان جاروب را فعال می‌کند. canary پاک شد.
+- **⚠️ پیامدها:** دیسک بی‌سقف رشد می‌کند (آرشیوِ صدا، آپلودها)؛ متنِ رضایت (LAW-009) باید هم‌گام شود؛ «حق فراموشی»/حذفِ درخواستیِ داده فقط دستی. **استثناهایِ آگاهانه:** توکنِ نشست هنگامِ خروج، اعلانِ failed هنگامِ retry، تکه‌هایِ موقتِ آپلود/نسخه‌یِ تکراریِ صفِ batch پس از آرشیوِ موفق، و ویرایشِ متنِ یادداشتِ پیش از جلسه (نسخه‌یِ قبلی ذخیره نمی‌شود).
+- **اسناد:** LAW-010، api-catalog، database-catalog، configuration-catalog.
+
+### 2026-10-02 — CODE + MIGRATION + DECISION + TEST + DOCS — حذفِ جلسه توسطِ تراپیست = حذفِ نرم؛ مسیرِ پیدا کردن/بازگردانی
+- **تصمیمِ مالک:** «حذفِ جلسه توسطِ تراپیست هم نگه داشته شود؛ ممکن است دستش بخورد، یک مسیر برایِ پیدا کردنش داشته باش».
+- **MIGRATION 042 (additive، روی DBِ dev اعمال شد):** `sessions.deleted_at/deleted_by` + index. **⚠️ در deploy خودکار اجرا می‌شود (runner در startup).**
+- **کد:** `DELETE /api/sessions/:id` حالا حذفِ نرم است (بدونِ purgeِ صدا؛ status دست‌نخورده)؛ `getOwnedSession`/`getOwnedSessionWithClient`/لیست‌هایِ تراپیست/corpusِ پرونده/live-monitor/autoClose جلسه‌یِ حذف‌شده را نمی‌بینند؛ `POST /api/sessions/:id/restore`، `GET /api/clients/:id/deleted-sessions`، `POST /api/admin/sessions/:id/restore`، فیلترِ `deleted=only|false` در `admin/sessions/recent`؛ audit `therapist.session_restore`/`admin.session_restore`. UI: بخشِ «جلسه‌هایِ حذف‌شده» (بازگردانی) در صفحه‌یِ مراجع، متنِ صادقانه‌یِ مودالِ حذف، برچسبِ 🗑 و دکمه‌یِ بازگردانی برایِ ادمین.
+- **تست:** یکپارچه‌یِ DB (canary، `app.inject`) ۱۹ ادعا PASS (حذف/ماندنِ ردیف و صدا/۴۰۴ برایِ تراپیست/فهرستِ حذف‌شده‌ها/مالکیت/ادمین/restore تراپیست و ادمین/۴۰۱/۴۰۳/۴۰۹)؛ E2Eِ مرورگرِ واقعی: حذف از UI، ظاهرشدن در «جلسه‌هایِ حذف‌شده»، ادمین با متن و دکمه‌یِ بازگردانی. canary پاک شد.
+- **اسناد:** LAW-010 (تصمیمِ مالک)، api-catalog، database-catalog، PRDِ جلسات. **⚠️ LAW-009:** متنِ رضایت/privacy باید هم‌گام شود.
+- **هنوز حذفِ سخت:** حذفِ مراجع و حذفِ حسابِ تراپیست (cascade) و حذف توسطِ ادمین — اگر آن‌ها هم باید نگه داشته شوند، تصمیمِ جدا لازم است.
+
+### 2026-10-02 — CODE + DECISION + TEST — «لغو جلسه» دیگر حذف نیست؛ همه‌چیز برایِ ادمین می‌ماند
+- **تصمیمِ مالک (در همین گفتگو):** «حتی اگر لغو بزند هم باید برایِ ادمین ذخیره شود». قبلاً `confirmCancelSession` موتور را `abort()` (پاک‌کردنِ صفِ صدایِ IndexedDB) و `DELETE /api/sessions/:id` (حذفِ جلسه+صدا، LAW-010) می‌زد.
+- **تغییر:** `public/index.html` `confirmCancelSession`: موتور `finish()` می‌شود (متن persist + صفِ صدا آپلود) سپس `PUT status=canceled` (۳ تلاش؛ اگر نشد، جلسه in_progress می‌ماند و بستنِ خودکار آن را با داده می‌بندد). `clients.repository.listClientSessions` جلساتِ canceled را از فهرستِ تراپیست پنهان می‌کند؛ `admin/sessions.admin.ts` فیلترِ `status=canceled` را می‌پذیرد. متنِ مودال صادقانه. بدونِ migration (status='canceled' از قبل در legacy-ws و PUT مجاز بود).
+- **تست:** E2Eِ واقعی (headless Chrome + canary): لغو ⇒ DB: status=canceled، ۹۸ نویسه متن، ۲ سگمنتِ صدا (۳۱KB)؛ فهرستِ تراپیست ۰؛ ادمین ۱ جلسه‌یِ canceled. canary پاک شد. routes/tsc/docs OK.
+- **⚠️ LAW-009/متنِ رضایت:** رفتارِ ذخیره‌یِ صدا عوض شد (لغو دیگر صدا را پاک نمی‌کند) — متنِ رضایت/privacy note باید با تصمیمِ مالک هم‌گام شود (R1 قبلاً باز است). جلسه‌یِ canceled تا سیاستِ نگهداریِ ۳۰روزه‌یِ آرشیو باقی می‌ماند.
+- **اسناد:** PRDِ جلسات، api-catalog.
+
+### 2026-10-02 — CODE + TEST — ذخیره‌یِ فوریِ صدا برایِ ادمین بدونِ «پایان جلسه»
+- **درخواستِ مالک:** «حتی اگر ذخیره‌ی نهایی را نزند، برایِ ادمین همه‌چیز باید ذخیره شود». ممیزی: متن autosave (≤۱۵ث) + flush در hidden/pagehide داشت؛ صدا فقط هر ۶۰ث و فقط در ACTIVE از IndexedDB به سرور می‌رفت ⇒ در قطعِ اتصال/توقف/مرگِ تب تا ~۷۵ث (یا کلِ دورانِ قطعی) فقط محلی بود.
+- **تغییر (`feelia-rt.js`):** `ARCHIVE_DRAIN_MS` ۶۰→۲۰ث، تایمر در همه‌یِ stateهایِ غیرِ پایانی و online، و `drainSoon()` (~۱ث پس از ذخیره‌یِ هر سگمنت). T38 به‌روز و T68 اضافه شد؛ T59/T60 برایِ بازرسیِ صف آپلودِ فوری را خاموش می‌کنند. `test:rt` 114 PASS / 0 FAIL.
+- **هنوز محلی می‌ماند:** سگمنتِ در حالِ ضبط (≤۱۵ث) هنگامِ crash/kill؛ «لغو جلسه»ِ صریح همه‌چیز را عمداً حذف می‌کند (LAW-010).
+- **سند:** subsystem 02.
+
+### 2026-10-02 — CODE + MIGRATION(بدونِ migration) + TEST + DOCS — فازهایِ ۳–۶ ممیزیِ Core (F7، F8، F6، F3، F10، P2)
+- **چه شد (به دستورِ مالک «به ترتیب همه را انجام بده، داک‌ها را به‌روز کن، تست‌ها را کامل کن»):** F7: نگهبانِ `speakers` در polish + پینِ نقشِ تأییدشده + پلِ `session_speaker_roles`؛ F8: `GET/POST /api/sessions/:id/transcript-revisions…` (فهرست، diffِ پاراگرافی، بازگردانیِ CAS-دار) + UI؛ F6: قفلِ چند-تبِ Web Locks؛ F3: `sessions` و `quoteVerified` روی یافته‌ها + دروازه‌یِ کیفیتِ تولیدِ خودکار (`low_coverage`/`speakers_merged`) + `quality` در GET پرونده؛ F10: `GET /api/admin/core-metrics` + کارتِ ادمین؛ P2: بستنِ placeholderِ «⏳»ِ ابدی (`mergeRecoveryLost`). بدونِ migration (JSON/جدولِ موجود).
+- **اسنادِ به‌روز:** api-catalog، CLAUDE.md (`test:hist`)، feature-index، repository-map، requirement-catalog (REQ-124..130)، traceability-matrix، subsystem 01 (I21–I22 + رویدادها)، 07-final-transcript، 08-session-record، PRDِ پرونده/جلسات/ادمین، PROJECT_MASTER_REFERENCE (R2 رفع‌شده).
+- **تست:** rt 113، up 71، ft 65، cf 115، tu 19، llm 22، adm 9، hist 11 — 0 FAIL؛ routes 153، arch، docs OK؛ tsc تمیز؛ یکپارچه‌یِ DB ۳۳ ادعا PASS؛ `test:api` (با مجوز) ۳۶۲ ورودی و فقط تفاوتِ additiveِ `quality`؛ E2Eِ مرورگرِ واقعی (دو تب، تاریخچه، ادمین). همه‌ی canaryها پاک شدند. جزئیات: verification/2026-10-02-core-audit.md.
+- **FINDING:** در نشستِ دیگر CAS اجباری و snapshotِ `unit_type` تغییرِ ذخیره‌نشده دارد (در مقایسه‌یِ test:api دیده شد؛ دست نخورد). ابزارِ ویرایشِ من در این نشست چند بار `
+` و `s` را در اسکریپت‌ها خورد؛ هر مورد با تست/tsc گرفته و اصلاح شد.
+- **کارِ باز / نیازمندِ تصمیمِ مالک:** F9 (متنِ رضایت)، retentionِ هوشمند، گسترشِ طبقه‌بندیِ خطایِ Soniox، guardِ ضمیر/زمان/اسم، ردیابیِ سطحِ نوبت، مصرفِ متنِ نهایی در پرونده؛ commit/deploy نشده.
+- **عامل:** این نشست.
+
+### 2026-10-02 — CODE + TEST — فاز ۲ ممیزیِ Core + رفعِ تکرارِ متن (به دستورِ مالک «مشکلاتِ موجود را حل کن»)
+- **تکرارِ جمله‌یِ live (ریسکِ بازِ فاز ۱) — ریشه پیدا و رفع شد:** `insertRecoveryPlaceholder` placeholder را «قبل از» نشانگرِ بازگشتِ انتهاییِ *ذخیره‌شده* می‌گذاشت ⇒ `persistedText` دیگر پیشوندِ متن نبود ⇒ rebaseِ 409 واگرایی می‌دید ⇒ متنِ live دوبار. (با لاگِ fetch در E2E واقعی ردیابی شد.) حالا اگر نشانگر ذخیره شده، ته‌پیوند می‌شود (I20). تستِ T63 (قبلِ رفع FAIL، بعد PASS) + E2E واقعی: یک‌بار، بدونِ برچسبِ واگرایی.
+- **F4 (سلامتِ ضبط):** `RTSession.setHealth/onHealth`؛ خطایِ `MediaRecorder.start()` دیگر بی‌صدا نیست (گزارش + ۵ تلاش)، `track.onmute/onunmute`، mic-lost و خطایِ IndexedDB ⇒ بنرِ قرمزِ پایدارِ `#recHealthBanner`؛ نشانگرِ «آخرین ذخیره‌ی صدا» (`#recSavedNote`) و هشدار اگر >۹۰ث بدونِ ذخیره. T62/T64/T65/T66.
+- **F5:** «پایان جلسه» حالا مودالِ تأیید دارد (`endSession`→`doEndSession`)؛ مودالِ لغو صادقانه می‌گوید کلِ جلسه (متن/یادداشت/علائم) حذف می‌شود. توجه: رویدادِ Clarity `session_end_clicked` حالا بعد از تأیید ثبت می‌شود.
+- **تست:** rt-harness 112 PASS / 0 FAIL؛ E2E واقعی (headless Chrome + canary رویِ DBِ dev): بنر/بازیابی/mute/مودالِ تأیید/ادامه‌ی جلسه با انصراف/پایان با تأیید همه درست؛ canary پاک شد.
+- **فایل‌ها:** `public/feelia-rt.js`، `public/index.html`، `scripts/rt-harness.cjs`، docs (subsystem 01 I19–I20، frontend-map).
+- **کارِ باز:** F6–F10 (چند-تب، polish/نقش، تاریخچه، traceability، metrics)؛ commit/deploy نشده.
+
+### 2026-10-02 — CODE + TEST — فاز ۱ ممیزیِ Core: watchdogِ WSِ ساکت (F1b) + نشانگرِ resume (F2)
+- **چه شد:** به دستورِ مالک («انجامش بده»). `feelia-rt.js`: `lastWsMsgAt` + `WS_SILENT_MS=30s` در watchdog ⇒ `requeueSilentAudio` (سگمنت‌هایِ archiveِ دورانِ سکوت ⇒ transcript + placeholder) و reconnect؛ `start()` رویِ جلسه‌ایِ دارایِ متن `noteDiscontinuity()` می‌گذارد. T60/T61 از KNOWN-GAP به FIXED وارونه شدند.
+- **عمداً نشده:** سگمنتِ مرزیِ پیش از قطع (T59، ≤۱۵ث) بازرونویسی نمی‌شود — نیمی از متنش زنده آمده و duplicate می‌شد؛ T62 (خطایِ بی‌صدایِ MediaRecorder) فازِ ۲.
+- **E2E واقعی (با مجوزِ مالک، Sonioxِ واقعی + canary رویِ DBِ dev):** Soniox در سکوت هر ~۱٫۲ث پیامِ بدونِ token می‌فرستد ⇒ آستانه‌ی ۳۰ث امن؛ در سوکتِ مرده جمله‌یِ گمشده بازیابی شد؛ resume بعد از رفرش نشانگر گذاشت. **ریسکِ باز:** در سناریویِ مصنوعیِ ۳ reconnectِ پیاپی، یک جمله‌یِ live در شاخه‌یِ واگراییِ `persistConfirmed` تکرار شد (در تک‌قطعی تکرار نشد؛ علت ایزوله نشد). canary و صدایش پاک شد. جزئیات: verification/2026-10-02-core-audit.md. هنوز deploy نشده.
+- **فایل‌ها:** `public/feelia-rt.js`، `scripts/rt-harness.cjs`، `docs/07-subsystems/01-browser-realtime-engine.md` (I17–I18).
+- **تست / تأیید:** rt 108، up 72، ft 62، cf 111، tu 19، llm 23، adm 8 — همه 0 FAIL؛ routes/arch/docs OK؛ tsc تمیز (جزئیات: verification/2026-10-02-core-audit.md). test:api و E2E واقعی اجرا نشد.
+- **عامل:** این نشست. **کارِ باز:** فاز ۲؛ تستِ مرورگرِ واقعی؛ commit نشد.
+
+### 2026-10-02 — TEST + FINDING — فاز ۰ ممیزیِ Core: تأییدِ F1/F2/F4/F5 پیش از اصلاح
+- **چه شد:** به دستورِ مالک («شروع کن» پس از پلنِ بررسیِ نقادانه). بدونِ تغییرِ کدِ محصولی؛ چهار تستِ characterization (T59–T62، KNOWN-GAP) به `rt-harness` اضافه شد.
+- **FINDING (مهم):** F1 در پلن **بخشی نادرست** بود — سگمنتِ خودِ قطعی transcript می‌گیرد (T18/T46). شکافِ واقعی: سگمنتِ پیش از *تشخیصِ* قطع `archive` است (T59) و WebSocketِ بازِ ساکت هرگز تشخیص داده نمی‌شود (T60؛ watchdog فقط `readyState`). F2 (T61)، F4a (T62: خطای `MediaRecorder.start()` بی‌صدا)، F4b (`onmute` نیست)، F4c و F5 (کد) تأیید شدند. F3، F6–F10 بررسی نشد. تفصیل: [verification/2026-10-02-core-audit.md](verification/2026-10-02-core-audit.md).
+- **فایل‌ها:** `scripts/rt-harness.cjs` (فایل پیش‌تر تغییراتِ نشستِ دیگر داشت؛ دست نخورد)، `verification/2026-10-02-core-audit.md` (جدید).
+- **تست / تأیید:** `node scripts/rt-harness.cjs` ⇒ 108 PASS / 0 FAIL.
+- **عامل:** این نشست.
+- **کارِ باز:** فاز ۱ باید بازتعریف شود (watchdogِ بدونِ-token + بستنِ شکافِ پیش از تشخیص + marker/برچسبِ resume)؛ unloadِ IndexedDB هنوز unverified؛ commit نشد. منتظرِ دستورِ مالک برایِ فاز ۱.
+
+### 2026-10-02 — DOCS + DECISION — افزودنِ Product Thesis (جهتِ محصول: Core = Capture + Preserve)
+- **چه شد:** مالک سندِ «Value Creation, Core Functional Job & Product Thesis» را داد و خواست در جای مناسب ثبت شود. به‌صورتِ سندِ governance ثبت شد (نه ماژول/PRD، چون جهتِ کلِ محصول است؛ زیرِ Laws و بالایِ planها). محتوا وفادار به متنِ مالک؛ فقط §۱۶ تفسیرِ نگارنده است (نگاشت به subsystemها + ۴ شکاف).
+- **فایل‌ها:** `docs/00-governance/product-thesis.md` (جدید)؛ لینک در `CLAUDE.md` (ترتیبِ خواندن + جدولِ task)، `docs/README.md`، `documentation-map.md`، `source-of-truth.md` (مالکِ «جهتِ محصول»).
+- **اسنادِ به‌روزشده:** همین‌ها + این ورودی.
+- **تست / تأیید:** `pnpm test:docs` (نتیجه در ورودیِ بعدی/پیامِ نشست).
+- **عامل:** این نشست، به دستورِ مالک.
+- **کارِ باز:** (۱) متریک‌هایِ §۱۴ (Capture Reliability، Recovery Success، Correction Rate، Repeat Usage) اندازه‌گیری نمی‌شوند؛ (۲) مکانیزمِ ثبتِ بازخوردِ درمانگر تعریف نشده؛ هر دو نیازمندِ تصمیمِ مالک. هیچ کدی عوض نشد؛ commit نشد.
+
+### 2026-10-01 — GIT + DEPLOY (production) — مرتب‌سازیِ جلساتِ ادمین بر اساسِ آخرین ضبط (`d5e384d`)
+- **مجوزِ مالک:** «دیپلوی کن».
+- **git:** commit `d5e384d` رویِ `feat/clarity` (پایه `b94e6c5`) از worktreeِ تمیز، فقط ۴ فایلِ همین کار (`admin.repository.ts`، `index.html` دو هانک، `api-catalog.md`، ورودیِ CODEِ «مرتب‌سازیِ جلسات»). در worktree: `tsc` تمیز، `test:rt` بدونِ FAIL، `test:up` 64/0، `test:ft` 61/0، `test:tu` 19/0، `test:cf` 111/0، `test:adm` 8/0، `test:routes`/`test:arch` OK، build OK؛ `test:docs` فقط خطایِ از قبل موجودِ `CURRENT_UI_STATE.md` (untracked). push نشد.
+- **FINDING:** هم‌زمان نشستِ دیگری در working tree رویِ آپلود کار می‌کند (ورودیِ زیر: fsync + `jobNotesHtml` در `index.html`) — هیچ‌کدام در این commit/deploy نیستند.
+- **deploy (حداقلی):** checksumِ CR-strippedِ `server/src` و `public`ِ production = `b94e6c5`، به‌جز `index.html` (هانکِ آیکونِ کپیِ نشستِ دیگر، از قبل رویِ production). پس فقط دو فایل رفت: `admin.repository.ts` (= commit) و `index.html` = نسخه‌ی production + فقط دو هانکِ همین commit (diff دقیقاً ۴ خط؛ parseِ inline OK). preflight دو بار GO (همه ۰). پشتیبان `/root/backups/code-pre-admin-sort-20261001T150125Z.tar.gz` (دو فایل + `server/dist`). build OK، `pm2 restart`، `/api/health` ok، pm2 online، بدونِ خطایِ جدید؛ `/api/admin/sessions/recent` بدونِ کوکی 401؛ `index.html`ِ سروشده شاملِ «آخرین ضبط». اجرایِ فقط‌خواندنیِ هر دو تابع رویِ DBِ production (فقط شماره/زمان): ترتیب درست.
+- **کارِ باز:** UIِ ادمین رویِ production با حسابِ واقعی دیده نشد. برگشت = استخراجِ همان پشتیبان + build + restart.
+
+### 2026-10-01 — CODE+MIGRATION+TEST — اجرایِ ممیزیِ Core: فازهایِ ۱ تا ۳ (به‌جز متنِ رضایت)
+- **چه شد:** دستورِ مالک: «migration را رویِ dev اجرا کن و تست کن؛ و به‌جز متنِ رضایت بقیه را کامل حل کن». **migrationهایِ 038–041 رویِ MySQLِ dev اعمال شدند** (با مجوزِ صریح).
+  - **فاز ۱ (لایو):** gap-check واقعی با `client_seq` + جدولِ `session_audio_skips` (039) و `?empty=` از کلاینت (رفعِ باگِ «همیشه کامل»)؛ `GET /api/sessions/:id/audio-status` + خطِ «X از Y دقیقه ذخیره شد»؛ `storage.persist()`؛ fsync پیش از 202؛ sweepِ batch-queue فایلِ آرشیوِ ناموفق را تا ۷ روز نگه می‌دارد (`audio.archive_lost`)؛ پیامِ جدایِ شکستِ IndexedDB؛ هشدارِ ۵روزه پیش از حذفِ ۷روزه‌یِ صدایِ محلی؛ سگمنتِ بی‌محتوا placeholder نمی‌گیرد.
+  - **فاز ۲:** توکن‌هایِ زمان‌دار (038)؛ `session_transcript_revisions` (040) برایِ هر جایگزینیِ غیر-الحاقی؛ **CAS اجباری** در `PUT /api/sessions/:id` (400 `version-required`؛ `TRANSCRIPT_CAS_REQUIRED=0` بازگشتِ اضطراری؛ مسیرِ legacy با `legacyPutTranscript`)؛ snapshotِ `sessions.unit_type/modalities`.
+  - **فاز ۳:** featureِ جدیدِ `session-record` (`session_segments`، `session_speaker_roles`، 041)؛ API و UIِ نقشِ گوینده‌ها؛ پرونده‌یِ AI و export (`schema_version: 2`) از رکوردِ canonical می‌خوانند (فقط اگر پس از آن ویرایش نشده)؛ گذرِ live با `CANONICAL_PASS=1` (پیش‌فرض خاموش) و `polishWanted`.
+- **فایل‌ها:** `server/src/features/session-record/*`، `sessions/{sessions.routes,sessions.repository,sessionSnapshot,transcriptRevision,batch.routes}.ts`، `transcription/{archive/listing,archive/skips,batch/processQueue,batch/sweep,index}.ts`، `audio-upload/{jobStore.sql,uploadSession,jobMachine}.ts`، `final-transcript/{runner,domain/jobMachine}.ts`، `case-file/application/aggregateClientCorpus.ts`، `admin/{export.admin,diagnosis,sessions.admin,audio.admin,admin.repository}.ts`، `obs/types.ts`، `app.ts`، migrationهایِ 039–041، `public/{index.html,feelia-rt.js,feelia-analytics.js}`، `scripts/{upload-harness.ts,rt-harness.cjs,final-transcript-harness.ts,route-snapshot.txt}`.
+- **اسنادِ به‌روزشده:** subsystem 08 (جدید)، 02 (تصحیحِ gap-check)، 06 §۱۳، api-catalog، database-catalog، configuration-catalog، feature-index، documentation-map، analytics-clarity، Master Reference (R4/R5/R15)، [verification](verification/2026-10-01-core-audit-implementation.md).
+- **تست / تأیید:** `tsc`، `test:up` 71/0، `test:ft` 62/0، `test:cf` 111/0، `test:rt` (T58 جدید) بدونِ FAIL، `test:routes`/`test:arch`/`test:docs` سبز؛ **E2Eِ واقعی رویِ MySQLِ dev** (PUT/CAS/revision/snapshot، skips، توکن، نقش، پرونده‌یِ AI، export، cascade) همه PASS؛ fixtureها پاک شدند. **انجام نشد:** مرورگرِ واقعی با ضبطِ زنده؛ `CANONICAL_PASS=1` با Sonioxِ واقعی؛ `test:api` (golden مورد «legacy no version» اکنون 400)؛ فاز ۴ (نیازمندِ جلساتِ واقعیِ رضایت‌دار).
+- **عامل:** این نشست (کنارِ تغییراتِ commitنشده‌یِ نشستِ دیگر در `jobMachine.ts`/`index.html` که دست نخورد).
+- **کارِ باز / پیامد:** (۱) **متنِ رضایت (R1) هنوز اصلاح نشده** ⇒ توکن‌هایِ ماندگار و `CANONICAL_PASS` پیش از اصلاحِ آن نباید روشن/deploy شوند؛ (۲) migrationهایِ 038–041 رویِ production هنوز اعمال نشده‌اند؛ (۳) commit/deploy نشد؛ (۴) توکنِ realtimeِ جلسه‌یِ زنده ذخیره نمی‌شود، `transcriptMetrics` فقط برایِ آپلود؛ (۵) مرورگرِ قدیمیِ legacy بدونِ نسخه‌ یِ CAS 400 می‌گیرد.
+
+### 2026-10-01 — CODE+MIGRATION — ذخیره‌ی توکن‌هایِ زمان‌دارِ آپلود (فاز ۲ ممیزی Core)
+- **چه شد:** تصمیمِ مالک: توکن‌ها بعد از پاکسازیِ صدا بمانند. migration 038 (`session_transcript_tokens`)، `tokenStore.ts` (pack/unpack gzip)، `TranscriptMeta.tokens` و INSERTِ fail-open در تراکنشِ `applyTranscriptOnce`.
+- **فایل‌ها:** `server/src/db/mysql/migrations/038_session_transcript_tokens.sql`، `server/src/features/audio-upload/{tokenStore,jobMachine,jobStore.sql}.ts`، `scripts/upload-harness.ts` (H66–H67).
+- **اسنادِ به‌روزشده:** database-catalog، subsystem 06 §۱۳.
+- **تست / تأیید:** `test:up` 68/0، `tsc` سبز. **INSERTِ واقعی رویِ MySQL و اجرایِ migration تست نشد** (DBِ dev مشترک است؛ نیازمندِ مجوزِ صریح).
+- **عامل:** این نشست.
+- **کارِ باز:** اجرایِ migration/E2E با مجوز؛ ذکرِ توکن‌ها در متنِ رضایت؛ خواننده (فاز ۳)؛ توکنِ جلسه‌یِ زنده؛ commit نشد.
+
+### 2026-10-01 — CODE — آپلود: fsync پیش از تأییدِ تکه + نمایشِ «کامل‌بودنِ متن» به تراپیست
+- **چه شد:** از ممیزیِ Core فقط مواردِ مسیرِ آپلود: (۱) `writeChunk`/`assembleUpload` با `fsync` پیش از rename؛ (۲) `jobView.transcript_notes` + بنرِ `jobNotesHtml` در کارتِ job (سینی و صفحه‌ی جلسه) برایِ پوشش کم/حفره/سر و ته بی‌متن/گوینده‌هایِ ادغام‌شده؛ JOB_SELECT ستونِ `transcript_metrics` را هم می‌گیرد.
+- **فایل‌ها:** `server/src/features/audio-upload/{uploadStore,jobView,uploads.repository}.ts`، `public/index.html`، `scripts/upload-harness.ts` (H64–H65).
+- **اسنادِ به‌روزشده:** subsystem 06 §۱۲، api-catalog (AudioJobView).
+- **تست / تأیید:** `test:up` 66/0، `tsc`، `test:arch`، `test:routes`، `test:docs` سبز. بنر در مرورگرِ واقعی (سرور استاتیکِ موقت رویِ public/، `jobCardHtml` با jobِ ساختگی) رندر و بررسی شد: بدون نکته ⇒ بنر نیست؛ ۴ نکته ⇒ یک بنرِ مرتب؛ نکته+low_confidence ⇒ دو بنرِ جدا؛ بدون خطایِ کنسول. جریانِ کاملِ لاگین/سینی با بک‌اندِ واقعی تست نشد.
+- **عامل:** این نشست (کنارِ تغییراتِ commitنشده‌ی نشستِ دیگر در `jobMachine.ts`/`index.html` که دست نخورد).
+- **کارِ باز:** فاز ۲ ممیزی (ذخیره‌ی توکن‌هایِ Soniox، تاریخچه‌ی متنِ خام) نیازمندِ migration و تصمیمِ مالک؛ commit نشد.
+
 ### 2026-10-01 — CODE — پنلِ ادمین: مرتب‌سازیِ جلسات بر اساسِ آخرین جلسه/آخرین ضبط
 - **چه شد:** درخواستِ مالک. دو فهرستِ جلسه در پنلِ ادمین (`GET /api/admin/clients/:id/sessions` = «جلساتِ ثبت‌شده»ی مراجع، قبلاً `session_num DESC`؛ `GET /api/admin/sessions/recent` = «جلساتِ اخیر»، قبلاً `updated_at DESC`) حالا با `COALESCE(last_recording_at, s.created_at) DESC` مرتب می‌شوند؛ `last_recording_at` = آخرین سگمنتِ `session_audio` با `kind='session'` (یادداشتِ صوتی حساب نمی‌شود). فیلدِ `last_recording_at` به هر دو پاسخ اضافه شد و در UI به‌صورتِ «آخرین ضبط» نمایش داده می‌شود. فیلترِ `since_hours` همچنان رویِ `updated_at` است. بدونِ migration، بدونِ تغییرِ route.
 - **فایل‌ها:** `server/src/features/admin/admin.repository.ts` (`listSessionsOfClient`، `listRecentSessions`)، `public/index.html` (`renderAdminRecentSessions`، `openAdminClientSessions`).
@@ -230,10 +375,16 @@
 - **عامل:** این نشست.
 - **کارِ باز / پیامد:** commit/deploy نشده.
 
+### 2026-10-01 — GIT + DEPLOY (production) — Core: مرورگرِ مشترک، «کیفیتِ رونویسی»، تاریخچه‌ی «متنِ نهایی» (`b94e6c5`، migration 037)
+- **مجوزِ مالک:** «بله دیپلوی کن».
+- **git:** commit `b94e6c5` رویِ `feat/clarity` (پایه `061d0ca`) از worktreeِ تمیز، فقط تغییراتِ همین کار (۲۶ فایل). هانک‌هایِ commitنشده‌ی نشستِ دیگر (آیکونِ «کپیِ کلِ متن» در `index.html`، باقی‌مانده‌ی «نظرِ دوم» در `jobMachine.ts`) commit نشدند. در worktree: `tsc` تمیز، `test:rt` 103/0، `test:up` 64/64، `test:ft` 61/61، `test:tu` 19/19، `test:cf` 111/111، `test:arch`/`test:routes` OK، parseِ inline OK، build OK؛ `test:docs` فقط خطایِ از قبل موجودِ `CURRENT_UI_STATE.md`. push نشد.
+- **preflight:** همه ۰ ⇒ GO؛ nginx فقط ربات در ۴۰ دقیقه‌ی اخیر؛ پیش از استخراج دوباره `busy=0`.
+- **deploy:** `server/` + `public/{feelia-rt.js, feelia-admin-quality.js, index.html}`. `index.html` = نسخه‌ی production (شاملِ آیکونِ کپیِ نشستِ دیگر) + فقط هانک‌هایِ همین کار — diffِ production⇄تار دقیقاً همین هانک‌ها بود. پشتیبان `/root/backups/code-pre-core-20261001T141341Z.tar.gz`. لاگ: `037_final_transcript_versions.sql applied`؛ `/api/health` ok؛ pm2 online؛ بدونِ خطایِ جدید؛ جدولِ `final_transcript_versions` موجود؛ checksumِ `server/src` = commit، سه فایلِ `public/` = نسخه‌ی محلی؛ دو routeِ ادمینِ جدید بدونِ کوکی 401؛ `feelia-admin-quality.js` 200.
+- **کارِ باز:** UIِ ادمین رویِ production با حسابِ واقعی امتحان نشد. برگشت = استخراجِ همان پشتیبان + build + restart (جدولِ 037 می‌ماند و بی‌اثر است).
+
 ### 2026-10-01 — FINDING (اصلاح) — `index.html` ِ production ثبت شده بود
 - **چه شد:** در ورودیِ «GIT + DEPLOY … (`061d0ca`)» نوشتم `public/index.html` ِ production «بدونِ ورودی در Event Log» deploy شده — **نادرست بود.** همان تغییر (دکمه‌ی «کپیِ کلِ متن» به‌صورتِ آیکونِ SVG داخلِ کادرِ متن، commitنشده) در ورودیِ «CODE + DEPLOY (production) — دکمه‌ی کپیِ کلِ متن (آیکونِ SVG کوچک) …» ثبت شده است. همچنان commit نشده و این نشست آن را commit نمی‌کند؛ در deployِ بعدی همان نسخه‌ی production حفظ می‌شود.
 - **عامل:** این نشست.
-
 
 ### 2026-10-01 — CODE + MIGRATION + DOCS + TEST — Core: دو باگِ گم‌شدنِ صدا، «کیفیتِ رونویسی» در پنلِ ادمین، تاریخچه‌ی «متنِ نهایی» (037)
 - **چه شد:** به دستورِ مالک («فعلا انجام بده همینارو 132»). (۱) مرورگرِ مشترک: 404 دیگر صدایِ آپلودنشده‌ی تراپیستِ دیگر را از IndexedDB حذف نمی‌کند (مالکِ رکورد + `setQueueOwner`)؛ جاروبِ ۲۴ساعته‌ی صف `.prenote.` را `kind='prenote'` آرشیو می‌کند (قبلاً `session`). (۳) صفحه‌ی «کیفیتِ رونویسی» در پنلِ ادمین (`GET /api/admin/upload-quality`). (۲) تاریخچه‌ی فقط‌افزودنیِ «متنِ نهایی» (`final_transcript_versions`، migration 037): هر ساخت و هر اصلاحِ نقش یک نسخه؛ متنِ پیش از 037 پیش از اولین بازنویسی کپی می‌شود؛ ادمین فهرست و متنِ هر نسخه را می‌بیند (ممیزی).
@@ -243,6 +394,38 @@
 - **عامل:** این نشست.
 - **کارِ باز / پیامد:** commit/deploy نشده. DBِ dev حالا 036 و 037 را دارد (سرورِ dev در startupِ بعدی «already applied» می‌بیند). routeهایِ HTTPِ جدید با سرورِ واقعی و هم‌زمانیِ واقعیِ دو نویسنده تست نشده‌اند.
 
+### 2026-10-01 — CODE — حذفِ کاملِ «نظرِ دوم» (Shenava)
+- **چه شد:** به دستورِ مالک، کدِ «نظرِ دوم» پس از نتیجه‌ی منفیِ تستِ ضبطِ واقعی حذف شد: پوشه‌ی `features/transcription/secondOpinion/`، `scripts/second-opinion-harness.ts` و اسکریپتِ `test:so`، export از `transcription/index.ts`، سیم‌کشی در `audio-upload/worker.ts`، پارامترِ `audioPath` در پورتِ `getText` (`jobMachine.ts`)، وابستگیِ اختیاریِ `sherpa-onnx-node` (`pnpm remove`)، ۳ ردیفِ env در configuration-catalog، خطِ `test:so` در CLAUDE.md، ارجاع در repository-map/feature-index، بندِ subsystem 06. رفتارِ محصول نسبت به قبل از این کار تغییری ندارد. تغییراتِ نشست‌هایِ دیگر در همان فایل‌ها دست نخورد.
+- **فایل‌ها:** موارد بالا؛ `verification/2026-10-01-shenava-vs-soniox-ab.md` (بندِ پایان).
+- **اسنادِ به‌روزشده:** configuration-catalog، CLAUDE.md، repository-map، feature-index، subsystem 06، verification.
+- **تست / تأیید:** `tsc --noEmit` تمیز، `test:up` 63/63، `test:arch` OK، `test:routes` OK (135)، `test:docs` OK (۳۶ env)؛ grep: هیچ ارجاعی به secondOpinion/SHENAVA/sherpa در کد و docs (به‌جز verification/Event Log) نمانده.
+- **عامل:** این نشست
+- **کارِ باز / پیامد:** هیچ؛ نتیجه‌ی A/B و دلیلِ رد در verification ثبت است.
+
+### 2026-10-01 — TEST + DECISION — نظرِ دوم Shenava رویِ ضبطِ واقعی: ارزشمند نیست ⇒ روشن نمی‌شود
+- **چه شد:** به دستورِ مالک («با یک ضبطِ واقعی تست کن؛ فقط اگر واقعاً ارزشمند است»)، ضبطِ تستِ خودِ مالک (`ec144271`، ۲ گوینده، ≈۹۰ث، ۲۴۰ واژه) با مسیرِ واقعی اجرا شد. علامت‌گذاری: فعلی ۲۶ واژه (۱۱٪) ← با نظرِ دوم ۹۰ واژه (۳۷٫۵٪). Shenava رویِ گفتارِ محاوره‌ایِ واقعی خروجیِ بی‌معنا می‌دهد؛ اغلبِ اختلاف‌ها غلطِ Shenava است. نتیجه‌ی FLEURS/TTS تعمیم نمی‌یابد.
+- **فایل‌ها:** فقط `verification/2026-10-01-shenava-vs-soniox-ab.md` (کد دست نخورد).
+- **اسنادِ به‌روزشده:** verification؛ این Event Log.
+- **تست / تأیید:** اجرایِ واقعیِ Soniox async + Shenava رویِ ضبطِ مالک (فایل بعد از اجرا از Soniox و scratchpad پاک شد). قضاوتِ شنیداریِ واژه‌به‌واژه انجام نشد.
+- **عامل:** این نشست
+- **کارِ باز / پیامد:** `STT_SECOND_OPINION` خاموش می‌ماند و روشن نمی‌شود. کدِ `secondOpinion/` + وابستگیِ اختیاریِ `sherpa-onnx-node` بی‌اثرند؛ پیشنهاد: حذفِ آن‌ها (تصمیمِ مالک).
+
+### 2026-10-01 — CODE + TEST — «نظرِ دوم» با Shenava برایِ علامت‌گذاریِ واژه‌هایِ مشکوک (مسیرِ آپلود، پیش‌فرض خاموش)
+- **چه شد:** به دستورِ مالک («هر استفاده‌ی مفیدی از Shenava را پیاده کن»). ماژولِ `features/transcription/secondOpinion/` (align خالص + Shenava با `sherpa-onnx-node` + orchestrator). صدایِ نرمال‌شده‌ی job تکه‌تکه (≈۲۰ث، در فاصله‌یِ واژه‌هایِ Soniox) به Shenava داده می‌شود؛ واژه‌ی بدونِ جفت با Shenava ∧ confidence<۰٫۹۷ ⇒ ⟦…؟⟧ در ورودیِ «متنِ نهایی». متنِ Soniox، `sessions.transcript`، `lowConfRatio` و هشدارِ کیفیت دست‌نخورده. پشتِ `STT_SECOND_OPINION=1`؛ بدونِ مدل/خطا/سقفِ زمان ⇒ رفتارِ قبلی. **روی production نصب/روشن نشد.**
+- **یافته:** علامت‌گذاریِ فعلی (conf<0.5) روی ضبطِ تمیز فقط ≈۹٪ غلط‌ها را می‌گیرد؛ انتها‌به‌انتها recall: تمیز ۵→۲۴٪، نویزی ۴۳→۶۵٪ (precision نویزی ۷۴→۶۴٪).
+- **فایل‌ها:** `server/src/features/transcription/secondOpinion/{align,shenava,index}.ts`، `transcription/index.ts`، `audio-upload/worker.ts` (+ پارامترِ اختیاریِ `getText(id, audioPath)` در `jobMachine.ts`)، `scripts/second-opinion-harness.ts`، `package.json` (`test:so`)، `server/package.json` + `pnpm-lock.yaml` (`optionalDependencies: sherpa-onnx-node`).
+- **اسنادِ به‌روزشده:** `configuration-catalog.md` (۵ env)، `CLAUDE.md` (§۸ `test:so`)، `repository-map.md`، `feature-index.md`، subsystem 06، `verification/2026-10-01-shenava-vs-soniox-ab.md`.
+- **تست / تأیید:** `test:so` 11/11، `test:up` 63/63، `test:ft` 61/61، `test:arch` OK، `test:routes` OK، `test:docs` OK، `tsc --noEmit` تمیز؛ e2eِ واقعی (ffmpeg+Shenava+Soniox tokens) رویِ ۶۰ جمله. انجام نشد: ضبطِ واقعیِ ساعت‌ها، بارِ CPUِ production، اثر رویِ نگهبانِ `uncertain`ِ polish.
+- **عامل:** این نشست
+- **کارِ باز / پیامد:** (۱) پیش از روشن‌کردن: دانلودِ مدل (۴۶۰MB) رویِ سرور + `SHENAVA_MODEL_DIR` + تستِ یک ضبطِ واقعیِ اجازه‌دار (تصمیمِ مالک؛ deploy ممنوع تا مجوز). (۲) مسیرِ «متنِ نهایی»ِ جلسه‌ی زنده هنوز نظرِ دوم ندارد. (۳) `pnpm-lock.yaml`/`server/package.json` در کنارِ تغییراتِ نشست‌هایِ دیگر در working tree است؛ commit فقط با درخواستِ مالک.
+
+### 2026-10-01 — TEST + FINDING — A/B شنوا (Shenava) در برابرِ Soniox async
+- **چه شد:** به درخواستِ مالک، Shenava-Koochik (آفلاین، sherpa-onnx، CPU) با مسیرِ async فعلی رویِ FLEURS-fa (۶۰ جمله، تمیز/نویزی) و ۳ گفت‌وگوی ساختگیِ TTS سنجیده شد. **Soniox بهتر یا برابر بود**: FLEURS تمیز WER ‏7.2% در برابرِ 9.1%؛ نویزی 23.8% در برابرِ 27.5%؛ convind 1.1% در برابرِ 9.1%. Shenava diarization/punctuation ندارد. یافته‌ی مفید: اختلافِ Shenava با Soniox به‌عنوانِ پرچمِ «احتمالاً غلط» ۵–۷× غلیظ‌تر از نرخِ پایه است (recall ‏40–79%).
+- **فایل‌ها:** فقط `verification/2026-10-01-shenava-vs-soniox-ab.md` (کدِ محصول دست‌نخورده). دانلودِ مدل (۴۶۰MB) و FLEURS dev (۲۷۱MB) فقط در scratchpadِ نشست.
+- **اسنادِ به‌روزشده:** این Event Log + verification.
+- **تست / تأیید:** اجرایِ واقعیِ هر دو سیستم؛ Soniox با `transcribeFileAsync` و پاک‌سازیِ فایل/transcription. محدودیت: بدونِ ضبطِ واقعیِ درمانی؛ نویز ساختگی؛ فقط batch.
+- **عامل:** این نشست
+- **کارِ باز / پیامد:** جایگزینیِ Soniox توصیه نمی‌شود. گزینه‌ی بعدی (نیازمندِ تصمیمِ مالک): «نظرِ دوم» برایِ علامت‌گذاریِ نقاطِ مشکوک در مسیرِ آپلود، یا سنجش با ضبط‌هایِ واقعیِ اجازه‌دار.
 
 ### 2026-10-01 — GIT + DEPLOY (production) + FINDING — «کیفیت به عدد» (`061d0ca`)، migration 036
 - **مجوزِ مالک:** «commit و deploy کن … قبلش چک کنی که کسی در حال استفاده نباشه».
@@ -261,13 +444,11 @@
 - **کارِ باز / پیامد:** commit/deploy نشده (منتظرِ دستور). آستانه‌ها از دادهٔ ساختگی‌اند ⇒ بعد از چند جلسه‌ی واقعیِ پدرام بازبینی (R20). migration 036 در startupِ بعدی اجرا می‌شود.
 - **FINDING (نشستِ دیگر، کشف‌شده همین زمان):** نشستِ هم‌زمانی «نظرِ دوم» (Shenava، `features/transcription/secondOpinion/`، `STT_SECOND_OPINION`) را در همان `jobMachine.ts`/`worker.ts` اضافه می‌کند. دست زده نشد؛ دو تغییر سازگارند (متریک‌ها از توکن‌هایِ اصلیِ Soniox، نه خروجیِ نظرِ دوم). روی وضعیتِ ترکیبی: `tsc` تمیز، `test:up` 63/63، `test:arch` OK؛ `test:docs` فقط یک خطایِ متعلق به آن نشست دارد: `D8 script در CLAUDE.md نیست: test:so`. در commit فقط فایل‌هایِ این کار جدا شوند (آن نشست هم همین دو فایل را عوض کرده ⇒ نیازمندِ `git add -p`).
 
-
 ### 2026-10-01 — DECISION + FINDING — اولویتِ «کیفیت به عدد» با مسیرِ آپلود
 - **چه شد:** مالک: «الان برای پدرام بیشتر جلسات آپلودی هستن» ⇒ پلنِ Session Data Engine بازاولویت‌بندی شد: اول متریک‌هایِ کیفیتِ مسیرِ آپلود (فاز Q-U). پیاده‌سازی نشده.
 - **یافته (کد):** مسیرِ آپلود یک بار Soniox async می‌زند و «متنِ نهایی» همان متن را بازاستفاده می‌کند (`server/src/features/audio-upload/jobStore.sql.ts:129`) ⇒ اندازه‌گیری هزینه‌ی Sonioxِ اضافه ندارد. ولی توکن‌هایِ زمان‌دار/گوینده/confidence در `worker.ts:60-63` فقط به متن + `lowConfRatio` تبدیل و دور ریخته می‌شوند و transcription در Soniox حذف می‌شود ⇒ برایِ جلساتِ گذشته پوشش/حفره قابلِ محاسبه نیست مگر با رونویسیِ دوباره.
 - **فایل‌ها:** فقط همین ورودی؛ پلن خارج از repo. **تست:** اجرا نشد (بدونِ تغییرِ کد). **عامل:** این نشست + مالک.
 - **کارِ باز:** دستورِ اجرا؛ تصمیمِ backfillِ جلساتِ قدیمی (هزینه‌ی یک async برایِ هر جلسه).
-
 
 ### 2026-10-01 — FINDING (audit فقط‌خواندنی) — «Session Data Engine»: کارنامه‌ی ۵ محورِ Core + پلنِ فازبندی‌شده
 - **چه شد:** به درخواستِ مالک، زنجیره‌ی جلسه→صدا→ذخیره→رونویسی→گوینده→متنِ نهایی در برابرِ ۵ محور (durabilityِ صدا، کامل‌بودنِ متن، تفکیکِ گوینده، نسخه‌بندیِ متن، کیفیتِ عددی) بررسی شد. هیچ کد/سندِ دیگری تغییر نکرد؛ پلن فقط ارائه شد (پیاده‌سازی منتظرِ دستورِ صریح).
@@ -304,8 +485,9 @@
 - **FINDING:** production از 2026-09-28 با **Metis** کار می‌کند (نه OpenRouter) و `.env`ِ prod متغیرِ عمومیِ `FINAL_TRANSCRIPT_REASONING_EFFORT` ندارد ⇒ پیش‌فرضِ جدیدِ `off` اعمال شد. فرضیه‌ی قبلی («مصرفِ OpenRouter از prod») رد می‌شود؛ مصرفِ OpenRouter مالِ پیش از سوییچ یا ابزارهایِ دیگر است. ثبتِ `llm.call` از همین ری‌استارت در prod فعال است.
 - **فعال‌سازیِ «متنِ نهایی» (درخواستِ مالک: فقط ادمین و پدرام):** SELECTِ فقط‌خواندنیِ `therapists`: `final_transcript_enabled=1` فقط برایِ ادمین (`faf6bd6c`) و «پدرام عاشوری» (`3cb546ef`)، بقیه (۷ نفر) ۰ ⇒ **تغییری لازم نبود و داده‌ای عوض نشد.**
 
-### 2026-10-01 — CODE — دکمه‌ی «کپیِ کلِ متن» بالایِ متنِ جلسه (فقط working tree، deploy/commit نشده)
-- `public/index.html`: در `attachTranscriptExpander` (فقط `transcriptBox`) دکمه‌ی «کپیِ کلِ متن» کنارِ «متنِ جلسه: N نویسه»؛ تابعِ `ftCopyText` (clipboard API با fallbackِ `execCommand`). متنِ نمایش‌داده‌شده (نهایی یا خام) کپی می‌شود و نشانگرهایِ ⟦…؟⟧ حذف می‌شوند. بدونِ رویدادِ Clarity و بدونِ تغییرِ بک‌اند. تست‌شده رویِ mock-ft (clipboardِ جعلی)؛ کپیِ واقعیِ سیستم تست نشده.
+### 2026-10-01 — CODE + DEPLOY (production) — دکمه‌ی کپیِ کلِ متن (آیکونِ SVG کوچک) داخلِ کادرِ متنِ جلسه (commit نشده)
+- `public/index.html`: `transcriptBox` در `.tbox-wrap` (position:relative) و دکمه‌ی `#transcriptCopyBtn` (۲۸px، آیکونِ SVG، گوشه‌ی بالا-چپِ کادر)؛ `attachTranscriptExpander` آن را نشان/پنهان و handler را روی متنِ نمایش‌داده‌شده (نهایی یا خام) تنظیم می‌کند؛ `ftCopyText` (clipboard + fallbackِ `execCommand`، حذفِ نشانگرهایِ ⟦…؟⟧). بدونِ رویدادِ Clarity/بک‌اند. تست‌شده رویِ mock-ft با clipboardِ جعلی؛ کپیِ واقعیِ سیستم تست نشده.
+- **deploy (مجوزِ مالک: «دیپلوی کن»):** فقط `public/index.html` (فایلِ ایستا ⇒ بدونِ restart/build/migration). پیش از آن sha1ِ CR-stripped ِ prod = HEAD `3801a5d` (`3e025f63926c`، بدونِ drift)؛ تنها اختلافِ working tree همین تغییر بود. پشتیبان: `/root/backups/index-pre-copyicon-*.html`. تأیید: sha1 سرور = محلی (`0069711e78eb`)، `GET /` 200 و `transcriptCopyBtn` در پاسخ، `/api/health` ok/connected. رویِ prod با حسابِ واقعی امتحان نشد. **commit نشده** ⇒ prod یک فایل جلوتر از HEAD است تا commit شود.
 
 ### 2026-10-01 — DEPLOY (production) — نگهداریِ صدا ۳۰ روز
 - **انجام شد با مجوزِ صریحِ مالک:** فقط تغییرِ «۱۴ ⇒ ۳۰ روز» (`archive/store.ts`، `uploadStore.ts`، متنِ `public/index.html` و کامنت‌ها) از worktreeِ تمیزِ `0a04829` ساخته و deploy شد؛ کارِ نیمه‌تمامِ نشستِ دیگر (pre-note، migration 035، STT context) در working tree **نرفت**. پیش از deploy checksumِ `server/src`+`public` با HEAD مقایسه شد: تنها اختلافِ production با پایه همین ۷ فایل بود.

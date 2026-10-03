@@ -7,7 +7,8 @@ import { lockCurrent, snapshotBaselineIfMissing, appendCurrentAsVersion } from '
 import { logEvent } from '../../../obs/eventLog.js';
 import { retryFinalTranscript, enqueueFinalTranscript } from '../runner.js';
 import { treatmentUnits } from '../../treatment-unit/index.js';
-import { allowedRoles, applyRoleEdit } from '../domain/roleEdit.js';
+import { setRoles } from '../../session-record/index.js';
+import { allowedRoles, applyRoleEdit, roleNameToEntry, toLatinDigits } from '../domain/roleEdit.js';
 import type { CleanTurn } from '../domain/transcriptText.js';
 
 function parseJson(v: unknown): any {
@@ -91,6 +92,17 @@ export async function finalTranscriptRoutes(app: FastifyInstance) {
         throw e;
       } finally {
         conn.release();
+      }
+      if (updated && sameSpeaker) {
+        // F7: ویرایشِ نقشِ «همه‌ی نوبت‌هایِ این گوینده» به رکوردِ canonical هم نوشته می‌شود؛ ساختِ دوباره آن را پین می‌کند. fail-open.
+        try {
+          const entry = roleNameToEntry(String(body.role ?? ''));
+          const keys = new Set<string>();
+          for (const i of (Array.isArray(body.indices) ? body.indices.map((x) => Number(x)) : [])) { const sp = turns[i]?.sp; if (sp) keys.add(toLatinDigits(sp)); }
+          const entries: Record<string, { role: string; label: string | null }> = {};
+          for (const k of keys) entries[k] = entry;
+          if (keys.size) await setRoles(id, request.therapistId ?? null, entries);
+        } catch { /* LAW-008: ثبتِ نقش مانعِ ویرایش نمی‌شود */ }
       }
       if (!updated) { reply.code(409); return { error: 'متنِ نهایی هم‌زمان دوباره ساخته شد — صفحه را تازه کنید', code: 'conflict' }; }
       logEvent({ event: 'final_transcript.role_edit', sessionId: id, therapistId: request.therapistId, detail: { count: res.changed, mode: sameSpeaker ? 'speaker' : 'turn' } });

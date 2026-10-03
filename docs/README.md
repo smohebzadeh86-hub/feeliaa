@@ -6,6 +6,7 @@
 | لایه | محتوا | اعتبار |
 |---|---|---|
 | [00-governance](00-governance/documentation-map.md) | قوانین (LAW-xxx)، source of truth، راهنمای agent، نقشه‌ی اسناد | بالاترین |
+| [product-thesis](00-governance/product-thesis.md) | **جهتِ محصول:** Core = ثبت و حفظِ دادهٔ جلسه؛ فیلترِ «این feature را بسازیم؟» | بالا (جهت، نه وضعیتِ کد) |
 | [01-architecture](01-architecture/system-architecture.md) | معماریِ سیستم/اپلیکیشن/داده/یکپارچه‌سازی/استقرار | بالا |
 | [02-reference](02-reference/api-catalog.md) | catalogهای استخراج‌شده از کد | متوسط (کد برنده است) |
 | [03-requirements](03-requirements/requirement-catalog.md) | REQ-xxx و traceability | بالا (فعلاً DERIVED) |

@@ -78,7 +78,7 @@ export interface TranscriptResult {
   lowConfRatio: number | null;
   // همان متن با ⟦…؟⟧ دورِ واژه‌هایِ کم‌اطمینان — فقط ورودیِ «متنِ نهایی»، هرگز در sessions.transcript
   markedText?: string;
-  // توکن‌هایِ زمان‌دار برایِ «کیفیت به عدد» (transcriptMetrics.ts) — فقط در حافظه، هرگز ذخیره نمی‌شوند.
+  // توکن‌هایِ زمان‌دار: «کیفیت به عدد» (transcriptMetrics.ts) + ذخیره‌ی فشرده در session_transcript_tokens (038، tokenStore.ts).
   tokens?: TimedToken[];
 }
 
@@ -88,6 +88,8 @@ export interface TranscriptMeta {
   markedText: string | null;
   // فقط عدد/پرچم (LAW-001) ⇒ audio_jobs.transcript_metrics. null ⇒ سنجیده نشد (fail-open).
   metrics?: TranscriptMetrics | null;
+  // توکن‌هایِ زمان‌دار ⇒ session_transcript_tokens (migration 038) در همان تراکنشِ ثبتِ متن؛ fail-open.
+  tokens?: TimedToken[] | null;
 }
 
 // پلنِ B بخشِ ۳: هشدار فقط از confidenceِ Soniox (تنها پیش‌بینی‌کننده در فاز ۰B)، نه از سنجه‌هایِ سطحِ صدا.
@@ -110,7 +112,8 @@ export interface SonioxPort {
   uploadFile(filePath: string, filename: string): Promise<string>;
   createTranscription(fileId: string, clientReferenceId: string): Promise<string>;
   poll(transcriptionId: string): Promise<{ status: string; error_message?: string; notFound?: boolean }>;
-  getText(transcriptionId: string): Promise<string | TranscriptResult>;
+  // audioPath: فایلِ نرمال‌شده‌ی همین job (برایِ «نظرِ دوم»ِ اختیاری)؛ fakeهایِ قدیمی آن را نادیده می‌گیرند.
+  getText(transcriptionId: string, audioPath?: string | null): Promise<string | TranscriptResult>;
   // true/undefined = حذف شد؛ false = حذف ناموفق (شناسه نگه داشته می‌شود — A4)
   deleteTranscription(id: string): Promise<boolean | void>;
   deleteFile(id: string): Promise<boolean | void>;
@@ -384,6 +387,7 @@ async function stepTranscribe(job: AudioJob, deps: JobDeps): Promise<StepResult>
     qualityWarning: text.trim() ? qualityWarningFor(got.lowConfRatio, deps.lowConfWarnRatio ?? 0.08) : null,
     markedText: got.markedText ?? null,
     metrics: await measureTranscript(job, got, deps),
+    tokens: got.tokens ?? null,
   };
   const res = await deps.store.applyTranscriptOnce(job, text, (await deps.caseFileAfterUpload(job)) ? 'case_file' : 'done', meta);
   deps.log(`[audio-job] ${job.id} transcript ${res} chars=${text.trim().length}${meta.qualityWarning ? ' warning=' + meta.qualityWarning : ''}${meta.metrics ? ' metrics=' + (meta.metrics.flags.join(',') || 'ok') : ''}`);

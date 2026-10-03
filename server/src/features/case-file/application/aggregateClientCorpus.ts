@@ -6,6 +6,7 @@
 // consent=false دارد ولی کاملاً معتبر است (تراپیست خودش تایپ کرده). معیارِ «مجاز و
 // ثبت‌شده» همین است که داده از دو جدولِ رسمی/از طریقِ APIِ موجود ذخیره شده باشد.
 import { query } from '../../../db/connection.js';
+import { canonicalTextForSession } from '../../session-record/index.js';
 
 export interface CorpusNote {
   type: string;
@@ -34,7 +35,7 @@ export async function aggregateClientCorpus(clientId: string): Promise<ClientCor
   const sessionsResult = await query(
     `SELECT id, session_num, date, source, transcript, pre_note
      FROM sessions
-     WHERE client_id = ? AND status IN ('completed', 'recovered')
+     WHERE client_id = ? AND status IN ('completed', 'recovered') AND deleted_at IS NULL
      ORDER BY session_num ASC`,
     [clientId]
   );
@@ -43,7 +44,7 @@ export async function aggregateClientCorpus(clientId: string): Promise<ClientCor
   for (const row of sessionsResult.rows) {
     const notesResult = await query(
       `SELECT type, text, created_at FROM session_notes
-       WHERE session_id = ? AND text IS NOT NULL AND text <> ''
+       WHERE session_id = ? AND text IS NOT NULL AND text <> '' AND deleted_at IS NULL
        ORDER BY created_at ASC`,
       [row.id]
     );
@@ -57,7 +58,9 @@ export async function aggregateClientCorpus(clientId: string): Promise<ClientCor
       sessionNum: row.session_num,
       date: row.date,
       source: row.source,
-      transcript: row.transcript,
+      // رکوردِ canonical (فاز ۳، 2026-10-01): گذرِ کاملِ صدا با نقشِ تأییدشده‌یِ گوینده‌ها — فقط اگر پس از آن کسی متن را ویرایش نکرده.
+      // وگرنه (یا بدونِ رکورد) همان sessions.transcript مثلِ قبل.
+      transcript: (await canonicalTextForSession(row.id))?.text ?? row.transcript,
       notes,
     });
   }
@@ -69,8 +72,8 @@ export async function aggregateClientCorpus(clientId: string): Promise<ClientCor
     `SELECT COUNT(DISTINCT s.id) session_count, MAX(s.updated_at) latest_session_update,
             COUNT(n.id) note_count, MAX(n.created_at) latest_note_created
      FROM sessions s
-     LEFT JOIN session_notes n ON n.session_id = s.id AND n.text IS NOT NULL AND n.text <> ''
-     WHERE s.client_id = ? AND s.status IN ('completed','recovered')`,
+     LEFT JOIN session_notes n ON n.session_id = s.id AND n.text IS NOT NULL AND n.text <> '' AND n.deleted_at IS NULL
+     WHERE s.client_id = ? AND s.status IN ('completed','recovered') AND s.deleted_at IS NULL`,
     [clientId]
   );
   const sig = signatureResult.rows[0] || {};

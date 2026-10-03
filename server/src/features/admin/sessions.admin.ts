@@ -1,7 +1,7 @@
 // ادمین: جلسه (متن + یادداشت‌ها، فقط‌خواندنی)، فهرستِ سراسریِ جلساتِ اخیر، تشخیص و timeline. pluginِ فرزندِ
 // adminRoutes (requireAdmin).
 import { FastifyInstance } from 'fastify';
-import { listSessionAudio, pendingAudiosFor } from '../transcription/index.js';
+import { listSessionAudio, pendingAudiosFor, listSkips } from '../transcription/index.js';
 import { recordAudit } from '../../obs/audit.js';
 import { listFinalTranscriptVersions, getFinalTranscriptVersion } from '../final-transcript/index.js';
 import { diagnoseSession } from './diagnosis.js';
@@ -10,8 +10,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 import { liveHealth, LIVE_WINDOW_HOURS } from './liveHealth.js';
 import {
   getSessionWithTranscript, listSessionNotesForAdmin, listRecentSessions, getSessionForDiagnosis, listSessionEventsBrief,
-  listSessionUiEventsBrief, listUploadJobsForDiagnosis, getFinalTranscriptForDiagnosis, getSessionTimelineHead, listSessionEvents, listSessionUiEvents, listSessionNotesMeta, listLiveSessions,
-} from './admin.repository.js';
+  listSessionUiEventsBrief, listUploadJobsForDiagnosis, getFinalTranscriptForDiagnosis, getSessionTimelineHead, listSessionEvents, listSessionUiEvents, listSessionNotesMeta, listLiveSessions, restoreDeletedSession } from './admin.repository.js';
 
 export async function sessionsAdminRoutes(app: FastifyInstance) {
   // GET /api/admin/sessions/live — جلساتِ زنده‌ی در حالِ ضبط (فقط وضعیت، بدونِ شنودِ زنده — تصمیمِ مالک 2026-10-01).
@@ -74,9 +73,9 @@ export async function sessionsAdminRoutes(app: FastifyInstance) {
   app.get('/api/admin/sessions/recent', async (request, reply) => {
     const q = request.query as {
       status?: string; since_hours?: string; therapist_id?: string;
-      has_transcript?: string; limit?: string; offset?: string;
+      has_transcript?: string; limit?: string; offset?: string; deleted?: string;
     };
-    const status = q.status === 'completed' || q.status === 'all' ? q.status : 'in_progress';
+    const status = q.status === 'completed' || q.status === 'canceled' || q.status === 'all' ? q.status : 'in_progress';
     const sinceHoursRaw = Number(q.since_hours);
     const sinceHours = Number.isFinite(sinceHoursRaw) && sinceHoursRaw > 0 ? Math.min(sinceHoursRaw, 24 * 365) : 168;
     const limitRaw = Number(q.limit);
@@ -88,10 +87,22 @@ export async function sessionsAdminRoutes(app: FastifyInstance) {
     const params: unknown[] = [sinceHours];
     if (status !== 'all') { conditions.push('s.status = ?'); params.push(status); }
     if (q.therapist_id) { conditions.push('t.id = ?'); params.push(q.therapist_id); }
+    // حذفِ نرم (042): پیش‌فرض همه (حذف‌شده‌ها هم دیده می‌شوند، با deleted_at)؛ deleted=only فقط حذف‌شده‌ها، deleted=false بدونِ آن‌ها
+    if (q.deleted === 'only') conditions.push('s.deleted_at IS NOT NULL');
+    else if (q.deleted === 'false') conditions.push('s.deleted_at IS NULL');
     if (q.has_transcript === 'true') conditions.push('CHAR_LENGTH(s.transcript) > 0');
     else if (q.has_transcript === 'false') conditions.push('(s.transcript IS NULL OR CHAR_LENGTH(s.transcript) = 0)');
 
     return { sessions: await listRecentSessions(conditions, params, limit, offset) };
+  });
+
+  // POST /api/admin/sessions/:id/restore — بازگردانیِ جلسه‌یِ حذف‌شده (حذفِ نرمِ تراپیست، migration 042) به فهرستِ خودِ تراپیست
+  app.post('/api/admin/sessions/:id/restore', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!UUID_RE.test(id)) { reply.code(404); return { error: 'جلسه یافت نشد' }; }
+    if ((await restoreDeletedSession(id)) === 0) { reply.code(404); return { error: 'جلسه‌یِ حذف‌شده یافت نشد' }; }
+    await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.session_restore', targetType: 'session', targetId: id });
+    return { restored: id };
   });
 
   // GET /api/admin/sessions/:id/diagnosis — «چه اتفاقی افتاد؟» به زبانِ ساده (audit ذخیره‌سازی 2026-09-26).
@@ -108,7 +119,8 @@ export async function sessionsAdminRoutes(app: FastifyInstance) {
     const ui = await listSessionUiEventsBrief(id);
     const uploadJobs = s.source === 'upload' ? await listUploadJobsForDiagnosis(id) : [];
     const finalTranscript = await getFinalTranscriptForDiagnosis(id);
-    return diagnoseSession({ s, audioRows, pendingCount, ev, ui, uploadJobs, finalTranscript });
+    const skips = (await listSkips([id])).get(id) ?? [];
+    return diagnoseSession({ s, audioRows, skips, pendingCount, ev, ui, uploadJobs, finalTranscript });
   });
 
   // GET /api/admin/sessions/:id/timeline — همه‌ی رویدادهایِ مرتبط با یک جلسه، مرتب بر ts.

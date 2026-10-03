@@ -35,7 +35,9 @@
     'voice_note_started', 'voice_note_stop_clicked',
     'final_transcript_viewed_raw', 'final_transcript_retry', 'final_transcript_viewed_edits', 'final_transcript_role_edit',
     // پلنِ B (2026-09-28): هشدارِ «بخش‌هایی از صدا واضح نبود» رویِ کارتِ فایلِ آپلودی نمایش داده شد (یک بار برایِ هر job)
-    'upload_quality_warned'
+    'upload_quality_warned',
+    // فاز ۳ (2026-10-01): تراپیست نقشِ گوینده‌ها را تأیید کرد (بدونِ پارامتر)
+    'speaker_roles_confirmed'
   ]);
   // نامِ screen در index.html → نامِ امن. Auth و Admin* عمداً اینجا نیستند.
   var SCREENS = {

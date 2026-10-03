@@ -3,12 +3,16 @@ import { readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../../../db/connection.js';
 import { logEvent } from '../../../obs/eventLog.js';
+import { hardDeleteAllowed } from '../../../shared/retention.js';
 import {
   QUEUE_DIR, ensureDir, archiveKindForFile, seqFromFilename, runIdFromFilename, mimeFromFilename,
-  sessionIdFromFilename, pendingAudiosFor,
+  sessionIdFromFilename, pendingAudiosFor, isNoteFile, isArchiveFile, isNoteArchiveFile, isPreNoteFile,
 } from './queueFiles.js';
 
 const RETENTION_MS = 24 * 60 * 60 * 1000;
+// (2026-10-01، ممیزیِ Core) فایلی که آرشیوش *ناموفق* بود پس از ۲۴ساعت دیگر بی‌صدا پاک نمی‌شود (تنها نسخه‌ی صدا بود)؛ هر ساعت
+// دوباره آرشیو می‌شود و فقط پس از این سقفِ سخت — با رویدادِ obsِ error — حذف می‌شود تا دیسک برایِ همیشه پر نشود.
+const ARCHIVE_FAIL_HARD_MAX_MS = 7 * 24 * 60 * 60 * 1000;
 
 // پاک‌سازی: فایل‌های قدیمی‌تر از RETENTION_MS (نشت دیسک/حریم خصوصی). در startup و هر
 // BATCH_SWEEP_INTERVAL_MS (index.ts) — قبلاً فقط startup، یعنی سروری که ری‌استارت نمی‌شد
@@ -32,14 +36,28 @@ export async function sweepOldBatchFiles(): Promise<void> {
         if (age > RETENTION_MS) {
           const sessionId = sessionIdFromFilename(p);
           if (sessionId === null) {
+            if (!hardDeleteAllowed()) { console.log(`[batch] unparsable filename KEPT (no hard delete): ${f}`); continue; }
             console.log(`[batch] unparsable filename, dropping without archive: ${f}`);
           } else {
             try {
               const buffer = readFileSync(p);
               await archiveAudioForAdmin(sessionId, seqFromFilename(p), buffer, mimeFromFilename(p), 'durable', runIdFromFilename(p), archiveKindForFile(f));
             } catch (e) {
-              console.log('[batch] pre-sweep archive failed (still sweeping):', String(e).slice(0, 160));
+              // جلسه حذف شده ⇒ صدا هم باید برود (LAW-010)؛ هر خطایِ دیگر ⇒ فایل می‌ماند تا آرشیو موفق شود.
+              if ((e as { code?: string })?.code !== 'session-gone') {
+                if (age < ARCHIVE_FAIL_HARD_MAX_MS || !hardDeleteAllowed()) {
+                  console.log('[batch] pre-sweep archive failed, KEEPING file for retry:', f, String(e).slice(0, 160));
+                  continue;
+                }
+                console.log('[batch] pre-sweep archive failed past hard max, dropping (ALLOW_HARD_DELETE=1):', f);
+                logEvent({ event: 'audio.archive_lost', sessionId, source: 'job', severity: 'error', detail: { reason: 'archive-failed-7d' } });
+              }
             }
+          }
+          // placeholderِ «⏳» بازه‌ای که دیگر هرگز رونویسی نمی‌شود با نشانگرِ «بازیابی نشد» بسته می‌شود (فاز ۶ ممیزیِ Core)
+          if (sessionId !== null && !isNoteFile(f) && !isArchiveFile(f) && !isNoteArchiveFile(f) && !isPreNoteFile(f)) {
+            const { closePlaceholderAsLost } = await import('./processQueue.js');
+            await closePlaceholderAsLost(sessionId, runIdFromFilename(p), seqFromFilename(p));
           }
           rmSync(p, { force: true });
           console.log(`[batch] swept old file ${f}`);

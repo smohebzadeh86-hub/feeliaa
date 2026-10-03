@@ -4,6 +4,7 @@
 // طبقِ تصمیمِ D-E مالک: حذفِ تراپیست/مراجع هیچ پاکسازیِ آبشاری‌ای در این جدول‌ها
 // نمی‌سازد — این تنها مسیرِ پاکسازیِ obs_* است، و فقط بر اساسِ سن.
 import { query } from '../db/connection.js';
+import { hardDeleteAllowed } from '../shared/retention.js';
 
 const OBS_EVENTS_RETENTION_DAYS = Number(process.env.OBS_EVENTS_RETENTION_DAYS) > 0
   ? Number(process.env.OBS_EVENTS_RETENTION_DAYS) : 180;
@@ -36,6 +37,8 @@ async function sweepTable(table: 'obs_events' | 'obs_ui_events' | 'audit_log', r
 }
 
 export async function sweepOldObsEvents(): Promise<void> {
+  // ⭐ «هیچ چیزی هارد دیلیت نشود» (2026-10-02): رصد و ممیزی هم نگه داشته می‌شوند مگر ALLOW_HARD_DELETE=1
+  if (!hardDeleteAllowed()) return;
   try {
     const events = await sweepTable('obs_events', OBS_EVENTS_RETENTION_DAYS);
     const ui = await sweepTable('obs_ui_events', OBS_UI_RETENTION_DAYS);

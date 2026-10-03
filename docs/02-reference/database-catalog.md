@@ -17,7 +17,7 @@
 | `auth_sessions` | platform `auth/` | 004 | — | بالا |
 | `clients` | `clients` | 001، 004، 008، 009، 015، 024، 029 | `admin` (حذف/فعال)، `treatment-unit` (`unit_type`) | بسیار بالا |
 | `client_members` | `treatment-unit` | 029 | `clients` | بسیار بالا |
-| `sessions` | `sessions` | 002، 007، 012، 013، 014، 023(CHECK)، 026، 029 | ⚠️ `audio-upload` (`uploadSession.ts`، `jobStore.sql.ts`)، `transcription` (`stt.routes.ts`، `batch/`، `speakerResolve.ts`، `archive/`)، `legacy-ws`، `final-transcript`، `admin`، `treatment-unit`، `case-file`(خواندن) | بسیار بالا (متنِ جلسه) |
+| `sessions` | `sessions` | 002، 007، 012، 013، 014، 023(CHECK)، 026، 029، 040 (`unit_type`، `modalities`: snapshotِ لحظه‌یِ ساخت)، 042 (`deleted_at`، `deleted_by`: حذفِ نرم) | ⚠️ `audio-upload` (`uploadSession.ts`، `jobStore.sql.ts`)، `transcription` (`stt.routes.ts`، `batch/`، `speakerResolve.ts`، `archive/`)، `legacy-ws`، `final-transcript`، `admin`، `treatment-unit`، `case-file`(خواندن) | بسیار بالا (متنِ جلسه) |
 | `session_notes` | `sessions` (`notes.routes.ts`) | 003 | `transcription` (`batch/processQueue.ts`، `speakerResolve.ts`)، `sessions/voiceNote.legacy.ts`، `legacy-ws` | بسیار بالا |
 | `session_audio` | `transcription` (`archive/`) | 011، 016، 017، 023، 027 | `admin` (حذف)، `sessions/autoClose.ts` | بسیار بالا (مسیرِ فایل) |
 | `client_case_file` | `case-file` | 018، 019، 023 | — | بسیار بالا |
@@ -26,6 +26,13 @@
 | `notifications` | `notifications` | 023 | `audio-upload` (ساخت از job) | متوسط (بدونِ متنِ بالینی) |
 | `final_transcripts` | `final-transcript` | 031، 034 | `audio-upload` (پاکسازیِ یتیم/ارجاعِ Soniox) | بسیار بالا (متن) |
 | `final_transcript_versions` | `final-transcript` | 037 | — (فقط `admin` از طریقِ `features/final-transcript/index.ts` می‌خواند) | بسیار بالا (متن) |
+| `session_transcript_tokens` | `session-record` | 038، 041 (`covers_full`، `source_version`) | `audio-upload` (`jobStore.sql.ts`) و `final-transcript` (`runner.ts`) از طریقِ `saveCanonicalRecord` می‌نویسند | بسیار بالا (متنِ زمان‌دار؛ بعد از پاکسازیِ صدا می‌ماند) |
+| `session_segments` | `session-record` | 041 | همان | بسیار بالا (نوبت‌هایِ گوینده) |
+| `session_speaker_roles` | `session-record` | 041 | — | بالا (فقط نقش/برچسب) |
+| `session_transcript_revisions` | `sessions` (`sessions.routes.ts`) | 040 | — | بسیار بالا (متنِ جایگزین‌شده) |
+| `session_note_revisions` | `sessions` (`notes.routes.ts`) | 044 | — | بسیار بالا (متنِ قبلیِ یادداشت) |
+| `client_case_file_versions` | `case-file` (`caseFileRepository.sql.ts`) | 044 | — | بسیار بالا (محتوایِ قبلیِ پرونده) |
+| `session_audio_skips` | `transcription` (`archive/skips.ts`) | 039 | — | پایین (فقط شماره) |
 | `tu_unit_types`، `tu_member_roles`، `tu_modalities`، `tu_modality_terms` | `treatment-unit` | 029، 030، 032 | — | پایین (کاتالوگ) |
 | `obs_events`، `obs_ui_events` | platform `obs` | 021 | `admin` (خواندن/پاکسازی) | متوسط |
 | `audit_log` | platform `obs` (`audit.ts`) | 028 | — | بالا |
@@ -73,6 +80,13 @@
 | `035_upload_pre_note.sql` | `audio_uploads.pre_note` (TEXT NULL؛ یادداشتِ متنیِ پیش از جلسه‌ی آپلود تا لحظه‌ی ساختِ جلسه؛ بعد از آن NULL و در `session_notes(note_before)` است) |
 | `036_upload_transcript_metrics.sql` | `audio_jobs.transcript_metrics` (JSON NULL؛ «کیفیت به عدد»: پوشش/حفره/گوینده/اطمینان — فقط عدد و پرچم، بدونِ متن؛ [subsystem 06 §11](../07-subsystems/06-audio-upload-pipeline.md)) |
 | `037_final_transcript_versions.sql` | جدولِ `final_transcript_versions` (تاریخچه‌ی فقط‌افزودنیِ «متنِ نهایی»؛ [subsystem 07](../07-subsystems/07-final-transcript.md)) |
+| `038_session_transcript_tokens.sql` | جدولِ `session_transcript_tokens` (توکن‌هایِ زمان‌دارِ async ِSoniox به‌صورتِ JSONِ gzip، یک ردیف به ازایِ گذر؛ FK CASCADE با جلسه؛ [subsystem 08](../07-subsystems/08-session-record.md)) |
+| `039_session_audio_skips.sql` | جدولِ `session_audio_skips` (سگمنت‌هایِ صوتیِ *خالی* که کلاینت گزارش می‌کند؛ ورودیِ چکِ «سگمنتی گم نشده» با `client_seq`؛ [subsystem 02](../07-subsystems/02-audio-durability-batch-fallback.md)) |
+| `040_transcript_revisions_and_unit_snapshot.sql` | `session_transcript_revisions` (تاریخچه‌یِ فقط‌افزودنیِ متنِ جایگزین‌شده) + `sessions.unit_type`/`modalities` ([subsystem 08 §۴](../07-subsystems/08-session-record.md)) |
+| `041_session_segments.sql` | `session_segments`، `session_speaker_roles` + `session_transcript_tokens.covers_full/source_version` ([subsystem 08](../07-subsystems/08-session-record.md)) |
+| `042_session_soft_delete.sql` | `sessions.deleted_at DATETIME NULL`، `sessions.deleted_by CHAR(36) NULL` (بدونِ FK)، `idx_sessions_deleted` — **حذفِ نرمِ جلسه** (تصمیمِ مالک 2026-10-02؛ additive) |
+| `043_soft_delete_everything.sql` | `clients.deleted_at/deleted_by` (+`idx_clients_deleted`)، `session_notes.deleted_at/deleted_by`، `client_members.deleted_at` — حذفِ نرمِ مراجع/یادداشت/عضو («هیچ چیزی هارد دیلیت نشود»، 2026-10-02؛ additive) |
+| `044_edit_history.sql` | `session_note_revisions` (متنِ قبلیِ یادداشت)، `client_case_file_versions` (محتوایِ قبلیِ پرونده؛ `UNIQUE(client_id, content_version)`) — «همه‌چیز قابلِ بازیابی باشد» (2026-10-02؛ additive) |
 
 جدولِ سیستمی: `_migrations(id INT AUTO_INCREMENT PK, name VARCHAR(255) UNIQUE, applied_at DATETIME)` — ساخته‌شده در `server/src/db/migrate.ts`.
 

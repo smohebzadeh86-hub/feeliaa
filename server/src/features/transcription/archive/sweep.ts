@@ -3,6 +3,7 @@ import { readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../../../db/connection.js';
 import { logEvent } from '../../../obs/eventLog.js';
+import { hardDeleteAllowed } from '../../../shared/retention.js';
 import { allQueueFilesFor, queueFilesWithSession, removeAudioFile } from '../batch/queueFiles.js';
 import { ARCHIVE_DIR, RETENTION_MS, ensureArchiveDir, sessionDir } from './store.js';
 
@@ -14,6 +15,8 @@ import { ARCHIVE_DIR, RETENTION_MS, ensureArchiveDir, sessionDir } from './store
 // نشده — مثلاً owner-check رد شده — پاک نشود). fail-open: خطایِ حذفِ فایل کلِ عملیاتِ
 // حذف را fail نمی‌کند؛ فقط لاگ می‌شود.
 export function deleteSessionAudioDirs(sessionIds: string[]): void {
+  // ⭐ «هیچ چیزی هارد دیلیت نشود» (2026-10-02): صدایِ آرشیو هرگز پاک نمی‌شود مگر ALLOW_HARD_DELETE=1
+  if (!hardDeleteAllowed()) return;
   for (const id of sessionIds) {
     try {
       rmSync(sessionDir(id), { recursive: true, force: true });
@@ -40,6 +43,7 @@ export function deleteSessionAudioDirs(sessionIds: string[]): void {
 // زنده هرگز پاک نمی‌شود.
 const SESSION_DIR_RE = /^[0-9a-f-]{36}$/i;
 export async function sweepAudioWithoutSession(): Promise<number> {
+  if (!hardDeleteAllowed()) return 0;
   ensureArchiveDir();
   const dirs = readdirSync(ARCHIVE_DIR).filter((n) => SESSION_DIR_RE.test(n));
   const queued = queueFilesWithSession();
@@ -75,6 +79,8 @@ export async function sweepAudioWithoutSession(): Promise<number> {
 // اجرا در startup + هر ۲۴ ساعت — نه فقط سرِ راه‌اندازی، چون سروری که هفته‌ها ری‌استارت
 // نمی‌شه نباید صدایِ بیشتر از ۱۴ روز رو نگه داره.
 export async function sweepOldSessionAudio(): Promise<void> {
+  // ⭐ سقفِ نگهداریِ ۳۰روزه خاموش است (تصمیمِ مالک 2026-10-02) مگر ALLOW_HARD_DELETE=1
+  if (!hardDeleteAllowed()) return;
   try {
     const cutoff = new Date(Date.now() - RETENTION_MS);
     const old = await query('SELECT id, path FROM session_audio WHERE created_at < ?', [cutoff]);

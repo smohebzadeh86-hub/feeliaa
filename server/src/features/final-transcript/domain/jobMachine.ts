@@ -69,6 +69,9 @@ export interface FtDeps {
   audioState(sessionId: string): Promise<AudioState>;
   fullAudio(sessionId: string): Promise<FullAudio>;
   soniox: FtSonioxPort;
+  // (2026-10-01، گذرِ canonical) false ⇒ فقط رکوردِ canonical ساخته شده و مرتب‌سازی (LLM) خواسته نشده ⇒ job بدونِ polish skipped می‌شود.
+  // undefined ⇒ همیشه polish (فیک‌هایِ قدیمیِ harness).
+  polishWanted?(sessionId: string): Promise<boolean>;
   // trustDiarization: متن از یک گذرِ asyncِ کامل است (نه realtime، نه الحاقی) ⇒ نگهبانِ برگشتِ نقش فعال
   polish(sessionId: string, text: string, opts?: { trustDiarization: boolean }): Promise<PolishOutcome>;
   config: FtConfig;
@@ -239,6 +242,11 @@ async function stepPolish(job: FtJob, deps: FtDeps): Promise<StepResult> {
   const text = (job.source === 'async' ? job.asyncText : sess.transcript)?.trim() || '';
   if (!text) {
     await deps.store.skip(job, 'no-text');
+    return WAIT;
+  }
+  // گذرِ canonical-only: رکورد پیش‌تر (در getText) ذخیره شده؛ درمانگر مرتب‌سازی نخواسته ⇒ بدونِ هزینه‌ی LLM پایان.
+  if (deps.polishWanted && !(await deps.polishWanted(job.sessionId))) {
+    await deps.store.skip(job, 'canonical-only');
     return WAIT;
   }
   // نسخه‌ی مبنا: نسخه‌ی فعلیِ متنِ جلسه در لحظه‌ی مرتب‌سازی — تغییرِ بعدی (دُمِ دیررس/ویرایش) ⇒ stale در UI

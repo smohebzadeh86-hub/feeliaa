@@ -103,6 +103,7 @@ FeeliaAnalytics.boot(therapist)
 | `session_meta_edited` / `session_deleted` | ویرایشِ تاریخ/حذفِ جلسه |
 | `final_transcript_viewed_edits` / `final_transcript_role_edit` | «متنِ نهایی» (2026-09-28): دکمه‌ی «نمایشِ ویرایش‌ها» و اصلاحِ گوینده‌ی یک بخش — **هیچ متن، نقش یا شمارشی ارسال نمی‌شود**، فقط نامِ رویداد |
 | `final_transcript_viewed_raw` / `final_transcript_retry` | «متنِ نهایی» (2026-09-27): دکمه‌ی «نمایشِ متنِ خام» و «تلاشِ دوباره/ساختِ متنِ نهایی» — **هیچ متن یا وضعیتی ارسال نمی‌شود**. (تنظیمِ روشن/خاموش فقط در پنلِ ادمین است، 2026-09-28) |
+| `speaker_roles_confirmed` | فاز ۳ (2026-10-01): تراپیست در صفحه‌ی جلسه نقشِ گوینده‌ها را تأیید کرد (رکوردِ canonical). **بدونِ پارامتر** (نقش/متن ارسال نمی‌شود) |
 | `upload_quality_warned` | پلنِ B (2026-09-28): بنرِ «بخش‌هایی از صدا واضح نبود» رویِ کارتِ فایلِ آپلودی نمایش داده شد — یک بار برایِ هر job در هر بارگذاریِ صفحه. **بدونِ پارامتر** (علت/flag/متن ارسال نمی‌شود) |
 | `client_consent_given` / `client_consent_declined` | دکمه‌های رضایتِ مراجع در Setup |
 | `preflight_mic_failed` + tag `mic_error` | خطای میکروفون؛ مقدارِ tag فقط نامِ خطای مرورگر (`NotAllowedError`، …) یا `other` |

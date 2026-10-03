@@ -7,7 +7,7 @@
 // رابطه‌ایِ گم‌شده به «موارد دیگر» می‌رود و نقل‌ها عینِ digest‌اند — حفظِ اطلاعات به retry وابسته نیست.
 import { normalizeDeep } from '../domain/normalizeText.js';
 import { validateCaseFileDraft, checkDigestCoverage } from '../domain/validate.js';
-import { finalizeDraft, reportProblems } from '../domain/findings.js';
+import { finalizeDraft, reportProblems, type QuoteVerifier } from '../domain/findings.js';
 import { renderDigest } from './renderDigest.js';
 import type { CaseFileDraft, CaseFileDigest, RawCaseFileDraft } from '../domain/types.js';
 import type { LLMProvider, CaseFilePromptInput } from '../ports/llmProvider.port.js';
@@ -64,20 +64,20 @@ export async function digestWithRepair(
 }
 
 export async function composeWithRepair(
-  llm: LLMProvider, input: CaseFilePromptInput, digest: CaseFileDigest | null, h: RepairHooks, extraCorpusText = ''
+  llm: LLMProvider, input: CaseFilePromptInput, digest: CaseFileDigest | null, h: RepairHooks, extraCorpusText = '', verifyQuote?: QuoteVerifier
 ): Promise<CaseFileDraft> {
   const baseText = digest ? renderDigest(digest) : input.corpusText;
   const composeInput = { ...input, corpusText: extraCorpusText ? baseText + '\n\n' + extraCorpusText : baseText };
   const raw: RawCaseFileDraft = normalizeDeep(await withBeat(h, () => llm.generateCaseFile(composeInput)));
   validateCaseFileDraft(raw);
-  let best = finalizeDraft(raw, digest);
+  let best = finalizeDraft(raw, digest, { verifyQuote });
   const problems = reportProblems(best.report);
   if (!problems.length) return best.draft;
   if (!inBudget(h)) { h.log?.(`compose: ${problems.length} تخلف، اصلاح ردشد (بودجه‌ی زمانی؛ بازیابیِ کدی اعمال شد)`); return best.draft; }
   try {
     const retryRaw: RawCaseFileDraft = normalizeDeep(await withBeat(h, () => llm.generateCaseFile({ ...composeInput, corpusText: composeInput.corpusText + asNote(problems) })));
     validateCaseFileDraft(retryRaw);
-    const retry = finalizeDraft(retryRaw, digest);
+    const retry = finalizeDraft(retryRaw, digest, { verifyQuote });
     const after = reportProblems(retry.report);
     if (after.length < problems.length) best = retry;
     h.log?.(`compose: تخلف ${problems.length} → ${after.length}`);

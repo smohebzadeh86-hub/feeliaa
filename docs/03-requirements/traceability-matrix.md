@@ -61,6 +61,13 @@
 | REQ-121 | [observability-audit](../06-platform/observability-audit.md) | `server/src/obs/audit.ts` | `test:api` (دستی) | E2Eِ 2026-09-26 |
 | REQ-122 | platform | `scripts/check-backend-boundaries.mjs` | `test:arch` | harness |
 | REQ-123 | [admin-panel](../04-modules/06-admin-panel/module-prd.md) | `server/src/features/admin/queue.admin.ts`، `system.admin.ts`، `liveHealth.ts` | `scripts/admin-monitor-harness.ts` (`test:adm`) | harness + mock UI ([verification](../../verification/2026-10-01-admin-live-queue-system.md)) |
+| REQ-124 | [transcription](../04-modules/04-transcription/module-prd.md)، [subsystem 01](../07-subsystems/01-browser-realtime-engine.md) | `public/feelia-rt.js`، `batch/recoveryMerge.ts`، `batch/processQueue.ts`، `batch/sweep.ts` | `test:rt` (T60/T61)، `test:hist` (H9–H11)، [E2Eِ واقعی](../../verification/2026-10-02-core-audit.md) | harness + E2E |
+| REQ-125 | [transcription](../04-modules/04-transcription/module-prd.md) | `public/feelia-rt.js`، `public/index.html` | `test:rt` (T62/T64–T66)، E2Eِ واقعی | harness + E2E |
+| REQ-126 | [subsystem 01](../07-subsystems/01-browser-realtime-engine.md) | `public/feelia-rt.js` | `test:rt` (T67)، E2Eِ دو-تبیِ واقعی | harness + E2E |
+| REQ-127 | [subsystem 07](../07-subsystems/07-final-transcript.md)، [subsystem 08](../07-subsystems/08-session-record.md) | `final-transcript/*`، `session-record/index.ts` | `test:ft` (B20–B22، R2)، تستِ یکپارچه‌یِ DB (verification) | harness + integration |
+| REQ-128 | [therapy-sessions](../04-modules/03-therapy-sessions/module-prd.md) | `sessions/revisions.routes.ts`، `transcriptDiff.ts`، `public/index.html` | `test:hist` (H1–H8)، تستِ یکپارچه‌یِ DB | harness + integration |
+| REQ-129 | [ai-case-file](../04-modules/08-ai-case-file/module-prd.md) | `case-file/domain/findings.ts`، `application/corpusQuality.ts`، `autoTrigger.ts` | `test:cf` (T1–T4)، تستِ یکپارچه‌یِ DB | harness + integration |
+| REQ-130 | [admin-panel](../04-modules/06-admin-panel/module-prd.md) | `admin/coreMetrics.ts`، `metrics.admin.ts` | `test:adm`، تستِ یکپارچه‌یِ DB | harness + integration |
 
 ## شکاف‌های پوشش (برای master plan)
 1. auth، clients، sessions، admin harnessِ خودکارِ اختصاصی ندارند (فقط `test:api` دستی رویِ DBِ dev و `test:routes` برایِ guardها).

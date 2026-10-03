@@ -2,8 +2,10 @@
 import { FastifyInstance } from 'fastify';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
+import { exportCanonicalRecord } from '../session-record/index.js';
 import {
   getTherapistForExport, listClientsForExport, listSessionsForExport, listNotesForExport, listTherapistIdsForExport,
+  listTranscriptRevisionsForExport, listNoteRevisionsForExport, listCaseFilesForExport, listCaseFileVersionsForExport,
 } from './admin.repository.js';
 
 // دیتای کاملِ یک تراپیست: مراجعین + جلسات (با متنِ رونویسی) + یادداشت‌ها/علائم.
@@ -15,6 +17,16 @@ async function buildTherapistExport(therapistId: string) {
   const clients = await listClientsForExport(therapistId);
   const sessions = await listSessionsForExport(therapistId);
   const notes = await listNotesForExport(therapistId);
+  // schema v3 (2026-10-02): همه‌چیز — حذف‌شده‌ها (deleted_at روی مراجع/جلسه/یادداشت) + تاریخچه‌هایِ ویرایش + پرونده و نسخه‌هایش
+  const transcriptRevisions = await listTranscriptRevisionsForExport(therapistId);
+  const noteRevisions = await listNoteRevisionsForExport(therapistId);
+  const caseFiles = await listCaseFilesForExport(therapistId);
+  const caseFileVersions = await listCaseFileVersionsForExport(therapistId);
+  const group = (rows: any[], key: string) => { const m = new Map<string, any[]>(); for (const r of rows) { if (!m.has(r[key])) m.set(r[key], []); m.get(r[key])!.push(r); } return m; };
+  const revBySession = group(transcriptRevisions, 'session_id');
+  const noteRevBySession = group(noteRevisions, 'session_id');
+  const cfByClient = new Map<string, any>(caseFiles.map((f) => [f.client_id, f]));
+  const cfvByClient = group(caseFileVersions, 'client_id');
 
   const notesBySession = new Map<string, any[]>();
   for (const n of notes) {
@@ -23,14 +35,16 @@ async function buildTherapistExport(therapistId: string) {
   }
   const sessionsByClient = new Map<string, any[]>();
   for (const s of sessions) {
-    const withNotes = { ...s, notes: notesBySession.get(s.id) || [] };
+    // schema v2: رکوردِ canonical (نوبت‌هایِ گوینده با نقش، زمان و اطمینان) کنارِ متنِ خام؛ null برایِ جلسه‌یِ بدونِ رکورد
+    const withNotes = { ...s, notes: notesBySession.get(s.id) || [], canonical: await exportCanonicalRecord(s.id),
+      transcript_revisions: revBySession.get(s.id) || [], note_revisions: noteRevBySession.get(s.id) || [] };
     if (!sessionsByClient.has(s.client_id)) sessionsByClient.set(s.client_id, []);
     sessionsByClient.get(s.client_id)!.push(withNotes);
   }
 
   return {
     therapist,
-    clients: clients.map(c => ({ ...c, sessions: sessionsByClient.get(c.id) || [] })),
+    clients: clients.map(c => ({ ...c, sessions: sessionsByClient.get(c.id) || [], case_file: cfByClient.get(c.id) || null, case_file_versions: cfvByClient.get(c.id) || [] })),
   };
 }
 
@@ -65,6 +79,6 @@ export async function exportAdminRoutes(app: FastifyInstance) {
     await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.export', targetType: 'system', detail: { kind: 'full', count: all.length } });
     reply.header('Content-Disposition', `attachment; filename="feelia-export-${new Date().toISOString().slice(0, 10)}.json"`);
     reply.type('application/json');
-    return { exported_at: new Date().toISOString(), therapists: all };
+    return { schema_version: 3, exported_at: new Date().toISOString(), therapists: all };
   });
 }

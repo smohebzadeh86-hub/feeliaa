@@ -522,6 +522,10 @@ input::-ms-reveal{display:none}
 .note-edit:hover{color:var(--sage-deep);background:var(--sage-mist)}
 .note-edit+.note-remove{margin-right:0}
 
+.tbox-wrap{position:relative}
+.tbox-copy{position:absolute;top:8px;left:8px;width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;display:grid;place-items:center;padding:0;opacity:.85}
+.tbox-copy:hover{color:var(--sage-deep);border-color:var(--sage);opacity:1}
+.tbox-copy svg{width:15px;height:15px}
 .transcript-box{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:400px;overflow-y:auto;font-size:13.5px;line-height:2.1;white-space:pre-wrap;color:var(--ink-2)}
 .transcript-notes{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:200px;overflow-y:auto;margin-top:12px}
 .transcript-notes .inline-note{background:var(--sage-mist);border-right:3px solid var(--sage);padding:8px 12px;margin:6px 0;border-radius:8px;font-size:12.5px;color:var(--ink-2)}
@@ -802,6 +806,7 @@ input::-ms-reveal{display:none}
 /* کیفیتِ فایلِ آپلودی (پلنِ B): هشدار فقط با کم‌اطمینانیِ Soniox؛ flagِ تنها ⇒ نکته‌ی خاکستری */
 .job-card .banner.job-quality{margin:9px 0 0;padding:10px 12px;font-size:12.5px;line-height:1.8}
 .job-tip{font-size:12px;color:var(--muted);line-height:1.8;margin-top:7px}
+.job-tip.warn{color:var(--gold-deep)}
 .pbar{height:8px;border-radius:99px;background:var(--line-soft);overflow:hidden;margin:4px 0 7px}
 .pbar>span{display:block;height:100%;background:var(--sage);border-radius:99px;transition:width .3s ease}
 .pbar.wait>span{background:var(--gold)}
@@ -1255,6 +1260,10 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     </div>
     <div id="adminSystemStats" class="admin-stats"></div>
     <div id="adminSystemHealth" class="card admin-row"></div>
+    <!-- حذف‌شده‌هایِ نرم (مراجع/جلسه/یادداشت) در کلِ سیستم + بازگردانی — «به همه دیتا دسترسی داشته باشم»، 2026-10-02 -->
+    <div class="card admin-row"><div class="admin-row-title">داده‌هایِ حذف‌شده (قابلِ بازگردانی)</div><div id="adminDeletedBox" data-clarity-mask="true" style="font-size:13px"></div></div>
+    <!-- سنجه‌هایِ Core (F10، 2026-10-02): فقط عدد؛ GET /api/admin/core-metrics -->
+    <div class="card admin-row"><div class="admin-row-title">سنجه‌هایِ هسته — ۳۰ روزِ اخیر</div><div id="adminCoreMetrics" class="admin-stats"></div><div id="adminCoreMetricsNote" style="font-size:12px;color:var(--muted);margin-top:8px"></div></div>
     <div class="card admin-row"><div class="admin-row-title">پردازشگرها و جاروب‌ها</div><div id="adminSystemWorkers"></div></div>
     <div class="card admin-row">
       <div class="admin-row-title">ترافیکِ ۲۴ ساعتِ اخیر <span class="admin-row-meta" id="adminSystemChartMeta"></span></div>
@@ -1284,6 +1293,11 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <div class="skeleton-card"><div class="skeleton-line short"></div><div class="skeleton-line"></div></div>
     </div>
     <div class="clients-grid" id="clientsList" data-clarity-mask="true"></div>
+    <!-- مراجعینِ حذف‌شده (حذفِ نرم، migration 043، 2026-10-02): مسیرِ پیدا کردن و بازگردانی -->
+    <details id="deletedClientsBox" hidden data-clarity-mask="true" style="margin-top:14px">
+      <summary id="deletedClientsSummary" style="cursor:pointer;font-size:13px;color:var(--muted)"></summary>
+      <div id="deletedClientsList" style="margin-top:8px"></div>
+    </details>
     <div class="empty" id="emptyFirst" hidden>
       <p>هنوز مراجعی ثبت نشده</p><span>اولین مراجع خود را اضافه کنید</span>
     </div>
@@ -1431,6 +1445,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
   <section id="screenLive" class="card screen" hidden>
     <div class="rec-meta"><span class="rec-chip" id="recChip" data-clarity-mask="true"></span></div>
     <div id="liveConnBanner" data-clarity-mask="true"></div>
+    <div id="recHealthBanner" role="alert" data-clarity-mask="true"></div>
     <div class="rec-stage">
       <div class="rec-dot" id="recDot">
         <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round">
@@ -1439,6 +1454,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       </div>
       <div class="timer" id="recTimer">۰۰:۰۰</div>
       <div class="rec-status" id="recStatus">در حال اتصال…</div>
+      <div class="rec-status" id="recSavedNote" style="font-size:12.5px;opacity:.8" hidden></div>
       <div class="level-meter" id="levelMeter"></div>
       <div id="audioQualityHint" hidden></div>
       <label class="toggle-row live-toggle"><span class="lt-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg></span><span class="lt-text"><span class="lt-title">نمایش متن زنده</span><span class="lt-sub">رونویسی را هم‌زمان ببینید</span></span><input type="checkbox" id="chkLiveText"></label>
@@ -1545,6 +1561,11 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <div class="presence-line" style="margin-bottom:14px" data-clarity-mask="true"><span id="detailUnitText"></span><button class="tu-link" onclick="openEditUnitModal()">تغییرِ نوعِ پرونده / افزودنِ عضو</button></div>
     <h3 class="detail-section-title">جلساتِ ثبت‌شده</h3>
     <div id="sessionsList" data-clarity-mask="true"></div>
+    <!-- جلسه‌هایِ حذف‌شده (حذفِ نرم، migration 042، 2026-10-02): مسیرِ پیدا کردن و بازگردانی -->
+    <details id="deletedSessionsBox" class="deleted-box" hidden data-clarity-mask="true" style="margin-top:12px">
+      <summary id="deletedSessionsSummary" style="cursor:pointer;font-size:13px;color:var(--muted)"></summary>
+      <div id="deletedSessionsList" style="margin-top:8px"></div>
+    </details>
     <button class="btn btn-primary btn-block" id="detailStartBtn" style="margin-top:14px" onclick="startFromDetail()">شروع جلسه‌ی جدید</button>
     <button class="btn btn-primary btn-block" id="detailManualBtn" hidden style="margin-top:14px" onclick="startManualSessionFlow()">ثبت جلسات گذشته</button>
     <!-- آپلودِ فایلِ صوتیِ جلسه‌ای که بیرون از فیلیا ضبط شده (مثلاً با ضبطِ گوشی وقتی اینترنتِ کلینیک ضعیف بود) -->
@@ -1567,6 +1588,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <div class="btn-row" style="margin-bottom:10px">
         <button class="btn btn-ghost btn-sm" id="editSessionMetaBtn" onclick="openEditSessionMeta()">ویرایش تاریخ/ساعت</button>
         <button class="btn btn-ghost btn-sm" id="resolveSpeakersBtn" hidden onclick="startResolveSpeakersUI()">بازسازیِ شماره‌گذاریِ گوینده‌ها</button>
+        <button class="btn btn-ghost btn-sm" id="historyBtn" hidden onclick="openTranscriptHistory()">تاریخچه‌ی ویرایش</button>
       </div>
       <!-- ⭐ فیکسِ باگِ واقعیِ UX (2026-09-15): برایِ جلسه‌ی دستی، دکمه‌ی «ویرایش» بی‌معنی
            بود چون چیزی از قبل تعیین نشده — تاریخ همیشه، مستقیم و بدونِ مودال اینجاست.
@@ -1584,7 +1606,16 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <!-- «متنِ نهایی» (migration 031): وضعیت، خام/نهایی، تلاشِ دوباره، روشن/خاموشِ قابلیت -->
       <div id="sessionPreNotes" class="pre-notes" data-clarity-mask="true" hidden></div>
       <div id="finalTranscriptBar" class="ft-bar" hidden></div>
-      <div class="transcript-box" id="transcriptBox"></div>
+      <!-- دفترِ کامل‌بودنِ صدایِ جلسه‌ی زنده: «X از Y دقیقه ذخیره شد» (GET /api/sessions/:id/audio-status) -->
+      <div id="audioStatusLine" class="job-tip" hidden></div>
+      <!-- نقشِ گوینده‌ها (رکوردِ canonical): تأییدِ یک‌کلیکیِ «گوینده ۱ = درمانگر …» (GET/PUT /api/sessions/:id/speakers) -->
+      <div id="speakerRolesBar" class="ft-bar quiet" hidden></div>
+      <div class="tbox-wrap">
+        <div class="transcript-box" id="transcriptBox"></div>
+        <button type="button" class="tbox-copy" id="transcriptCopyBtn" title="کپیِ کلِ متن" aria-label="کپیِ کلِ متن" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"/></svg>
+        </button>
+      </div>
       <div class="transcript-notes" id="transcriptNotes" hidden></div>
       <!-- ⭐ فقط برایِ جلسه‌ی ثبت‌شده‌ی دستی (source=manual): افزودنِ یادداشتِ متنی/صوتی —
            دقیقاً همان مسیرِ صوتیِ Wrapup (FeeliaRT یا legacy WS)، با متغیرها/DOMِ جداگانه
@@ -1824,6 +1855,17 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
   </div>
 </div>
 
+<!-- تاریخچه‌ی ویرایشِ متنِ جلسه (F8، 2026-10-02): فهرست + diff + بازگردانی. باید قبل از genericConfirmModal باشد (تأییدِ بازگردانی روی آن می‌نشیند) -->
+<div class="modal-back" id="historyModal" data-clarity-mask="true">
+  <div class="modal" style="max-width:680px;width:calc(100vw - 32px);max-height:86vh;overflow:auto">
+    <h3>تاریخچه‌ی ویرایشِ متن</h3>
+    <p style="font-size:12.5px;color:var(--muted)">نسخه‌هایِ قبلیِ متن که با ویرایش یا بازسازیِ گوینده‌ها جایگزین شده‌اند. بازگرداندنِ هر نسخه، متنِ فعلی را هم در همین تاریخچه نگه می‌دارد.</p>
+    <div id="historyList"></div>
+    <div id="historyDetail" hidden></div>
+    <div class="modal-actions"><button class="btn btn-ghost" onclick="closeTranscriptHistory()">بستن</button></div>
+  </div>
+</div>
+
 <div class="modal-back" id="genericConfirmModal" data-clarity-mask="true">
   <div class="modal">
     <h3 id="genericConfirmTitle">مطمئن هستید؟</h3>
@@ -1838,7 +1880,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
 <div class="modal-back" id="cancelModal">
   <div class="modal">
     <h3>لغو این جلسه؟</h3>
-    <p>رونویسی متوقف و متنِ تا اینجا دور ریخته می‌شود.<br>اگر متن را می‌خواهید، «پایان جلسه» بزنید.</p>
+    <p><b>جلسه لغو و از فهرستِ شما پنهان می‌شود.</b> متن، صدا، یادداشت‌ها و علائمِ ثبت‌شده حذف نمی‌شوند و برایِ ادمین (مدیرِ سیستم) نگه داشته می‌شوند.<br>اگر متن را می‌خواهید، «پایان جلسه» بزنید.</p>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeCancelModal()">ادامه‌ی جلسه</button>
       <button class="btn btn-danger" onclick="confirmCancelSession()">بله، لغو شود</button>
@@ -2506,7 +2548,7 @@ async function endDirectLive(){
   if(audioCtx){try{audioCtx.close();}catch(e){}audioCtx=null;}
   stopSttWatchdog();stopDurationAutosave();
   try{
-    await api('/api/sessions/'+currentSession.id,{method:'PUT',body:{transcript:finalText,duration_ms:elapsedMs}});
+    await legacyPutTranscript(currentSession.id,finalText,{duration_ms:elapsedMs});
   }catch(e){}
   handleFinished(null);
 }
@@ -3221,6 +3263,8 @@ setInterval(sweepOrphanedAudioQueue,60000);
 window.addEventListener('online',sweepOrphanedAudioQueue);
 
 const LOCAL_AUDIO_MAX_AGE_MS=7*86400000; // (A3) سقفِ ماندنِ صدایِ آپلودنشده در IndexedDBِ مرورگر
+const LOCAL_AUDIO_WARN_AGE_MS=5*86400000; // هشدار پیش از حذف (۲ روز مانده)
+let localAudioExpiringWarned=false;
 async function sweepOrphanedAudioQueue(){
   try{
     if(!window.FeeliaRT||!window.FeeliaRT.audioQueue||!window.FeeliaRT.uploadQueuedSegment||!window.FeeliaRT.withAudioLock)return;
@@ -3247,6 +3291,7 @@ async function sweepOrphanedAudioQueue(){
       await window.FeeliaRT.withAudioLock(sid,async function(){
         const pending=await q.listForSession(sid);
         let expired=0;
+        let expiring=0;
         for(const rec of pending){
           if(!rec.blob||rec.blob.size<=100){await q.remove(rec.id);continue;}
           let done=false;
@@ -3260,6 +3305,13 @@ async function sweepOrphanedAudioQueue(){
           // ⭐ (A3) صدایِ بالینی نباید بی‌پایان در مرورگر بماند: بعد از ۷ روز تلاشِ ناموفق (سرور خودش صدا را فقط ۳۰ روز
           // نگه می‌دارد) رکورد پاک و رویدادش (فقط تعداد) ثبت می‌شود.
           if(!done&&rec.createdAt&&Date.now()-rec.createdAt>LOCAL_AUDIO_MAX_AGE_MS){await q.remove(rec.id,rec.bytes);expired++;}
+          else if(!done&&rec.createdAt&&mine&&Date.now()-rec.createdAt>LOCAL_AUDIO_WARN_AGE_MS)expiring++;
+        }
+        // هشدار پیش از حذفِ بی‌صدا (۷روزه): از ۵ روزگی تراپیست می‌داند صدایی هنوز ارسال نشده و باید اینترنت وصل شود.
+        if(expiring&&!localAudioExpiringWarned){
+          localAudioExpiringWarned=true;
+          try{showBanner('warn','بخشی از صدایِ یک جلسه هنوز روی این دستگاه است و ارسال نشده. اینترنت را وصل کنید و این صفحه را باز نگه دارید؛ پس از چند روز دیگر این نسخه پاک می‌شود.');}catch(e){}
+          try{if(window.FeeliaObs)window.FeeliaObs.event('rt.local_audio_expiring',{count:expiring},{session_id:sid});}catch(e){}
         }
         if(expired){try{if(window.FeeliaObs)window.FeeliaObs.event('rt.local_audio_expired',{count:expired},{session_id:sid});}catch(e){}}
       });
@@ -3344,7 +3396,7 @@ function renderAdminRecentSessions(sessions){
     title.textContent=(s.therapist_name||'—')+' · '+(s.client_code||'—')+' · جلسه‌ی '+toFa(s.session_num);
     const meta=document.createElement('div');
     meta.style.cssText='font-size:11.5px;color:var(--muted);margin-top:4px';
-    meta.textContent=adminSessionStatusFa(s.status)+' · طول متن '+toFa(s.transcript_len||0)+' نویسه · '+
+    meta.textContent=(s.deleted_at?'🗑 حذف‌شده توسطِ تراپیست ('+fmtDateTime(s.deleted_at)+') · ':'')+adminSessionStatusFa(s.status)+' · طول متن '+toFa(s.transcript_len||0)+' نویسه · '+
       toFa(Math.round((s.audio_duration_ms||0)/1000))+' ثانیه صدا · '+toFa(s.audio_count||0)+' سگمنت صدا · '+
       (s.last_recording_at?'آخرین ضبط: '+fmtDateTime(s.last_recording_at)+' · ':'')+
       'آخرین نوشتن: '+fmtDateTime(s.updated_at);
@@ -3474,18 +3526,22 @@ function attachTranscriptExpander(box,text,durationMs,note){
   if(!info){
     info=document.createElement('div');info.id=infoId;info.className='admin-row-meta';
     info.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px';
-    box.parentNode.insertBefore(info,box);
+    const anchor=box.parentNode.classList.contains('tbox-wrap')?box.parentNode:box;
+    anchor.parentNode.insertBefore(info,anchor);
   }
   info.innerHTML='';
   box.style.maxHeight='';
   info.hidden=box.hidden||!text;
+  if(box.id==='transcriptBox'){
+    const cb=$('transcriptCopyBtn');
+    cb.hidden=box.hidden||!text;
+    cb.onclick=function(){ftCopyText(text);};
+  }
   if(!text)return;
   const label=document.createElement('span');
   label.textContent='متنِ جلسه: '+toFa(text.length.toLocaleString('en-US'))+' نویسه'+(durationMs?' · '+fmtDur(durationMs):'')+(note?' · '+note:'');
   if(note)label.style.color='var(--gold-deep)';
   info.appendChild(label);
-  // کپیِ کلِ متنِ جلسه (نهایی یا خام، هر کدام که نمایش داده می‌شود) — فقط برایِ متنِ صفحه‌ی جلسه
-  if(box.id==='transcriptBox')info.appendChild(adminBtn('کپیِ کلِ متن','btn-secondary',function(){ftCopyText(text);}));
   if(text.length>1500){
     info.appendChild(adminBtn('نمایشِ کامل','btn-ghost',function(){
       const open=box.style.maxHeight==='none';
@@ -3781,6 +3837,50 @@ async function openAdminSystem(){
 async function loadAdminSystem(){
   try{renderAdminSystem(await api('/api/admin/system'));}
   catch(e){showBanner('error',e.message);}
+  loadAdminCoreMetrics();
+  loadAdminDeleted();
+}
+// حذف‌شده‌ها: فهرستِ مراجع/جلسه/یادداشت با دکمه‌یِ بازگردانی (فقط متادیتا)
+async function loadAdminDeleted(){
+  const box=$('adminDeletedBox');if(!box)return;
+  try{
+    const d=await api('/api/admin/deleted');
+    box.textContent='';
+    const add=function(title,rows,label,url){
+      if(!rows.length)return;
+      const h=document.createElement('div');h.style.cssText='font-weight:700;margin:8px 0 4px';h.textContent=title+' ('+toFa(rows.length)+')';box.appendChild(h);
+      rows.forEach(function(x){
+        const row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--line, #ddd)';
+        const t=document.createElement('span');t.textContent=label(x)+' · '+(x.therapist_name||'—')+' · حذف: '+historyTimeFa(x.deleted_at);
+        const b=document.createElement('button');b.type='button';b.className='btn btn-ghost btn-sm';b.textContent='بازگردانی';
+        b.onclick=async function(){b.disabled=true;try{await api(url(x),{method:'POST'});showBanner('info','بازگردانی شد.');loadAdminDeleted();}catch(e){b.disabled=false;showBanner('error',e.message);}};
+        row.appendChild(t);row.appendChild(b);box.appendChild(row);
+      });
+    };
+    add('مراجعین',d.clients||[],function(x){return x.code+(x.alias?' — '+x.alias:'')+' · '+toFa(x.session_count||0)+' جلسه';},function(x){return '/api/admin/clients/'+x.id+'/restore';});
+    add('جلسه‌ها',d.sessions||[],function(x){return (x.client_code||'—')+' · جلسه '+toFa(x.session_num)+' · '+toFa(x.transcript_len||0)+' نویسه · '+toFa(x.audio_count||0)+' سگمنتِ صدا';},function(x){return '/api/admin/sessions/'+x.id+'/restore';});
+    add('یادداشت‌ها',d.notes||[],function(x){return (x.client_code||'—')+' · '+x.type+' · '+toFa(x.text_len||0)+' نویسه';},function(x){return '/api/admin/notes/'+x.id+'/restore';});
+    if(!box.childNodes.length)box.textContent='چیزی حذف نشده است.';
+  }catch(e){box.textContent='بارگذاری نشد: '+e.message;}
+}
+function adminPct(r){return r===null||r===undefined?'—':toFa((r*100).toFixed(1))+'٪';}
+async function loadAdminCoreMetrics(){
+  const box=$('adminCoreMetrics');if(!box)return;
+  try{
+    const m=await api('/api/admin/core-metrics?days=30');
+    const cr=m.capture_reliability,rs=m.recovery_success,co=m.correction_rate,ru=m.repeat_usage;
+    box.innerHTML=
+      adminStatTile('جلسه‌هایِ زنده',toFa(cr.live_sessions))+
+      adminStatTile('بدونِ گپِ جبران‌نشده',adminPct(cr.realtime_reliable_rate),cr.realtime_reliable_rate!==null&&cr.realtime_reliable_rate<0.9)+
+      adminStatTile('متنِ ثبت‌شده',adminPct(cr.text_captured_rate),cr.text_captured_rate!==null&&cr.text_captured_rate<0.98)+
+      adminStatTile('صدایِ ذخیره‌شده',adminPct(cr.audio_saved_rate),cr.audio_saved_rate!==null&&cr.audio_saved_rate<0.95)+
+      adminStatTile('موفقیتِ اتصالِ دوباره',adminPct(rs.reconnect_success_rate),rs.reconnect_success_rate!==null&&rs.reconnect_success_rate<0.8)+
+      adminStatTile('موفقیتِ بازیابیِ batch',adminPct(rs.batch_success_rate),rs.batch_success_rate!==null&&rs.batch_success_rate<0.8)+
+      adminStatTile('نرخِ اصلاحِ متن',adminPct(co.revision_rate))+
+      adminStatTile('درمانگرانِ بازگشتی',adminPct(ru.returning_rate))+
+      adminStatTile('جلسه به ازایِ درمانگرِ فعال',ru.sessions_per_active_therapist===null?'—':toFa(ru.sessions_per_active_therapist));
+    $('adminCoreMetricsNote').textContent='قطعیِ سوکتِ بی‌صدا: '+toFa(rs.silent_ws_detected)+' · قطعِ میکروفون: '+toFa(cr.mic_lost_events)+' · هشدارِ سلامتِ ضبط: '+toFa(cr.health_problem_events)+' · گپِ ثبت‌شده در متن: '+toFa(rs.gap_marked);
+  }catch(e){box.innerHTML='';$('adminCoreMetricsNote').textContent='سنجه‌ها بارگذاری نشد: '+e.message;}
 }
 function fmtUptime(s){
   s=Math.max(0,Math.round(Number(s)||0));
@@ -3932,7 +4032,8 @@ function renderAdminAudioRow(it){
   }));
   actions.appendChild(adminBtn('دانلود','btn-ghost',function(){adminDownload(url+'?download=1');}));
   actions.appendChild(adminBtn('جزئیاتِ جلسه','btn-ghost',function(){adminDetailReturn='audio';openAdminSessionDetail(it.session_id,(it.therapist_name||'—')+' · '+(it.client_code||'—'));}));
-  actions.appendChild(adminBtn('حذفِ صدا','btn-ghost',function(){
+  // حذفِ صدا غیرفعال است (2026-10-02، «هیچ چیزی هارد دیلیت نشود») — دکمه ساخته می‌شود ولی اضافه نمی‌شود
+  void (adminBtn('حذفِ صدا','btn-ghost',function(){
     showGenericConfirm({
       title:'حذفِ صدایِ این جلسه؟',
       text:titleText+' — '+fmtDur(it.audio_ms)+' صدا برایِ همیشه حذف می‌شود. متن و یادداشت‌هایِ جلسه دست نمی‌خورند. این کار ثبت می‌شود.',
@@ -4144,7 +4245,9 @@ function renderAdminTherapists(list){
     btnDel.className='btn btn-danger btn-sm';
     btnDel.textContent='حذف';
     btnDel.addEventListener('click',function(){showDeleteTherapist(t.id,t.phone);});
-    actions.appendChild(btnView);actions.appendChild(btnDownload);actions.appendChild(btnDel);
+    // حذفِ سختِ تراپیست غیرفعال است (2026-10-02، «هیچ چیزی هارد دیلیت نشود»)؛ به‌جایش «غیرفعال‌سازی» در همین صفحه
+    void btnDel;
+    actions.appendChild(btnView);actions.appendChild(btnDownload);
     div.appendChild(actions);
 
     box.appendChild(div);
@@ -4205,17 +4308,18 @@ async function openAdminTherapistDetail(id){
       head.style.paddingLeft='0';
       const code=document.createElement('span');
       code.className='session-num';
-      code.textContent=c.code+(c.alias?' — '+c.alias:'');
+      code.textContent=(c.deleted_at?'🗑 ':'')+c.code+(c.alias?' — '+c.alias:'');
       head.appendChild(code);
       const delBtn=document.createElement('button');
       delBtn.className='btn btn-ghost btn-sm';
-      delBtn.textContent='حذف مراجع';
+      delBtn.textContent=c.deleted_at?'بازگردانیِ مراجع':'حذف مراجع';
       // ⭐ فیکسِ باگِ واقعی (UI-27): حذفِ مراجع از پنلِ ادمین بدونِ هیچ تأییدی انجام
       // می‌شد — یک لمسِ اشتباه یعنی حذفِ آبشاریِ مراجع + همه‌ی جلسات/یادداشت‌هایش.
       // مودالِ استانداردِ اپ به‌جایِ `confirm()`ِ خام (هم‌راستا با سیستمِ طراحی).
       delBtn.addEventListener('click',function(e){
         e.stopPropagation();
-        showGenericConfirm({title:'حذفِ مراجع؟',text:'مراجعِ '+c.code+(c.alias?' — '+c.alias:'')+' حذف شود؟ همه‌ی جلسات و یادداشت‌هایش هم برای همیشه حذف می‌شوند.',okLabel:'بله، حذف کامل',onConfirm:function(){adminDeleteClient(c.id);}});
+        if(c.deleted_at){api('/api/admin/clients/'+c.id+'/restore',{method:'POST'}).then(function(){showBanner('info','مراجع بازگردانی شد.');if(currentAdminTherapistId)openAdminTherapistDetail(currentAdminTherapistId);}).catch(function(err){showBanner('error',err.message);});return;}
+        showGenericConfirm({title:'حذفِ مراجع؟',text:'مراجعِ '+c.code+(c.alias?' — '+c.alias:'')+' از فهرستِ تراپیست حذف شود؟ جلسات، متن، یادداشت‌ها و صدا نگه داشته می‌شوند و قابلِ بازگردانی‌اند.',okLabel:'بله، حذف',onConfirm:function(){adminDeleteClient(c.id);}});
       });
       head.appendChild(delBtn);
       div.appendChild(head);
@@ -4411,6 +4515,7 @@ async function openAdminSessionDetail(sessionId,clientTitle){
       +adminSourceLabel(s.source)+(s.consent?' · رضایت ✓':' · بدونِ رضایت')
       // (audit ذخیره‌سازی 2026-09-26) ادمین باید ببیند جلسه پایان خورده یا نیمه‌کاره رها شده و آخرین ذخیره کِی بوده.
       +' · '+sessionStatusFa(s)
+      +(s.deleted_at?' · 🗑 حذف‌شده توسطِ تراپیست ('+new Date(s.deleted_at).toLocaleString('fa-IR',{timeZone:FEELIA_TZ})+')':'')
       +(s.updated_at?' · آخرین ذخیره '+new Date(s.updated_at).toLocaleString('fa-IR',{timeZone:FEELIA_TZ}):'')
       +(s.source==='upload'
         ?(s.batch_status==='queued'||s.batch_status==='processing'?' · فایل در حالِ پردازش':s.batch_status==='failed'?' · پردازشِ فایل ناموفق':'')
@@ -4418,6 +4523,33 @@ async function openAdminSessionDetail(sessionId,clientTitle){
           +(isLiveS&&(s.realtime_reliable===0||s.realtime_reliable===false)?' · بخشی از متن از صدایِ قطعی بازیابی شده':''));
     // (2026-09-26، گزارشِ مالک) متنِ یک جلسه‌ی ۱ساعته (~۵۵هزار نویسه) در جعبه‌ی ۴۰۰پیکسلی فقط چند خطِ اول دیده می‌شد
     // و ناقص به نظر می‌رسید. حالا طولِ متن بالایش نوشته می‌شود و «نمایشِ کامل» سقفِ ارتفاع را برمی‌دارد.
+    // حذفِ نرم (042): ادمین می‌تواند جلسه را به فهرستِ تراپیست برگرداند
+    const oldRb=$('adminSessionRestoreBtn');if(oldRb)oldRb.remove();
+    if(s.deleted_at){
+      const rb=document.createElement('button');rb.id='adminSessionRestoreBtn';rb.type='button';rb.className='btn btn-ghost btn-sm';rb.style.margin='8px 0';rb.textContent='بازگردانی به فهرستِ تراپیست';
+      rb.onclick=async function(){rb.disabled=true;try{await api('/api/admin/sessions/'+sessionId+'/restore',{method:'POST'});showBanner('info','جلسه بازگردانی شد.');openAdminSessionDetail(sessionId,clientTitle);}catch(e){rb.disabled=false;showBanner('error',e.message);}};
+      $('adminSessionDetailMeta').insertAdjacentElement('afterend',rb);
+    }
+    // تاریخچه‌یِ ویرایشِ متن (040): همه‌یِ نسخه‌هایِ قبلی قابلِ خواندن‌اند
+    const oldRv=$('adminSessionRevisions');if(oldRv)oldRv.remove();
+    const rv=document.createElement('details');rv.id='adminSessionRevisions';rv.style.cssText='margin:8px 0;font-size:13px';
+    const rvs=document.createElement('summary');rvs.style.cursor='pointer';rvs.textContent='تاریخچه‌یِ ویرایشِ متن';rv.appendChild(rvs);
+    const rvBody=document.createElement('div');rv.appendChild(rvBody);
+    rv.addEventListener('toggle',async function(){
+      if(!rv.open||rvBody.dataset.loaded)return;rvBody.dataset.loaded='1';rvBody.textContent='در حال بارگذاری…';
+      try{
+        const r=await api('/api/admin/sessions/'+sessionId+'/transcript-revisions');
+        rvBody.textContent='';
+        if(!(r.revisions||[]).length){rvBody.textContent='نسخه‌یِ قبلی وجود ندارد.';return;}
+        r.revisions.forEach(function(x){
+          const b=document.createElement('button');b.type='button';b.className='btn btn-ghost btn-sm';b.style.margin='2px 4px 2px 0';
+          b.textContent=historyTimeFa(x.created_at)+' · '+(HISTORY_CAUSE_FA[x.cause]||x.cause)+' · '+toFa(x.chars)+' نویسه';
+          b.onclick=async function(){const d=await api('/api/admin/sessions/'+sessionId+'/transcript-revisions/'+x.id);const pre=document.createElement('div');pre.style.cssText='white-space:pre-wrap;border:1px solid var(--line, #ddd);border-radius:8px;padding:8px;margin:6px 0;max-height:260px;overflow:auto';pre.textContent=d.text;const old=rvBody.querySelector('.rv-text');if(old)old.remove();pre.className='rv-text';rvBody.appendChild(pre);};
+          rvBody.appendChild(b);
+        });
+      }catch(e){rvBody.textContent='خطا: '+e.message;}
+    });
+    $('adminSessionDetailMeta').insertAdjacentElement('afterend',rv);
     const tBox=$('adminSessionDetailTranscript');
     tBox.textContent=s.transcript||'(متنی ثبت نشده)';
     attachTranscriptExpander(tBox,s.transcript||'',s.duration_ms,transcriptProgressNote(s));
@@ -4489,7 +4621,7 @@ async function adminDeleteClient(clientId){
   adminDeleteTargetClient=clientId;
   try{
     await api('/api/admin/clients/'+clientId,{method:'DELETE'});
-    showBanner('info','مراجع حذف شد.');
+    showBanner('info','مراجع حذف شد (حذفِ نرم؛ قابلِ بازگردانی).');
     if(currentAdminTherapistId)openAdminTherapistDetail(currentAdminTherapistId);
   }catch(e){showBanner('error',e.message);}
 }
@@ -4577,7 +4709,7 @@ async function liveResumeSession(sessionId){
       try{
         const started=await startNewRTSession();
         if(started)return;
-      }catch(e){}
+      }catch(e){if(e&&e.lockDenied)throw e;}
     }
     await connectWS();
   }catch(e){
@@ -5375,6 +5507,31 @@ function flushUploadPreNotes(){
 if(window.FeeliaUpload)window.FeeliaUpload.onChange(flushUploadPreNotes);
 
 // ===== [feature:clients] ===== نقطه‌ی ورودِ اصلی؛ بقیه‌ی توابعِ این feature پراکنده‌اند — docs/02-reference/frontend-map.md
+// مراجعینِ حذف‌شده (حذفِ نرم): فهرست + بازگردانی. خطا بی‌صدا (بخش پنهان می‌ماند).
+async function loadDeletedClients(){
+  const box=$('deletedClientsBox');if(!box)return;
+  box.hidden=true;
+  try{
+    const r=await api('/api/deleted-clients');
+    const rows=r.clients||[];
+    if(!rows.length)return;
+    $('deletedClientsSummary').textContent='مراجعینِ حذف‌شده ('+toFa(rows.length)+')';
+    const list=$('deletedClientsList');list.textContent='';
+    rows.forEach(function(x){
+      const row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line, #ddd);font-size:13px';
+      const t=document.createElement('span');
+      t.textContent=x.code+(x.alias?' — '+x.alias:'')+' · '+toFa(x.session_count||0)+' جلسه';
+      const b=document.createElement('button');b.type='button';b.className='btn btn-ghost btn-sm';b.textContent='بازگردانی';
+      b.onclick=async function(){
+        b.disabled=true;
+        try{await api('/api/clients/'+x.id+'/restore',{method:'POST'});uxTrack('client_restored');showBanner('info','مراجع بازگردانی شد.');loadClients();}
+        catch(e){b.disabled=false;showBanner('error',e.message);}
+      };
+      row.appendChild(t);row.appendChild(b);list.appendChild(row);
+    });
+    box.hidden=false;
+  }catch(e){}
+}
 async function loadClients(){
   try{
     $('skeletonList').hidden=false;
@@ -5385,6 +5542,7 @@ async function loadClients(){
     allClients=data.clients||[];
     $('btnAllClientsLabel').textContent='همه‌ی مراجعین ('+toFa(allClients.length)+')';
     applyClientFilters();
+    loadDeletedClients();
   }catch(e){
     $('skeletonList').hidden=true;
     $('skeletonListAll').hidden=true;
@@ -5955,7 +6113,7 @@ async function confirmEditCategory(){
 
 function showDeleteClient(id,code,sc){
   deleteTargetClient=id;
-  $('deleteClientText').innerHTML='مراجع <b>'+code+'</b> و تمام <b>'+toFa(sc)+' جلسه</b> و یادداشت‌های آن برای همیشه حذف می‌شوند.<br><span style="font-size:12px;color:var(--muted)">این عمل قابل بازگشت نیست.</span>';
+  $('deleteClientText').innerHTML='مراجع <b>'+code+'</b> از فهرستِ شما حذف می‌شود. <b>'+toFa(sc)+' جلسه</b> و یادداشت‌هایش برایِ ادمین نگه داشته می‌شود و هر وقت خواستید از «مراجعینِ حذف‌شده» برش می‌گردانید.';
   $('deleteClientModal').classList.add('open');
 }
 function closeDeleteClient(){$('deleteClientModal').classList.remove('open');deleteTargetClient=null;}
@@ -5966,14 +6124,14 @@ async function confirmDeleteClient(){
   try{
     await api('/api/clients/'+id,{method:'DELETE'});
     uxTrack('client_deleted');
-    showBanner('info','مراجع حذف شد.');
+    showBanner('info','مراجع حذف شد؛ از «مراجعینِ حذف‌شده» قابلِ بازگردانی است.');
     loadClients();
   }catch(e){showBanner('error',e.message);}
 }
 
 function showDeleteSession(id,num){
   deleteTargetSession=id;
-  $('deleteSessionText').innerHTML='جلسه‌ی <b>'+toFa(num)+'</b> و تمام متن و یادداشت‌های آن برای همیشه حذف می‌شود.';
+  $('deleteSessionText').innerHTML='جلسه‌ی <b>'+toFa(num)+'</b> از فهرستِ شما حذف می‌شود. متن، صدا و یادداشت‌هایش برایِ ادمین (مدیرِ سیستم) نگه داشته می‌شود و هر وقت خواستید از «جلسه‌هایِ حذف‌شده»ِ همین صفحه می‌توانید برش گردانید.';
   $('deleteSessionModal').classList.add('open');
 }
 function closeDeleteSession(){$('deleteSessionModal').classList.remove('open');deleteTargetSession=null;}
@@ -5986,11 +6144,37 @@ async function confirmDeleteSession(){
   try{
     await api('/api/sessions/'+id,{method:'DELETE'});
     uxTrack('session_deleted');
-    showBanner('info','جلسه حذف شد.');
+    showBanner('info','جلسه حذف شد؛ از «جلسه‌هایِ حذف‌شده» قابلِ بازگردانی است.');
     if(currentClient)openClientDetail(currentClient.id);
   }catch(e){showBanner('error',e.message);}
 }
 
+// جلسه‌هایِ حذف‌شده‌یِ این مراجع (حذفِ نرم): فهرست + «بازگردانی». فقط متادیتا؛ خطا بی‌صدا (بخش پنهان می‌ماند).
+async function loadDeletedSessions(clientId){
+  const box=$('deletedSessionsBox');if(!box)return;
+  box.hidden=true;
+  try{
+    const r=await api('/api/clients/'+clientId+'/deleted-sessions');
+    if(!currentClient||String(currentClient.id)!==String(clientId))return;
+    const rows=r.sessions||[];
+    if(!rows.length)return;
+    $('deletedSessionsSummary').textContent='جلسه‌هایِ حذف‌شده ('+toFa(rows.length)+')';
+    const list=$('deletedSessionsList');list.textContent='';
+    rows.forEach(function(x){
+      const row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line, #ddd);font-size:13px';
+      const t=document.createElement('span');
+      t.textContent='جلسه '+toFa(x.session_num)+' · '+(x.date?toFa(x.date):'بدونِ تاریخ')+' · حذف: '+historyTimeFa(x.deleted_at);
+      const b=document.createElement('button');b.type='button';b.className='btn btn-ghost btn-sm';b.textContent='بازگردانی';
+      b.onclick=async function(){
+        b.disabled=true;
+        try{await api('/api/sessions/'+x.id+'/restore',{method:'POST'});uxTrack('session_restored');showBanner('info','جلسه بازگردانی شد.');openClientDetail(clientId);}
+        catch(e){b.disabled=false;showBanner('error',e.message);}
+      };
+      row.appendChild(t);row.appendChild(b);list.appendChild(row);
+    });
+    box.hidden=false;
+  }catch(e){}
+}
 async function openClientDetail(clientId,opts){
   cleanupArchiveVoice();
   try{
@@ -6013,6 +6197,7 @@ async function openClientDetail(clientId,opts){
     // (قبلاً فقط غیرفعال‌ها)؛ دکمه‌ی «پرونده» روی کارت با scrollToCaseFile مستقیم به این بخش می‌آید.
     caseFileEditMode=false;
     const cfLoad=(currentTherapist&&currentTherapist.case_file_enabled)?loadCaseFile(clientId):Promise.resolve();
+    loadDeletedSessions(clientId);
     const sl=$('sessionsList');
     sl.innerHTML='';
     data.sessions.forEach(function(s){
@@ -6181,7 +6366,7 @@ async function loadCaseFile(clientId){
   try{
     const data=await api('/api/clients/'+clientId+'/case-file');
     if(!stillOpen())return;
-    currentCaseFile={clientId:clientId,record:data.case_file,rhythm:data.treatment_rhythm};
+    currentCaseFile={clientId:clientId,record:data.case_file,rhythm:data.treatment_rhythm,quality:data.quality||[]};
     if(data.case_file&&data.case_file.status==='generating')startCaseFileGenerationPolling(clientId);
     renderCaseFile();
   }catch(e){
@@ -6275,9 +6460,16 @@ const CF_STAR='<svg class="cf-star" viewBox="0 0 24 24" width="14" height="14" f
 function cfStarBtn(id,on){
   return '<button class="cf-star-btn'+(on?' on':'')+'" data-cf-fid="finding.'+id+'" title="'+(on?'برداشتن از نکات کلیدی':'افزودن به نکات کلیدی')+'" aria-label="نکته‌ی کلیدی" onclick="toggleKeyPoint(this)">'+CF_STAR+'</button>';
 }
+// ردیابی (F3، 2026-10-02): جلساتِ منبعِ یافته (از شناسه‌هایِ digest، نه ادعایِ مدل) + هشدارِ نقلی که در متنِ جلسه عیناً پیدا نشد
+function cfTraceChips(it){
+  let h='';
+  if(it&&Array.isArray(it.sessions)&&it.sessions.length)h+='<span class="cf-prov" title="یافته از متنِ این جلسه‌ها ساخته شده است">جلسه '+it.sessions.map(function(n){return toFa(n);}).join('، ')+'</span>';
+  if(it&&it.quoteVerified===false)h+='<span class="cf-prov cf-prov-i" title="متنِ این نقل در داده‌یِ ثبت‌شده‌یِ جلسه عیناً یافت نشد؛ پیش از اتکا با متنِ جلسه تطبیق دهید">⚠ عینِ متنِ جلسه نیست</span>';
+  return h;
+}
 function cfChips(it){
   const s=CF_SRC[it.source];
-  return (s?'<span class="cf-prov '+s[1]+'">'+s[0]+'</span>':'')+(it.about&&it.about!==it.label?'<span class="cf-prov cf-about">'+escapeHtml(it.about)+'</span>':'');
+  return (s?'<span class="cf-prov '+s[1]+'">'+s[0]+'</span>':'')+(it.about&&it.about!==it.label?'<span class="cf-prov cf-about">'+escapeHtml(it.about)+'</span>':'')+cfTraceChips(it);
 }
 // انتقالِ یافته‌ی محور به نقش/محورِ دیگر: پنلِ کوچکِ بسته‌شده تا بارِ بصریِ هر ردیف زیاد نشود (خطایِ طبقه‌بندیِ مدل قابلِ اصلاح است).
 const CF_DOTS='<svg class="cf-dots" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>';
@@ -6332,7 +6524,7 @@ function cfFindingsHtml(f){
     let head='';
     if(it.role&&it.role!==lastRole){lastRole=it.role;head='<div class="cf-role-head">'+escapeHtml(CF_ROLE[it.role]||it.role)+'</div>';}
     if(cfPinned.has(it.id))return head+'<div class="cf-kp-ref" data-cf-id="'+it.id+'">'+CF_STAR+'<span>'+escapeHtml(it.label||'نقلِ عینی')+' — در «نکات کلیدی»</span></div>';
-    if(!it.label)return head+'<div class="cf-rich-s" data-cf-id="'+it.id+'">«'+escapeHtml(it.text)+'»'+cfStarBtn(it.id,false)+'</div>';
+    if(!it.label)return head+'<div class="cf-rich-s" data-cf-id="'+it.id+'">«'+escapeHtml(it.text)+'»'+cfTraceChips(it)+cfStarBtn(it.id,false)+'</div>';
     return head+'<div class="cf-rich-row" data-cf-id="'+it.id+'"><div class="cf-rich-lbl">'+escapeHtml(it.label)+cfChips(it)+cfStarBtn(it.id,false)+(f.statusTone!==undefined?cfMoveHtml(it,f):'')+'</div>'+cfSentencesHtml(it.text,'cf-rich-txt')+'</div>';
   }).join('');
 }
@@ -6712,10 +6904,15 @@ function renderCaseFile(){
   // می‌شود و وضعیت فقط به‌صورتِ بنر بالایِ آن می‌آید.
   const cfHasPrior=!!(rec.generatedAt&&rec.content&&Object.keys(rec.content).length);
   let cfNotice='';
+  // دروازه‌یِ کیفیت (F3): جلساتی که پوششِ صدا ناقص یا گوینده‌هایشان ادغام شده ⇒ تولیدِ خودکار نگه داشته شده است
+  const cfQ=(currentCaseFile&&currentCaseFile.quality)||[];
+  if(cfQ.length){
+    cfNotice+='<div class="cf-banner cf-amber" style="margin:0 0 12px"><span class="cf-lbl">کیفیتِ متنِ برخی جلسه‌ها پایین است:</span> جلسه '+cfQ.map(function(q){return toFa(q.session_num);}).join('، ')+' (پوششِ ناقصِ صدا یا ادغامِ گوینده‌ها). تولیدِ خودکارِ پرونده تا بررسیِ شما متوقف است؛ «تولیدِ پرونده» دستی همچنان کار می‌کند.</div>';
+  }
   if(cfHasPrior&&rec.status==='generating'){
-    cfNotice='<div class="cf-banner cf-amber" style="margin:0 0 12px"><span class="cf-lbl">در حالِ به‌روزرسانی:</span> نسخه‌ی تازه چند دقیقه‌ی دیگر آماده می‌شود؛ تا آن موقع همین نسخه را می‌بینید.</div>';
+    cfNotice+='<div class="cf-banner cf-amber" style="margin:0 0 12px"><span class="cf-lbl">در حالِ به‌روزرسانی:</span> نسخه‌ی تازه چند دقیقه‌ی دیگر آماده می‌شود؛ تا آن موقع همین نسخه را می‌بینید.</div>';
   }else if(cfHasPrior&&rec.status==='error'){
-    cfNotice='<div class="cf-banner cf-red" style="margin:0 0 12px"><span class="cf-lbl">آخرین به‌روزرسانی ناموفق بود:</span> '+escapeHtml(rec.errorMessage||'نامشخص')+' — نسخه‌ی قبلی دست‌نخورده است. <button class="cf-btn cf-ghost" style="margin-right:6px" onclick="regenerateCaseFile(false)">تلاشِ دوباره</button></div>';
+    cfNotice+='<div class="cf-banner cf-red" style="margin:0 0 12px"><span class="cf-lbl">آخرین به‌روزرسانی ناموفق بود:</span> '+escapeHtml(rec.errorMessage||'نامشخص')+' — نسخه‌ی قبلی دست‌نخورده است. <button class="cf-btn cf-ghost" style="margin-right:6px" onclick="regenerateCaseFile(false)">تلاشِ دوباره</button></div>';
   }
   if(rec.status==='generating'&&!cfHasPrior){
     sec.innerHTML='<div class="cf-toolbar"><div class="cf-title">پرونده‌ی روندِ درمان</div></div>'+
@@ -7086,6 +7283,79 @@ function viewTranscript(sessionId){
   if(currentViewSession&&currentViewSession.id!==sessionId){guardUnsavedArchiveWork(function(){doViewTranscript(sessionId);});return;}
   doViewTranscript(sessionId);
 }
+// ===== تاریخچه‌ی ویرایشِ متنِ جلسه (F8، 2026-10-02) — GET/POST /api/sessions/:id/transcript-revisions =====
+const HISTORY_CAUSE_FA={'resolve-speakers':'بازسازیِ گوینده‌ها','marker-remove':'حذفِ علامت','edit':'ویرایش','put':'ذخیره','restore':'بازگردانی'};
+function historyTimeFa(iso){
+  try{return new Date(iso).toLocaleString('fa-IR',{timeZone:FEELIA_TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});}catch(e){return '';}
+}
+async function loadHistoryButton(sessionId){
+  const b=$('historyBtn');if(!b)return;
+  try{
+    const r=await api('/api/sessions/'+sessionId+'/transcript-revisions');
+    if(!currentViewSession||currentViewSession.id!==sessionId)return;
+    const n=(r.revisions||[]).length;
+    b.hidden=!n;
+    b.textContent='تاریخچه‌ی ویرایش ('+toFa(n)+')';
+  }catch(e){b.hidden=true;}
+}
+async function openTranscriptHistory(){
+  if(!currentViewSession)return;
+  const list=$('historyList');list.textContent='در حال بارگذاری…';
+  $('historyDetail').hidden=true;$('historyDetail').textContent='';
+  $('historyModal').classList.add('open');
+  try{
+    const r=await api('/api/sessions/'+currentViewSession.id+'/transcript-revisions');
+    list.textContent='';
+    if(!(r.revisions||[]).length){list.textContent='نسخه‌ی قبلی وجود ندارد.';return;}
+    r.revisions.forEach(function(rv){
+      const b=document.createElement('button');
+      b.type='button';b.className='btn btn-ghost btn-sm btn-block';b.style.cssText='justify-content:space-between;margin-bottom:6px';
+      b.textContent=historyTimeFa(rv.created_at)+' · '+(HISTORY_CAUSE_FA[rv.cause]||rv.cause)+' · '+toFa(rv.chars)+' نویسه';
+      b.onclick=function(){showRevisionDetail(rv.id);};
+      list.appendChild(b);
+    });
+  }catch(e){list.textContent='خطا: '+e.message;}
+}
+function closeTranscriptHistory(){$('historyModal').classList.remove('open');}
+async function showRevisionDetail(rid){
+  const sid=currentViewSession&&currentViewSession.id;if(!sid)return;
+  const box=$('historyDetail');box.hidden=false;box.textContent='در حال بارگذاری…';
+  try{
+    const d=await api('/api/sessions/'+sid+'/transcript-revisions/'+rid);
+    box.textContent='';
+    const head=document.createElement('div');head.style.cssText='font-size:12.5px;margin:10px 0 6px;color:var(--muted)';
+    const s=d.diff&&d.diff.summary;
+    head.textContent=s?('تفاوت با متنِ فعلی: '+toFa(s.removed)+' پاراگراف فقط در این نسخه، '+toFa(s.added)+' پاراگراف فقط در متنِ فعلی، '+toFa(s.same)+' یکسان'):'تفاوت قابلِ نمایش نیست (متن بسیار بلند)؛ متنِ این نسخه در زیر است.';
+    box.appendChild(head);
+    const view=document.createElement('div');view.style.cssText='max-height:300px;overflow:auto;border:1px solid var(--line, #ddd);border-radius:8px;padding:8px;font-size:13px;line-height:1.9;white-space:pre-wrap';
+    if(d.diff&&d.diff.ops){
+      d.diff.ops.forEach(function(o){
+        const p=document.createElement('div');p.style.cssText='padding:2px 6px;margin-bottom:4px;border-radius:6px';
+        if(o.op==='removed'){p.style.background='var(--clay-soft, #fbe9e7)';p.style.textDecoration='line-through';p.title='فقط در این نسخه';}
+        else if(o.op==='added'){p.style.background='var(--sage-mist, #e8f3ec)';p.title='فقط در متنِ فعلی';}
+        else{p.style.opacity='.65';}
+        p.textContent=o.text;view.appendChild(p);
+      });
+    }else{view.textContent=d.text;}
+    box.appendChild(view);
+    const act=document.createElement('div');act.className='modal-actions';act.style.marginTop='10px';
+    const rb=document.createElement('button');rb.type='button';rb.className='btn btn-primary';rb.textContent='بازگردانیِ این نسخه';
+    rb.onclick=function(){
+      showGenericConfirm({title:'بازگردانیِ این نسخه؟',text:'متنِ فعلی با این نسخه جایگزین می‌شود. متنِ فعلی در تاریخچه می‌ماند و هر وقت خواستید می‌توانید دوباره برش گردانید.',okLabel:'بله، بازگردان',okClass:'btn-primary',onConfirm:function(){restoreRevision(rid,d.current_version);}});
+    };
+    act.appendChild(rb);box.appendChild(act);
+  }catch(e){box.textContent='خطا: '+e.message;}
+}
+async function restoreRevision(rid,currentVersion){
+  const sid=currentViewSession&&currentViewSession.id;if(!sid)return;
+  try{
+    await api('/api/sessions/'+sid+'/transcript-revisions/'+rid+'/restore',{method:'POST',body:{transcript_version:currentVersion}});
+    uxTrack('transcript_restored');
+    closeTranscriptHistory();
+    await doViewTranscript(sid);
+    showBanner('info','نسخه بازگردانی شد؛ متنِ قبلی در تاریخچه ماند.');
+  }catch(e){showBanner('error',e.message);}
+}
 async function doViewTranscript(sessionId){
   // ⭐ اگر یادداشتِ صوتیِ جلسه‌ی دستیِ دیگری نیمه‌کاره مانده بود (کاربر بدونِ «پایان
   // ضبط» به جلسه‌ی دیگری سوئیچ کرد)، امن رها می‌شود — نه ضبطِ اشتباه ادامه پیدا کند.
@@ -7115,6 +7385,7 @@ async function doViewTranscript(sessionId){
     // (2026-09-26) طولِ متن + «نمایشِ کامل» (متنِ بلند در جعبه‌ی ۴۰۰پیکسلی ناقص به نظر می‌رسید) + وضعیتِ بازیابیِ متن
     attachTranscriptExpander($('transcriptBox'),hasTranscript?data.session.transcript:'',data.session.duration_ms,transcriptProgressNote(data.session));
     $('resolveSpeakersBtn').hidden=(data.session.status!=='completed'||isManualSession||isUploadSession);
+    $('historyBtn').hidden=true;loadHistoryButton(sessionId);
     // ⭐ فیکسِ باگِ واقعیِ UX: برایِ جلسه‌ی دستی «ویرایش» بی‌معنی بود (چیزی از قبل
     // تعیین نشده) — این‌جا تاریخ مستقیم و همیشه‌قابل‌مشاهده‌ست، نه پشتِ دکمه/مودال.
     $('editSessionMetaBtn').hidden=isManualSession||isUploadSession;
@@ -7176,7 +7447,79 @@ async function doViewTranscript(sessionId){
     showScreen('SessionDetail');
     uxTrack('transcript_opened');
     if(isUploadSession)renderSessionUploadJob(data.session.id);
+    renderSessionAudioStatus(data.session);
+    renderSpeakerRoles(data.session);
   }catch(e){showBanner('error',e.message);}
+}
+// نقشِ گوینده‌ها (فاز ۳، 2026-10-01): فقط وقتی جلسه رکوردِ تفکیکِ گوینده دارد و نقش‌ها هنوز کامل تأیید نشده‌اند. تأیید متنِ جلسه
+// را عوض نمی‌کند؛ فقط به رکوردِ canonical (و ورودیِ پروندهٔ AI) برچسبِ «درمانگر/مراجع» می‌دهد. fail-open.
+const SPEAKER_ROLE_OPTS=[['','— انتخاب کنید —'],['therapist','درمانگر'],['client','مراجع'],['member','عضوِ دیگر'],['other','دیگر']];
+async function renderSpeakerRoles(session){
+  const bar=$('speakerRolesBar');
+  if(!bar)return;
+  bar.hidden=true;bar.textContent='';
+  if(!session||session.source==='manual'||session.status==='in_progress')return;
+  try{
+    const d=await api('/api/sessions/'+session.id+'/speakers',{timeoutMs:15000});
+    if(!currentViewSession||currentViewSession.id!==session.id)return;
+    if(!d.has_record||!d.speakers||d.speakers.length<2||d.roles_complete)return;
+    const label=document.createElement('span');
+    label.textContent='نقشِ گوینده‌ها را مشخص کنید تا پرونده دقیق‌تر شود:';
+    const wrap=document.createElement('div');wrap.className='ft-actions';
+    const sels={};
+    d.speakers.forEach(function(sp){
+      const row=document.createElement('label');row.style.cssText='display:inline-flex;gap:6px;align-items:center;margin:2px 8px 2px 0';
+      const t=document.createElement('span');t.textContent='گوینده '+toFa(sp.ordinal)+' ('+toFa(Math.round(sp.share*100))+'٪ از کلمات)';
+      const sel=document.createElement('select');
+      SPEAKER_ROLE_OPTS.forEach(function(o){const op=document.createElement('option');op.value=o[0];op.textContent=o[1];if(o[0]===(sp.role||''))op.selected=true;sel.appendChild(op);});
+      sels[sp.speaker_key]=sel;row.appendChild(t);row.appendChild(sel);wrap.appendChild(row);
+    });
+    const save=document.createElement('button');save.type='button';save.className='btn btn-secondary btn-sm';save.textContent='تأیید';
+    save.onclick=async function(){
+      const roles={};Object.keys(sels).forEach(function(k){if(sels[k].value)roles[k]={role:sels[k].value};});
+      if(!Object.keys(roles).length){showBanner('warn','برایِ دست‌کم یک گوینده نقش انتخاب کنید.');return;}
+      save.disabled=true;
+      try{await api('/api/sessions/'+session.id+'/speakers',{method:'PUT',body:{roles:roles}});uxTrack('speaker_roles_confirmed');showBanner('info','نقشِ گوینده‌ها ثبت شد.');renderSpeakerRoles(session);}
+      catch(e){showBanner('error',e.message);save.disabled=false;}
+    };
+    wrap.appendChild(save);
+    bar.appendChild(label);bar.appendChild(wrap);bar.hidden=false;
+  }catch(e){}
+}
+// «دفترِ کامل‌بودنِ صدا» (ممیزیِ Core 2026-10-01): تراپیست بداند صدایِ این جلسه چقدر ذخیره شده. فقط جلسه‌ی زنده‌یِ پایان‌یافته؛
+// fail-open (خطا ⇒ خط پنهان). صدایی که طبقِ سیاستِ ۳۰روزه پاک شده هشدار نیست.
+async function renderSessionAudioStatus(session){
+  const el=$('audioStatusLine');
+  if(!el)return;
+  el.hidden=true;el.textContent='';el.classList.remove('warn');
+  if(!session||session.source!=='live'||session.status==='in_progress')return;
+  try{
+    const st=await api('/api/sessions/'+session.id+'/audio-status',{timeoutMs:15000});
+    if(!currentViewSession||currentViewSession.id!==session.id)return;
+    let localPending=0;
+    try{if(window.FeeliaRT&&window.FeeliaRT.audioQueue){const rows=await window.FeeliaRT.audioQueue.listForSession(session.id);localPending=rows.filter(function(r){return r.blob&&r.blob.size>100;}).length;}}catch(e){}
+    const msg=audioStatusMessage(st,localPending);
+    if(!msg.text)return;
+    el.textContent=msg.text;
+    if(msg.warn)el.classList.add('warn');
+    el.hidden=false;
+  }catch(e){}
+}
+function audioStatusMessage(st,localPending){
+  if(st.expired&&st.audio_status==='none')return {text:''};
+  const parts=[];let warn=false;
+  if(st.audio_status==='none'){
+    if(!localPending)return {text:'صدایِ این جلسه روی سرور ذخیره نشده است.',warn:true};
+  }else{
+    const have=st.archived_ms||0,want=st.expected_ms||0;
+    if(want>0&&have<want*0.9){parts.push('صدا: '+fmtDurationFa(have)+' از '+fmtDurationFa(want)+' ذخیره شد');warn=true;}
+    else parts.push('صدایِ جلسه ذخیره شده است ('+fmtDurationFa(have)+')');
+    if(st.missing_count>0){parts.push(toFa(st.missing_count)+' بخش از صدا هرگز به سرور نرسید');warn=true;}
+    if(st.pending_count>0)parts.push(toFa(st.pending_count)+' بخش در حالِ انتقال به سرور');
+  }
+  if(localPending>0){parts.push(toFa(localPending)+' بخش هنوز روی این دستگاه است و با اتصالِ اینترنت خودکار ارسال می‌شود');warn=true;}
+  if(!warn&&st.transcript_status!=='complete'&&st.transcript_status!=='none')return {text:parts.join(' · ')};
+  return {text:parts.join(' · '),warn:warn};
 }
 function backToClientDetailFromSession(){
   guardUnsavedArchiveWork(doBackToClientDetailFromSession);
@@ -7378,6 +7721,8 @@ function renderFinalTranscript(){
   const s=currentViewSession,st=ftState;
   bar.innerHTML='';bar.className='ft-bar';bar.hidden=true;
   if(!s||!st)return;
+  // گذرِ canonical-only (CANONICAL_PASS): درمانگری که «متنِ نهایی» را ندارد نباید «در حالِ آماده‌سازی» ببیند.
+  if(!st.enabled&&ftBusy(st))return;
   const box=$('transcriptBox');
   const raw=s.transcript||'';
   const showFinal=st.stage==='done'&&!!st.clean_text&&!ftShowRaw;
@@ -7490,7 +7835,8 @@ async function applyResolvedSpeakers(){
   try{
     const put=await api('/api/sessions/'+currentViewSession.id,{method:'PUT',body:{
       transcript:resolveSpeakersLatestText,
-      transcript_version:currentViewSession.transcript_version
+      transcript_version:currentViewSession.transcript_version,
+      change_reason:'resolve-speakers'
     }});
     currentViewSession.transcript=resolveSpeakersLatestText;
     // نسخه از پاسخِ سرور (مثلِ A1.6) — نه +1ِ محلی
@@ -7787,7 +8133,7 @@ async function startSession(){
       try{
         const started=await startNewRTSession();
         if(started)return;
-      }catch(e){}
+      }catch(e){if(e&&e.lockDenied)throw e;}
       // fallthrough به مسیر legacy proxy
     }
     if(isDirectMode()){await startDirectLive();}
@@ -7862,11 +8208,21 @@ async function startNewRTSession(){
     },
     onError:function(m){
       try{setLiveConnBanner('warn','<b>مشکل در رونویسی:</b> '+escapeHtml(m));}catch(e){}
-    }
+    },
+    onHealth:rtOnHealth
   });
   $('recStatus').textContent='در حال برقراریِ اتصال…';
   let ok=false;
-  try{ok=await rtSession.start();}catch(e){ok=false;}
+  try{ok=await rtSession.start();}catch(e){
+    ok=false;
+    // ⭐ (2026-10-02، فاز ۳، F6) همین جلسه در تبِ دیگری ضبط می‌شود ⇒ نه fallback به proxyِ legacy، نه ذخیره‌ی duration از این تب
+    if(e&&e.lockDenied){
+      try{window.FeeliaRT.forget(rtSession);}catch(x){}
+      rtSession=null;
+      handleLiveLockDenied();
+      throw e;
+    }
+  }
   if(!ok){
     try{window.FeeliaRT.forget(rtSession);}catch(e){}
     rtSession=null;
@@ -7879,8 +8235,44 @@ async function startNewRTSession(){
     $('recStatus').textContent='در حال ضبط — متن پس از پایان آماده می‌شود';
     $('recStatus').classList.add('warn');
   }
-  startTimer();startSttWatchdog();startDurationAutosave();startAudioQualityMonitor();
+  startTimer();startSttWatchdog();startDurationAutosave();startAudioQualityMonitor();startRecSavedIndicator();
   return true;
+}
+// ⭐ (2026-10-02، فاز ۲ ممیزیِ Core) سلامتِ ضبط: مشکلاتِ پایدار (mic/mute/ذخیره/شروعِ ضبط) در بنرِ قرمزی که با stateِ سالمِ رونویسی
+// پاک نمی‌شود، + نشانگرِ مثبتِ «آخرین ذخیره‌ی صدا». هر دو تا رفعِ واقعی/پایانِ جلسه می‌مانند.
+function rtOnHealth(h){
+  const el=$('recHealthBanner');if(!el)return;
+  const keys=Object.keys(h||{});
+  el.innerHTML=keys.length?'<div class="banner error"><b>ضبطِ صدا مشکل دارد</b><br>'+keys.map(function(k){return escapeHtml(h[k]);}).join('<br>')+'</div>':'';
+}
+let recSavedTimer=null;
+const REC_SAVED_STALE_MS=90*1000; // چرخشِ durable هر ۱۵ث است؛ ۹۰ث بدونِ ذخیره = مشکل
+function updateRecSavedNote(){
+  const el=$('recSavedNote');if(!el)return;
+  const s=rtSession;
+  if(!s||!s.lastAudioSavedAt){el.hidden=true;return;}
+  const idle=s.state==='MANUAL_PAUSED'||s.state==='FINALIZING'||s.state==='COMPLETED'||s.state==='CANCELED';
+  const stale=!idle&&(Date.now()-s.lastAudioSavedAt>REC_SAVED_STALE_MS);
+  el.textContent=(stale?'⚠ صدا مدتی است ذخیره نشده — آخرین ذخیره: ':'آخرین ذخیره‌ی صدا: ')+nowClockAt(s.lastAudioSavedAt);
+  el.style.color=stale?'var(--clay-deep)':'';
+  el.style.fontWeight=stale?'700':'';
+  el.hidden=false;
+}
+function nowClockAt(ts){return new Date(ts).toLocaleTimeString('fa-IR',{hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:FEELIA_TZ});}
+function startRecSavedIndicator(){
+  if(recSavedTimer)clearInterval(recSavedTimer);
+  recSavedTimer=setInterval(updateRecSavedNote,5000);
+}
+function stopRecSavedIndicator(){
+  if(recSavedTimer){clearInterval(recSavedTimer);recSavedTimer=null;}
+  const el=$('recSavedNote');if(el){el.hidden=true;el.textContent='';}
+  rtOnHealth({});
+}
+function handleLiveLockDenied(){
+  stopSttWatchdog();stopDurationAutosave();clearInterval(timerInterval);timerRunning=false;
+  currentSession=null;
+  showScreen('Clients');
+  try{loadClients();}catch(e){}
 }
 // ⭐ باگِ واقعی: نوارِ سطحِ صدا (levelMeter) فقط توی مسیرِ قدیمیِ proxy وصل می‌شد.
 // مسیرِ اصلیِ فعلی (FeeliaRT/rtSession) هیچ‌وقت آنالایزر رو به استریمِ خودش وصل
@@ -7931,7 +8323,7 @@ function startAudioQualityMonitor(){
   audioQualityLogged={};
   audioQualityMon=(window.FeeliaRT&&window.FeeliaRT.createAudioQualityMonitor)?window.FeeliaRT.createAudioQualityMonitor():null;
 }
-function stopAudioQualityMonitor(){audioQualityMon=null;showAudioQualityHint(null);}
+function stopAudioQualityMonitor(){audioQualityMon=null;showAudioQualityHint(null);stopRecSavedIndicator();}
 function showAudioQualityHint(issue){
   const el=$('audioQualityHint');if(!el)return;
   if(!issue||!AUDIO_QUALITY_MSG[issue]){el.hidden=true;el.innerHTML='';return;}
@@ -8401,7 +8793,7 @@ async function removeSignMarkerFromTranscript(sessionId,s){
       const r=await api('/api/sessions/'+sessionId);
       const next=window.FeeliaRT.removeMarkerFromText((r.session&&r.session.transcript)||'',marker);
       if(next===null)return;
-      await api('/api/sessions/'+sessionId,{method:'PUT',body:{transcript:next,transcript_version:r.session.transcript_version||0}});
+      await api('/api/sessions/'+sessionId,{method:'PUT',body:{transcript:next,transcript_version:r.session.transcript_version||0,change_reason:'marker-remove'}});
       return;
     }catch(e){if(!(e&&e.status===409))return;}
   }
@@ -8507,7 +8899,27 @@ function saveDirectTranscript(){
   const t=cleanDirectText(directFinalText||'');
   if(t===lastSavedDirectText)return;
   lastSavedDirectText=t;
-  api('/api/sessions/'+currentSession.id,{method:'PUT',body:{transcript:t,duration_ms:elapsedMs}}).catch(function(){});
+  legacyPutTranscript(currentSession.id,t,{duration_ms:elapsedMs}).catch(function(){});
+}
+// مسیرِ legacy (SonioxDirect بدونِ FeeliaRT): تنها نویسنده‌ی متنِ جلسه‌ی در حالِ ضبط است ⇒ overwrite عمدی، ولی سرور (2026-10-01)
+// CAS را اجباری کرده: نسخه‌ی پایه از GET گرفته و از پاسخِ هر PUT نگه داشته می‌شود؛ 409 ⇒ یک بار نسخه تازه و دوباره.
+const legacyTranscriptVersions={};
+async function legacyPutTranscript(sessionId,text,extra){
+  for(let attempt=0;attempt<2;attempt++){
+    if(typeof legacyTranscriptVersions[sessionId]!=='number'){
+      const r=await api('/api/sessions/'+sessionId);
+      legacyTranscriptVersions[sessionId]=(r&&r.session&&r.session.transcript_version)||0;
+    }
+    try{
+      const body=Object.assign({transcript:text,transcript_version:legacyTranscriptVersions[sessionId]},extra||{});
+      const put=await api('/api/sessions/'+sessionId,{method:'PUT',body:body});
+      if(put&&put.session&&typeof put.session.transcript_version==='number')legacyTranscriptVersions[sessionId]=put.session.transcript_version;
+      return put;
+    }catch(e){
+      if(e&&e.status===409&&attempt===0){delete legacyTranscriptVersions[sessionId];continue;}
+      throw e;
+    }
+  }
 }
 let directPauseEpoch=0;
 let directClosing=false;
@@ -8644,7 +9056,18 @@ async function resumeSessionLive(){
 }
 
 // ===== End =====
+// ⭐ (2026-10-02، فاز ۲ ممیزیِ Core، F5) «پایان جلسه» برگشت‌ناپذیر است (ضبط می‌ایستد) و دکمه‌ی «لغو جلسه» درست زیرش است — تأیید لازم.
 function endSession(){
+  if(!currentSession)return;
+  showGenericConfirm({
+    title:'پایان جلسه؟',
+    text:'ضبط متوقف و جلسه بسته می‌شود؛ متن آماده‌ی مرور و یادداشت می‌شود. بعد از پایان نمی‌توان همین ضبط را ادامه داد.',
+    okLabel:'بله، پایان جلسه',
+    okClass:'btn-danger',
+    onConfirm:doEndSession
+  });
+}
+function doEndSession(){
   uxTrack('session_end_clicked');
   if(rtSession){endNewRTSession();return;}
   if(directActive&&currentSession){endDirectLive();return;}
@@ -8756,7 +9179,16 @@ function closeCancelModal(){$('cancelModal').classList.remove('open');}
 async function confirmCancelSession(){
   closeCancelModal();
   uxTrack('session_canceled');
-  if(rtSession){try{rtSession.abort();}catch(e){}try{window.FeeliaRT.forget(rtSession);}catch(ee){}rtSession=null;}
+  // ⭐ (2026-10-02، تصمیمِ مالک) لغو = حذف نیست: همه‌چیز (متن، صدا، یادداشت) برایِ ادمین ذخیره می‌ماند. موتورِ رونویسی مثلِ «پایان»
+  // finish می‌شود (متن persist، صفِ صدا آپلود) و بعد جلسه status='canceled' می‌گیرد؛ فقط از فهرستِ تراپیست پنهان است.
+  const cancelSid=currentSession&&currentSession.id;
+  if(rtSession){
+    const s=rtSession;
+    try{$('recStatus').textContent='در حالِ لغو و ذخیره‌یِ داده‌ها…';}catch(e){}
+    try{await s.finish();}catch(e){}
+    try{window.FeeliaRT.forget(s);}catch(ee){}
+    rtSession=null;
+  }
   stopAudioQualityMonitor();
   // P3: cancel → ترمینال، کلید resume پاک شود
   try{localStorage.removeItem('feelia_active_session');}catch(e){}
@@ -8767,8 +9199,13 @@ async function confirmCancelSession(){
   if(ws){try{ws.close();}catch(e){}ws=null;}
   if(wsReconnectTimer)clearTimeout(wsReconnectTimer);
   clearInterval(timerInterval);
-  if(currentSession){
-    try{await api('/api/sessions/'+currentSession.id,{method:'DELETE'});}catch(e){}
+  let cancelOk=true;
+  if(cancelSid){
+    // PUT status=canceled با چند تلاش؛ اگر نشد، جلسه in_progress می‌ماند و بستنِ خودکارِ بی‌فعالیت آن را با همه‌یِ داده‌اش می‌بندد (چیزی گم نمی‌شود)
+    cancelOk=false;
+    for(let i=0;i<3&&!cancelOk;i++){
+      try{await api('/api/sessions/'+cancelSid,{method:'PUT',body:{status:'canceled'}});cancelOk=true;}catch(e){await new Promise(function(r){setTimeout(r,800*(i+1));});}
+    }
   }
   currentSession=null;
   resetTimer();
@@ -8776,7 +9213,7 @@ async function confirmCancelSession(){
   sessionNotes=[];
   showScreen('Clients');
   loadClients();
-  showBanner('info','جلسه لغو شد.');
+  showBanner(cancelOk?'info':'warn',cancelOk?'جلسه لغو شد؛ داده‌هایش برایِ ادمین ذخیره ماند.':'لغو روی سرور هنوز ثبت نشد؛ داده‌ها ذخیره‌اند و جلسه خودکار بسته می‌شود.');
 }
 
 // ⭐ فیکسِ باگِ واقعی (UI-19): این هشدار می‌گفت «N یادداشت از بین می‌رود» در حالی
@@ -9764,6 +10201,23 @@ const UPLOAD_QUALITY_CAUSE={
 };
 const UPLOAD_QUALITY_ORDER=['no_signal','noisy','too_quiet','clipping'];
 let uploadQualityTracked={};
+// «کامل‌بودنِ متن» (ممیزی Core 2026-10-01): وقتی سنجه‌ها نشان می‌دهند بخشی از گفتار در متن نیامده یا گوینده‌ها یکی شده‌اند،
+// تراپیست باید بداند. لحنِ «مقایسه کنید» (نه خطا): VAD ساده است و آستانه‌ها با داده‌ی واقعی بازبینی می‌شوند (R20).
+const UPLOAD_NOTE_MSG={
+  head_gap:'ابتدایِ صدا متنی ندارد.',
+  tail_gap:'انتهایِ صدا متنی ندارد.',
+  uncovered_gap:'در میانه‌ی صدا بخشِ بلندی بدونِ متن مانده است.',
+  low_coverage:'بخشِ قابل‌توجهی از گفتارِ فایل در متن نیامده است.',
+  speakers_merged:'ممکن است صدایِ دو نفر در بعضی بخش‌ها یک گوینده ثبت شده باشد.'
+};
+const UPLOAD_NOTE_ORDER=['low_coverage','uncovered_gap','head_gap','tail_gap','speakers_merged'];
+function jobNotesHtml(job){
+  if(!job.transcript_ready||!job.transcript_chars)return '';
+  const notes=(job.transcript_notes||[]).filter(function(f){return UPLOAD_NOTE_MSG[f];});
+  if(!notes.length)return '';
+  notes.sort(function(a,b){return UPLOAD_NOTE_ORDER.indexOf(a)-UPLOAD_NOTE_ORDER.indexOf(b);});
+  return '<div class="banner warn job-quality"><b>پیش از استفاده، متن را با صدا مقایسه کنید.</b> '+notes.map(function(f){return escapeHtml(UPLOAD_NOTE_MSG[f]);}).join(' ')+'</div>';
+}
 function jobQualityHtml(job){
   if(!job.transcript_ready||!job.transcript_chars)return '';
   const flags=(job.quality_flags||[]).filter(function(f){return UPLOAD_QUALITY_CAUSE[f];});
@@ -9802,7 +10256,7 @@ function jobCardHtml(job,opts){
     '<div class="jsteps">'+steps+'</div>'+
     ((job.stage==='transcribing'||job.stage==='normalizing'||job.stage==='queued')&&!job.error_code?'<div class="pbar indet"><span></span></div>':'')+
     '<div class="job-msg">'+escapeHtml(jobMessage(job))+'</div>'+
-    jobQualityHtml(job)+
+    jobNotesHtml(job)+jobQualityHtml(job)+
     (actions?'<div class="job-actions">'+actions+'</div>':'')+
   '</div>';
 }
@@ -10057,7 +10511,7 @@ async function renderSessionUploadJob(sessionId){
   panel.innerHTML=jobCardHtml(job,{inSession:true});
   // بعد از پایانِ موفق و وجودِ متن، پنل فقط اگر پرونده هم نتیجه‌ای دارد می‌ماند.
   // هشدارِ کیفیت (یا نکته‌ی ضبطِ بعدی) هم پنل را نگه می‌دارد — وگرنه درمانگر در صفحه‌ی جلسه آن را نمی‌دید.
-  const hasQuality=!!job.quality_warning||!!(job.quality_flags&&job.quality_flags.length);
+  const hasQuality=!!job.quality_warning||!!(job.quality_flags&&job.quality_flags.length)||!!(job.transcript_notes&&job.transcript_notes.length);
   panel.hidden=!hasQuality&&finished&&job.stage==='done'&&job.transcript_chars>0&&job.case_file_status!=='failed'&&job.case_file_status!=='done'&&job.case_file_status!=='disabled';
   if(!finished)sessionJobTimer=setTimeout(function(){renderSessionUploadJob(sessionId);},4000);
 }
@@ -10073,6 +10527,7 @@ const MODAL_CLOSERS={
   modalitiesModal:closeModalitiesModal,
   cancelModal:closeCancelModal,
   exitModal:closeExitWarning,
+  historyModal:closeTranscriptHistory,
   deleteSessionModal:closeDeleteSession,
   editSessionModal:closeEditSessionMeta,
   deleteTherapistModal:closeDeleteTherapist,

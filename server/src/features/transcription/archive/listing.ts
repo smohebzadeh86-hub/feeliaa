@@ -2,6 +2,7 @@
 import { query } from '../../../db/connection.js';
 import { runStartMs } from '../batch/queueFiles.js';
 import type { SessionAudioRow } from './store.js';
+import type { SkipRow } from './skips.js';
 
 // ⭐ (A2، 2026-09-26) ترتیبِ ضبط، نه ترتیبِ رسیدن: (زمانِ شروعِ run، client_seq) — seqِ سرور MAX+1ِ لحظه‌ی رسیدن
 // است و سگمنتِ دیررسیده (صفِ آفلاین) را بعد از سگمنت‌هایِ تازه‌تر می‌گذاشت. ردیفِ بدونِ client_seq ⇒ seq.
@@ -40,10 +41,11 @@ export interface DerivedSessionStatus {
 export function deriveSessionStatus(
   sessionAudioRows: SessionAudioRow[],
   pendingCount: number,
-  session: { batch_status: string | null; realtime_reliable: boolean | null; stt_mode: string | null }
+  session: { batch_status: string | null; realtime_reliable: boolean | null; stt_mode: string | null },
+  skips: SkipRow[] = []
 ): DerivedSessionStatus {
   const onlySession = sessionAudioRows.filter((r) => r.kind === 'session');
-  const { complete: seqComplete, missing: missingSeq } = checkSeqContiguous(onlySession);
+  const { complete: seqComplete, missing: missingSeq } = checkSeqContiguous(onlySession, skips);
   const audioStatus: DerivedSessionStatus['audioStatus'] =
     onlySession.length === 0 ? 'none'
       : pendingCount > 0 ? 'syncing'
@@ -58,17 +60,24 @@ export function deriveSessionStatus(
   return { audioStatus, audioMissingSegments: missingSeq, transcriptStatus, pendingCount };
 }
 
-// بخشِ ۱۱ی audit «zero-loss recording» (2026-09-22): قبل از این، فایلِ نهایی/دانلود صرفاً
-// concatِ ffmpeg بود — هیچ‌جا چک نمی‌شد که seqِ سگمنت‌هایِ kind='session' واقعاً پیوسته‌اند.
-// اگر سگمنتی هیچ‌وقت آپلود نشود (کاربر تبِ مرورگر را قبل از sync کاملاً بست)، فایلِ نهایی
-// بدونِ خطا ولی با gap ساخته می‌شد و هیچ‌جا علامت‌گذاری نمی‌شد. این تابع فقط چک می‌کند،
-// چیزی نمی‌سازد/حذف نمی‌کند — fail-open برایِ خودِ آرشیو دست‌نخورده می‌ماند.
-export function checkSeqContiguous(rows: SessionAudioRow[]): { complete: boolean; missing: number[] } {
-  if (!rows.length) return { complete: true, missing: [] };
-  const seqs = rows.map((r) => r.seq).sort((a, b) => a - b);
+// ⭐ (2026-10-01، ممیزیِ Core) باگِ قبلی: seq رویِ سرور MAX+1 است ⇒ همیشه پیوسته ⇒ این چک هرگز «ناقص» نمی‌داد.
+// حالا شماره‌ی خودِ کلاینت (client_seq، migration 027) در هر run سنجیده می‌شود: شماره‌هایی که نه سگمنتشان رسیده و نه
+// کلاینت «خالی بود» گزارش کرده (session_audio_skips، migration 039) = سگمنتِ گم‌شده (IndexedDBِ پر/خراب، تبِ بسته‌شده پیش
+// از sync). ردیفِ بدونِ client_seq (قدیمی/آپلودی) بررسی نمی‌شود. missing = شماره‌هایِ client_seq (ممکن است بینِ runها تکرار شود).
+// فقط چک می‌کند؛ چیزی نمی‌سازد/حذف نمی‌کند — fail-open برایِ خودِ آرشیو.
+export function checkSeqContiguous(rows: SessionAudioRow[], skips: SkipRow[] = []): { complete: boolean; missing: number[] } {
+  const byRun = new Map<string, { have: Set<number>; max: number }>();
+  for (const r of rows) {
+    if (r.client_seq === null || r.client_seq === undefined) continue;
+    const g = byRun.get(r.run_id) || { have: new Set<number>(), max: -1 };
+    g.have.add(r.client_seq);
+    if (r.client_seq > g.max) g.max = r.client_seq;
+    byRun.set(r.run_id, g);
+  }
+  for (const k of skips) byRun.get(k.run_id)?.have.add(k.client_seq);
   const missing: number[] = [];
-  for (let i = 0; i <= seqs[seqs.length - 1]; i++) {
-    if (!seqs.includes(i)) missing.push(i);
+  for (const g of byRun.values()) {
+    for (let i = 0; i <= g.max; i++) if (!g.have.has(i)) missing.push(i);
   }
   return { complete: missing.length === 0, missing };
 }

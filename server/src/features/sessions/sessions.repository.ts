@@ -3,6 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { query, pool } from '../../db/connection.js';
 import { isSessionNumConflict, SESSION_NUM_MAX_RETRIES, sessionNumRetryPause } from './sessionNumber.js';
+import { snapshotSessionUnit } from './sessionSnapshot.js';
 
 // ⭐ رفعِ M7 (audit 2026-09-24): شماره‌ی جلسه MAX+1 است و UNIQUE(client_id, session_num) دارد. ساختِ هم‌زمانِ دو
 // جلسه برایِ یک مراجع (مثلاً شروعِ جلسه‌ی زنده درست هم‌زمان با پایانِ آپلودِ فایلِ صوتیِ همان مراجع، یا دو کلیک)
@@ -28,6 +29,7 @@ export async function createManualSession(s: {
              VALUES (?, ?, ?, ?, ?, false, 'completed', 'manual')`,
         [s.sessionId, s.clientId, sessionNum, s.date, s.time]
       );
+      await snapshotSessionUnit(s.sessionId, conn);
       if (s.noteText !== null) {
         await conn.query(
           `INSERT INTO session_notes (id, session_id, type, text) VALUES (?, ?, 'note_after', ?)`,
@@ -62,6 +64,7 @@ export async function createLiveSession(s: {
            VALUES (?, ?, ?, ?, ?, ?, 'in_progress', ?)`,
         [s.sessionId, s.clientId, sessionNum, s.date, s.time, true, s.attendees]
       );
+      await snapshotSessionUnit(s.sessionId, conn);
       if (s.preNote !== null) {
         await conn.query(
           `INSERT INTO session_notes (id, session_id, type, text, wall_clock) VALUES (?, ?, 'note_before', ?, ?)`,
@@ -87,13 +90,25 @@ export async function getOwnedNoteType(id: string, therapistId: string | null): 
     `SELECT n.type FROM session_notes n
        JOIN sessions s ON n.session_id = s.id
        JOIN clients c ON s.client_id = c.id
-       WHERE n.id = ? AND c.therapist_id = ?`,
+       WHERE n.id = ? AND c.therapist_id = ? AND n.deleted_at IS NULL`,
     [id, therapistId]
   );
   return r.rows[0]?.type ?? null;
 }
 export async function updateNoteText(id: string, text: string): Promise<void> {
   await query('UPDATE session_notes SET text = ? WHERE id = ?', [text, id]);
+}
+
+// تاریخچه‌ی متنِ خام (migration 040): متنِ جایگزین‌شده را فقط‌افزودنی نگه می‌دارد. fail-open — شکست هرگز PUT را نمی‌اندازد.
+export async function insertTranscriptRevision(r: { sessionId: string; version: number; cause: string; actor: string | null; text: string }): Promise<void> {
+  try {
+    await query(
+      'INSERT INTO session_transcript_revisions (session_id, version, cause, actor, chars, text) VALUES (?, ?, ?, ?, ?, ?)',
+      [r.sessionId, r.version, r.cause, r.actor, r.text.length, r.text]
+    );
+  } catch (e) {
+    console.log('[session] transcript revision failed (ignored):', String((e as Error)?.message || e).slice(0, 120));
+  }
 }
 
 export async function getSessionRow(id: string): Promise<any> {
@@ -109,7 +124,7 @@ export async function getOwnedSessionWithClient(id: string, therapistId: string 
     `SELECT s.*, c.code, c.alias
        FROM sessions s
        JOIN clients c ON c.id = s.client_id
-       WHERE s.id = ? AND c.therapist_id = ?`, [id, therapistId]
+       WHERE s.id = ? AND c.therapist_id = ? AND s.deleted_at IS NULL AND c.deleted_at IS NULL`, [id, therapistId]
   );
   return sessionResult.rows[0];
 }
@@ -118,7 +133,7 @@ export async function getOwnedSessionWithClient(id: string, therapistId: string 
 // را قبل از یک (null) می‌گذارد — همان اثرِ NULLS LAST.
 export async function listSessionNotes(sessionId: string): Promise<any[]> {
   const notesResult = await query(
-    'SELECT * FROM session_notes WHERE session_id = ? ORDER BY (offset_ms IS NULL), offset_ms, created_at',
+    'SELECT * FROM session_notes WHERE session_id = ? AND deleted_at IS NULL ORDER BY (offset_ms IS NULL), offset_ms, created_at',
     [sessionId]
   );
   return notesResult.rows;
@@ -141,7 +156,7 @@ export async function updateOwnedSession(
   // دومی چون `transcript_version = ?`ِ قدیمی دیگر با ردیفِ به‌روزشده نمی‌خورَد rowCount=0
   // می‌گیرد (نه overwriteِ بی‌صدا).
   let sql = `UPDATE sessions SET ${updates.join(', ')}
-       WHERE id = ? AND client_id IN (SELECT id FROM clients WHERE therapist_id = ?)`;
+       WHERE id = ? AND client_id IN (SELECT id FROM clients WHERE therapist_id = ? AND deleted_at IS NULL)`;
   if (versionGuard !== undefined) {
     sql += ` AND transcript_version = ?`;
     values.push(versionGuard);
@@ -152,20 +167,37 @@ export async function updateOwnedSession(
 
 export async function getOwnedTranscriptVersionRow(id: string, therapistId: string | null): Promise<{ transcript_version: number } | undefined> {
   const recheck = await query(
-    'SELECT transcript_version FROM sessions WHERE id = ? AND client_id IN (SELECT id FROM clients WHERE therapist_id = ?)',
+    'SELECT transcript_version FROM sessions WHERE id = ? AND client_id IN (SELECT id FROM clients WHERE therapist_id = ? AND deleted_at IS NULL)',
     [id, therapistId]
   );
   return recheck.rows[0];
 }
 
-// rowCount
+// rowCount. ⭐ (2026-10-02، تصمیمِ مالک) حذفِ جلسه توسطِ تراپیست «حذفِ نرم» است: deleted_at/deleted_by (migration 042)؛ متن، صدا،
+// یادداشت‌ها و علائم برایِ ادمین می‌مانند و قابلِ بازگردانی‌اند. status دست نمی‌خورد (بازگردانی دقیقاً همان را برمی‌گرداند)؛ جلسه‌یِ باز در
+// پایشِ زنده و بستنِ خودکار نمی‌آید (listLiveSessions/autoClose deleted_at IS NULL).
 export async function deleteOwnedSession(id: string, therapistId: string | null): Promise<number> {
   const del = await query(
-    `DELETE FROM sessions
-       WHERE id = ? AND client_id IN (SELECT id FROM clients WHERE therapist_id = ?)`,
-    [id, therapistId]
+    `UPDATE sessions SET deleted_at = NOW(), deleted_by = ?, updated_at = NOW()
+       WHERE id = ? AND deleted_at IS NULL AND client_id IN (SELECT id FROM clients WHERE therapist_id = ? AND deleted_at IS NULL)`,
+    [therapistId, id, therapistId]
   );
   return del.rowCount;
+}
+
+export async function restoreOwnedSession(id: string, therapistId: string | null): Promise<number> {
+  const r = await query(
+    `UPDATE sessions SET deleted_at = NULL, deleted_by = NULL, updated_at = NOW()
+       WHERE id = ? AND deleted_at IS NOT NULL AND client_id IN (SELECT id FROM clients WHERE therapist_id = ? AND deleted_at IS NULL)`,
+    [id, therapistId]
+  );
+  return r.rowCount;
+}
+
+export async function listDeletedSessionsOfClient(clientId: string): Promise<any[]> {
+  return (await query(
+    `SELECT id, session_num, date, start_time, status, source, deleted_at, CHAR_LENGTH(COALESCE(transcript, '')) AS transcript_len
+       FROM sessions WHERE client_id = ? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 100`, [clientId])).rows;
 }
 
 // rowCount — CAS رویِ transcript_version
@@ -199,12 +231,55 @@ export async function isNoteOwned(id: string, therapistId: string | null): Promi
     `SELECT n.id FROM session_notes n
        JOIN sessions s ON n.session_id = s.id
        JOIN clients c ON s.client_id = c.id
-       WHERE n.id = ? AND c.therapist_id = ?`,
+       WHERE n.id = ? AND c.therapist_id = ? AND n.deleted_at IS NULL`,
     [id, therapistId]
   );
   return owned.rows.length > 0;
 }
 
-export async function deleteNote(id: string): Promise<void> {
-  await query('DELETE FROM session_notes WHERE id = ?', [id]);
+// ⭐ حذفِ نرم (migration 043)؛ ادمین یادداشتِ حذف‌شده را می‌بیند.
+export async function deleteNote(id: string, by: string | null = null): Promise<void> {
+  await query('UPDATE session_notes SET deleted_at = NOW(), deleted_by = ? WHERE id = ? AND deleted_at IS NULL', [by, id]);
+}
+
+// ——— تاریخچه‌ی متن: خواندن (F8، 2026-10-02) ———
+export interface TranscriptRevisionMeta { id: number; version: number; cause: string; actor_is_user: boolean; chars: number; created_at: string }
+export async function listTranscriptRevisions(sessionId: string): Promise<TranscriptRevisionMeta[]> {
+  const r = await query(
+    'SELECT id, version, cause, actor IS NOT NULL AS by_user, chars, created_at FROM session_transcript_revisions WHERE session_id = ? ORDER BY id DESC LIMIT 200',
+    [sessionId]);
+  return (r.rows as any[]).map((x) => ({
+    id: Number(x.id), version: Number(x.version), cause: String(x.cause), actor_is_user: !!Number(x.by_user), chars: Number(x.chars || 0),
+    created_at: new Date(x.created_at).toISOString(),
+  }));
+}
+export async function getTranscriptRevision(sessionId: string, id: number): Promise<(TranscriptRevisionMeta & { text: string }) | null> {
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const r = await query(
+    'SELECT id, version, cause, actor IS NOT NULL AS by_user, chars, created_at, text FROM session_transcript_revisions WHERE session_id = ? AND id = ?',
+    [sessionId, id]);
+  const x = (r.rows as any[])[0];
+  return x ? {
+    id: Number(x.id), version: Number(x.version), cause: String(x.cause), actor_is_user: !!Number(x.by_user), chars: Number(x.chars || 0),
+    created_at: new Date(x.created_at).toISOString(), text: String(x.text || ''),
+  } : null;
+}
+
+// ——— تاریخچه‌یِ ویرایشِ یادداشت (migration 044؛ «همه‌چیز قابلِ بازیابی باشد») ———
+export async function insertNoteRevision(noteId: string, sessionId: string, text: string | null, actor: string | null): Promise<void> {
+  try {
+    await query('INSERT INTO session_note_revisions (note_id, session_id, text, actor) VALUES (?, ?, ?, ?)', [noteId, sessionId, text, actor]);
+  } catch (e) {
+    console.log('[note] revision failed (ignored):', String((e as Error)?.message || e).slice(0, 120));
+  }
+}
+export async function listNoteRevisions(noteId: string): Promise<Array<{ id: number; chars: number; created_at: string }>> {
+  const r = await query('SELECT id, CHAR_LENGTH(COALESCE(text, \'\')) AS chars, created_at FROM session_note_revisions WHERE note_id = ? ORDER BY id DESC LIMIT 100', [noteId]);
+  return (r.rows as any[]).map((x) => ({ id: Number(x.id), chars: Number(x.chars || 0), created_at: new Date(x.created_at).toISOString() }));
+}
+export async function getNoteRevisionText(noteId: string, id: number): Promise<string | null> {
+  if (!Number.isInteger(id) || id <= 0) return null;
+  const r = await query('SELECT text FROM session_note_revisions WHERE note_id = ? AND id = ?', [noteId, id]);
+  const x = (r.rows as any[])[0];
+  return x ? String(x.text ?? '') : null;
 }

@@ -18,6 +18,7 @@ CLAUDE.md (همین فایل)
   → PROJECT_MASTER_REFERENCE.md                (تصویر کل + وضعیت واقعی)
   → PROJECT_STATUS.md                           (وضعیتِ زنده + آخرین رویدادها — Event Log)
   → docs/00-governance/project-laws.md          (قوانین — بالاترین اعتبار)
+  → docs/00-governance/product-thesis.md        (جهتِ محصول: Core فعلی = Capture + Preserve؛ فیلترِ feature)
   → docs/00-governance/source-of-truth.md       (حلِ تعارض)
   → docs/00-governance/ai-agent-reading-guide.md (workflow هر task)
   → معماریِ مرتبط (docs/01-architecture/)
@@ -44,6 +45,7 @@ CLAUDE.md (همین فایل)
 | آپلودِ فایلِ صوتیِ جلسه، jobِ پس‌زمینه، اعلان‌ها | `docs/07-subsystems/06-audio-upload-pipeline.md` |
 | صدا، صف آفلاین، batch fallback، یادداشتِ صوتیِ ناموفق | `docs/07-subsystems/02-audio-durability-batch-fallback.md`، `05-session-audio-archive-speaker-resolve.md` |
 | «متنِ نهایی» (polish/نوبت‌به‌نوبت) | `docs/07-subsystems/07-final-transcript.md` |
+| رکوردِ canonicalِ جلسه (توکن، نوبتِ گوینده، نقشِ گوینده، تاریخچه‌یِ متن، CAS) | `docs/07-subsystems/08-session-record.md` |
 | پروندهٔ درمان (AI Case File) | `docs/04-modules/08-ai-case-file/` |
 | واحدِ درمان (treatment-unit، زوج/خانواده) | `docs/04-modules/09-treatment-unit/` |
 | لایهٔ LLM (provider، کلید، هزینه) | `docs/06-platform/llm-provider-layer.md` |
@@ -51,6 +53,7 @@ CLAUDE.md (همین فایل)
 | ساختارِ ماژول/مرزِ import | LAW-025، `docs/01-architecture/application-architecture.md` §1 |
 | نقشه‌ی فرانت (صفحه/تابع/state) | `docs/02-reference/frontend-map.md` |
 | `/ws/t`، `/ws/voice`، `SonioxDirect` | `docs/07-subsystems/04-legacy-ws-proxy-p1.md` (مسیرِ LEGACY — قانون LAW-015) |
+| اولویت‌بندی/پیشنهادِ feature جدید، «Core چیست؟» | `docs/00-governance/product-thesis.md` (§۱۲ فیلتر) |
 | **هر feature (نقطه‌ی شروع)** | `docs/02-reference/feature-index.md` ← ردیفِ feature ← سندِ مالکش (قالب: `docs/00-governance/feature-doc-template.md`) |
 | مراجعین | `docs/04-modules/02-client-management/` |
 | جلسه (شروع/پایان/لغو/ادامه/ویرایش) | `docs/04-modules/03-therapy-sessions/` |
@@ -135,6 +138,8 @@ cd server && npx tsc --noEmit
 - `pnpm llm:usage` = گزارشِ مصرفِ LLMِ «متنِ نهایی» (`scripts/llm-usage-report.ts`، 2026-10-01) — فقط‌خواندنیِ DB: جمعِ روزانه، آمارِ هر ویرایش (توکن/هزینه/تکه) و بودجه‌ی امروز؛ `-- --days=N --sessions=N`. بدونِ متنِ بالینی.
 - `pnpm test:docs` = بهداشتِ مستندات (`scripts/check-docs.mjs`، LAW-027): پوششِ feature-index، documentation-map، لینک‌ها/مسیرها، routeها↔api-catalog، migrationها↔database-catalog، envها↔configuration-catalog، scriptها↔این بخش؛ بدونِ DB/شبکه.
 - `pnpm test:adm` = harness پنلِ ادمین (`scripts/admin-monitor-harness.ts`، 2026-10-01) — `liveHealth`، heartbeat و متریکِ HTTP (سطل/p95)؛ توابعِ خالص، بدونِ DB/شبکه.
+- `pnpm test:hist` = harness تاریخچه‌یِ متنِ جلسه (`scripts/session-history-harness.ts`، 2026-10-02) — diffِ پاراگرافیِ نسخه‌ها (F8) و بستنِ placeholderِ «⏳»ِ بازه‌ای که هرگز رونویسی نمی‌شود (`mergeRecoveryLost`)؛ توابعِ خالص، بدونِ DB/شبکه.
+- `pnpm backup` = پشتیبانِ فقط‌افزودنیِ DB (NDJSON + schema + manifest با sha256) و mirrorِ پایدارِ فایل‌هایِ `server/data/{session-audio,uploads,batch-queue}` (`scripts/backup-data.mjs`، 2026-10-02): فقط SELECT، هرگز چیزی را پاک/بازنویسی نمی‌کند؛ `--dry-run`، `--only=t1,t2`، `--no-files`، `--out=DIR`، `--data-dir=DIR`. خروجی (`backups/`) حاویِ دادهٔ بالینی است و در `.gitignore` است.
 - `pnpm test:routes` = قراردادِ routeها (method/path + hookهایِ مؤثر مثلِ `requireAuth`/`requireAdmin` + bodyLimit) در برابرِ `scripts/route-snapshot.txt`؛ بدونِ DB. `-- --update` فقط وقتی route عمداً عوض شده.
 - `pnpm test:arch` = قواعدِ مرزِ ماژول‌هایِ backend (`scripts/check-backend-boundaries.mjs`، 2026-09-28): importِ بینِ featureها فقط از `features/<x>/index.ts`، platform (`shared/db/auth/obs/llm`) هرگز از features، بدونِ چرخه‌ی importِ استاتیک، لایه‌بندیِ case-file/treatment-unit/final-transcript، و `index.ts` برایِ هر feature (allowlistِ نام‌دار برایِ ۴ بدهی). ساختار: `docs/01-architecture/application-architecture.md` §1.
 - `pnpm test:api` = characterizationِ APIِ backend رویِ **DBِ مشترکِ dev** با fixtureِ ساختگی + Sonioxِ mock (`scripts/api-contract-harness.mts`). فقط با `FEELIA_E2E_OK=1` و **مجوزِ صریحِ مالک در همان گفتگو** اجرا می‌شود؛ `FEELIA_E2E_ENV_FILE` (مسیرِ `.env` برایِ فقط `DATABASE_URL`)، `FEELIA_API_GOLDEN` برایِ مقایسه. fixtureها در پایان پاک می‌شوند.

@@ -1,7 +1,7 @@
 // رونویسیِ فایل‌هایِ صف (Soniox async) و اعمالِ یک‌باره‌ی متن در جلسه/یادداشت؛ صف‌کردنِ سگمنتِ تازه؛ workerِ retry.
 // آرشیو و Soniox و پرونده عمداً با import پویا (lazy، همان رفتارِ قبلی) بارگذاری می‌شوند.
 import { createHash, randomUUID } from 'node:crypto';
-import { readdirSync, writeFileSync } from 'node:fs';
+import { closeSync, fsyncSync, openSync, readdirSync, writeSync } from 'node:fs';
 import path from 'node:path';
 import { query, pool } from '../../../db/connection.js';
 import { logEvent } from '../../../obs/eventLog.js';
@@ -11,7 +11,8 @@ import {
   seqFromFilename, runIdFromFilename, extFromFilename, mimeFromFilename, sessionIdFromFilename, pendingAudiosFor, removeAudioFile,
   type BatchPurpose,
 } from './queueFiles.js';
-import { mergeRecoveredSegment, recoveryKey } from './recoveryMerge.js';
+import { mergeRecoveredSegment, recoveryKey, mergeRecoveryLost } from './recoveryMerge.js';
+import { hardDeleteAllowed } from '../../../shared/retention.js';
 
 export type BatchStatus = 'queued' | 'processing' | 'done' | 'failed';
 
@@ -36,7 +37,15 @@ export async function enqueueBatch(
   const cur = await query('SELECT transcript_version FROM sessions WHERE id = ?', [sessionId]);
   const baseVersion: number = cur.rows[0]?.transcript_version ?? 0;
   const p = audioPathFor(sessionId, purpose, seq, runId, mime);
-  writeFileSync(p, buf);
+  // fsync پیش از پاسخِ 202: مرورگر بعد از 202 نسخه‌ی IndexedDB را پاک می‌کند؛ بدونِ fsync قطعِ برقِ سرور همان تنها نسخه را می‌برد.
+  const fd = openSync(p, 'w');
+  try {
+    let off = 0;
+    while (off < buf.length) off += writeSync(fd, buf, off, buf.length - off);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
   if (purpose === 'transcript' || purpose === 'late-transcript') {
     await query(
       `UPDATE sessions SET batch_status = 'queued', stt_mode = 'batch', updated_at = NOW() WHERE id = ?`,
@@ -49,8 +58,32 @@ export async function enqueueBatch(
 }
 
 // سگمنتِ غیرقابلِ‌رونویسی را از صف خارج کن (نسخه‌ی آرشیوِ ادمین از قبل نوشته شده و می‌ماند).
+export async function closePlaceholderAsLost(sessionId: string, runId: string, seq: number): Promise<boolean> {
+  const key = recoveryKey(runId, seq);
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query('SELECT transcript FROM sessions WHERE id = ? FOR UPDATE', [sessionId]);
+    const cur = (rows as any[])[0];
+    const merged = cur ? mergeRecoveryLost(cur.transcript ?? '', key) : null;
+    if (merged !== null) {
+      await conn.query('UPDATE sessions SET transcript = ?, transcript_version = transcript_version + 1, updated_at = NOW() WHERE id = ?', [merged, sessionId]);
+    }
+    await conn.commit();
+    return merged !== null;
+  } catch (e) {
+    try { await conn.rollback(); } catch {}
+    return false; // fail-open: ثبتِ نشانگر مانعِ پاک‌سازیِ صف نمی‌شود
+  } finally {
+    conn.release();
+  }
+}
+
 function dropUnrecoverable(sessionId: string, file: string, purpose: BatchPurpose, bytes: number, reason: string) {
   removeAudioFile(file);
+  if (purpose === 'transcript' || purpose === 'late-transcript') {
+    void closePlaceholderAsLost(sessionId, runIdFromFilename(file), seqFromFilename(file));
+  }
   console.log(`[batch] unrecoverable segment dropped from queue (archive kept) session=${sessionId} purpose=${purpose} seq=${seqFromFilename(file)} bytes=${bytes} reason=${reason}`);
   logEvent({ event: 'batch.segment_unrecoverable', sessionId, source: 'job', severity: 'warn', detail: { purpose, seq: seqFromFilename(file), bytes, reason } });
 }
@@ -169,7 +202,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
         console.log(`[batch] archived (no transcribe) session=${sessionId} seq=${seqFromFilename(file)}`);
       } catch (e) {
         // (A4) جلسه حذف شده ⇒ صدایش هم نباید بماند (LAW-010)
-        if ((e as { code?: string })?.code === 'session-gone') { removeAudioFile(file); continue; }
+        if ((e as { code?: string })?.code === 'session-gone') { if (hardDeleteAllowed()) removeAudioFile(file); continue; }
         console.log('[batch] archive-only failed:', String(e).slice(0, 160));
       }
     }
@@ -205,7 +238,7 @@ async function processBatchQueueInner(sessionId: string, purpose: BatchPurpose):
       try {
         await archiveAudioForAdmin(sessionId, seqFromFilename(file), buffer, mimeFromFilename(file), 'durable', runIdFromFilename(file), purpose === 'note' ? 'note' : purpose === 'pre-note' ? 'prenote' : 'session');
       } catch (e) {
-        if ((e as { code?: string })?.code === 'session-gone') { removeAudioFile(file); continue; } // (A4) LAW-010
+        if ((e as { code?: string })?.code === 'session-gone') { if (hardDeleteAllowed()) removeAudioFile(file); continue; } // (A4) LAW-010
         console.log('[batch] archive-for-admin failed, kept queued:', String(e).slice(0, 160));
         logEvent({ event: 'audio.archive_failed', sessionId, source: 'job', severity: 'error', detail: { purpose } });
         continue;

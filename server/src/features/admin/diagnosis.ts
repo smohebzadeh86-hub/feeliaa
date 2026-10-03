@@ -1,10 +1,11 @@
 // «چه اتفاقی افتاد؟» — تشخیصِ یک جلسه از داده‌یِ موجود (ردیفِ جلسه، صدایِ kind='session'، صفِ پردازش، رویدادهایِ
 // obs و UI). تابعِ خالص: بدونِ DB/فایل. متنِ بالینی برگردانده نمی‌شود — فقط شمارش/طول (LAW-001).
-import type { SessionAudioRow } from '../transcription/index.js';
+import { checkSeqContiguous, type SessionAudioRow, type SkipRow } from '../transcription/index.js';
 
 export interface DiagnosisInput {
   s: any;
   audioRows: SessionAudioRow[];
+  skips?: SkipRow[];
   pendingCount: number;
   ev: any[];
   ui: any[];
@@ -60,13 +61,12 @@ export function metricsFindings(m: any | null): Array<{ level: 'ok' | 'warn' | '
   return out;
 }
 
-export function diagnoseSession({ s, audioRows, pendingCount, ev, ui, uploadJobs = [], finalTranscript = null }: DiagnosisInput) {
+export function diagnoseSession({ s, audioRows, skips = [], pendingCount, ev, ui, uploadJobs = [], finalTranscript = null }: DiagnosisInput) {
   const audioMs = audioRows.reduce((a, r) => a + (Number(r.duration_ms) || 0), 0);
   const audioBytes = audioRows.reduce((a, r) => a + (Number(r.bytes) || 0), 0);
   const kbps = audioMs > 0 ? Math.round((audioBytes * 8) / audioMs * 10) / 10 : null;
-  const seqs = audioRows.map((r) => r.seq);
-  const missing: number[] = [];
-  if (seqs.length) for (let i = 0; i <= Math.max(...seqs); i++) if (!seqs.includes(i)) missing.push(i);
+  // سگمنتِ گم‌شده = client_seq که نه رسیده و نه کلاینت «خالی» گزارش کرده (listing.ts#checkSeqContiguous)
+  const missing = checkSeqContiguous(audioRows, skips).missing;
 
   const countEv = (name: string, pred?: (d: any) => boolean) => ev.filter((e) => e.event === name && (!pred || pred(e.detail || {}))).length;
   const wsDrops = countEv('rt.ws_close', (d) => d.close_code !== 1000 && d.close_code !== 1005);

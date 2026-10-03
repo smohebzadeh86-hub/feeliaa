@@ -53,7 +53,7 @@ feeliaa/
 │           │   ├── batch/       queueFiles · recoveryMerge · processQueue · sweep
 │           │   └── archive/     store · ffmpegOps · archiveWrite · listing · fullAudio · sweep
 │           ├── session-media/   purge.ts · index.ts
-│           ├── admin/           admin.routes.ts · therapists/sessions/audio/export/obs.admin.ts · queue.admin.ts · system.admin.ts · admin.repository.ts · diagnosis.ts · liveHealth.ts · filters.ts
+│           ├── admin/           admin.routes.ts · therapists/sessions/audio/export/obs.admin.ts · queue.admin.ts · system.admin.ts · metrics.admin.ts + coreMetrics.ts (F10) · admin.repository.ts · diagnosis.ts · liveHealth.ts · filters.ts
 │           ├── audio-upload/    uploads.routes.ts · uploads.repository.ts · uploadSession.ts · groupFinalize.ts · uploadLocks.ts · jobMachine.ts
 │           │                    · jobStore.sql.ts · worker.ts · quota.ts · sonioxRefs.ts · orphanSweep.ts · uploadStore.ts · media.ts · quality.ts · index.ts
 │           ├── notifications/   notify.ts · notifications.routes.ts · index.ts
@@ -61,6 +61,7 @@ feeliaa/
 │           │                    (adapters/llm/chatLlm.adapter.ts + registry؛ prompts/{systemPrompts,userPrompts}.ts)
 │           ├── treatment-unit/  واحدِ درمان (فردی/زوج/خانواده) + contextِ پویایِ Soniox؛ index.ts (routeها هم) — `pnpm test:tu`
 │           ├── final-transcript/ «متنِ نهایی» ([subsystem 07](../07-subsystems/07-final-transcript.md))؛ index.ts (routeها + worker) — `pnpm test:ft`
+│           ├── session-record/ رکوردِ canonicalِ جلسه ([subsystem 08](../07-subsystems/08-session-record.md))؛ tokens.ts · segments.ts · record.repository.ts · record.routes.ts · index.ts — `pnpm test:up` (H66–H70)
 │           ├── client-config/   clientConfig.routes.ts
 │           └── legacy-ws/       transcription.routes.ts · p1.ts · soniox.ts (LAW-015)
 │

@@ -6,7 +6,8 @@
 //   source.<ext>          ← بعد از complete: الحاقِ stream‌یِ تکه‌ها (هرگز کلِ فایل در RAM نیست)
 //
 // هیچ‌چیز از این پوشه static سرو نمی‌شود (فقط public/ سرو می‌شود — LAW-005).
-import { createReadStream, createWriteStream, existsSync, mkdirSync, readdirSync, renameSync, rmSync, statSync, statfsSync, writeFileSync } from 'node:fs';
+import { closeSync, createReadStream, createWriteStream, existsSync, fsyncSync, mkdirSync, openSync, readdirSync, renameSync, rmSync, statSync, statfsSync, writeSync } from 'node:fs';
+import { hardDeleteAllowed } from '../../shared/retention.js';
 import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import { query } from '../../db/connection.js';
@@ -47,7 +48,16 @@ export function writeChunk(uploadId: string, n: number, body: Buffer): void {
   const dir = ensureUploadDir(uploadId);
   const final = path.join(dir, chunkName(n));
   const tmp = final + '.tmp-' + process.pid + '-' + Date.now();
-  writeFileSync(tmp, body);
+  // fsync پیش از rename (و پیش از پاسخِ 200 که کلاینت بر اساسش نسخه‌ی خودش را رها می‌کند): بدونِ آن، قطعِ برقِ سرور
+  // می‌تواند تکه‌ای را که «دریافت شد» گفته‌ایم خالی/ناقص بگذارد (ممیزی Core 2026-10-01).
+  const fd = openSync(tmp, 'w');
+  try {
+    let off = 0;
+    while (off < body.length) off += writeSync(fd, body, off, body.length - off);
+    fsyncSync(fd);
+  } finally {
+    closeSync(fd);
+  }
   renameSync(tmp, final);
 }
 
@@ -88,12 +98,16 @@ export async function assembleUpload(uploadId: string, chunksTotal: number, size
     rmSync(tmp, { force: true });
     throw new Error(`assembled size mismatch: ${size} != ${sizeBytes}`);
   }
+  const fd = openSync(tmp, 'r+');
+  try { fsyncSync(fd); } finally { closeSync(fd); }
   renameSync(tmp, out);
   for (let n = 0; n < chunksTotal; n++) rmSync(path.join(dir, chunkName(n)), { force: true });
   return out;
 }
 
 export function removeUploadDir(uploadId: string): void {
+  // ⭐ «هیچ چیزی هارد دیلیت نشود» (2026-10-02): فایلِ آپلودیِ کاربر (و تکه‌هایِ نیمه‌کاره) پاک نمی‌شود مگر ALLOW_HARD_DELETE=1
+  if (!hardDeleteAllowed()) return;
   try { rmSync(uploadDir(uploadId), { recursive: true, force: true }); } catch {}
 }
 

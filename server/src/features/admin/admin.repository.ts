@@ -38,7 +38,7 @@ export async function getTherapistBrief(id: string): Promise<any> {
 
 export async function listClientsOfTherapistWithStats(therapistId: string): Promise<any[]> {
   const clients = await query(`
-      SELECT c.id, c.code, c.alias, c.status, c.status_reason, c.category, c.gender, c.created_at,
+      SELECT c.id, c.code, c.alias, c.status, c.status_reason, c.category, c.gender, c.created_at, c.deleted_at,
         COUNT(s.id) as session_count,
         MAX(s.date) as last_session_date
       FROM clients c
@@ -57,7 +57,7 @@ export async function getClientBrief(id: string): Promise<any> {
 // (2026-10-01) ترتیب: آخرین ضبطِ صدایِ جلسه (kind='session')، وگرنه زمانِ ساختِ جلسه — تازه‌ترین بالا.
 export async function listSessionsOfClient(clientId: string): Promise<any[]> {
   const sessions = await query(`
-      SELECT s.id, s.session_num, s.date, s.start_time, s.duration_ms, s.status, s.source, s.consent,
+      SELECT s.id, s.session_num, s.date, s.start_time, s.duration_ms, s.status, s.source, s.consent, s.deleted_at,
         s.created_at, s.updated_at, s.batch_status, s.auto_closed_at, s.realtime_reliable, CHAR_LENGTH(COALESCE(s.transcript, '')) as transcript_len,
         COUNT(a.id) as audio_count,
         MAX(CASE WHEN a.kind = 'session' THEN a.created_at END) AS last_recording_at
@@ -104,10 +104,6 @@ export async function listSessionIdsOfTherapist(therapistId: string): Promise<st
   return sessionIdsResult.rows.map((r: { id: string }) => r.id);
 }
 
-export async function deleteTherapist(id: string): Promise<void> {
-  await query('DELETE FROM therapists WHERE id = ?', [id]);
-}
-
 export async function getClientCodeRow(id: string): Promise<any> {
   return (await query('SELECT code FROM clients WHERE id = ?', [id])).rows[0];
 }
@@ -117,8 +113,13 @@ export async function listSessionIdsOfClient(clientId: string): Promise<string[]
   return sessionIdsResult.rows.map((r: { id: string }) => r.id);
 }
 
-export async function deleteClient(id: string): Promise<void> {
-  await query('DELETE FROM clients WHERE id = ?', [id]);
+// ⭐ حذفِ نرم (migration 043) — حذفِ سخت ممنوع است.
+export async function deleteClient(id: string, by: string | null = null): Promise<number> {
+  return (await query('UPDATE clients SET deleted_at = NOW(), deleted_by = ? WHERE id = ? AND deleted_at IS NULL', [by, id])).rowCount;
+}
+
+export async function restoreClient(id: string): Promise<number> {
+  return (await query('UPDATE clients SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND deleted_at IS NOT NULL', [id])).rowCount;
 }
 
 // ————— جلسات —————
@@ -130,7 +131,7 @@ export async function getSessionWithTranscript(id: string): Promise<any> {
   const session = await query(`
       SELECT s.id, s.client_id, s.session_num, s.date, s.start_time, s.duration_ms,
         s.status, s.source, s.consent, s.transcript, s.created_at,
-        s.updated_at, s.transcript_version, s.realtime_reliable, s.stt_mode, s.batch_status, s.auto_closed_at, s.pre_note
+        s.updated_at, s.transcript_version, s.realtime_reliable, s.stt_mode, s.batch_status, s.auto_closed_at, s.pre_note, s.deleted_at, s.deleted_by
       FROM sessions s WHERE s.id = ?
     `, [id]);
   return session.rows[0];
@@ -138,7 +139,7 @@ export async function getSessionWithTranscript(id: string): Promise<any> {
 
 export async function listSessionNotesForAdmin(sessionId: string): Promise<any[]> {
   const notes = await query(`
-      SELECT id, type, text, sign_type, offset_ms, wall_clock, created_at
+      SELECT id, type, text, sign_type, offset_ms, wall_clock, created_at, deleted_at
       FROM session_notes
       WHERE session_id = ?
       ORDER BY (offset_ms IS NULL), offset_ms, created_at
@@ -157,7 +158,7 @@ export async function getSessionSttState(id: string): Promise<any> {
 // conditions/params را route ساخته؛ خودِ متنِ transcript هرگز SELECT نمی‌شود — فقط CHAR_LENGTH.
 export async function listRecentSessions(conditions: string[], params: unknown[], limit: number, offset: number): Promise<any[]> {
   const rows = await query(
-    `SELECT s.id, s.session_num, s.date, s.start_time, s.status, s.source,
+    `SELECT s.id, s.session_num, s.date, s.start_time, s.status, s.source, s.deleted_at, s.deleted_by,
               s.created_at, s.updated_at, s.batch_status, s.realtime_reliable, s.stt_mode,
               c.id AS client_id, c.code AS client_code,
               t.id AS therapist_id, t.name AS therapist_name,
@@ -264,7 +265,7 @@ export async function listAudioArchivePage(base: string, f: { sql: string; param
 }
 
 export async function listSessionSeqs(ids: string[]): Promise<any[]> {
-  return (await query(`SELECT session_id, seq FROM session_audio WHERE kind = 'session' AND session_id IN (${ids.map(() => '?').join(',')})`, ids)).rows;
+  return (await query(`SELECT session_id, seq, run_id, client_seq FROM session_audio WHERE kind = 'session' AND session_id IN (${ids.map(() => '?').join(',')})`, ids)).rows;
 }
 
 export async function audioArchiveTotals(base: string, f: { sql: string; params: unknown[] }): Promise<any> {
@@ -286,10 +287,6 @@ export async function countAudioExpiringSoon(base: string, f: { sql: string; par
 
 export async function sessionAudioTotals(sessionId: string): Promise<any> {
   return (await query('SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b FROM session_audio WHERE session_id = ?', [sessionId])).rows[0];
-}
-
-export async function deleteSessionAudioRows(sessionId: string): Promise<void> {
-  await query('DELETE FROM session_audio WHERE session_id = ?', [sessionId]);
 }
 
 // f: فیلترهایِ audioFilters رویِ x.ts
@@ -338,7 +335,7 @@ export async function getTherapistForExport(therapistId: string): Promise<any> {
 
 export async function listClientsForExport(therapistId: string): Promise<any[]> {
   const clients = await query(
-    'SELECT id, code, alias, status, status_reason, category, gender, created_at FROM clients WHERE therapist_id = ? ORDER BY created_at',
+    'SELECT id, code, alias, status, status_reason, category, gender, created_at, deleted_at, deleted_by FROM clients WHERE therapist_id = ? ORDER BY created_at',
     [therapistId]
   );
   return clients.rows;
@@ -347,7 +344,7 @@ export async function listClientsForExport(therapistId: string): Promise<any[]> 
 export async function listSessionsForExport(therapistId: string): Promise<any[]> {
   const sessions = await query(`
     SELECT s.id, s.client_id, s.session_num, s.date, s.start_time, s.duration_ms,
-           s.status, s.source, s.consent, s.transcript, s.created_at
+           s.status, s.source, s.consent, s.transcript, s.created_at, s.unit_type, s.modalities, s.deleted_at, s.deleted_by
     FROM sessions s
     JOIN clients c ON c.id = s.client_id
     WHERE c.therapist_id = ?
@@ -359,7 +356,7 @@ export async function listSessionsForExport(therapistId: string): Promise<any[]>
 // MySQL از NULLS LAST پشتیبانی نمی‌کند؛ `(offset_ms IS NULL)` در ASC همان اثر را دارد.
 export async function listNotesForExport(therapistId: string): Promise<any[]> {
   const notes = await query(`
-    SELECT n.id, n.session_id, n.type, n.text, n.sign_type, n.offset_ms, n.wall_clock, n.created_at
+    SELECT n.id, n.session_id, n.type, n.text, n.sign_type, n.offset_ms, n.wall_clock, n.created_at, n.deleted_at, n.deleted_by
     FROM session_notes n
     JOIN sessions s ON s.id = n.session_id
     JOIN clients c ON c.id = s.client_id
@@ -454,7 +451,7 @@ export async function listLiveSessions(windowHours: number): Promise<any[]> {
        JOIN therapists t ON t.id = c.therapist_id
        LEFT JOIN (SELECT session_id, COUNT(*) AS seg_count, COALESCE(SUM(bytes), 0) AS seg_bytes, MAX(created_at) AS last_at
                     FROM session_audio WHERE kind = 'session' GROUP BY session_id) a ON a.session_id = s.id
-      WHERE s.status = 'in_progress' AND s.source = 'live' AND s.updated_at >= (NOW() - INTERVAL ? HOUR)
+      WHERE s.status = 'in_progress' AND s.source = 'live' AND s.deleted_at IS NULL AND s.updated_at >= (NOW() - INTERVAL ? HOUR)
       ORDER BY s.updated_at DESC LIMIT 200`, [windowHours])).rows;
 }
 
@@ -510,4 +507,79 @@ export async function countLlmUnavailable24h(): Promise<number> {
   const r = await query(
     `SELECT COUNT(*) AS n FROM notifications WHERE kind = 'llm_unavailable' AND created_at >= (NOW() - INTERVAL 24 HOUR)`);
   return Number(r.rows[0]?.n) || 0;
+}
+
+// حذفِ نرمِ جلسه (migration 042): بازگردانی توسطِ ادمین. rowCount
+export async function restoreDeletedSession(id: string): Promise<number> {
+  return (await query('UPDATE sessions SET deleted_at = NULL, deleted_by = NULL, updated_at = NOW() WHERE id = ? AND deleted_at IS NOT NULL', [id])).rowCount;
+}
+
+// ————— دسترسیِ کاملِ ادمین به همه‌یِ داده (2026-10-02: «به همه دیتا دسترسی داشته باشم و هیچی هارد دیلیت نشه») —————
+// مرورِ حذف‌شده‌ها (حذفِ نرم، migration 042/043)
+export async function listDeletedOverview(): Promise<{ clients: any[]; sessions: any[]; notes: any[] }> {
+  const clients = (await query(
+    `SELECT c.id, c.code, c.alias, c.deleted_at, c.deleted_by, t.id AS therapist_id, t.name AS therapist_name,
+            (SELECT COUNT(*) FROM sessions s WHERE s.client_id = c.id) AS session_count
+       FROM clients c JOIN therapists t ON t.id = c.therapist_id WHERE c.deleted_at IS NOT NULL ORDER BY c.deleted_at DESC LIMIT 200`)).rows;
+  const sessions = (await query(
+    `SELECT s.id, s.session_num, s.status, s.source, s.deleted_at, s.deleted_by, c.id AS client_id, c.code AS client_code, t.id AS therapist_id, t.name AS therapist_name,
+            CHAR_LENGTH(COALESCE(s.transcript, '')) AS transcript_len, (SELECT COUNT(*) FROM session_audio a WHERE a.session_id = s.id) AS audio_count
+       FROM sessions s JOIN clients c ON c.id = s.client_id JOIN therapists t ON t.id = c.therapist_id WHERE s.deleted_at IS NOT NULL ORDER BY s.deleted_at DESC LIMIT 200`)).rows;
+  const notes = (await query(
+    `SELECT n.id, n.session_id, n.type, n.deleted_at, n.deleted_by, CHAR_LENGTH(COALESCE(n.text, '')) AS text_len, c.code AS client_code, t.name AS therapist_name
+       FROM session_notes n JOIN sessions s ON s.id = n.session_id JOIN clients c ON c.id = s.client_id JOIN therapists t ON t.id = c.therapist_id
+      WHERE n.deleted_at IS NOT NULL ORDER BY n.deleted_at DESC LIMIT 200`)).rows;
+  return { clients, sessions, notes };
+}
+
+export async function restoreDeletedNote(id: string): Promise<number> {
+  return (await query('UPDATE session_notes SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND deleted_at IS NOT NULL', [id])).rowCount;
+}
+
+// تاریخچه‌یِ متنِ جلسه (migration 040) — ادمین هر جلسه‌ای را می‌خواند (حتی حذف‌شده)
+export async function listTranscriptRevisionsAdmin(sessionId: string): Promise<any[]> {
+  return (await query(
+    `SELECT id, version, cause, actor IS NOT NULL AS by_user, chars, created_at FROM session_transcript_revisions WHERE session_id = ? ORDER BY id DESC LIMIT 500`, [sessionId])).rows;
+}
+export async function getTranscriptRevisionAdmin(sessionId: string, id: number): Promise<any> {
+  return (await query('SELECT id, version, cause, chars, created_at, text FROM session_transcript_revisions WHERE session_id = ? AND id = ?', [sessionId, id])).rows[0];
+}
+
+// تاریخچه‌یِ یادداشت (044)
+export async function listNoteRevisionsAdmin(noteId: string): Promise<any[]> {
+  return (await query('SELECT id, CHAR_LENGTH(COALESCE(text, \'\')) AS chars, created_at FROM session_note_revisions WHERE note_id = ? ORDER BY id DESC LIMIT 500', [noteId])).rows;
+}
+export async function getNoteRevisionAdmin(noteId: string, id: number): Promise<any> {
+  return (await query('SELECT id, text, created_at FROM session_note_revisions WHERE note_id = ? AND id = ?', [noteId, id])).rows[0];
+}
+
+// پروندهٔ درمان: محتوایِ فعلی و نسخه‌هایِ قبلی (044)
+export async function getCaseFileAdmin(clientId: string): Promise<any> {
+  return (await query('SELECT client_id, content, status, model, content_version, generated_at, updated_at FROM client_case_file WHERE client_id = ?', [clientId])).rows[0];
+}
+export async function listCaseFileVersionsAdmin(clientId: string): Promise<any[]> {
+  return (await query('SELECT id, content_version, status, model, created_at, CHAR_LENGTH(content) AS chars FROM client_case_file_versions WHERE client_id = ? ORDER BY id DESC LIMIT 500', [clientId])).rows;
+}
+export async function getCaseFileVersionAdmin(clientId: string, id: number): Promise<any> {
+  return (await query('SELECT id, content_version, status, model, created_at, content FROM client_case_file_versions WHERE client_id = ? AND id = ?', [clientId, id])).rows[0];
+}
+
+// برایِ export (schema v3): همه‌چیز، شاملِ حذف‌شده‌ها و تاریخچه‌ها
+export async function listTranscriptRevisionsForExport(therapistId: string): Promise<any[]> {
+  return (await query(
+    `SELECT r.session_id, r.id, r.version, r.cause, r.created_at, r.text FROM session_transcript_revisions r
+       JOIN sessions s ON s.id = r.session_id JOIN clients c ON c.id = s.client_id WHERE c.therapist_id = ? ORDER BY r.session_id, r.id`, [therapistId])).rows;
+}
+export async function listNoteRevisionsForExport(therapistId: string): Promise<any[]> {
+  return (await query(
+    `SELECT r.session_id, r.note_id, r.id, r.created_at, r.text FROM session_note_revisions r
+       JOIN sessions s ON s.id = r.session_id JOIN clients c ON c.id = s.client_id WHERE c.therapist_id = ? ORDER BY r.note_id, r.id`, [therapistId])).rows;
+}
+export async function listCaseFilesForExport(therapistId: string): Promise<any[]> {
+  return (await query(
+    `SELECT f.client_id, f.content, f.status, f.model, f.content_version, f.generated_at FROM client_case_file f JOIN clients c ON c.id = f.client_id WHERE c.therapist_id = ?`, [therapistId])).rows;
+}
+export async function listCaseFileVersionsForExport(therapistId: string): Promise<any[]> {
+  return (await query(
+    `SELECT v.client_id, v.id, v.content_version, v.created_at, v.content FROM client_case_file_versions v JOIN clients c ON c.id = v.client_id WHERE c.therapist_id = ? ORDER BY v.client_id, v.id`, [therapistId])).rows;
 }

@@ -21,7 +21,7 @@ export async function autoCloseAbandonedSessions(opts: { therapistId?: string } 
     const r = await query(
       `SELECT s.id, s.client_id, c.therapist_id FROM sessions s
          JOIN clients c ON c.id = s.client_id
-        WHERE s.status IN ('in_progress', 'recovered')
+        WHERE s.status IN ('in_progress', 'recovered') AND s.deleted_at IS NULL
           AND (s.source IS NULL OR s.source <> 'upload')
           AND s.updated_at < (NOW() - INTERVAL ? SECOND)
           AND NOT EXISTS (SELECT 1 FROM session_audio a WHERE a.session_id = s.id AND a.created_at > (NOW() - INTERVAL ? SECOND))

@@ -67,6 +67,12 @@ stateDiagram-v2
 | I14 | هر سگمنتِ durable فقط یک نوع محتوا دارد (یا کاملاً حینِ ACTIVEِ سالم، یا کاملاً حینِ قطعی) — مرزِ سگمنت رویِ هر گذارِ ACTIVE↔قطعی صریح بسته می‌شود | `scheduleReconnect`، `offlineHandler`، `connectWithFreshMint` (2026-09-22) |
 | I15 | فقط یک تلاشِ reconnect هم‌زمان در جریان است، حتی اگه چند منبع (`handleWSClose`، خطایِ Soniox، watchdog) هم‌زمان trigger کنند | `reconnectInFlight` (2026-09-22) |
 | I16 | اگه `ws.readyState` دیگر OPEN نباشد ولی state هنوز ACTIVE است (onclose/onerror دیر/هیچ‌وقت فایر نشده)، حداکثر تا ۳ ثانیه بعد reconnect خودکار شروع می‌شود | `startWsWatchdog` (2026-09-22) |
+| I17 | (2026-10-02، فاز ۱ ممیزیِ Core) WS باز ولی بی‌پیام برای بیش از `WS_SILENT_MS` (۳۰ث؛ override: `wsSilentMs`) ⇒ `requeueSilentAudio` سگمنت‌هایِ archiveِ شروع‌شده بعد از آخرین پیام را `transcript` + placeholder می‌کند و `scheduleReconnect('watchdog-ws-silent')`. سگمنتِ مرزی (≤ یک چرخشِ ۱۵ث) عمداً بازرونویسی نمی‌شود (خطرِ duplicate). **تأییدشده با Sonioxِ واقعی (2026-10-02):** در سکوت هر ~۱٫۲ث پیامِ بدونِ token می‌آید. |
+| I18 | شروعِ RTSession رویِ جلسه‌ای که متن دارد (رفرش/crash/ادامه) نشانگرِ ناپیوستگی (`RECONNECT_MARK`) می‌گذارد؛ شماره‌گذاریِ گوینده از ۱ شروع می‌شود. |
+| I19 | (فاز ۲ ممیزیِ Core، 2026-10-02) مشکلاتِ پایدارِ ضبط در `RTSession.health` (کلید→پیام؛ `setHealth`) و از `cb.onHealth(map)` به UI می‌رسند — برخلافِ `cb.onError` (بنرِ گذرا) با stateِ سالم پاک نمی‌شوند: `durable` (خطایِ `MediaRecorder` start/constructor ⇒ ۵ تلاشِ دوباره هر ۲ث)، `mic` (`track.onended`)، `mute` (`track.onmute/onunmute`)، `storage` (خطا/پُرشدنِ IndexedDB). `lastAudioSavedAt` با هر ذخیره‌یِ موفقِ سگمنت ثبت می‌شود (UI: «آخرین ذخیره‌ی صدا»، هشدارِ قرمز اگر >۹۰ث بدونِ ذخیره). |
+| I20 | `insertRecoveryPlaceholder` وقتی `persistedText` تا داخلِ نشانگرِ بازگشتِ انتهایی رسیده، placeholder را *ته‌پیوند* می‌کند (نه قبلِ نشانگر) تا `persistedText` پیشوندِ متن بماند؛ وگرنه rebaseِ 409 واگرایی می‌بیند و جمله‌یِ live دوبار ذخیره می‌شود (E2E 2026-10-02). |
+| I21 | (فاز ۳ ممیزیِ Core) قفلِ چند-تب: `RTSession.start` برایِ mode=live اول `navigator.locks.request('feelia-live-<sessionId>', {ifAvailable:true})` می‌گیرد؛ تبِ دوم با `{lockDenied:true}` رد می‌شود (بدونِ mint/WS، بدونِ fallback به proxyِ legacy، بدونِ ذخیره‌یِ duration). قفل تا COMPLETED/CANCELED/`forget` می‌ماند؛ با بسته‌شدن/رفرشِ تب مرورگر آزاد می‌کند. بدونِ Web Locks ⇒ fail-open. |
+| I22 | placeholderِ «⏳»ِ بازه‌ای که هرگز رونویسی نمی‌شود (فایلِ نامعتبر drop شد، یا sweepِ ۲۴ساعتهٔ صف) سمتِ سرور با `[بازه‌ی قطعی — متنِ این بخش بازیابی نشد (صدا در آرشیو است) · #key]` جایگزین می‌شود (`mergeRecoveryLost`/`closePlaceholderAsLost`)؛ کلید حفظ است تا کلاینت بازه را حل‌شده ببیند. |
 | I17 | هر live pusher فقط به WSِ زمانِ ساختِ خودش می‌فرستد؛ اولین بایت‌هایِ صوتیِ هر WSِ تازه هدرِ container است (دُمِ ناهمگامِ recorderِ قبلی هرگز رویِ WSِ تازه نمی‌رود) | `targetWs` در `startLivePusher`، `stopLivePusher` در `scheduleReconnect` (2026-09-23، `T21`) |
 | I18 | rebaseِ 409 در `persistConfirmed` متنی که سرور از آخرین ذخیره append کرده (batchِ دوره‌ی قطعی) را بازنویسی نمی‌کند — اگر هر دو طرف فقط به `persistedText` افزوده‌اند، ترکیب می‌شوند | `persistedText` (2026-09-23، `T22`) |
 
@@ -129,6 +135,11 @@ state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250
 | `rt.mint_failed` | catchِ `connectWithFreshMint` | `status`، `code` (نه `message`) | mintِ credential شکست خورد (شبکه/rate-limit/۴۰۱) |
 | `rt.unreliable_set` | هرجا `self.unreliable` اولین‌بار true می‌شود (یک‌طرفه) | `reason` (`reconnect`/`reconnect_exhausted`/`start_fail_open`) | از این لحظه به بعد، fallbackِ batch لازم است |
 | `rt.watchdog_fired` | `startWsWatchdog`، قبل از `scheduleReconnect('watchdog-ws-not-open')` | — | قطعیِ «بی‌صدا» (WSای که readyState مرده ولی onclose نیامده) تشخیص داده شد |
+| `rt.watchdog_silent` | `startWsWatchdog` (WS باز ولی بی‌پیام > `WS_SILENT_MS`) | `silent_ms` | سوکتِ مرده؛ پس از آن `scheduleReconnect('watchdog-ws-silent')` (فاز ۱) |
+| `rt.health_problem` | `setHealth(code, msg)` | `code` ∈ durable/mic/mute/storage | مشکلِ پایدارِ ضبط به UI رسید (فاز ۲) |
+| `rt.durable_start_failed` | `onDurableStartFailed` | `attempt` | خطایِ `MediaRecorder` start/constructor |
+| `rt.mic_muted` / `rt.mic_unmuted` | `track.onmute/onunmute` | — | — |
+| `rt.live_lock_denied` | `RTSession.start` | — | تبِ دوم برایِ همان جلسه رد شد (F6) |
 | `rt.state_change` | `setState(s)` (چون این فایل از قبل یک state machineِ صریحِ `STATES` دارد) | `state`، `prev_state` | دنباله‌ی کاملِ گذارهایِ یک RTSession — برایِ بازسازیِ timeline |
 | `rt.gap_marked` | `noteDiscontinuity()` | — | مارکرِ ناپیوستگیِ گوینده به transcript اضافه شد (بندِ ۳ همین سند) |
 | `rt.audio_quality_warn` | `showAudioQualityHint` در `index.html` (2026-09-26) | `reason` = `no_signal`\|`too_quiet`\|`noisy`\|`clipping` | هشدارِ کیفیتِ ضبط به تراپیست نشان داده شد؛ یک بار برایِ هر reason در هر جلسه |

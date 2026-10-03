@@ -9,7 +9,9 @@ export interface GuardLimits {
 }
 export const DEFAULT_GUARD_LIMITS: GuardLimits = { minLengthRatio: 0.65, maxLengthRatio: 1.15, minOverlap: 0.7 };
 
-export type GuardFailure = 'length' | 'negation' | 'number' | 'marker' | 'overlap' | 'empty' | 'uncertain';
+// 'speakers' (2026-10-02، F7): یک خروجی نوبت‌هایِ خامِ دو گویندهٔ متفاوت را ادغام کرده (src=[4,5] با گوینده‌هایِ متفاوت) ⇒ یک نقش
+// به هر دو می‌چسبید. این نگهبان در polishTranscript (نه checkPolishedChunk) ارزیابی می‌شود چون به برچسبِ گوینده نیاز دارد.
+export type GuardFailure = 'length' | 'negation' | 'number' | 'marker' | 'overlap' | 'empty' | 'uncertain' | 'speakers';
 
 const FA_DIGIT: Record<string, string> = { '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
   '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9' };

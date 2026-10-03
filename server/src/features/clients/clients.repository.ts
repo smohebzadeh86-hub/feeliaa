@@ -6,12 +6,12 @@ export async function listClientsWithStats(therapistId: string | null): Promise<
       SELECT
         c.id, c.code, c.alias, c.created_at,
         c.status, c.status_reason, c.category, c.gender, c.pinned_at, c.recording_consent_at, c.unit_type,
-        (SELECT COUNT(*) FROM client_members m WHERE m.client_id = c.id) as member_count,
+        (SELECT COUNT(*) FROM client_members m WHERE m.client_id = c.id AND m.deleted_at IS NULL) as member_count,
         COUNT(s.id) as session_count,
         MAX(s.date) as last_session_date
       FROM clients c
-      LEFT JOIN sessions s ON s.client_id = c.id
-      WHERE c.therapist_id = ?
+      LEFT JOIN sessions s ON s.client_id = c.id AND s.deleted_at IS NULL
+      WHERE c.therapist_id = ? AND c.deleted_at IS NULL
       GROUP BY c.id
       ORDER BY c.created_at DESC
     `, [therapistId]);
@@ -45,7 +45,7 @@ export async function listRecoveredSessions(therapistId: string | null): Promise
         c.code as client_code, c.alias as client_alias
       FROM sessions s
       JOIN clients c ON c.id = s.client_id
-      WHERE s.status = 'recovered' AND c.therapist_id = ?
+      WHERE s.status = 'recovered' AND c.therapist_id = ? AND s.deleted_at IS NULL
       ORDER BY s.session_num DESC
     `, [therapistId]);
   return result.rows;
@@ -75,9 +75,11 @@ export async function listClientSessions(clientId: string): Promise<any[]> {
   const sessionsResult = await query(`
       SELECT id, session_num, date, start_time, duration_ms, status, source, batch_status, auto_closed_at, created_at
       FROM sessions
-      WHERE client_id = ?
+      WHERE client_id = ? AND status <> 'canceled' AND deleted_at IS NULL
       ORDER BY session_num DESC
     `, [clientId]);
+  // ⭐ (2026-10-02، تصمیمِ مالک) «لغو جلسه» دیگر حذف نیست: جلسه status='canceled' می‌گیرد و فقط از فهرستِ تراپیست پنهان می‌شود؛
+  // متن، صدا و یادداشت‌ها برایِ ادمین می‌مانند.
   return sessionsResult.rows;
 }
 
@@ -121,7 +123,7 @@ export async function countClientCascade(id: string): Promise<any> {
   const countResult = await query(`
       SELECT
         (SELECT COUNT(*) FROM sessions WHERE client_id = ?) as session_count,
-        (SELECT COUNT(*) FROM session_notes WHERE session_id IN
+        (SELECT COUNT(*) FROM session_notes WHERE deleted_at IS NULL AND session_id IN
           (SELECT id FROM sessions WHERE client_id = ?)) as note_count
     `, [id, id]);
   return countResult.rows[0];
@@ -133,10 +135,25 @@ export async function listSessionIdsOfClient(clientId: string): Promise<string[]
 }
 
 // rowCount
+// ⭐ (2026-10-02، تصمیمِ مالک «هیچ چیزی هارد دیلیت نشود») حذفِ مراجع = حذفِ نرم (deleted_at)؛ جلسه‌ها، متن، یادداشت و صدا می‌مانند.
 export async function deleteOwnedClient(id: string, therapistId: string | null): Promise<number> {
   const del = await query(
-    'DELETE FROM clients WHERE id = ? AND therapist_id = ?',
-    [id, therapistId]
+    'UPDATE clients SET deleted_at = NOW(), deleted_by = ? WHERE id = ? AND therapist_id = ? AND deleted_at IS NULL',
+    [therapistId, id, therapistId]
   );
   return del.rowCount;
+}
+
+export async function restoreOwnedClient(id: string, therapistId: string | null): Promise<number> {
+  const r = await query(
+    'UPDATE clients SET deleted_at = NULL, deleted_by = NULL WHERE id = ? AND therapist_id = ? AND deleted_at IS NOT NULL',
+    [id, therapistId]
+  );
+  return r.rowCount;
+}
+
+export async function listDeletedClients(therapistId: string | null): Promise<any[]> {
+  return (await query(
+    `SELECT c.id, c.code, c.alias, c.deleted_at, (SELECT COUNT(*) FROM sessions s WHERE s.client_id = c.id) AS session_count
+       FROM clients c WHERE c.therapist_id = ? AND c.deleted_at IS NOT NULL ORDER BY c.deleted_at DESC LIMIT 200`, [therapistId])).rows;
 }

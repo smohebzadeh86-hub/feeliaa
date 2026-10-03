@@ -2,14 +2,13 @@
 import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../auth/guard.js';
-import { getOwnedClient } from '../../db/ownership.js';
+import { getOwnedClient, getOwnedClientAny } from '../../db/ownership.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
-import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/index.js';
 import {
   listClientsWithStats, clearRecordingConsent, listRecoveredSessions, clientCodeExists, insertClient, getClientRow,
   listClientSessions, updateClientAlias, updateClientStatus, setClientPinned, updateClientCategory, countClientCascade,
-  listSessionIdsOfClient, deleteOwnedClient,
+  deleteOwnedClient, restoreOwnedClient, listDeletedClients,
 } from './clients.repository.js';
 import { treatmentUnits, TreatmentUnitValidationError } from '../treatment-unit/index.js';
 
@@ -246,6 +245,8 @@ export async function clientRoutes(app: FastifyInstance) {
   });
 
   // DELETE /api/clients/:id — حذف آبشاری
+  // DELETE /api/clients/:id — ⭐ (2026-10-02، تصمیمِ مالک «هیچ چیزی هارد دیلیت نشود») حذفِ نرم: deleted_at (migration 043). جلسه‌ها، متن،
+  // یادداشت و صدا می‌مانند و برایِ ادمین قابلِ‌مشاهده‌اند؛ با POST /restore (تراپیست/ادمین) برمی‌گردد.
   app.delete('/api/clients/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
 
@@ -256,23 +257,32 @@ export async function clientRoutes(app: FastifyInstance) {
     }
 
     const cascade = await countClientCascade(id);
-    // LAW-010: قبل از cascadeِ DB، شناسه‌ی جلسه‌ها را نگه می‌داریم — بعدِ حذف دیگر قابلِ
-    // خواندن نیستند، ولی فایل‌هایِ آرشیوشده‌ی هرکدام (data/session-audio/<sessionId>/)
-    // بدونِ این لیست یتیم می‌مانند.
-    const sessionIds = await listSessionIdsOfClient(id);
-    const media = await prepareSessionMediaPurge(sessionIds);
-
     if ((await deleteOwnedClient(id, request.therapistId)) === 0) {
       reply.code(404);
       return { error: 'مراجع یافت نشد' };
     }
-
-    purgeSessionMedia(media);
-    await recordAudit({ actorId: request.therapistId, action: 'therapist.client_delete', targetType: 'client', targetId: id, detail: { count: sessionIds.length } });
+    await recordAudit({ actorId: request.therapistId, action: 'therapist.client_delete', targetType: 'client', targetId: id, detail: { soft: true, count: Number(cascade?.session_count || 0) } });
 
     return {
       deleted: owned.code,
       cascade,
+      recoverable: true,
     };
+  });
+
+  // GET /api/deleted-clients — «مراجعینِ حذف‌شده»: مسیرِ پیدا کردنِ مراجعِ حذف‌شده (فقط متادیتا)
+  app.get('/api/deleted-clients', async (request) => {
+    return { clients: await listDeletedClients(request.therapistId) };
+  });
+
+  // POST /api/clients/:id/restore — بازگردانیِ مراجعِ حذف‌شده‌یِ خودِ تراپیست
+  app.post('/api/clients/:id/restore', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const any = await getOwnedClientAny(id, request.therapistId!);
+    if (!any) { reply.code(404); return { error: 'مراجع یافت نشد' }; }
+    if (!any.deleted_at) { reply.code(409); return { error: 'این مراجع حذف نشده است', code: 'not-deleted' }; }
+    if ((await restoreOwnedClient(id, request.therapistId)) === 0) { reply.code(409); return { error: 'این مراجع حذف نشده است', code: 'not-deleted' }; }
+    await recordAudit({ actorId: request.therapistId, action: 'therapist.client_restore', targetType: 'client', targetId: id });
+    return { restored: any.code };
   });
 }

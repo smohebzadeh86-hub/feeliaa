@@ -98,3 +98,6 @@ REQ-010…016، REQ-018، REQ-019. نکات:
 
 ## Out of Scope
 انتقالِ مراجع بینِ تراپیست‌ها، فیلدهای تماس/هویتی، برچسب/یادداشتِ پرونده. **(اصلاح 2026-09-16:** ویرایشِ نامِ مستعار دیگر Out of Scope نیست — `openEditAliasModal`/`confirmEditAlias` در UI موجود است و `PUT /api/clients/:id` را صدا می‌زند؛ خطِ قبلی از قبل با کد ناهم‌گام بوده، ربطی به این تغییر ندارد.)
+
+## حذفِ نرمِ مراجع (2026-10-02 — «هیچ چیزی هارد دیلیت نشود»)
+`DELETE /api/clients/:id` دیگر cascade/purge نمی‌کند: `clients.deleted_at/deleted_by` (migration 043) ست می‌شود؛ مراجع برایِ تراپیست پنهان (404) است ولی جلسه‌ها، متن، یادداشت‌ها و صدا می‌مانند و ادمین می‌بیند. مسیرِ پیدا کردن/بازگردانی: `GET /api/deleted-clients` + `POST /api/clients/:id/restore` (UI «مراجعینِ حذف‌شده») و `POST /api/admin/clients/:id/restore`. حذفِ حسابِ تراپیست توسطِ ادمین مسدود است (409 `hard-delete-disabled`؛ غیرفعال‌سازی جایگزین). سیاستِ کامل: [LAW-010](../../00-governance/project-laws.md)، `ALLOW_HARD_DELETE` در configuration-catalog.

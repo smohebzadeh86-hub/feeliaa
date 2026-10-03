@@ -1,6 +1,10 @@
 // نمایِ job برایِ APIها (تراپیست و ادمین) — تنها منبعِ شکلِ پاسخِ job.
 import { uploadCaseFileAllowed } from './jobMachine.js';
 import { parseAudioQuality } from './quality.js';
+import { parseTranscriptMetrics, type MetricsFlag } from './transcriptMetrics.js';
+
+// پرچم‌هایِ «کامل‌بودنِ متن» که برایِ تراپیست معنا دارند (فقط نام؛ عددها به UI نمی‌روند).
+const THERAPIST_NOTE_FLAGS: MetricsFlag[] = ['low_coverage', 'uncovered_gap', 'head_gap', 'tail_gap', 'speakers_merged'];
 
 export function jobView(j: any) {
   return {
@@ -33,5 +37,7 @@ export function jobView(j: any) {
     // پلنِ B: فقط نامِ flagها (علتِ احتمالی) و هشدارِ کم‌اطمینان — سنجه‌هایِ عددی به UI نمی‌روند.
     quality_flags: parseAudioQuality(j.audio_quality)?.flags ?? [],
     quality_warning: j.quality_warning ?? null,
+    // «کامل‌بودنِ متن»: بخشی از گفتار بی‌متن مانده یا گوینده‌ها ادغام شده‌اند (transcript_metrics.flags).
+    transcript_notes: (parseTranscriptMetrics(j.transcript_metrics)?.flags ?? []).filter((f) => THERAPIST_NOTE_FLAGS.includes(f)),
   };
 }

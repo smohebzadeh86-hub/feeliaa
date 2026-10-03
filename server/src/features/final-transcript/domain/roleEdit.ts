@@ -41,3 +41,30 @@ export function applyRoleEdit(turns: CleanTurn[], edit: RoleEdit, allowed: strin
   });
   return { ok: true, turns: next, text: renderClean(next), changed };
 }
+
+// ——— پلِ بینِ دو سیستمِ نقش (F7، 2026-10-02) ———
+// «متنِ نهایی» نقش را به‌صورتِ نام («درمانگر»/«مراجع»/«آقا»…) نگه می‌دارد؛ رکوردِ canonical (session_speaker_roles) enum + برچسب.
+// ویرایشِ نقشِ هم‌گوینده (async) در متنِ نهایی به رکوردِ canonical هم نوشته می‌شود و «ساختِ دوباره» آن را پین می‌کند.
+export type CanonicalRole = 'therapist' | 'client' | 'member' | 'other';
+const ROLE_NAME: Record<CanonicalRole, string> = { therapist: 'درمانگر', client: 'مراجع', member: 'عضو', other: 'دیگر' };
+
+export function roleNameToEntry(name: string): { role: CanonicalRole; label: string | null } {
+  const n = String(name || '').trim();
+  if (n === 'درمانگر') return { role: 'therapist', label: null };
+  if (n === 'مراجع') return { role: 'client', label: null };
+  return { role: 'member', label: n || null };
+}
+
+const FA = '۰۱۲۳۴۵۶۷۸۹';
+export const toLatinDigits = (s: string): string => s.replace(/[۰-۹]/g, (d) => String(FA.indexOf(d)));
+export const toPersianDigits = (s: string): string => s.replace(/[0-9]/g, (d) => FA[+d]);
+
+// speaker_key (لاتین) ⇒ برچسبِ گوینده با ارقامِ فارسی در متن؛ مقدار = نامِ نقش.
+export function confirmedRolesFromEntries(entries: Record<string, { role: string; label: string | null }>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, v] of Object.entries(entries || {})) {
+    const name = v.label || ROLE_NAME[v.role as CanonicalRole];
+    if (name && /^[0-9]+$/.test(key)) out[toPersianDigits(key)] = name;
+  }
+  return out;
+}

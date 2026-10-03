@@ -54,6 +54,7 @@
 | نوع fact | مالک |
 |---|---|
 | قانون/ممنوعیت | `docs/00-governance/project-laws.md` |
+| جهتِ محصول، Core/Non-Core، فیلترِ اولویتِ feature | `docs/00-governance/product-thesis.md` |
 | نگاشتِ feature ↔ کد ↔ سند ↔ تست ↔ جدول | `docs/02-reference/feature-index.md` |
 | «چرا»ی یک feature (تصمیم‌ها با تاریخ/مرجع) | بخشِ «چرا»ی سندِ مالکِ همان feature (قالب: `feature-doc-template.md`) |
 | مالکِ جدولِ DB | `docs/02-reference/database-catalog.md` §۰ |

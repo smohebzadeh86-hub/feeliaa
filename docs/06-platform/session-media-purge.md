@@ -26,3 +26,5 @@
 
 ## ۸. ریسک و بدهی
 purge پس از DELETE و غیرِ تراکنشی است؛ کرشِ بینِ دو گام فایلِ یتیم می‌سازد (sweeperِ orphan برایِ `uploads`؛ برایِ `session-audio` sweeperِ سنی). حذفِ IndexedDBِ مرورگر خارج از دامنه است.
+
+> **به‌روزرسانی 2026-10-02 — «هیچ چیزی هارد دیلیت نشود»:** `purgeSessionMedia`/`deleteSessionAudioDirs` و همه‌ی جاروب‌هایِ نگهداری پیش‌فرض **no-op** هستند (`shared/retention.ts#hardDeleteAllowed`)؛ مسیرهایِ حذفِ تراپیست/ادمین هم حذفِ نرم‌اند و purge را اصلاً صدا نمی‌زنند. فقط `ALLOW_HARD_DELETE=1` رفتارِ قدیمی را برمی‌گرداند. ([LAW-010](../00-governance/project-laws.md)).

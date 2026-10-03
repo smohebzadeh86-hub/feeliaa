@@ -133,6 +133,17 @@ interface Ctx {
   report: FinalizeReport;
   // شناسه‌ی فکت‌هایِ هر یافته (برایِ «یک فکت = یک خانه‌ی کامل»؛ در یافته‌ی ذخیره‌شده نمی‌ماند)
   ids: WeakMap<CaseFileFinding, string[]>;
+  // بررسیِ عینیِ نقل در متنِ خامِ همان جلسه (F3)؛ بدونِ آن quoteVerified ست نمی‌شود
+  verifyQuote?: QuoteVerifier;
+}
+
+// (شماره‌ی جلسه، متنِ نقل) ⇒ آیا نقل عیناً در داده‌یِ ثبت‌شده‌یِ آن جلسه هست؟
+export type QuoteVerifier = (sessionNum: number, text: string) => boolean;
+
+// شماره‌ی جلسه از شناسه‌یِ digest (S3F2 ⇒ 3)
+export function sessionNumOfId(id: string): number | null {
+  const m = /^S(\d+)[FQ]\d+$/.exec(id);
+  return m ? Number(m[1]) : null;
 }
 
 // یک یافته‌ی غیرِنقل را نهایی می‌کند (منبع از فیلد، برچسبِ معتبر، ردِ ارجاع‌ها)؛ متنِ خالی ⇒ null
@@ -171,6 +182,9 @@ function processQuote(it: RawFinding, ctx: Ctx): CaseFileFinding | null {
   if (!text) return null;
   const fin: CaseFileFinding = { id: findingId('', text), label: '', text, source: 'unspecified', about: '' };
   ctx.ids.set(fin, entry ? [...new Set([...ids, entry.id])] : ids);
+  // نقلِ عینی: فقط وقتی verifier هست و شماره‌ی جلسه از شناسه معلوم است
+  const qn = entry ? sessionNumOfId(entry.id) : null;
+  if (ctx.verifyQuote && qn !== null) fin.quoteVerified = ctx.verifyQuote(qn, text);
   return fin;
 }
 
@@ -315,10 +329,10 @@ const rawText = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v ??
 
 // همه‌ی کارهایِ قطعیِ بعد از مدل اینجاست: منبع/نقلِ عینی/برچسب + ردیابیِ مکانیکیِ حفظِ اطلاعات برایِ
 // «همه‌ی» بخش‌هایِ یافته‌محور (زوجین، خانواده، محورها).
-export function finalizeDraft(raw: RawCaseFileDraft, digest: CaseFileDigest | null): { draft: CaseFileDraft; report: FinalizeReport } {
+export function finalizeDraft(raw: RawCaseFileDraft, digest: CaseFileDigest | null, opts: { verifyQuote?: QuoteVerifier } = {}): { draft: CaseFileDraft; report: FinalizeReport } {
   const report: FinalizeReport = { orphanFacts: [], unmatchedQuotes: [], badLabels: [], droppedDuplicates: 0 };
   const index = indexDigest(digest);
-  const ctx: Ctx = { digest, index, digestQuotes: [...index.values()].filter(e => e.kind === 'quote'), referenced: new Set(), report, ids: new WeakMap() };
+  const ctx: Ctx = { digest, index, digestQuotes: [...index.values()].filter(e => e.kind === 'quote'), referenced: new Set(), report, ids: new WeakMap(), verifyQuote: opts.verifyQuote };
 
   const couple = raw.coupleRelationship ? finalizeGroup(raw.coupleRelationship, ctx) : null;
   const family = finalizeGroup(raw.familyRelationship, ctx);
@@ -404,6 +418,12 @@ export function finalizeDraft(raw: RawCaseFileDraft, digest: CaseFileDigest | nu
       if (ov > bestOverlap) { best = f; bestOverlap = ov; }
     }
     if (best && !keyPointIds.includes(best.id)) keyPointIds.push(best.id);
+  }
+
+  // ردیابیِ جلسه (F3): هر یافته‌یِ دارایِ ارجاع، شماره‌ی جلساتِ منبعش را می‌گیرد (مرتب، بدونِ تکرار)
+  for (const f of [...axes.flatMap(a => a.items ?? []), ...[couple, family].flatMap(g => (g?.fields ?? []).flatMap(x => x.items ?? []))]) {
+    const nums = [...new Set((ctx.ids.get(f) ?? []).map(sessionNumOfId).filter((n): n is number => n !== null))].sort((a, b) => a - b);
+    if (nums.length) f.sessions = nums;
   }
 
   const { keyPoints: _rawKeyPoints, changes: _rawChanges, ...rest } = raw;

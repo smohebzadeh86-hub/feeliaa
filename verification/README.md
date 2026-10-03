@@ -16,3 +16,4 @@
 | [2026-09-30-docs-modularity-audit.md](2026-09-30-docs-modularity-audit.md) | فاز ۰: baseline (`test:arch`/`test:routes`/`tsc`) + یافته‌هایِ drift/ماژولاریتی/سندِ فیچر |
 | [2026-09-30-docs-phases-1-6.md](2026-09-30-docs-phases-1-6.md) | نتیجه‌ی فازهایِ ۱–۶ + آزمونِ cold-read |
 | [2026-09-30-docs-followup-p7-banners-tests.md](2026-09-30-docs-followup-p7-banners-tests.md) | تست‌هایِ رفتاری + `test:api` + فاز ۷ + bannerها |
+| [2026-10-02-core-audit.md](2026-10-02-core-audit.md) | فاز ۰ ممیزیِ Core: تأییدِ F1/F2/F4/F5 با harness (T59–T62 KNOWN-GAP)؛ F1 بخشی نادرست؛ 108 PASS |

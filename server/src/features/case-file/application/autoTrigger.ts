@@ -6,6 +6,8 @@ import { generateCaseFile } from './generateCaseFile.js';
 import { caseFileRepo, llmProvider } from '../composition.js';
 import { CaseFileGenerationError } from '../domain/errors.js';
 import { createNotification } from '../../notifications/index.js';
+import { logEvent } from '../../../obs/eventLog.js';
+import { corpusQualityIssues } from './corpusQuality.js';
 
 // ⭐ پی‌ریزی برایِ مراجعینِ فعال (تصمیمِ مالک 2026-09-23: «الان نه ولی پی‌ریزی انجام بشه»):
 // امروز تولیدِ خودکار فقط برایِ مراجعِ غیرفعال است (همان رفتارِ قبلی). روشن‌کردنِ آن برایِ فعال‌ها
@@ -38,12 +40,21 @@ export async function maybeAutoGenerateCaseFile(
     if (therapistRow.rows[0]?.case_file_auto_generate !== true) return 'not_applicable';
 
     const clientRow = await query(
-      'SELECT category, gender, alias, status FROM clients WHERE id = ? AND therapist_id = ?',
+      'SELECT category, gender, alias, status FROM clients WHERE id = ? AND therapist_id = ? AND deleted_at IS NULL',
       [clientId, therapistId]
     );
     const client = clientRow.rows[0];
     if (!client) return 'not_applicable';
     if (client.status !== 'inactive' && !autoGenerateAllowedForActiveClients()) return 'not_applicable';
+
+    // دروازه‌یِ کیفیت (F3، 2026-10-02): پرونده‌ی خودکار از متنی که صدایِ بخشِ بزرگی از آن جا افتاده یا دو گویندهٔ آن ادغام شده ساخته
+    // نمی‌شود — تا تراپیست رسیدگی کند. تولیدِ دستی (POST regenerate) آزاد است و `quality` در GET می‌آید. خروجی 'skipped' است
+    // (قراردادِ jobِ آپلود را عوض نمی‌کند). فقط شمارنده لاگ می‌شود (LAW-001).
+    const issues = await corpusQualityIssues(clientId).catch(() => []);
+    if (issues.length) {
+      logEvent({ event: 'casefile.auto_held', clientId, therapistId, detail: { count: issues.length, reason: 'quality' } });
+      return 'skipped';
+    }
 
     const provider = llmProvider();
     const { skipped } = await generateCaseFile(

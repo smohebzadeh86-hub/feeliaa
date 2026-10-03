@@ -6,6 +6,7 @@ export { sweepOldBatchFiles, BATCH_SWEEP_INTERVAL_MS } from './batch/sweep.js';
 // آرشیوِ صدایِ جلسات (فقط ادمین)
 export { archiveAudioFileForAdmin } from './archive/archiveWrite.js';
 export { listSessionAudio, getSessionAudioRow, deriveSessionStatus, checkSeqContiguous } from './archive/listing.js';
+export { listSkips, recordSkippedSegments, parseEmptySeqs, type SkipRow } from './archive/skips.js';
 export { getFullSessionAudio } from './archive/fullAudio.js';
 export { deleteSessionAudioDirs, sweepOldSessionAudio } from './archive/sweep.js';
 export { SESSION_AUDIO_RETENTION_MS, type SessionAudioRow } from './archive/store.js';

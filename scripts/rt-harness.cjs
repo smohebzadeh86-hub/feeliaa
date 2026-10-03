@@ -23,17 +23,19 @@ const sentBlobs = [];
 // container (نشانگرِ 'HDR') را دارد، و stop() ناهمگام است — دُمِ صدا ('TAIL') و onstop در
 // یک taskِ بعدی می‌رسند. نسخه‌ی قبلیِ کاملاً همگام این race را هرگز بازتولید نمی‌کرد.
 class FakeRecorder {
-  constructor(stream, opts) { this.stream = stream; this.durable = !!(opts && opts.audioBitsPerSecond); this.state = 'inactive'; this.ondataavailable = null; this.onstop = null; }
+  constructor(stream, opts) { this.silent = !!FakeRecorder.silentNext; FakeRecorder.silentNext = false; this.stream = stream; this.durable = !!(opts && opts.audioBitsPerSecond); this.state = 'inactive'; this.ondataavailable = null; this.onstop = null; }
   start(ts) {
+    if (FakeRecorder.throwNext) { FakeRecorder.throwNext = false; throw new Error('MediaRecorder start failed'); }
     this.state = 'recording';
     if (this.durable) FakeRecorder.durableStarts++; // فقط durable (liveRec بیت‌ریتِ صریح ندارد)
+    if (this.silent) return;
     setTimeout(() => { if (this.ondataavailable) this.ondataavailable({ data: new Blob(['HDR' + 'x'.repeat(500)]) }); }, 0);
   }
   stop() {
     if (this.state === 'inactive') return;
     this.state = 'inactive';
     setTimeout(() => {
-      if (this.ondataavailable) this.ondataavailable({ data: new Blob(['TAIL']) });
+      if (this.ondataavailable && !this.silent) this.ondataavailable({ data: new Blob(['TAIL']) });
       if (this.onstop) this.onstop();
     }, 0);
   }
@@ -41,7 +43,7 @@ class FakeRecorder {
 globalThis.MediaRecorder = FakeRecorder;
 FakeRecorder.isTypeSupported = () => true;
 FakeRecorder.durableStarts = 0;
-Object.defineProperty(globalThis, 'navigator', { value: { mediaDevices: { getUserMedia: async (c) => (globalThis.lastGumConstraints = c, { active: true, getTracks: () => [{ stop() {} }] }) } }, configurable: true, writable: true });
+Object.defineProperty(globalThis, 'navigator', { value: { mediaDevices: { getUserMedia: async (c) => (globalThis.lastGumConstraints = c, { active: true, getTracks: () => [{ stop() {} }], getAudioTracks: () => [(globalThis.fakeTrack = { stop() {} })] }) } }, configurable: true, writable: true });
 
 class FakeWS {
   constructor(url) { this.url = url; this.readyState = 0; this.sent = []; FakeWS.last = this; wsCreatedCount++; }
@@ -723,11 +725,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     RT.forget(n);
   }
 
-  // T38: حینِ ACTIVE، صفِ durable هر ARCHIVE_DRAIN_MS آپلود می‌شود (نه فقط در finish)؛ finish تایمر را پاک می‌کند.
+  // T38: صفِ durable هر ARCHIVE_DRAIN_MS (۲۰ث) و ~۱ث پس از ذخیره‌یِ هر سگمنت آپلود می‌شود (نه فقط در finish)؛ finish تایمر را پاک می‌کند.
   {
     const realSetInterval = globalThis.setInterval;
     const captured = [];
-    globalThis.setInterval = function (fn, ms) { const id = realSetInterval(fn, ms); if (ms === 60000) captured.push(fn); return id; };
+    globalThis.setInterval = function (fn, ms) { const id = realSetInterval(fn, ms); if (ms === 20000) captured.push(fn); return id; };
     newSession('s38');
     const s38 = RT.createSession('s38', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
     const p38 = s38.start(); await sleep(5); serverOpen(FakeWS.last); await p38;
@@ -1054,6 +1056,246 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ok('T57 shared browser: 404 keeps another therapist\'s / ownerless record; deletes only own record (or when no owner is known)',
       addedA === true && recA && recA.owner === 'thA' && asB === false && legacyAsB === false && isOwnB === false && asA === true && noOwner === true,
       JSON.stringify({ addedA, owner: recA && recA.owner, asB, legacyAsB, isOwnB, asA, noOwner }));
+  }
+
+  // T58 (2026-10-01، ممیزیِ Core): سگمنتِ خالی شماره‌اش را مصرف می‌کند ولی آپلود نمی‌شود؛ شماره‌اش همراهِ سگمنتِ واقعیِ بعدی
+  // (?empty=) گزارش می‌شود تا چکِ «گم نشده» فرقِ «خالی» و «گم‌شده» را بفهمد. سگمنتِ خالی placeholderِ «در حالِ بازیابی» هم نمی‌گیرد.
+  {
+    newSession('s59');
+    const s59 = RT.createSession('s59', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p59 = s59.start(); await sleep(5); serverOpen(FakeWS.last); await p59;
+    await s59.stopDurableSegment();               // seq0: عادی
+    FakeRecorder.silentNext = true; s59.startDurable();
+    await s59.stopDurableSegment();               // seq1: خالی
+    s59.startDurable();                           // seq2: عادی
+    const fin59 = s59.finish(); await sleep(5);
+    serverTokens(FakeWS.last, [], true);
+    await fin59; await sleep(80);
+    const up59 = fetchUrls.filter((u) => u.includes('/sessions/s59/batch-audio'));
+    const seqs59 = up59.map((u) => Number((/seq=(\d+)/.exec(u) || [])[1]));
+    const withEmpty = up59.filter((u) => u.includes('&empty=1'));
+    ok('T58 empty segment: not uploaded, its seq reported via ?empty= on the next real segment',
+      !seqs59.includes(1) && seqs59.includes(0) && seqs59.includes(2) && withEmpty.length === 1 && /seq=2&/.test(withEmpty[0]),
+      up59.join(','));
+    RT.forget(s59);
+  }
+
+  // ——— فاز ۰ ممیزیِ Core (2026-10-02): characterizationِ شکاف‌هایِ F1/F2/F4 ———
+  // این تست‌ها رفتارِ *فعلی* را قفل می‌کنند (سبز)؛ هر کدام «KNOWN-GAP» است و با اصلاحِ فاز ۱/۲ باید عمداً وارونه شود.
+  // T59 (F1a): سگمنتِ پیش از قطع در لحظه‌ی scheduleReconnect بسته می‌شود در حالی که هنوز ACTIVE است ⇒ intent=archive؛
+  // سگمنتِ خودِ قطعی transcript می‌گیرد (T18/T46). یعنی فقط صدایِ «بعد از تشخیصِ قطع» بازیابی می‌شود.
+  {
+    newSession('s59a');
+    const sa = RT.createSession('s59a', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    sa.drainSoon = () => {}; // این تست صفِ IndexedDB را بررسی می‌کند؛ آپلودِ فوری (۱ث) کنار گذاشته شود
+    const pa = sa.start(); await sleep(5); serverOpen(FakeWS.last); await pa;
+    serverTokens(FakeWS.last, [{ text: 'قبل', is_final: true }]); await sleep(5);
+    serverClose(FakeWS.last); await sleep(1200);
+    serverOpen(FakeWS.last); await sleep(30);
+    const rowsA = (await RT.audioQueue.listForSession('s59a')).sort((a, b) => a.seq - b.seq);
+    ok('T59 KNOWN-GAP F1a: segment closed at drop detection is archive-only; only the outage segment is transcript',
+      rowsA.length >= 2 && rowsA[0].intent === 'archive' && rowsA.some((r) => r.intent === 'transcript'), rowsA.map((r) => r.seq + ':' + r.intent).join(','));
+    sa.abort(); RT.forget(sa);
+  }
+
+  // T60 (F1b، اصلاحِ فاز ۱ 2026-10-02): WebSocketِ «بازِ ولی مرده» (readyState=OPEN، هیچ پیامی نمی‌آید) حالا تشخیص داده می‌شود:
+  // سگمنت‌هایِ archiveِ دورانِ سکوت → transcript (+placeholder) و reconnect. سکوتِ کوتاه (زیرِ سقف) false-positive نمی‌دهد.
+  {
+    newSession('s60');
+    const s60 = RT.createSession('s60', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    s60.drainSoon = () => {}; // همان دلیل
+    const p60 = s60.start(); await sleep(5); serverOpen(FakeWS.last); await p60;
+    serverTokens(FakeWS.last, [{ text: 'زنده', is_final: true }]); await sleep(5);
+    const mint0 = mintCount;
+    s60.wsSilentMs = 60000; // سقفِ بالا ⇒ سکوتِ ۳.۸ث تشخیص داده نمی‌شود
+    await sleep(3800);
+    const quietOk = s60.state === 'ACTIVE' && mintCount === mint0;
+    // سکوتِ طولانی را شبیه‌سازی کن: آخرین پیام ۴۰ث پیش؛ دو سگمنتِ archive «در دورانِ سکوت» ساخته شده‌اند
+    await s60.stopDurableSegment(); s60.startDurable();
+    await s60.stopDurableSegment(); s60.startDurable();
+    s60.wsSilentMs = 1000; s60.lastWsMsgAt = Date.now() - 40000;
+    await sleep(3600);
+    const rows60 = (await RT.audioQueue.listForSession('s60')).filter((r) => r.runId === s60.runId);
+    const tr60 = rows60.filter((r) => r.intent === 'transcript');
+    ok('T60 F1b FIXED: short silence = no reconnect; long silent-open WS ⇒ reconnect + silent-period segments re-queued as transcript with placeholder',
+      quietOk && mintCount > mint0 && tr60.length >= 2 && s60.confirmed.includes('⏳'),
+      JSON.stringify({ quietOk, mint: mintCount - mint0, rows: rows60.map((r) => r.seq + ':' + r.intent), c: s60.confirmed }));
+    s60.abort(); RT.forget(s60);
+  }
+
+  // T61 (F2، اصلاحِ فاز ۱): رفرش/crash در وسطِ جلسه ⇒ RTSessionِ تازه؛ نشانگرِ ناپیوستگی قبل از اولین گفته گذاشته می‌شود.
+  {
+    newSession('s61');
+    sessions.s61.transcript = 'گوینده ۱: درمانگر\n\nگوینده ۲: مراجع'; sessions.s61.transcript_version = 3;
+    const s61 = RT.createSession('s61', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p61 = s61.start(); await sleep(5); serverOpen(FakeWS.last); await p61;
+    serverTokens(FakeWS.last, [{ text: 'ادامه', is_final: true, speaker: 1 }]); await sleep(5);
+    const c61 = s61.confirmed;
+    const iMark61 = c61.indexOf('[اتصال دوباره برقرار شد'), iNew61 = c61.lastIndexOf('گوینده ۱: ادامه');
+    ok('T61 F2 FIXED: refresh-resume puts the discontinuity marker between old text and the new «گوینده ۱»; old text intact',
+      c61.startsWith('گوینده ۱: درمانگر\n\nگوینده ۲: مراجع') && iMark61 > 0 && iNew61 > iMark61, JSON.stringify(c61));
+    s61.abort(); RT.forget(s61);
+  }
+
+  // T63 (2026-10-02، E2E واقعی): placeholderِ تازه نباید «وسطِ» متنِ ذخیره‌شده (قبل از نشانگرِ بازگشتِ ذخیره‌شده) بنشیند —
+  // وگرنه persistedText دیگر پیشوندِ متن نیست، شاخه‌ی rebase واگرایی می‌بیند و جمله‌ی live دوبار می‌آید.
+  {
+    newSession('s63');
+    const s63 = RT.createSession('s63', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p63 = s63.start(); await sleep(5); serverOpen(FakeWS.last); await p63;
+    serverTokens(FakeWS.last, [{ text: 'جمله‌ی اول', is_final: true }]); await sleep(5);
+    await s63.persistConfirmed();
+    s63.insertRecoveryPlaceholder(s63.runId, 4); s63.noteDiscontinuity();
+    await s63.persistConfirmed();                       // متنِ ذخیره‌شده به نشانگرِ بازگشت ختم می‌شود
+    sessions.s63.transcript = sessions.s63.transcript.replace(/\[⏳ [^\]]*\]/, '[بازیابی‌شده از صدایِ بازه‌ی قطعی · #' + s63.runId + ':4]\nمتنِ بازیابی'); // سرور درجا پر می‌کند
+    sessions.s63.transcript_version++;
+    s63.insertRecoveryPlaceholder(s63.runId, 7); s63.noteDiscontinuity(); // قطعیِ بعدی؛ سگمنتش ناهمگام بسته می‌شود
+    await s63.persistConfirmed();
+    const t63 = sessions.s63.transcript;
+    const cnt63 = (t63.match(/جمله‌ی اول/g) || []).length;
+    ok('T63 placeholder after a persisted reconnect mark: no divergence, no duplicated live text, recovered text + new placeholder kept',
+      cnt63 === 1 && !t63.includes('ذخیره نشده بود') && t63.includes('متنِ بازیابی') && t63.includes('#' + s63.runId + ':7]'), JSON.stringify(t63));
+    s63.abort(); RT.forget(s63);
+  }
+
+  // T62 (F4): اگر MediaRecorderِ durable هنگامِ start بترکد، چه به درمانگر گفته می‌شود؟
+  {
+    newSession('s62');
+    // فاز ۲ (2026-10-02): خطایِ start() دیگر بی‌صدا نیست ⇒ مشکلِ پایدار (onHealth) + تلاشِ دوباره؛ با موفقیت مشکل برداشته می‌شود.
+    const healths62 = [];
+    const s62 = RT.createSession('s62', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {}, onHealth: (h) => healths62.push(Object.keys(h).join(',')) });
+    const p62 = s62.start(); await sleep(5); serverOpen(FakeWS.last); await p62;
+    await s62.stopDurableSegment();
+    FakeRecorder.throwNext = true;
+    s62.startDurable();
+    await sleep(20);
+    const reportedDown = Object.keys(s62.health).includes('durable') && !s62.durableRec;
+    await sleep(2300); // DURABLE_START_RETRY_MS
+    ok('T62 F4a FIXED: durable start() failure ⇒ persistent health problem, bounded retry restores recording and clears the problem',
+      reportedDown && !!s62.durableRec && s62.durableRec.state === 'recording' && Object.keys(s62.health).length === 0 && healths62.length >= 2,
+      JSON.stringify({ reportedDown, rec: s62.durableRec && s62.durableRec.state, health: s62.health, healths62 }));
+    s62.abort(); RT.forget(s62);
+  }
+
+  // T64 (F4b): mute/unmute رویِ track ⇒ مشکلِ پایدار و برداشتنش.
+  {
+    newSession('s64');
+    const h64 = [];
+    const s64 = RT.createSession('s64', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {}, onHealth: (h) => h64.push(Object.keys(h).join(',')) });
+    const p64 = s64.start(); await sleep(5); serverOpen(FakeWS.last); await p64;
+    globalThis.fakeTrack.onmute();
+    const afterMute = Object.keys(s64.health).join(',');
+    globalThis.fakeTrack.onunmute();
+    ok('T64 F4b FIXED: track mute ⇒ persistent «mute» health problem; unmute clears it',
+      afterMute === 'mute' && Object.keys(s64.health).length === 0 && h64.join('|') === 'mute|', JSON.stringify({ afterMute, h64 }));
+    s64.abort(); RT.forget(s64);
+  }
+
+  // T65 (F4c): میکروفون قطع می‌شود و دوباره وصل نمی‌شود ⇒ مشکلِ «mic» می‌ماند (و با برگشتِ میکروفون برداشته می‌شود).
+  {
+    newSession('s65');
+    const s65 = RT.createSession('s65', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p65 = s65.start(); await sleep(5); serverOpen(FakeWS.last); await p65;
+    const gum = navigator.mediaDevices.getUserMedia;
+    navigator.mediaDevices.getUserMedia = async () => { throw new Error('NotFoundError'); };
+    globalThis.fakeTrack.onended();
+    await sleep(50);
+    const downHealth = Object.keys(s65.health).join(',');
+    navigator.mediaDevices.getUserMedia = gum;
+    await sleep(1500); // backoff اولین تلاشِ بعدی
+    ok('T65 F4c FIXED: mic lost ⇒ persistent «mic» problem that stays while unavailable and clears on recovery',
+      downHealth === 'mic' && Object.keys(s65.health).length === 0, JSON.stringify({ downHealth, after: s65.health }));
+    s65.abort(); RT.forget(s65);
+  }
+
+  // T66 (F4d): ذخیره‌ی IndexedDB ناموفق ⇒ مشکلِ «storage» پایدار؛ ذخیره‌یِ موفقِ بعدی آن را برمی‌دارد و lastAudioSavedAt را ثبت می‌کند.
+  {
+    newSession('s66');
+    const s66 = RT.createSession('s66', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p66 = s66.start(); await sleep(5); serverOpen(FakeWS.last); await p66;
+    const origAdd = RT.audioQueue.add;
+    RT.audioQueue.add = async () => { RT.audioQueue.lastFailure = 'idb'; return false; };
+    await s66.stopDurableSegment(); s66.startDurable();
+    const failedHealth = Object.keys(s66.health).join(',');
+    RT.audioQueue.add = origAdd;
+    const before66 = s66.lastAudioSavedAt;
+    await s66.stopDurableSegment(); s66.startDurable();
+    ok('T66 F4d FIXED: failed local audio save ⇒ persistent «storage» problem; next successful save clears it and stamps lastAudioSavedAt',
+      failedHealth === 'storage' && Object.keys(s66.health).length === 0 && before66 === 0 && s66.lastAudioSavedAt > 0, JSON.stringify({ failedHealth, health: s66.health, saved: s66.lastAudioSavedAt }));
+    s66.abort(); RT.forget(s66);
+  }
+
+  // T67 (2026-10-02، فاز ۳، F6): قفلِ چند-تب (Web Locks) — تبِ دوم برایِ همان جلسه رد می‌شود، بدونِ mint/WS؛ پس از abort قفل آزاد می‌شود؛
+  // بدونِ Web Locks (یا خطا) fail-open است (همه‌ی تست‌هایِ بالا بدونِ locks اجرا شده‌اند).
+  {
+    const held = new Set();
+    navigator.locks = {
+      request(name, opts, cb) {
+        if (opts && opts.ifAvailable && held.has(name)) return Promise.resolve(cb(null)).then(() => {});
+        held.add(name);
+        return Promise.resolve(cb({ name })).then(() => { held.delete(name); }, () => { held.delete(name); });
+      },
+    };
+    newSession('s67');
+    const sA = RT.createSession('s67', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const pA = sA.start(); await sleep(5); serverOpen(FakeWS.last); await pA;
+    const heldWhileActive = held.has('feelia-live-s67');
+    const mint0 = mintCount, ws0 = wsCreatedCount;
+    const sB = RT.createSession('s67', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    let denied = false;
+    await sB.start().catch((e) => { denied = !!(e && e.lockDenied); });
+    const noSideEffects = mintCount === mint0 && wsCreatedCount === ws0 && sB.state === 'IDLE';
+    // جلسه‌ی دیگر قفلِ جدا دارد
+    newSession('s67b');
+    const sOther = RT.createSession('s67b', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const pO = sOther.start(); await sleep(5); serverOpen(FakeWS.last); await pO;
+    const otherOk = sOther.state === 'ACTIVE';
+    sOther.abort(); RT.forget(sOther);
+    sA.abort(); await sleep(10);
+    const releasedAfterAbort = !held.has('feelia-live-s67');
+    const sC = RT.createSession('s67', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const pC = sC.start(); await sleep(5); serverOpen(FakeWS.last); await pC;
+    const reacquired = sC.state === 'ACTIVE';
+    // forget بدونِ abort (شکستِ start) هم قفل را آزاد می‌کند
+    sC.abort(); RT.forget(sB); RT.forget(sA); RT.forget(sC);
+    // حالتِ note قفل نمی‌خواهد
+    const sN = RT.createSession('s67', { mode: 'note', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const noteLockFree = (await sN.acquireLiveLock()) === true && !held.has('feelia-live-s67');
+    delete navigator.locks;
+    ok('T67 F6 FIXED: cross-tab live lock — 2nd tab denied (no mint/WS), other sessions unaffected, released on abort/forget, note mode lock-free',
+      heldWhileActive && denied && noSideEffects && otherOk && releasedAfterAbort && reacquired && noteLockFree,
+      JSON.stringify({ heldWhileActive, denied, noSideEffects, otherOk, releasedAfterAbort, reacquired, noteLockFree }));
+    RT.forget(sN);
+  }
+
+  // T68 (2026-10-02، «همه‌چیز برایِ ادمین ذخیره شود، حتی بدونِ پایانِ جلسه»): هر سگمنتِ ذخیره‌شده ~۱ث بعد خودکار آپلود می‌شود
+  // (بدونِ تایمر/finish)، و تایمرِ ۲۰ثانیه‌ای در stateِ غیرِ ACTIVE (اتصال قطع) هم صف را می‌فرستد. «تب‌ می‌میرد» = فقط ≤ ۱ سگمنت در صف.
+  {
+    const realSetInterval = globalThis.setInterval;
+    const captured = [];
+    globalThis.setInterval = function (fn, ms) { const id = realSetInterval(fn, ms); if (ms === 20000) captured.push(fn); return id; };
+    newSession('s68');
+    const s68 = RT.createSession('s68', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p68 = s68.start(); await sleep(5); serverOpen(FakeWS.last); await p68;
+    globalThis.setInterval = realSetInterval;
+    await s68.stopDurableSegment(); s68.startDurable();
+    const immediately = fetchUrls.filter((u) => u.includes('/sessions/s68/batch-audio')).length;
+    await sleep(1300);
+    const afterSoon = fetchUrls.filter((u) => u.includes('/sessions/s68/batch-audio'));
+    const queueAfterSoon = await RT.audioQueue.listForSession('s68');
+    // قطعِ اتصال ⇒ stateِ غیرِ ACTIVE؛ سگمنتِ بعدی با آپلودِ فوری نرفته باشد (drainSoon خاموش) ولی تایمرِ ۲۰ث بفرستد
+    serverClose(FakeWS.last); await sleep(30);
+    const nonActive = s68.state !== 'ACTIVE';
+    s68.drainSoon = () => {};
+    await s68.stopDurableSegment(); s68.startDurable();
+    const queuedBefore = (await RT.audioQueue.listForSession('s68')).length;
+    captured.forEach((fn) => fn());
+    await sleep(120);
+    const queuedAfter = (await RT.audioQueue.listForSession('s68')).length;
+    ok('T68 every saved segment is uploaded within ~1s and also by the 20s timer in non-ACTIVE states (admin keeps audio without final save)',
+      immediately === 0 && afterSoon.length === 1 && queueAfterSoon.length === 0 && nonActive && queuedBefore >= 1 && queuedAfter === 0,
+      JSON.stringify({ immediately, soon: afterSoon.length, queueAfterSoon: queueAfterSoon.length, nonActive, queuedBefore, queuedAfter }));
+    s68.abort(); RT.forget(s68);
   }
 
   console.log(results.map((r) => r[0]).join('\n'));

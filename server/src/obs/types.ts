@@ -47,6 +47,7 @@ export const OBS_SERVER_EVENTS = [
   'auth.logout',
   'session.created',
   'session.transcript_put',
+  'session.transcript_put_no_cas',
   'session.transcript_conflict',
   'session.deleted',
   // A3 (2026-09-26): جلسه‌ی زنده‌ی رهاشده توسطِ worker بسته شد (sessionAutoClose.ts) / دوباره باز شد
@@ -54,6 +55,7 @@ export const OBS_SERVER_EVENTS = [
   'session.reopened',
   'audio.segment_received',
   'audio.archive_failed',
+  'audio.archive_lost',
   // سگمنتِ آرشیوشده که decode نمی‌شود و از فایلِ کاملِ ادمین کنار گذاشته شد (audit ذخیره‌سازی 2026-09-26)
   'audio.segment_unreadable',
   'batch.enqueued',
@@ -111,6 +113,8 @@ export const OBS_CLIENT_EVENTS = [
   'rt.final_persist_failed',
   // A3: صدایِ آپلودنشده‌ی بیش از ۷ روز در IndexedDB پاک شد (detail: count)
   'rt.local_audio_expired',
+  'rt.storage_persist_denied',
+  'rt.local_audio_expiring',
   // فازِ ۱: افتِ رویدادِ سمتِ کلاینت به‌خاطرِ سرریزِ ring buffer (feelia-obs.js)
   'obs.client_dropped',
 ] as const;

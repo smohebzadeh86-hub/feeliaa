@@ -5,6 +5,7 @@ import { getOwnedSession } from '../../db/ownership.js';
 import { maybeAutoGenerateCaseFile } from '../case-file/index.js';
 import {
   insertNote, getNoteRow, isNoteOwned, deleteNote, getOwnedNoteType, updateNoteText, EDITABLE_NOTE_TYPES,
+  insertNoteRevision, listNoteRevisions, getNoteRevisionText,
 } from './sessions.repository.js';
 
 // سقفِ متنِ ویرایش‌شده‌ی یادداشتِ پیش از جلسه — متنِ رونویسیِ یک ضبطِ ۵دقیقه‌ای از ۲۰۰۰ نویسه بیشتر است.
@@ -72,7 +73,30 @@ export async function sessionNotesRoutes(app: FastifyInstance) {
       reply.code(400);
       return { error: 'یادداشت بیش از حد طولانی است', code: 'note-too-long' };
     }
+    // متنِ قبلی پیش از جایگزینی در تاریخچه می‌ماند (044)
+    const before = await getNoteRow(id);
+    if (before && typeof before.text === 'string' && before.text !== clean) await insertNoteRevision(id, before.session_id, before.text, request.therapistId ?? null);
     await updateNoteText(id, clean);
+    return { note: await getNoteRow(id) };
+  });
+
+  // GET /api/notes/:id/revisions — نسخه‌هایِ قبلیِ متنِ یادداشت (فقط متادیتا)
+  app.get('/api/notes/:id/revisions', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!(await isNoteOwned(id, request.therapistId))) { reply.code(404); return { error: 'یادداشت یافت نشد' }; }
+    return { revisions: await listNoteRevisions(id) };
+  });
+
+  // POST /api/notes/:id/revisions/:rid/restore — بازگردانیِ یک نسخه؛ متنِ فعلی هم در تاریخچه می‌ماند
+  app.post('/api/notes/:id/revisions/:rid/restore', async (request, reply) => {
+    const { id, rid } = request.params as { id: string; rid: string };
+    const type = await getOwnedNoteType(id, request.therapistId);
+    if (!type) { reply.code(404); return { error: 'یادداشت یافت نشد' }; }
+    const old = await getNoteRevisionText(id, Number(rid));
+    if (old === null) { reply.code(404); return { error: 'نسخه یافت نشد' }; }
+    const before = await getNoteRow(id);
+    if (before && typeof before.text === 'string' && before.text !== old) await insertNoteRevision(id, before.session_id, before.text, request.therapistId ?? null);
+    await updateNoteText(id, old);
     return { note: await getNoteRow(id) };
   });
 
@@ -85,7 +109,8 @@ export async function sessionNotesRoutes(app: FastifyInstance) {
       return { error: 'یادداشت یافت نشد' };
     }
 
-    await deleteNote(id);
-    return { deleted: id };
+    // حذفِ نرم (migration 043): ادمین یادداشتِ حذف‌شده را می‌بیند
+    await deleteNote(id, request.therapistId ?? null);
+    return { deleted: id, recoverable: true };
   });
 }

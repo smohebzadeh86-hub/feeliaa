@@ -9,6 +9,8 @@ import { exportAdminRoutes } from './export.admin.js';
 import { obsAdminRoutes } from './obs.admin.js';
 import { queueAdminRoutes } from './queue.admin.js';
 import { systemAdminRoutes } from './system.admin.js';
+import { metricsAdminRoutes } from './metrics.admin.js';
+import { dataAccessAdminRoutes } from './dataAccess.admin.js';
 
 export async function adminRoutes(app: FastifyInstance) {
   app.addHook('preHandler', requireAdmin);
@@ -19,4 +21,6 @@ export async function adminRoutes(app: FastifyInstance) {
   await app.register(obsAdminRoutes);
   await app.register(queueAdminRoutes);
   await app.register(systemAdminRoutes);
+  await app.register(metricsAdminRoutes);
+  await app.register(dataAccessAdminRoutes);
 }

@@ -10,7 +10,7 @@ import {
 import { parseTurns, chunkTurns, renderClean, sampleForOverview, UPLOAD_LABEL, appendUploadForPolish, maxSpeakerNumber } from '../server/src/features/final-transcript/domain/transcriptText.js';
 import { checkPolishedChunk, negationCount, numberBag, DEFAULT_GUARD_LIMITS } from '../server/src/features/final-transcript/domain/polishGuards.js';
 import { polishTranscript } from '../server/src/features/final-transcript/application/polishTranscript.js';
-import { applyRoleEdit, allowedRoles } from '../server/src/features/final-transcript/domain/roleEdit.js';
+import { applyRoleEdit, allowedRoles, roleNameToEntry, confirmedRolesFromEntries } from '../server/src/features/final-transcript/domain/roleEdit.js';
 import type { LlmJsonPort } from '../server/src/features/final-transcript/ports.js';
 
 let pass = 0;
@@ -205,6 +205,17 @@ await t('مسیرِ آپلود (source=async از قبل) ⇒ بدونِ Soniox 
   assert.equal(w.job.stage, 'done');
   assert.equal(w.soniox.length, 0);
   assert.deepEqual(w.polishedInputs, ['گوینده ۱: متنِ آپلود']);
+});
+
+await t('گذرِ canonical-only (polishWanted=false): بدونِ هزینه‌ی LLM ⇒ skipped با canonical-only؛ polishWanted=true ⇒ مثلِ قبل', async () => {
+  const w = world({ job: newJob({ stage: 'polishing', source: 'async', asyncText: 'گوینده ۱: متن' }) });
+  await stepFinalTranscript(w.job, { ...deps(w), polishWanted: async () => false });
+  assert.equal(w.job.stage, 'skipped');
+  assert.equal(w.job.errorCode, 'canonical-only');
+  assert.deepEqual(w.polishedInputs, []);
+  const w2 = world({ job: newJob({ stage: 'polishing', source: 'async', asyncText: 'گوینده ۱: متن' }) });
+  await stepFinalTranscript(w2.job, { ...deps(w2), polishWanted: async () => true });
+  assert.equal(w2.job.stage, 'done');
 });
 
 await t('sourceVersion در لحظه‌ی polish به نسخه‌ی فعلی می‌رسد (مبنایِ stale)', async () => {
@@ -627,7 +638,16 @@ await t('R2 polish: دو نوبتِ خامِ شکسته (src=[2,3]) ⇒ raw هر
   const mixed = 'گوینده ۱: از کی شروع شد\n\nگوینده ۲: از دوشنبه که کارم زیاد شد';
   const llm2 = fakeLlm(() => ({ turns: [{ src: [1, 2], speaker_role: 'مراجع', text: 'از کی شروع شد؟ از دوشنبه که کارم زیاد شد.' }] }));
   const r2 = await polishTranscript(mixed, null, llm2, NCFG);
-  assert.equal(r2.turns[0].sp, null);
+  // F7 (2026-10-02): ادغامِ دو گوینده‌یِ پرحرف دیگر پذیرفته نمی‌شود ⇒ نوبت‌هایِ خام و جدا (قبلاً یک نقش و sp=null)
+  assert.equal(r2.turns.length, 2);
+  assert.equal(r2.turns[0].sp, '۱');
+  assert.equal(r2.turns[1].sp, '۲');
+  assert.ok((r2.report.fallback_reasons.speakers || 0) >= 1);
+  // همهمه‌یِ کوتاه (≤ ۲ واژه) از گوینده‌یِ دیگر هنوز قابلِ ادغام است (sp=null)
+  const back = 'گوینده ۱: از کی شروع شد\n\nگوینده ۲: آره';
+  const llm3 = fakeLlm(() => ({ turns: [{ src: [1, 2], speaker_role: 'درمانگر', text: 'از کی شروع شد؟ آره.' }] }));
+  const r3 = await polishTranscript(back, null, llm3, NCFG);
+  assert.equal(r3.turns[0].sp, null);
 });
 
 await t('R3 اصلاحِ نقش: یک بخش؛ همه‌ی بخش‌هایِ همان صدا؛ متن دست نمی‌خورد؛ پاراگراف‌ها دوباره یکی می‌شوند', () => {
@@ -717,6 +737,37 @@ await t('usage: آمارِ هر ویرایش — جمع = برداشتِ کلی 
   const plain = fakeLlm(() => ({ turns: [] }));
   const r2 = await polishTranscript(RAW4, null, plain, NCFG).catch(() => null);
   assert.ok(!r2 || r2.report.usage === undefined);
+});
+
+await t('B20 (F7) خروجیِ واحد که نوبت‌هایِ دو گویندهٔ متفاوت را ادغام کرده ⇒ رد (speakers)؛ نوبت‌ها خام می‌مانند، نقش‌ها جدا', async () => {
+  const merged = [
+    { src: [1, 2], speaker_role: 'درمانگر', text: 'سلام، خوش اومدید. امروز از کجا شروع کنیم؟ این هفته خیلی سخت گذشت برامون.' },
+    { src: [3], speaker_role: 'آقا', text: SWAPPED[2].text },
+  ];
+  const llm = mapLlm([['۱', 'درمانگر'], ['۲', 'خانم'], ['۳', 'آقا']], merged);
+  const r = await polishTranscript(RAW3, COUPLE, llm, { ...PCFG, trustDiarization: false });
+  assert.ok((r.report.fallback_reasons.speakers || 0) >= 1, JSON.stringify(r.report.fallback_reasons));
+  assert.ok(r.text.includes('درمانگر: سلام خوش اومدید امروز از کجا شروع کنیم'), r.text);
+  assert.ok(r.text.includes('خانم: این هفته خیلی سخت گذشت برامون'), r.text);
+  assert.ok(!r.text.includes('درمانگر: سلام، خوش اومدید. امروز از کجا شروع کنیم؟ این هفته'), 'ادغام نباید پذیرفته شود');
+});
+
+await t('B21 (F7) نقشِ تأییدشده‌ی درمانگر پین است: LLM برخلافش بنویسد ⇒ نقشِ تأییدشده می‌ماند و role_overrides شمرده می‌شود', async () => {
+  const llm = mapLlm([['۱', 'درمانگر'], ['۲', 'آقا'], ['۳', 'خانم']], SWAPPED);
+  const r = await polishTranscript(RAW3, COUPLE, llm, { ...PCFG, trustDiarization: false, confirmedRoles: { '۲': 'خانم', '۳': 'آقا' } });
+  assert.ok(r.text.includes('خانم: این هفته خیلی سخت گذشت برامون.'), r.text);
+  assert.ok(r.text.includes('آقا: من فکر می‌کنم بحث نبود'), r.text);
+  assert.ok(r.report.role_overrides >= 1, String(r.report.role_overrides));
+  // نقشِ تأییدشده‌ی بیرون از فهرستِ حاضرین نادیده گرفته می‌شود (نامِ نمایشیِ نادرست نمی‌سازد)
+  const r2 = await polishTranscript(RAW3, COUPLE, mapLlm([['۱', 'درمانگر'], ['۲', 'خانم'], ['۳', 'آقا']], [SWAPPED[0], { speaker_role: 'خانم', text: SWAPPED[1].text }, { speaker_role: 'آقا', text: SWAPPED[2].text }]), { ...PCFG, trustDiarization: false, confirmedRoles: { '۲': 'پدربزرگ' } });
+  assert.ok(r2.text.includes('خانم: این هفته'), r2.text);
+});
+
+await t('B22 (F7) پلِ نقش: نامِ نقش ⇄ رکوردِ canonical (enum+برچسب) و برگشت به برچسبِ فارسیِ گوینده', () => {
+  assert.deepEqual(roleNameToEntry('درمانگر'), { role: 'therapist', label: null });
+  assert.deepEqual(roleNameToEntry('مراجع'), { role: 'client', label: null });
+  assert.deepEqual(roleNameToEntry('آقا'), { role: 'member', label: 'آقا' });
+  assert.deepEqual(confirmedRolesFromEntries({ '1': { role: 'therapist', label: null }, '2': { role: 'member', label: 'خانم' }, x: { role: 'client', label: null } }), { '۱': 'درمانگر', '۲': 'خانم' });
 });
 
 console.log(`\n${pass} pass, ${fail} fail`);

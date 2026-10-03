@@ -80,7 +80,14 @@
   // state هنوز ACTIVEه، یعنی onclose/onerror دیر یا هیچ‌وقت فایر نشده؛ همون reconnect
   // معمولی را دستی صدا می‌زنیم تا مرزِ سگمنت هرچه زودتر بسته شود.
   var WS_WATCHDOG_MS = 3000;
-  var ARCHIVE_DRAIN_MS = 60 * 1000; // آپلودِ تدریجیِ صفِ durable حینِ جلسه‌ی ACTIVE (startAutosave)
+  // ⭐ (2026-10-02، فاز ۱ ممیزیِ Core، F1b) WebSocketِ «بازِ ولی مرده»: readyState=OPEN ولی هیچ پیامی (حتی بدونِ token)
+  // از Soniox نمی‌آید. سقفِ سکوت عمداً بلند است تا رویِ سکوتِ طبیعیِ گفتگو false-positive ندهد؛ قابلِ override با
+  // RTSession.wsSilentMs (تست). VERIFY: با Sonioxِ واقعی بررسی شود که در سکوت هم پیامِ بدونِ token می‌آید.
+  var WS_SILENT_MS = 30 * 1000;
+  // ⭐ (2026-10-02) هر چیزی که ضبط شد باید برایِ ادمین ذخیره شود، حتی اگر تراپیست «پایان جلسه» نزند و تب بمیرد:
+  // آپلودِ صفِ durable هر ۲۰ث (قبلاً ۶۰ث و فقط در ACTIVE) + بلافاصله (~۱ث) پس از ذخیره‌یِ هر سگمنت در IndexedDB.
+  var ARCHIVE_DRAIN_MS = 20 * 1000;
+  var DRAIN_SOON_MS = 1000;
   var BATCH_POLL_MS = 5000;
   var BATCH_TIMEOUT_MS = 15 * 60 * 1000; // explicit: سقف انتظار batch
   var MIME_CANDIDATES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg'];
@@ -223,9 +230,12 @@
     // purposeِ آپلود در آینده است، نه وضعیتِ لحظه‌ایِ RTSession در زمانِ آپلود (audit
     // صدا/۲۰۲۶-۰۹-۱۶، بخشِ C). رکوردهایِ قدیمی‌ترِ بدونِ این فیلد در uploadQueuedSegment
     // با fallbackِ 'archive' هندل می‌شن.
-    function add(sessionId, runId, seq, blob, mime, intent) {
+    // emptyBefore (2026-10-01، ممیزیِ Core): شماره‌هایِ سگمنت‌هایِ *خالی* که درست پیش از این سگمنت مصرف شده‌اند؛ همراهِ آپلود
+    // به سرور می‌رود (?empty=) تا چکِ «سگمنتی گم نشده» فرقِ سگمنتِ خالی و سگمنتِ واقعاً گم‌شده را بفهمد.
+    // lastFailure: 'quota' (سقفِ ۳۰۰MB) یا 'idb' (خطایِ خودِ IndexedDB) — پیامِ صادقانه برایِ تراپیست.
+    function add(sessionId, runId, seq, blob, mime, intent, emptyBefore) {
       return totalBytes().then(function (used) {
-        if (used + blob.size > AUDIO_QUEUE_MAX_BYTES) return false;
+        if (used + blob.size > AUDIO_QUEUE_MAX_BYTES) { api.lastFailure = 'quota'; return false; }
         var rec = {
           id: sessionId + '_' + runId + '_' + seq,
           sessionId: sessionId,
@@ -235,6 +245,7 @@
           mime: mime || 'audio/webm',
           bytes: blob.size,
           intent: intent || 'archive',
+          emptyBefore: (emptyBefore && emptyBefore.length) ? emptyBefore.slice() : undefined,
           owner: queueOwner,
           createdAt: Date.now(),
         };
@@ -242,7 +253,7 @@
           if (cachedTotal !== null) cachedTotal += blob.size;
           return true;
         });
-      }).catch(function () { cachedTotal = null; return false; });
+      }).catch(function () { cachedTotal = null; api.lastFailure = 'idb'; return false; });
     }
     function listForSession(sessionId) {
       return withStore('readonly', function (store) {
@@ -293,10 +304,12 @@
       copy.intent = intent;
       return withStore('readwrite', function (store) { return store.put(copy); }).then(function () { return copy; });
     }
-    return {
+    var api = {
+      lastFailure: null,
       add: add, listForSession: listForSession, remove: remove, clearForSession: clearForSession, clearForRun: clearForRun,
       totalBytes: totalBytes, listSessionIdsWithPending: listSessionIdsWithPending, retag: retag
     };
+    return api;
   })();
 
   // ⭐ منطقِ یکتایِ انتخابِ purpose از رویِ intentِ خودِ رکورد + آپلود + fallback
@@ -324,7 +337,8 @@
       fd.append('file', rec.blob, 'segment-' + rec.seq + '.webm');
       var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
       var timer = controller ? setTimeout(function () { try { controller.abort(); } catch (e) {} }, SEGMENT_UPLOAD_TIMEOUT_MS) : null;
-      return fetch('/api/sessions/' + sessionId + '/batch-audio?purpose=' + p + '&seq=' + rec.seq + '&run=' + encodeURIComponent(run), {
+      return fetch('/api/sessions/' + sessionId + '/batch-audio?purpose=' + p + '&seq=' + rec.seq + '&run=' + encodeURIComponent(run) +
+        (rec.emptyBefore && rec.emptyBefore.length ? '&empty=' + rec.emptyBefore.join(',') : ''), {
         method: 'POST', body: fd, signal: controller ? controller.signal : undefined
       }).then(function (res) { if (timer) clearTimeout(timer); return res; }, function (err) { if (timer) clearTimeout(timer); throw err; });
     };
@@ -459,7 +473,8 @@
     this.cb = {
       onState: opts.onState || function () {},
       onResult: opts.onResult || function () {},
-      onError: opts.onError || function () {}
+      onError: opts.onError || function () {},
+      onHealth: opts.onHealth || null
     };
     this.state = STATES.IDLE;
     this.generation = 0;
@@ -470,6 +485,8 @@
     this.durableRec = null;
     this.durableRotateTimer = null;
     this.durableSeq = 0; // شماره‌ی افزایشیِ سگمنت — کلیدِ ردیفِ IndexedDB می‌شه (sessionId_seq)
+    this.pendingEmptySeqs = []; // سگمنت‌هایِ خالی که هنوز همراهِ یک سگمنتِ واقعی به سرور گزارش نشده‌اند
+    requestPersistentStorage();
     // (chunkهای durable عمداً رویِ self نیستند — محلیِ هر recorder در startDurable؛ race چرخش)
     this.confirmed = '';
     this.interim = '';
@@ -490,6 +507,9 @@
     // راه‌حل: هر (نسل، شماره‌ی خامِ Soniox) یه برچسبِ سراسریِ تازه می‌گیره — پس گوینده‌ها
     // بعدِ هر reconnect/resume، به‌جایِ قاطی‌شدن با گوینده‌هایِ قبلی، شماره‌ی جدید می‌گیرن.
     this.speakerLabelMap = {};
+    // ⭐ (2026-10-02، فاز ۲ ممیزیِ Core) مشکلاتِ پایدارِ ضبط (کلید→پیام) و آخرین ذخیره‌ی موفقِ صدا؛ cb.onHealth(map) هر تغییر را می‌گیرد.
+    this.health = {};
+    this.lastAudioSavedAt = 0;
     // ⭐ (2026-09-26) از ۱، هم‌راستا با خودِ Soniox و مسیرِ async/batch/آپلود (buildTextFromAsyncTokens که
     // شماره‌ی خام را می‌نویسد) — قبلاً از ۰ بود و متنِ زنده «گوینده ۰» می‌داد ولی بازسازی «گوینده ۱».
     this.nextSpeakerLabel = 1;
@@ -523,6 +543,7 @@
   RTSession.prototype.setState = function (s) {
     var prevState = this.state;
     this.state = s;
+    if (s === STATES.COMPLETED || s === STATES.CANCELED) this.releaseLiveLock();
     if (prevState !== s) obsEvent('rt.state_change', { state: s, prev_state: prevState }, this);
     try { this.cb.onState(s, this.snapshot()); } catch (e) {}
     syncWakeLock();
@@ -559,6 +580,7 @@
     if (this.autosaveTimer) { clearInterval(this.autosaveTimer); this.autosaveTimer = null; }
     if (this.wsWatchdogTimer) { clearInterval(this.wsWatchdogTimer); this.wsWatchdogTimer = null; }
     if (this.archiveDrainTimer) { clearInterval(this.archiveDrainTimer); this.archiveDrainTimer = null; }
+    if (this._drainSoonTimer) { clearTimeout(this._drainSoonTimer); this._drainSoonTimer = null; }
   };
 
   // ——— audio مشترک ———
@@ -568,6 +590,13 @@
     return reqStream().then(function (s) { self.stream = s; self.watchTrackEnded(s); return s; });
   };
 
+  // مشکلِ پایدارِ ضبط: msg=falsy ⇒ برداشتنِ مشکل. برخلافِ cb.onError (بنرِ گذرا که با اولین stateِ سالم پاک می‌شود)، تا رفعِ واقعی می‌ماند.
+  RTSession.prototype.setHealth = function (code, msg) {
+    if (!msg) { if (!(code in this.health)) return; delete this.health[code]; }
+    else { if (this.health[code] === msg) return; this.health[code] = msg; obsEvent('rt.health_problem', { code: code }, this); }
+    try { if (this.cb.onHealth) { var snap = {}; for (var k in this.health) snap[k] = this.health[k]; this.cb.onHealth(snap); } } catch (e) {}
+  };
+
   // ⭐ باگِ واقعی (audit صدا/۲۰۲۶-۰۹-۱۶): جداشدنِ فیزیکیِ میکروفون (هدست/OS/تماسِ
   // تلفن) به MediaRecorder هیچ خطایی نمی‌ده — ضبط فقط بی‌صدا متوقف می‌شه، بدونِ
   // هیچ نشانه‌ای برایِ کاربر یا کد. تنها رویدادِ قابلِ‌اعتماد track.onended است.
@@ -575,7 +604,12 @@
     var self = this;
     try {
       var tracks = stream.getAudioTracks ? stream.getAudioTracks() : [];
-      tracks.forEach(function (t) { t.onended = function () { self.handleMicLost(); }; });
+      tracks.forEach(function (t) {
+        t.onended = function () { self.handleMicLost(); };
+        // ⭐ (F4) mute (قطعِ موقتِ OS/هدست/حریمِ خصوصی): track زنده است ولی صدا نمی‌آید؛ قبلاً هیچ‌جا هندل نمی‌شد.
+        t.onmute = function () { obsEvent('rt.mic_muted', {}, self); self.setHealth('mute', 'میکروفون بی‌صدا شده (mute) — تا برطرف‌شدن صدایی ضبط نمی‌شود'); };
+        t.onunmute = function () { obsEvent('rt.mic_unmuted', {}, self); self.setHealth('mute', null); };
+      });
     } catch (e) {}
   };
 
@@ -589,6 +623,7 @@
     if (self._micRecovering) return;
     self._micRecovering = true;
     obsEvent('rt.mic_lost', { state: self.state }, self);
+    self.setHealth('mic', 'میکروفون قطع شده — تا وصل‌شدنِ دوباره صدایی ضبط نمی‌شود');
     try { self.cb.onError('میکروفون قطع شد — در حال تلاش برای اتصالِ دوباره'); } catch (e) {}
     self.stopLivePusher();
     var wasDurable = !!(self.durableRec && self.durableRec.state === 'recording');
@@ -599,6 +634,7 @@
       self.ensureStream().then(function () {
         self._micRecovering = false;
         obsEvent('rt.mic_recovered', { attempt: n }, self);
+        self.setHealth('mic', null);
         try { self.cb.onError('میکروفون دوباره وصل شد'); } catch (e) {}
         if (self.hasOpenWS()) self.startLivePusher();
         if (wasDurable) self.startDurable();
@@ -678,7 +714,7 @@
       // بعضی مرورگرها ترکیبِ mimeType+audioBitsPerSecond رو رد می‌کنن؛ بدونِ بیت‌ریتِ صریح امتحان کن
       try {
         self.durableRec = mime ? new MediaRecorder(self.stream, { mimeType: mime }) : new MediaRecorder(self.stream);
-      } catch (e2) { return; }
+      } catch (e2) { self.onDurableStartFailed(e2, null); return; }
     }
     // ⭐ mimeِ واقعیِ گزارش‌شده توسطِ خودِ MediaRecorder (audit صدا/۲۰۲۶-۰۹-۱۶، بخشِ E) —
     // باید همین‌جا (بلافاصله بعدِ ساخت) گرفته بشه، نه داخلِ onstop: تا اون لحظه
@@ -704,11 +740,13 @@
     rec.onstop = function () {
       // اگه abort() صدا زده شده باشه (لغوِ صریحِ کاربر)، این تکه رو دور بریز — وگرنه
       // بعدِ پاک‌سازیِ صف دوباره اضافه می‌شد و برایِ همیشه یتیم می‌موند.
-      if (!chunks.length || self.aborted) { resolveFlush(); return; }
+      if (self.aborted) { resolveFlush(); return; }
       // seq و state در لحظه‌ی stopDurableSegment ثبت شده‌اند (نه اینجا، که ممکن است بعد از
       // تغییرِ state و شروعِ سگمنتِ بعدی اجرا شود). fallback فقط برایِ recorderی است که
       // خودش (مثلاً با پایانِ track) بدونِ stopDurableSegment متوقف شده.
       var seq = typeof rec._seqAtStop === 'number' ? rec._seqAtStop : self.durableSeq++;
+      // سگمنتِ خالی شماره‌اش را مصرف کرده ولی هرگز آپلود نمی‌شود ⇒ شماره ثبت می‌شود تا همراهِ سگمنتِ واقعیِ بعدی گزارش شود.
+      if (!chunks.length) { self.pendingEmptySeqs.push(seq); resolveFlush(); return; }
       var stateAtStop = rec._stateAtStop || self.state;
       // ⭐ intent تصمیمِ همین لحظه است (نه بعداً حدس‌زده‌شده در زمانِ آپلود، audit صدا/
       // ۲۰۲۶-۰۹-۱۶، بخشِ C): یادداشتِ صوتی همیشه 'note'؛ اگه realtime همین الان غیرقابل‌اعتماد
@@ -731,19 +769,31 @@
           ? 'transcript' : 'archive';
       // ⭐ (A2، 2026-09-26، تصمیمِ مالک: «متنِ بازیابی‌شده در جایِ زمانیِ درست») جایِ متنِ این بازه همین‌جاست —
       // placeholder با کلیدِ run:seq؛ سرور بعد از رونویسی همان را درجا جایگزین می‌کند (applyBatchSegmentOnce).
-      if (intent === 'transcript' && self.persist) self.insertRecoveryPlaceholder(self.runId, seq);
       try {
         var blob = new Blob(chunks, { type: recordedMime });
-        AudioQueueDB.add(self.sessionId, self.runId, seq, blob, recordedMime, intent).then(function (ok) {
+        // سگمنتِ بی‌محتوا (≤۱۰۰ بایت: فقط هدر) هرگز رونویسی نمی‌شود ⇒ مثلِ خالی؛ placeholderِ «در حالِ بازیابی» هم برایش گذاشته نمی‌شود.
+        if (blob.size <= 100) { self.pendingEmptySeqs.push(seq); resolveFlush(); return; }
+        if (intent === 'transcript' && self.persist) self.insertRecoveryPlaceholder(self.runId, seq);
+        var empties = self.pendingEmptySeqs.splice(0);
+        AudioQueueDB.add(self.sessionId, self.runId, seq, blob, recordedMime, intent, empties).then(function (ok) {
           if (!ok) {
-            // سقفِ صفِ آفلاین رد شده — این سگمنت ذخیره نشد. صادقانه به caller اطلاع بده
-            // تا UI بتونه هشدارِ واضح نشون بده، نه اینکه بی‌صدا صدا گم بشه.
-            try { self.cb.onError('فضایِ ذخیره‌ی محلیِ صدا پر شده — صدایِ جدید ذخیره نمی‌شود'); } catch (e) {}
+            // ذخیره نشد ⇒ شماره‌هایِ خالی را برگردان تا با سگمنتِ بعدی گزارش شوند. پیامِ صادقانه: سقفِ حجم یا خطایِ خودِ IndexedDB.
+            self.pendingEmptySeqs = empties.concat(self.pendingEmptySeqs);
+            var why = AudioQueueDB.lastFailure === 'idb'
+              ? 'ذخیره‌ی محلیِ صدا در مرورگر خطا داد — این بخش از صدا ذخیره نشد (حافظه‌ی مرورگر را بررسی کنید)'
+              : 'فضایِ ذخیره‌ی محلیِ صدا پر شده — صدایِ جدید ذخیره نمی‌شود';
+            try { self.cb.onError(why); } catch (e) {}
+            self.setHealth('storage', why);
+          } else {
+            self.lastAudioSavedAt = Date.now();
+            self.setHealth('storage', null);
+            self.drainSoon();
           }
         }).catch(function () {}).then(resolveFlush);
       } catch (e) { resolveFlush(); }
     };
-    try { self.durableRec.start(1000); } catch (e) {}
+    try { self.durableRec.start(1000); self.durableStartFails = 0; self.setHealth('durable', null); }
+    catch (e) { self.onDurableStartFailed(e, rec); return; }
     // چرخشِ خودکارِ ۱۵ثانیه‌ای — نه فقط سرِ pause/resume (توضیح بالایِ DURABLE_ROTATE_MS).
     // stop و بلافاصله start امن است چون chunks/seq/state هر recorder مالِ خودش است (بالا).
     self.durableRotateTimer = self.later(function () {
@@ -752,6 +802,29 @@
         self.startDurable();
       }
     }, DURABLE_ROTATE_MS);
+  };
+
+  // ⭐ (F4a) start() خطا داد (قبلاً بی‌صدا قورت داده می‌شد؛ ضبطِ پشتیبان تا پایان مرده می‌ماند و درمانگر نمی‌دانست).
+  // گزارشِ پایدار + تلاشِ دوباره (محدود). seq با stopDurableSegment مصرف می‌شود، پس recorderِ شکست‌خورده چیزی ثبت نمی‌کند.
+  var DURABLE_START_RETRY_MS = 2000;
+  var DURABLE_START_MAX_RETRIES = 5;
+  RTSession.prototype.onDurableStartFailed = function (err, rec) {
+    var self = this;
+    if (self.durableRec === rec) self.durableRec = null;
+    self.durableStartFails = (self.durableStartFails || 0) + 1;
+    obsEvent('rt.durable_start_failed', { attempt: self.durableStartFails }, self);
+    if (self.aborted || self.state === STATES.COMPLETED || self.state === STATES.CANCELED || self.state === STATES.FINALIZING) return;
+    if (self.durableStartFails > DURABLE_START_MAX_RETRIES) {
+      self.setHealth('durable', 'ضبطِ صدا شروع نمی‌شود — صدا ذخیره نمی‌شود؛ صفحه را دوباره باز کنید یا میکروفون/مرورگر را بررسی کنید');
+      try { self.cb.onError('ضبطِ صدا شروع نمی‌شود — صدا ذخیره نمی‌شود'); } catch (e) {}
+      return;
+    }
+    self.setHealth('durable', 'ضبطِ ذخیره‌یِ صدا شروع نشد — در حالِ تلاشِ دوباره…');
+    self.later(function () {
+      if (self.durableRec || self.aborted || !self.stream) return;
+      if (self.state === STATES.MANUAL_PAUSED || self.state === STATES.FINALIZING || self.state === STATES.COMPLETED || self.state === STATES.CANCELED) return;
+      self.startDurable();
+    }, DURABLE_START_RETRY_MS);
   };
 
   // برمی‌گردونه promiseِ «آخرین سگمنت واقعاً توی IndexedDB نوشته شد» — caller هایی
@@ -765,6 +838,20 @@
   // ثانیه طول بکشه؛ اگه نگهبان زودتر fire بشه، finish()/pause() سراغِ صفی می‌رن که
   // آخرین سگمنت هنوز توش نیست — نه throw، فقط صدا بدونِ خبر جا می‌مونه.
   var DURABLE_FLUSH_GUARD_MS = 10000;
+  // ذخیره‌ی پایدار (2026-10-01، ممیزیِ Core): بدونِ این، مرورگر در فشارِ حافظه می‌تواند IndexedDB (تنها نسخه‌ی صدایِ آپلودنشده) را
+  // بی‌خبر پاک کند. یک بار در هر بارگذاری؛ رد شدنِ درخواست بی‌اثر است (fail-open). فقط یک رویدادِ obs بدونِ داده.
+  var persistRequested = false;
+  function requestPersistentStorage() {
+    if (persistRequested) return;
+    persistRequested = true;
+    try {
+      if (navigator.storage && navigator.storage.persist) {
+        navigator.storage.persist().then(function (granted) {
+          if (!granted) { try { obsEvent('rt.storage_persist_denied', {}, null); } catch (e) {} }
+        }).catch(function () {});
+      }
+    } catch (e) {}
+  }
   // stateOverride: فقط finish() — که پیش از بستنِ آخرین سگمنت به FINALIZING رفته — stateِ واقعیِ
   // لحظه‌ی «پایانِ جلسه» را می‌دهد تا intentِ همان سگمنت درست حساب شود.
   RTSession.prototype.stopDurableSegment = function (stateOverride) {
@@ -850,7 +937,8 @@
 
   RTSession.prototype.attachWSHandlers = function (ws) {
     var self = this;
-    ws.onmessage = function (ev) { self.handleSonioxMessage(ev); };
+    self.lastWsMsgAt = Date.now();
+    ws.onmessage = function (ev) { self.lastWsMsgAt = Date.now(); self.handleSonioxMessage(ev); };
     ws.onclose = function (ev) { self.handleWSClose(ev); };
   };
 
@@ -1029,7 +1117,16 @@
     var c = this.confirmed || '';
     // سگمنتِ قطعی ناهمگام بسته می‌شود — اگر نشانگرِ «اتصال دوباره برقرار شد» همین حالا اضافه شده، جایِ زمانیِ
     // این بازه قبل از آن است.
-    if (c.length >= RECONNECT_MARK.length && c.slice(-RECONNECT_MARK.length) === RECONNECT_MARK) {
+    // ⭐ (2026-10-02، E2E واقعی) فقط وقتی نشانگر هنوز ذخیره نشده: اگر persistedText تا داخلِ نشانگر می‌رسد، وسطِ متنِ ذخیره‌شده
+    // درج‌کردنِ placeholder آن را از «پیشوندِ متن» خارج می‌کند ⇒ rebaseِ 409 واگرایی می‌بیند و جمله‌ی live را دوبار می‌نویسد. آنجا ته‌پیوند.
+    var endsWithMark = c.length >= RECONNECT_MARK.length && c.slice(-RECONNECT_MARK.length) === RECONNECT_MARK;
+    var markSaved = false;
+    if (endsWithMark) {
+      var headLen = c.slice(0, -RECONNECT_MARK.length).replace(/\s+$/, '').length;
+      var persisted = this.persistedText || '';
+      markSaved = persisted.length > headLen && cleanText(c).indexOf(persisted) === 0;
+    }
+    if (endsWithMark && !markSaved) {
       var head = c.slice(0, -RECONNECT_MARK.length).replace(/\s+$/, '');
       this.confirmed = head + (head ? '\n\n' : '') + ph + '\n\n' + RECONNECT_MARK;
     } else {
@@ -1207,7 +1304,47 @@
   // به‌جای fallback به legacy proxy (که همان egress خراب را لازم دارد)، وارد حالت
   // durable-only می‌شود: ضبط محلی ادامه می‌یابد و finish از صف batch استفاده می‌کند.
   // فقط وقتی false برمی‌گردد که میکروفون هم در دسترس نباشد (آن‌وقت glue پیام می‌دهد).
+  // ⭐ (2026-10-02، فاز ۳ ممیزیِ Core، F6) قفلِ چند-تب: دو تب با یک جلسه‌ی زنده دو استریم و متنِ تکراری/واگرا می‌ساختند (CAS فقط
+  // overwrite را می‌گیرد). Web Locks API: تا پایانِ RTSession (COMPLETED/CANCELED) قفلِ «feelia-live-<id>» نگه داشته می‌شود؛ تبِ دوم
+  // با {lockDenied:true} رد می‌شود. با بسته‌شدن/رفرشِ تبِ مالک مرورگر قفل را خودش آزاد می‌کند (resume بعد از رفرش بدونِ مانع).
+  // مرورگرِ بدونِ Web Locks یا هر خطا ⇒ fail-open (رفتارِ قبلی). فقط حالتِ live (mode=note قفل نمی‌خواهد).
+  RTSession.prototype.acquireLiveLock = function () {
+    var self = this;
+    if (!self.persist) return Promise.resolve(true);
+    var locks = null;
+    try { locks = navigator.locks; } catch (e) {}
+    if (!locks || typeof locks.request !== 'function') return Promise.resolve(true);
+    return new Promise(function (resolve) {
+      try {
+        var p = locks.request('feelia-live-' + self.sessionId, { ifAvailable: true }, function (lock) {
+          if (!lock) { resolve(false); return undefined; }
+          resolve(true);
+          return new Promise(function (release) { self._releaseLiveLock = release; });
+        });
+        if (p && typeof p.catch === 'function') p.catch(function () { resolve(true); });
+      } catch (e) { resolve(true); }
+    });
+  };
+  RTSession.prototype.releaseLiveLock = function () {
+    var r = this._releaseLiveLock;
+    this._releaseLiveLock = null;
+    if (r) { try { r(); } catch (e) {} }
+  };
   RTSession.prototype.start = function () {
+    var self = this;
+    if (self.state !== STATES.IDLE) return Promise.resolve(false);
+    return self.acquireLiveLock().then(function (got) {
+      if (!got) {
+        self.lockDenied = true;
+        obsEvent('rt.live_lock_denied', {}, self);
+        var err = new Error('این جلسه هم‌اکنون در تب یا پنجره‌ی دیگری در حالِ ضبط است');
+        err.lockDenied = true;
+        throw err;
+      }
+      return self.startInner();
+    });
+  };
+  RTSession.prototype.startInner = function () {
     var self = this;
     if (self.state !== STATES.IDLE) return Promise.resolve(false);
     self.aborted = false;
@@ -1224,6 +1361,8 @@
       ? reqJson('/api/sessions/' + self.sessionId).then(function (r) {
           var t = (r.session && r.session.transcript) || '';
           if (t && t.length > self.confirmed.length) self.confirmed = t;
+          // ⭐ (F2) ادامه‌ی جلسه‌ای که متن دارد (رفرش/crash/ادامه) = دیاریزیشنِ تازه؛ بدونِ نشانگر «گوینده ۱» ممکن است فردِ دیگری باشد.
+          if (t && self.confirmed === t && t.slice(-RECONNECT_MARK.length) !== RECONNECT_MARK) self.noteDiscontinuity();
           self.persistedText = t;
           self.baseVersion = (r.session && r.session.transcript_version) || 0;
         }).catch(function () {})
@@ -1321,6 +1460,16 @@
       if (self.state === STATES.ACTIVE && (!self.ws || self.ws.readyState !== WebSocket.OPEN)) {
         obsEvent('rt.watchdog_fired', {}, self);
         self.scheduleReconnect('watchdog-ws-not-open');
+        return;
+      }
+      // WS باز ولی ساکت: صدایی که بعد از آخرین پیام بسته شده فقط archive شده؛ برگردان به رونویسی و reconnect کن.
+      var silentMs = self.wsSilentMs || WS_SILENT_MS;
+      if (self.state === STATES.ACTIVE && self.ws && self.ws.readyState === WebSocket.OPEN && self.lastWsMsgAt &&
+          Date.now() - self.lastWsMsgAt > silentMs) {
+        var since = self.lastWsMsgAt;
+        obsEvent('rt.watchdog_silent', { silent_ms: Date.now() - since }, self);
+        self.lastWsMsgAt = Date.now(); // یک بار در هر دورِ سکوت
+        self.requeueSilentAudio(since).then(function () { self.scheduleReconnect('watchdog-ws-silent'); });
       }
     }, WS_WATCHDOG_MS);
   };
@@ -1333,8 +1482,10 @@
     // ~۲۴۰ سگمنت پشتِ سرِ هم می‌رفت. حالا هر ARCHIVE_DRAIN_MS هرچه در صف است (به intentِ خودش) آپلود می‌شود.
     if (self.archiveDrainTimer) clearInterval(self.archiveDrainTimer);
     self.archiveDrainTimer = setInterval(function () {
-      if (self.state === STATES.ACTIVE) {
-        try { self.drainQueuedAudioInBackground(); } catch (e) {}
+      // هر stateِ غیرِ پایانی (قطعِ اتصال/توقفِ دستی/FAILED هم): آپلودِ صدا به سرورِ خودمان به Soniox وابسته نیست. finish خودش می‌کشد.
+      if (self.state !== STATES.IDLE && self.state !== STATES.STARTING && self.state !== STATES.FINALIZING &&
+          self.state !== STATES.COMPLETED && self.state !== STATES.CANCELED && !self.aborted) {
+        try { if (typeof navigator === 'undefined' || navigator.onLine !== false) self.drainQueuedAudioInBackground(); } catch (e) {}
       }
     }, ARCHIVE_DRAIN_MS);
     if (self.autosaveTimer) clearInterval(self.autosaveTimer);
@@ -1660,6 +1811,26 @@
     }).catch(function () { return 0; });
   };
 
+  // ⭐ (F1b) سگمنت‌هایِ archiveِ بعد از آخرین پیامِ Soniox → رونویسی (+placeholder در جایِ زمانی). فقط سگمنت‌هایی که
+  // کاملاً بعد از آخرین پیام شروع شده‌اند (closeTime >= since + چرخش): سگمنتِ مرزی نیمی از متنش زنده آمده و
+  // بازرونویسی‌اش متن را دوباره می‌آورد (duplicate)؛ آن بخش (≤ یک چرخش) با نشانگرِ بازگشت پوشش داده می‌شود.
+  RTSession.prototype.requeueSilentAudio = function (since) {
+    var self = this;
+    var cutoff = since + DURABLE_ROTATE_MS;
+    return withAudioLock(self.sessionId, function () {
+      return AudioQueueDB.listForSession(self.sessionId).then(function (rows) {
+        var hit = rows.filter(function (r) {
+          return r.runId === self.runId && (r.intent || 'archive') === 'archive' && (r.createdAt || 0) >= cutoff;
+        });
+        return Promise.all(hit.map(function (r) {
+          return AudioQueueDB.retag(r, 'transcript').then(function () {
+            if (self.persist) self.insertRecoveryPlaceholder(r.runId, r.seq);
+          }).catch(function () {});
+        })).then(function () { return hit.length; });
+      });
+    }).catch(function () { return 0; });
+  };
+
   // finish رویدادمحور: توقف ورودی → finalize → انتظار finished/timeout صریح →
   // تعیین reliability → persist → در صورت نیاز آپلود batch (بدون انتظار برای drain) → COMPLETED.
   // ISSUE 1: در ابتدای finalize، epoch باطل می‌شود تا mint/WS دیررسیده نتواند resurrection کند.
@@ -1825,6 +1996,17 @@
   // یعنی این تابع بدونِ گارد، دوبار پشتِ سرِ هم اجرا می‌شد، هر دو همون سگمنتِ
   // آپلودنشده رو می‌دیدن (چون هنوز حذف نشده بود) و هر دو آپلودش می‌کردن — نتیجه:
   // همون متن دوبار merge می‌شد توی transcript. با شبیه‌سازی تایید و با این گارد فیکس شد.
+  // آپلودِ تقریباً فوریِ سگمنتِ تازه‌ذخیره‌شده (debounce)؛ شکست مهم نیست — تایمرِ ۲۰ثانیه‌ای و sweep دوباره امتحان می‌کنند.
+  RTSession.prototype.drainSoon = function () {
+    var self = this;
+    if (!self.persist || self._drainSoonTimer || self.aborted) return;
+    self._drainSoonTimer = setTimeout(function () {
+      self._drainSoonTimer = null;
+      if (self.aborted || self.state === STATES.FINALIZING || self.state === STATES.COMPLETED || self.state === STATES.CANCELED) return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      try { self.drainQueuedAudioInBackground(); } catch (e) {}
+    }, DRAIN_SOON_MS);
+  };
   RTSession.prototype.drainQueuedAudioInBackground = function () {
     var self = this;
     if (self._draining) return;
@@ -2001,6 +2183,7 @@
     });
   }
   function forget(s) {
+    try { if (s && s.releaseLiveLock) s.releaseLiveLock(); } catch (e) {}
     live = live.filter(function (x) { return x !== s; });
     syncWakeLock();
   }

@@ -82,6 +82,12 @@ export interface CaseFileFinding {
   about: string;
   // فقط یافته‌هایِ محور (نقشِ بالینی)؛ در رابطه‌ها نقش همان field است
   role?: FindingRole;
+  // ردیابی (F3، 2026-10-02): شماره‌ی جلساتی (session_num) که فکت‌ها/نقل‌هایِ این یافته از آن‌ها آمده‌اند — از شناسه‌هایِ digest
+  // (S<num>F<i> / S<num>Q<i>) مشتق می‌شود، نه ادعایِ مدل. یافته‌یِ بدونِ ارجاع این فیلد را ندارد.
+  sessions?: number[];
+  // فقط نقل‌ها: آیا متنِ نقل (پس از نرمال‌سازیِ فاصله/نیم‌فاصله/نشانه‌گذاری) عیناً در متنِ همان جلسه یا یادداشت‌هایش هست؟
+  // false ⇒ «نقلِ عینی» در داده‌یِ ثبت‌شده پیدا نشد (احتمالِ بازنویسیِ مدل) و UI هشدار می‌دهد. undefined ⇒ بررسی نشده.
+  quoteVerified?: boolean;
   // جابه‌جاییِ دستیِ تراپیست (خطایِ طبقه‌بندیِ مدل قابلِ اصلاح است)؛ merge آن را بعد از regenerate دوباره اعمال می‌کند
   movedTo?: { axisTitle: string; role: FindingRole };
 }
@@ -299,6 +305,9 @@ export interface CaseFileContent {
   keyPoints?: { ids: string[]; edited: boolean };
   // ردیف‌هایِ قبل/اکنون؛ نبودنش = پرونده‌ی قدیمی (نمایشِ دوجعبه‌ایِ changeOverTime)
   changeRows?: CaseFileChangeRow[];
+  // «هیچ چیزی هارد دیلیت نشود» (2026-10-02): ردیفِ دستیِ حذف‌شده و نسخه‌یِ پیش از بازتولیدِ کامل (force) دور ریخته نمی‌شوند، اینجا می‌مانند.
+  removedItems?: Array<{ kind: string; item: unknown; removedAt: string }>;
+  previousForced?: Array<{ at: string; content: unknown }>;
 }
 
 // خروجیِ مرحله‌ی ۱ (digest) — متنِ تصحیح‌شده + فکت‌ها؛ ورودیِ مرحله‌ی ۲ (compose). ذخیره نمی‌شود.

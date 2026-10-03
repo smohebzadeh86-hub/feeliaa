@@ -20,7 +20,16 @@ import { computeTranscriptMetrics, parseTranscriptMetrics, METRICS, type TimedTo
 import { metricsFindings } from '../server/src/features/admin/diagnosis.js';
 import { rankQualityRows, summarizeQuality } from '../server/src/features/audio-upload/adminQuality.js';
 import { parseProbe, probeMedia, normalizeAudio, sniffObviouslyNotAudio, extensionOf, ACCEPTED_EXTENSIONS, MAX_DURATION_MS } from '../server/src/features/audio-upload/media.js';
-import { expectedChunkBytes } from '../server/src/features/audio-upload/uploadStore.js';
+import { expectedChunkBytes, writeChunk, receivedChunks, removeUploadDir } from '../server/src/features/audio-upload/uploadStore.js';
+import { packTokens, unpackTokens } from '../server/src/features/session-record/index.js';
+import { checkSeqContiguous } from '../server/src/features/transcription/archive/listing.js';
+import { parseEmptySeqs } from '../server/src/features/transcription/archive/skips.js';
+import { shouldRecordRevision, revisionCause, casRequired } from '../server/src/features/sessions/transcriptRevision.js';
+import { buildSegments, renderCanonicalText, rolesComplete, cleanLabel } from '../server/src/features/session-record/segments.js';
+import { deterministicJobId } from '../server/src/features/session-record/record.repository.js';
+import { jobView } from '../server/src/features/audio-upload/jobView.js';
+import { randomUUID } from 'node:crypto';
+import { readdirSync } from 'node:fs';
 import { archiveKindForFile, isPreNoteFile, isNoteFile, isArchiveFile, isNoteArchiveFile, isLateFile, seqFromFilename, runIdFromFilename, mimeFromFilename, sessionIdFromFilename } from '../server/src/features/transcription/batch/queueFiles.js';
 
 let pass = 0;
@@ -1054,6 +1063,129 @@ async function main() {
     assert.equal(s.low_conf_median, 0.02);
     assert.deepEqual(s.flag_counts, { low_coverage: 1, uncovered_gap: 1, speakers_merged: 2 });
     assert.deepEqual(summarizeQuality([]), { sessions: 0, coverage_median: null, coverage_min: null, low_conf_median: null, flagged: 0, flag_counts: {} });
+  });
+
+  await t('H64 jobView.transcript_notes: فقط پرچم‌هایِ کامل‌بودن برایِ تراپیست؛ null/نامعتبر ⇒ []؛ عدد نشت نمی‌کند', () => {
+    const m = computeTranscriptMetrics({ tokens: [], speechSpans: null, durationMs: 120_000, lowConfRatio: null });
+    const v = jobView({ id: 'j', transcript_metrics: JSON.stringify({ ...m, flags: ['low_coverage', 'fragmented_turns', 'tail_gap', 'speakers_extra'] }) });
+    assert.deepEqual(v.transcript_notes, ['low_coverage', 'tail_gap']);
+    assert.equal(JSON.stringify(v).includes('"coverage"'), false);
+    assert.deepEqual(jobView({ id: 'j', transcript_metrics: null }).transcript_notes, []);
+    assert.deepEqual(jobView({ id: 'j', transcript_metrics: '{bad' }).transcript_notes, []);
+  });
+
+  await t('H65 writeChunk (با fsync): محتوا کامل، idempotent در بازنویسی، tmp باقی نمی‌ماند', () => {
+    const id = randomUUID();
+    try {
+      const body = Buffer.alloc(1024 * 1024 + 7, 3);
+      writeChunk(id, 0, body); writeChunk(id, 0, body); writeChunk(id, 1, Buffer.from('xy'));
+      assert.deepEqual(receivedChunks(id, body.length + 2, body.length), [0, 1]);
+      const dir = path.join(process.cwd(), 'data', 'uploads', id);
+      assert.equal(readFileSync(path.join(dir, 'chunk-000000.part')).equals(body), true);
+      assert.equal(readdirSync(dir).some((f) => f.includes('.tmp-')), false);
+    } finally { removeUploadDir(id); }
+  });
+
+  await t('H66 tokenStore: pack/unpack roundtrip (فارسی، گوینده، اطمینان)، فیلدِ نامعلوم حفظ، خالی ⇒ null، gzip کوچک‌تر', () => {
+    const toks: TimedToken[] = [];
+    for (let i = 0; i < 2000; i++) toks.push({ text: i % 2 ? ' سلام' : 'خوبی؟', start_ms: i * 400, end_ms: i * 400 + 350, speaker: (i % 3) + 1, confidence: 0.5 + (i % 50) / 100 });
+    toks.push({ text: 'x' });
+    const p = packTokens(toks)!;
+    assert.equal(p.count, 2001);
+    const back = unpackTokens(p.gz)!;
+    assert.equal(back.length, 2001);
+    assert.deepEqual(back[0], { text: 'خوبی؟', start_ms: 0, end_ms: 350, speaker: 1, confidence: 0.5 });
+    assert.deepEqual(back[2000], { text: 'x' });
+    assert.ok(p.gz.length < JSON.stringify(toks).length / 4, 'gz=' + p.gz.length);
+    assert.equal(packTokens([]), null); assert.equal(packTokens(undefined), null);
+    assert.equal(unpackTokens(Buffer.from('bad')), null);
+  });
+
+  await t('H67 ماشینِ حالت: توکن‌هایِ getText در meta.tokens به store می‌رسند؛ بدونِ توکن ⇒ null و متن ثبت می‌شود', async () => {
+    const w = newWorld(); const deps = makeDeps(w, { tokens: toks(0, 30_000) }, { caseFileAfterUpload: () => false });
+    const job = newJob(w); await drive(w, deps, job.id);
+    const got = w.metas.get(job.id)?.tokens;
+    assert.ok(got && got.length > 0, 'tokens در meta');
+    assert.equal(w.jobs.get(job.id)!.stage, 'done');
+    const w2 = newWorld(); const d2 = makeDeps(w2, {}, { caseFileAfterUpload: () => false });
+    const j2 = newJob(w2); await drive(w2, d2, j2.id);
+    assert.equal(w2.metas.get(j2.id)?.tokens ?? null, null);
+    assert.equal(w2.transcripts.get('se-1'), 'گوینده ۱: سلام');
+  });
+
+
+
+  await t('H68 gap-check واقعی (client_seq): سگمنتِ گم‌شده، سگمنتِ خالیِ گزارش‌شده، چند run، ردیفِ قدیمی', () => {
+    const row = (run: string, cs: number | null, seq: number) => ({ run_id: run, client_seq: cs, seq, kind: 'session' }) as any;
+    // سرور seq را MAX+1 می‌دهد ⇒ seq همیشه پیوسته؛ ولی client_seq 2 هرگز نرسیده ⇒ گم‌شده (باگِ قبلی: همیشه «کامل»)
+    const lost = [row('r1', 0, 0), row('r1', 1, 1), row('r1', 3, 2)];
+    assert.deepEqual(checkSeqContiguous(lost), { complete: false, missing: [2] });
+    // همان با گزارشِ «سگمنت ۲ خالی بود» ⇒ کامل
+    assert.deepEqual(checkSeqContiguous(lost, [{ session_id: 's', run_id: 'r1', client_seq: 2 }]), { complete: true, missing: [] });
+    // دو run مستقل؛ skipِ runِ دیگر اثر ندارد
+    const two = [row('r1', 0, 0), row('r1', 1, 1), row('r2', 0, 2), row('r2', 2, 3)];
+    assert.deepEqual(checkSeqContiguous(two, [{ session_id: 's', run_id: 'r1', client_seq: 1 }]), { complete: false, missing: [1] });
+    // سگمنتِ خالیِ انتهایی (بعد از آخرین سگمنتِ رسیده) گم‌شده حساب نمی‌شود
+    assert.deepEqual(checkSeqContiguous([row('r1', 0, 0), row('r1', 1, 1)]), { complete: true, missing: [] });
+    // ردیفِ قدیمی/آپلودی (client_seq=null) بررسی نمی‌شود؛ خالی ⇒ کامل
+    assert.deepEqual(checkSeqContiguous([row('legacy', null, 0), row('legacy', null, 5)]), { complete: true, missing: [] });
+    assert.deepEqual(checkSeqContiguous([]), { complete: true, missing: [] });
+    // parseEmptySeqs: ورودیِ نامعتبر نادیده، تکراری یکی، مرتب، سقف
+    assert.deepEqual(parseEmptySeqs('7,3,3,x,-1,2.5,'), [3, 7]);
+    assert.deepEqual(parseEmptySeqs(undefined), []);
+    assert.equal(parseEmptySeqs(Array.from({ length: 500 }, (_, i) => i).join(',')).length, 100);
+  });
+
+  await t('H69 تاریخچه‌ی متنِ خام: فقط جایگزینیِ غیر-الحاقی؛ خودذخیره‌یِ حینِ جلسه فقط با علتِ صریح/کوتاه‌شدنِ >۱۰٪؛ CAS اجباری', () => {
+    const old = 'گوینده ۱: سلام خوبی؟\n\nگوینده ۲: ممنون';
+    // الحاق و تکرار ⇒ ثبت نمی‌شود
+    assert.equal(shouldRecordRevision(old, old + '\n\nادامه', 'completed', 'put'), false);
+    assert.equal(shouldRecordRevision(old, old, 'completed', 'put'), false);
+    // متنِ قبلی خالی ⇒ چیزی برایِ نگه‌داری نیست
+    assert.equal(shouldRecordRevision('', 'x', 'completed', 'put'), false);
+    assert.equal(shouldRecordRevision(null, 'x', 'completed', 'put'), false);
+    // بعد از پایان: هر جایگزینیِ غیر-الحاقی (resolve-speakers) ثبت می‌شود
+    assert.equal(shouldRecordRevision(old, 'گوینده ۲: سلام خوبی؟\n\nگوینده ۱: ممنون', 'completed', 'resolve-speakers'), true);
+    assert.equal(shouldRecordRevision(old, 'گوینده ۲: سلام خوبی؟\n\nگوینده ۱: ممنون', 'completed', 'put'), true);
+    // حینِ جلسه: تغییرِ کوچکِ آخرین واژه (autosave) ثبت نمی‌شود؛ کوتاه‌شدنِ زیاد یا علتِ صریح ثبت می‌شود
+    const live = 'الف '.repeat(100);
+    assert.equal(shouldRecordRevision(live, live.slice(0, -3) + 'ب', 'in_progress', 'put'), false);
+    assert.equal(shouldRecordRevision(live, live.slice(0, 200), 'in_progress', 'put'), true);
+    assert.equal(shouldRecordRevision(live, live.slice(0, -3) + 'ب', 'in_progress', 'marker-remove'), true);
+    // علتِ ناشناخته ⇒ put
+    assert.equal(revisionCause('resolve-speakers'), 'resolve-speakers');
+    assert.equal(revisionCause('hack'), 'put'); assert.equal(revisionCause(undefined), 'put');
+    // CAS: پیش‌فرض اجباری؛ =0 فقط بازگشتِ اضطراری
+    const prev = process.env.TRANSCRIPT_CAS_REQUIRED;
+    delete process.env.TRANSCRIPT_CAS_REQUIRED; assert.equal(casRequired(), true);
+    process.env.TRANSCRIPT_CAS_REQUIRED = '0'; assert.equal(casRequired(), false);
+    if (prev === undefined) delete process.env.TRANSCRIPT_CAS_REQUIRED; else process.env.TRANSCRIPT_CAS_REQUIRED = prev;
+  });
+
+  await t('H70 رکوردِ canonical: نوبت‌ها از توکن (ادغامِ هم‌گوینده، زمان، اطمینان)، متنِ canonical با نقش، نقش‌هایِ کامل، برچسبِ امن', () => {
+    const tk = (text: string, speaker: any, s?: number, e?: number, c?: number) => ({ text, speaker, start_ms: s, end_ms: e, confidence: c });
+    const segs = buildSegments([tk('سلام', 1, 0, 400, 0.9), tk(' خوبی', 1, 400, 800, 0.7), tk(' ممنون', 2, 1000, 1500, 0.8), tk(' ', undefined), tk('تو', undefined, 1500, 1700), tk(' چطوری', 1, 2000, 2600)]);
+    assert.deepEqual(segs.map((s) => [s.seq, s.speaker_key, s.text, s.start_ms, s.end_ms, s.confidence_pct]),
+      [[0, '1', 'سلام خوبی', 0, 800, 80], [1, '2', 'ممنون تو', 1000, 1700, 80], [2, '1', 'چطوری', 2000, 2600, null]]);
+    // بدونِ گوینده در ابتدا ⇒ '0'؛ تهی ⇒ []
+    assert.equal(buildSegments([tk('الف', undefined)])[0].speaker_key, '0');
+    assert.deepEqual(buildSegments([]), []); assert.deepEqual(buildSegments(null), []);
+    // نوبتِ فقط-فاصله حذف می‌شود
+    assert.equal(buildSegments([tk('   ', 1)]).length, 0);
+    // متنِ canonical: بدونِ نقش «گوینده N» به ترتیبِ ظهور؛ با نقش/برچسب
+    const plain = renderCanonicalText(segs);
+    assert.equal(plain, 'گوینده ۱: سلام خوبی\n\nگوینده ۲: ممنون تو\n\nگوینده ۱: چطوری');
+    const roles = { '1': { role: 'therapist' as const, label: null }, '2': { role: 'client' as const, label: 'همسر' } };
+    assert.equal(renderCanonicalText(segs, roles), 'درمانگر: سلام خوبی\n\nهمسر: ممنون تو\n\nدرمانگر: چطوری');
+    assert.equal(rolesComplete(['1', '2'], roles), true);
+    assert.equal(rolesComplete(['1', '2', '3'], roles), false);
+    assert.equal(rolesComplete([], roles), false);
+    // برچسب: خط‌جدید/دونقطه حذف (قالبِ «برچسب: متن» را نمی‌شکند) و سقف ۴۰
+    assert.equal(cleanLabel('مراجع: الف\nب'), 'مراجع الف ب');
+    assert.equal(cleanLabel('x'.repeat(100))!.length, 40); assert.equal(cleanLabel('  '), null); assert.equal(cleanLabel(5), null);
+    // کلیدِ قطعیِ گذر: یکسان برایِ ورودیِ یکسان، شکلِ UUID
+    assert.equal(deterministicJobId('ft:abc'), deterministicJobId('ft:abc'));
+    assert.match(deterministicJobId('ft:abc'), /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
   });
 
   console.log(`\n${pass} PASS / ${fail} FAIL`);

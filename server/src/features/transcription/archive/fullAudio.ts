@@ -4,6 +4,7 @@ import { logEvent } from '../../../obs/eventLog.js';
 import { mimeForExt } from '../batch/queueFiles.js';
 import { sessionDir, withSessionLock } from './store.js';
 import { listSessionAudio, checkSeqContiguous } from './listing.js';
+import { listSkips } from './skips.js';
 import { runFfmpeg } from './ffmpegOps.js';
 
 // ————————————————— فایلِ کاملِ جلسه (بخشِ F، audit صدا/۲۰۲۶-۰۹-۱۶) —————————————————
@@ -44,7 +45,7 @@ export async function getFullSessionAudio(sessionId: string): Promise<FullAudioR
     // seq (که در `/api/admin/sessions/:id/audio` هم استفاده می‌شود) مستقیماً همینجا هم
     // محاسبه و در نتیجه برگردانده می‌شود — fail-open: فایل هنوز ساخته/سرو می‌شود، فقط
     // caller دیگر نمی‌تواند ادعا کند که «کامل» بودنش تضمین‌شده است.
-    const { complete, missing: missingSegments } = checkSeqContiguous(rows);
+    const { complete, missing: missingSegments } = checkSeqContiguous(rows, (await listSkips([sessionId])).get(sessionId) ?? []);
 
     const dir = sessionDir(sessionId);
     const metaPath = fullAudioMetaPath(dir);

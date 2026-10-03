@@ -79,7 +79,7 @@ export function startResolveSpeakers(sessionId: string): ResolveJob {
       const { audio, ext } = await fullSessionAudio(sessionId);
       // (2026-09-27) علائمِ ثبت‌شده‌ی جلسه در جایِ زمانیِ خودشان دوباره در متنِ بازسازی‌شده می‌آیند — وگرنه
       // «جایگزینیِ متن» نشانگرهایِ علامت را که حینِ جلسه داخلِ متن نوشته شده بودند پاک می‌کرد.
-      const signs = await query("SELECT sign_type, offset_ms FROM session_notes WHERE session_id = ? AND type = 'sign'", [sessionId]);
+      const signs = await query("SELECT sign_type, offset_ms FROM session_notes WHERE session_id = ? AND deleted_at IS NULL AND type = 'sign'", [sessionId]);
       const context = await treatmentUnits.sessionSttContext(sessionId);
       const text = await transcribeFileAsync(audio, `${sessionId}-resolve${ext}`, `feelia:${sessionId}:resolve-speakers`,
         { signs: signs.rows as SignMark[], context });

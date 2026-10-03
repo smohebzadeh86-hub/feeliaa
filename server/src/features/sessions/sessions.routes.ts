@@ -3,7 +3,7 @@
 import { randomUUID } from 'node:crypto';
 import { FastifyInstance } from 'fastify';
 import { requireAuth } from '../../auth/guard.js';
-import { getOwnedClient, getOwnedSession } from '../../db/ownership.js';
+import { getOwnedClient, getOwnedSession, getOwnedSessionAny } from '../../db/ownership.js';
 import {
   INVALID_DATE_ERROR,
   INVALID_TIME_ERROR,
@@ -11,7 +11,6 @@ import {
   normalizeStartTime,
   nowInTehran,
 } from './sessionDate.js';
-import { prepareSessionMediaPurge, purgeSessionMedia } from '../session-media/index.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { hasStoredConsent, recordClientConsent } from '../clients/index.js';
 // خودکارسازیِ تولیدِ پرونده بعدِ پایانِ کاملِ جلسه (فازِ ۲ِ Module 08) — سیاستِ مرکزی حالا در
@@ -22,11 +21,13 @@ import { enqueueFinalTranscript } from '../final-transcript/index.js';
 import { treatmentUnits, TreatmentUnitValidationError } from '../treatment-unit/index.js';
 import {
   createManualSession, createLiveSession, getSessionRow, getClientConsentRow, getOwnedSessionWithClient, listSessionNotes,
-  getTranscriptVersionRow, updateOwnedSession, getOwnedTranscriptVersionRow, deleteOwnedSession, appendTranscriptTail,
+  getTranscriptVersionRow, updateOwnedSession, getOwnedTranscriptVersionRow, deleteOwnedSession, restoreOwnedSession, listDeletedSessionsOfClient, appendTranscriptTail, insertTranscriptRevision,
 } from './sessions.repository.js';
+import { casRequired, revisionCause, shouldRecordRevision } from './transcriptRevision.js';
 import { sessionNotesRoutes } from './notes.routes.js';
 import { sessionVoiceNoteRoutes } from './voiceNote.legacy.js';
 import { sessionBatchRoutes } from './batch.routes.js';
+import { sessionRevisionRoutes } from './revisions.routes.js';
 
 // سقفِ یادداشتِ «پیش از جلسه» (configuration-catalog)
 const PRE_NOTE_MAX_CHARS = Number(process.env.PRE_NOTE_MAX_CHARS) > 0 ? Number(process.env.PRE_NOTE_MAX_CHARS) : 2000;
@@ -36,6 +37,7 @@ export async function sessionRoutes(app: FastifyInstance) {
   await app.register(sessionNotesRoutes);
   await app.register(sessionVoiceNoteRoutes);
   await app.register(sessionBatchRoutes);
+  await app.register(sessionRevisionRoutes);
 
   // POST /api/sessions — شروع جلسه‌ی جدید (مراجع باید مالِ همین تراپیست باشه)
   // mode='manual': ثبتِ دستیِ جلسه‌ی گذشته (آرشیوِ پرونده‌های قبلی) — هیچ ضبط/صدایی
@@ -185,6 +187,7 @@ export async function sessionRoutes(app: FastifyInstance) {
     const body = request.body as {
       transcript?: string;
       transcript_version?: number;
+      change_reason?: string; // علتِ جایگزینیِ متن برایِ تاریخچه: resolve-speakers | marker-remove | edit
       realtime_reliable?: boolean;
       stt_mode?: string;
       anchors?: Array<{ chars: number; off: number }>;
@@ -214,8 +217,13 @@ export async function sessionRoutes(app: FastifyInstance) {
       // ۸۰ نویسه‌ی آخرِ متنِ بالینی را مستقیم در stdout لاگ می‌کرد (console.log
       // [diag-transcript]). جایگزین: فقط متادیتای امن (طول/نسخه) از طریقِ logEvent.
       logEvent({ event: 'session.transcript_put', sessionId: id, therapistId: request.therapistId, detail: { len: body.transcript.length, version: body.transcript_version } });
-      // ✅ Compare-and-swap: اگر caller نسخه‌ی پایه بفرستد و با DB نخورد → 409، نه overwrite.
-      // callerهای قدیمی (بدون transcript_version) همچنان پذیرفته‌اند (سازگاری عقبرو).
+      // ✅ Compare-and-swap اجباری (2026-10-01): بدونِ transcript_version → 400، نه overwriteِ بی‌صدا.
+      // (TRANSCRIPT_CAS_REQUIRED=0 فقط بازگشتِ اضطراری.) نسخه‌ی ناهم‌خوان با DB → 409.
+      if (typeof body.transcript_version !== 'number' && casRequired()) {
+        logEvent({ event: 'session.transcript_put_no_cas', sessionId: id, therapistId: request.therapistId, severity: 'warn' });
+        reply.code(400);
+        return { error: 'نسخه‌ی پایه‌ی متن (transcript_version) الزامی است؛ صفحه را تازه‌سازی کنید', code: 'version-required' };
+      }
       if (typeof body.transcript_version === 'number') {
         const cv: number = (await getTranscriptVersionRow(id))?.transcript_version ?? 0;
         if (cv !== body.transcript_version) {
@@ -333,6 +341,13 @@ export async function sessionRoutes(app: FastifyInstance) {
       return { error: 'جلسه یافت نشد' };
     }
 
+    // تاریخچه‌ی متنِ خام: متنِ جایگزین‌شده (غیر-الحاقی) فقط‌افزودنی ذخیره می‌شود (migration 040). fail-open.
+    if (body.transcript !== undefined) {
+      const cause = revisionCause(body.change_reason);
+      if (shouldRecordRevision(owned.transcript, body.transcript, owned.status, cause)) {
+        await insertTranscriptRevision({ sessionId: id, version: Number(owned.transcript_version) || 0, cause, actor: request.therapistId ?? null, text: owned.transcript });
+      }
+    }
     const updatedSession = await getSessionRow(id);
     if (reopened) logEvent({ event: 'session.reopened', sessionId: id, therapistId: request.therapistId });
     if (body.status === 'completed') {
@@ -345,7 +360,8 @@ export async function sessionRoutes(app: FastifyInstance) {
     return { session: updatedSession };
   });
 
-  // DELETE /api/sessions/:id
+  // DELETE /api/sessions/:id — ⭐ (2026-10-02، تصمیمِ مالک) حذفِ نرم: از فهرست/APIِ تراپیست پنهان می‌شود ولی متن، صدا، یادداشت و علائم
+  // برایِ ادمین می‌مانند (هیچ فایلی پاک نمی‌شود) و با POST /restore (تراپیست) یا ادمین قابلِ بازگردانی است. حذفِ واقعی فقط با حذفِ مراجع/حساب (cascade) یا ادمین.
   app.delete('/api/sessions/:id', async (request, reply) => {
     const { id } = request.params as { id: string };
 
@@ -354,20 +370,33 @@ export async function sessionRoutes(app: FastifyInstance) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
-
-    const media = await prepareSessionMediaPurge([id]);
     if ((await deleteOwnedSession(id, request.therapistId)) === 0) {
       reply.code(404);
       return { error: 'جلسه یافت نشد' };
     }
+    logEvent({ event: 'session.deleted', sessionId: id, therapistId: request.therapistId, detail: { mode: 'soft' } });
+    await recordAudit({ actorId: request.therapistId, action: 'therapist.session_delete', targetType: 'session', targetId: id, detail: { soft: true } });
 
-    // LAW-010: بعدِ حذفِ موفقِ ردیفِ DB، فایل‌هایِ آرشیوشده‌ی همین جلسه رویِ دیسک را هم پاک کن
-    // (وگرنه یتیم می‌مانند — cascadeِ DB فقط ردیف را می‌بیند، نه فایل).
-    purgeSessionMedia(media);
-    logEvent({ event: 'session.deleted', sessionId: id, therapistId: request.therapistId });
-    await recordAudit({ actorId: request.therapistId, action: 'therapist.session_delete', targetType: 'session', targetId: id });
+    return { deleted: id, recoverable: true };
+  });
 
-    return { deleted: id };
+  // POST /api/sessions/:id/restore — بازگردانیِ جلسه‌یِ حذف‌شده‌یِ خودِ تراپیست (فقط اگر حذفِ نرم شده باشد)
+  app.post('/api/sessions/:id/restore', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const any = await getOwnedSessionAny(id, request.therapistId!);
+    if (!any) { reply.code(404); return { error: 'جلسه یافت نشد' }; }
+    if (!any.deleted_at) { reply.code(409); return { error: 'این جلسه حذف نشده است', code: 'not-deleted' }; }
+    if ((await restoreOwnedSession(id, request.therapistId)) === 0) { reply.code(409); return { error: 'این جلسه حذف نشده است', code: 'not-deleted' }; }
+    logEvent({ event: 'session.restored', sessionId: id, therapistId: request.therapistId });
+    await recordAudit({ actorId: request.therapistId, action: 'therapist.session_restore', targetType: 'session', targetId: id });
+    return { restored: id };
+  });
+
+  // GET /api/clients/:id/deleted-sessions — «جلسه‌هایِ حذف‌شده»ِ این مراجع (مسیرِ پیدا کردنِ جلسه‌یِ حذف‌شده)؛ فقط متادیتا
+  app.get('/api/clients/:id/deleted-sessions', async (request, reply) => {
+    const { id } = request.params as { id: string };
+    if (!(await getOwnedClient(id, request.therapistId!))) { reply.code(404); return { error: 'مراجع یافت نشد' }; }
+    return { sessions: await listDeletedSessionsOfClient(id) };
   });
 
   // ===== (A5، 2026-09-26) ذخیره‌ی فقط دُمِ متن هنگامِ بستنِ صفحه =====

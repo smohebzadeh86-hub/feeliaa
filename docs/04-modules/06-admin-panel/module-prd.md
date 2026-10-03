@@ -117,3 +117,9 @@ platform (guard)، subsystem 05 (آرشیو)، همه‌ی جداول.
 - **ممیزی (A6):** مشاهده‌ی جلسه، پخش/دانلود، حذفِ صدا، نمایشِ متنِ یادداشت، export، تغییر/حذفِ تراپیست/مراجع در `audit_log` ثبت می‌شوند ([database-catalog](../../02-reference/database-catalog.md) — migration 028). UIِ نمایشِ `audit_log` هنوز ساخته نشده (فاز بعد).
 - **فازهایِ بعد (فقط ثبت):** جلساتِ زنده + صفِ پردازش (سراسری)، گزارشِ رضایت/فعالیت از `audit_log`، آمارِ سیستم.
 - **تست:** E2E رویِ DBِ dev (B2 ×8، B3 ×4) + UI در Browser pane با mock (دسکتاپ/موبایل، تیره/روشن) — [verification](../../../verification/2026-09-26-storage-fixes-full-test-run.md).
+
+## سنجه‌هایِ هسته (2026-10-02 — F10)
+`GET /api/admin/core-metrics` و کارتِ «سنجه‌هایِ هسته» در صفحه‌یِ «سلامتِ سیستم»: Capture Reliability (جلسه‌هایِ زنده‌یِ بدونِ گپ/با متن/با صدا)، Recovery Success (reconnect، batch، سوکتِ ساکت)، Correction Rate (جلساتِ دارایِ تاریخچه/ویرایشِ نقش) و Repeat Usage (درمانگرانِ بازگشتی، جلسه به ازایِ درمانگر). فقط عدد/نسبت (LAW-001)؛ رویدادها از `obs_events` (کلاینت/سرور) و جلسات از `sessions`. محدودیت: `obs_events` نگهداریِ محدود دارد (جاروبِ `sweep-obs-events`) ⇒ نسبت‌هایِ recovery فقط برایِ پنجره‌یِ نگه‌داشته‌شده معتبرند؛ coverageِ جلسه‌یِ زنده هنوز اندازه‌گیری نمی‌شود (فقط آپلودی: `upload-quality`).
+
+## دسترسیِ کامل به همه‌یِ داده (2026-10-02)
+تصمیمِ مالک: «به همه دیتا دسترسی داشته باشم و هیچی هارد دیلیت نشه». ادمین: (۱) «داده‌هایِ حذف‌شده» در صفحه‌یِ سلامتِ سیستم (`GET /api/admin/deleted`) با بازگردانیِ مراجع/جلسه/یادداشت؛ (۲) در جزئیاتِ جلسه «تاریخچه‌یِ ویرایشِ متن» (همه‌یِ نسخه‌ها)؛ (۳) `/api/admin/notes/:id/revisions` و `/api/admin/clients/:id/case-file` (+نسخه‌ها)؛ (۴) export schema_version 3: مراجع/جلسه/یادداشتِ حذف‌شده با `deleted_at` + `transcript_revisions`، `note_revisions`، `case_file`، `case_file_versions`؛ (۵) `pnpm backup` (پشتیبانِ فقط‌افزودنیِ DB + mirrorِ صدا). هر خواندنِ متن/محتوا audit می‌شود.
