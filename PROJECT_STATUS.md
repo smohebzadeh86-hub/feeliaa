@@ -220,6 +220,10 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-10-03 — DEPLOY (production) — انتشارِ `da3c040` (UI: select/مرتب‌سازیِ ادمین/مودالِ آپلود + ویرایشِ `note_during` + بازتلاشِ DB)
+- preflight پس از صبرِ کوتاه GO شد؛ تارِ `git archive` از HEAD، پشتیبانِ کد در `/root/backups/code-pre-da3c040-*.tar.gz`، استخراج، `pnpm install --frozen-lockfile`، build، `pm2 restart feelia-mysql`. بدونِ migrationِ جدید (همه تا 044 applied). `/api/health` ok، سایت 200. کدِ قبلیِ prod = `75aede4`؛ پس `d70f471` و `bdb106d` هم همراه رفتند.
+- **عامل:** این نشست.
+
 ### 2026-10-03 — DATA (production) — اجرایِ دوباره‌یِ polishِ `5dbb946c` (به دستورِ مالک: «چالش‌ها را حل کن»)؛ fallback از ۱۵۸ به ۰
 - **پیمایشِ فقط‌خواندنیِ همه‌یِ `final_transcripts` (۸ ردیف):** تنها دو جلسه‌یِ آپلودی fallbackِ سنگین داشتند: `1d621be5` (۱۳۷/۵۱۳؛ پیش‌تر اصلاح شد) و `5dbb946c` (۱۵۸/۵۰۴: `uncertain` ۱۰۲، `length` ۱۲، `llm-error` ۱، مدلِ رایگانِ Dots3، ۰۹-۲۸). بقیه: `9d79792d` ۱/۵۳۳ (`length`)، `3bb0da7b` ۷/۴۷۸ (`uncertain`)، جلسه‌هایِ زنده/۱نوبتی ۰.
 - **چه شد:** baseline (v1) تأیید شد ⇒ UPDATEِ هم‌ارزِ `retryFinalTranscript` با `async_text` (بدونِ Soniox) ⇒ worker (tick ۵ثانیه‌ای؛ **این بار بدونِ ری‌استارتِ pm2**) با Metis `reasoning=off` تمام کرد: **fallback_turns ۱۵۸ ⇒ ۰، fallback_chunks ۱ ⇒ ۰، retries ۳، turns ۵۰۴ ⇒ ۵۰۴**؛ `final_transcript_versions`: v1 baseline (قدیمی، ۵۳۴۸۴ نویسه) + v2 generated (۵۳۴۷۳). `/api/health` 200. متنی چاپ نشد.
