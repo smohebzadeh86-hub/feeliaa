@@ -37,9 +37,37 @@ const pool = mysql.createPool({
   });
 });
 
+// ری‌استارتِ MySQL (مثلاً unattended-upgrade رویِ prod: 2026-09-30 06:01 و 2026-10-02 06:40 UTC، ~۵ثانیه؛ لاگِ MySQL
+// «Received SHUTDOWN … Forcing close of thread … user feelia») اتصال‌هایِ pool را می‌بُرد ⇒ ECONNREFUSED/ECONNRESET
+// در tickهایِ پس‌زمینه و درخواست‌هایِ زنده. بازتلاشِ کوتاه (~۱۲ث) این قطعِ گذرا را می‌پوشاند.
+// امن‌بودن: ECONNREFUSED/ENOTFOUND و «اتصال بسته است» یعنی دستور هرگز به سرور نرسیده ⇒ برایِ همه‌ی دستورها.
+// ECONNRESET/PROTOCOL_CONNECTION_LOST/EPIPE ممکن است بعد از اجرایِ دستور رخ دهد ⇒ فقط برایِ خواندن (SELECT/SHOW).
+const NEVER_SENT = new Set(['ECONNREFUSED', 'ENOTFOUND', 'EAI_AGAIN']);
+const MAYBE_SENT = new Set(['ECONNRESET', 'PROTOCOL_CONNECTION_LOST', 'EPIPE', 'ETIMEDOUT']);
+const DB_RETRY_DELAYS_MS = [250, 500, 1000, 2000, 4000, 4000];
+
+export function isRetryableDbError(err: unknown, sql: string): boolean {
+  const e = err as { code?: string; message?: string } | null;
+  const code = e?.code || '';
+  if (NEVER_SENT.has(code)) return true;
+  if (/connection is in closed state|Pool is closed/i.test(e?.message || '')) return !/Pool is closed/i.test(e?.message || '');
+  if (MAYBE_SENT.has(code)) return /^\s*\(?\s*(select|show)\b/i.test(sql);
+  return false;
+}
+
 export async function query(text: string, params?: unknown[]) {
   const start = Date.now();
-  const [result] = await pool.query(text, params as unknown[]);
+  let result: unknown;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      [result] = await pool.query(text, params as unknown[]);
+      break;
+    } catch (err) {
+      if (attempt >= DB_RETRY_DELAYS_MS.length || !isRetryableDbError(err, text)) throw err;
+      if (attempt === 0) console.log(`[db] transient error (${(err as { code?: string }).code || 'unknown'}), retrying:`, text.slice(0, 40));
+      await new Promise((r) => setTimeout(r, DB_RETRY_DELAYS_MS[attempt]));
+    }
+  }
   const duration = Date.now() - start;
   if (duration > 100) {
     console.log(`[db] slow query (${duration}ms):`, text.slice(0, 60));
