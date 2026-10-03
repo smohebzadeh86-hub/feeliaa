@@ -262,7 +262,7 @@
 | `sessions.status` | `in_progress`، `recovered`، `completed`، `canceled` | `POST /api/sessions`، `PUT` (آزاد)، `features/legacy-ws/transcription.routes.ts` |
 | `sessions.batch_status` | `queued`، `processing`، `done`، `failed`، null | `features/transcription/batch/` |
 | `sessions.stt_mode` | `realtime`، `batch`، `batch-pending`، `realtime-unreliable-noaudio`، null | `feelia-rt.js`، `features/transcription/batch/` |
-| `session_notes.type` | `note_during`، `note_after`، `sign`، `voice`، **`note_before`، `voice_before` (2026-09-29 — یادداشتِ متنی/صوتیِ پیش از جلسه؛ تنها نوع‌هایِ ویرایش‌پذیر با `PATCH /api/notes/:id`؛ VARCHAR(16) کافی است، بدونِ migration)** | UI، batch/voice-note، `createLiveSession`، `processQueue` (`purpose=pre-note`) |
+| `session_notes.type` | `note_during`، `note_after`، `sign`، `voice`، **`note_before`، `voice_before` (2026-09-29 — یادداشتِ متنی/صوتیِ پیش از جلسه؛ نوع‌هایِ ویرایش‌پذیر با `PATCH /api/notes/:id` (+ `note_during` از 2026-10-03)؛ VARCHAR(16) کافی است، بدونِ migration)** | UI، batch/voice-note، `createLiveSession`، `processQueue` (`purpose=pre-note`) |
 | `session_notes.sign_type` | `گریان`، `لرزش`، `تنش عضلانی`، `سکوت طولانی`، `خشم`، `پرخاشگری`، `اتصال چشمی گریزان`، `خواب‌آلودگی`، `بی‌قراری` | `.sign-chip[data-sign]` |
 | `clients.status_reason` (UI) | `ناتوانی مالی`، `ظرفیت روحی/زمانی`، `روند تکمیل شد`، `سایر` + متنِ آزاد؛ «نامشخص» → null (فقط در ساختِ مراجع از تبِ غیرفعال)؛ سرور trim و حداکثر ۲۰۰ کاراکتر | `deactivateClientModal`، `newClientModal` |
 | `sessions.source` | `live`، `manual`، `upload` (CHECK؛ `upload` از 023) | `POST /api/sessions` (`mode`)؛ `POST /api/uploads/:id/complete` |

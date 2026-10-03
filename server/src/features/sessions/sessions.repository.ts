@@ -83,8 +83,8 @@ export async function createLiveSession(s: {
   }
 }
 
-// PATCH /api/notes/:id — فقط متنِ یادداشت‌هایِ پیش از جلسه (تصمیمِ مالک 2026-09-29: ویرایش بعد از پایانِ ضبط).
-export const EDITABLE_NOTE_TYPES = ['note_before', 'voice_before'] as const;
+// PATCH /api/notes/:id — متنِ یادداشت‌هایِ پیش از جلسه (تصمیمِ مالک 2026-09-29) و یادداشتِ سریعِ حینِ جلسه (`note_during`، درخواستِ مالک 2026-10-03).
+export const EDITABLE_NOTE_TYPES = ['note_before', 'voice_before', 'note_during'] as const;
 export async function getOwnedNoteType(id: string, therapistId: string | null): Promise<string | null> {
   const r = await query(
     `SELECT n.type FROM session_notes n
