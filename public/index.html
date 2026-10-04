@@ -858,7 +858,7 @@ input::-ms-reveal{display:none}
   .case-file-doc .cf-med-mobile{display:block}
 }
 
-/* ===== آپلودِ فایلِ صوتیِ جلسه + سینیِ پردازش/اعلان (migration 023) =====
+/* ===== آپلود فایل صوتی جلسه + سینیِ پردازش/اعلان (migration 023) =====
    فقط توکن‌هایِ موجودِ سیستمِ طراحی (--sage/--clay/--gold، --r-*، --shadow) — تمِ تاریک خودکار. */
 .icon-btn{position:relative}
 .icon-badge{position:absolute;top:-5px;left:-5px;min-width:19px;height:19px;border-radius:99px;background:var(--clay);color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center;padding:0 5px;border:2px solid var(--bg);font-variant-numeric:tabular-nums}
@@ -1706,7 +1706,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     </details>
     <button class="btn btn-primary btn-block" id="detailStartBtn" style="margin-top:14px" onclick="startFromDetail()">شروع جلسه‌ی جدید</button>
     <button class="btn btn-primary btn-block" id="detailManualBtn" hidden style="margin-top:14px" onclick="startManualSessionFlow()">ثبت جلسات گذشته</button>
-    <!-- آپلودِ فایلِ صوتیِ جلسه‌ای که بیرون از فیلیا ضبط شده (مثلاً با ضبطِ گوشی وقتی اینترنتِ کلینیک ضعیف بود) -->
+    <!-- آپلود فایل صوتی جلسه‌ای که بیرون از فیلیا ضبط شده (مثلاً با ضبطِ گوشی وقتی اینترنتِ کلینیک ضعیف بود) -->
     <button class="btn btn-secondary btn-block" id="detailUploadBtn" style="margin-top:10px" onclick="openAudioUploadModal()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
       آپلود فایل صوتی جلسه
@@ -6196,7 +6196,7 @@ function buildClientCard(c){
       });
       actions.appendChild(btn1);
     }
-    // آپلودِ فایلِ صوتیِ جلسه — مستقیم رویِ کارتِ هر دو تب (گزارشِ مالک 2026-09-24: دکمه فقط داخلِ صفحه‌ی
+    // آپلود فایل صوتی جلسه — مستقیم رویِ کارتِ هر دو تب (گزارشِ مالک 2026-09-24: دکمه فقط داخلِ صفحه‌ی
     // مراجع بود و پیدا نمی‌شد). همان مودالِ openAudioUploadModal؛ برایِ فعال و غیرفعال یکسان.
     const upBtn=document.createElement('button');
     upBtn.className='btn btn-secondary btn-sm card-upload-btn';
@@ -10191,7 +10191,7 @@ window.addEventListener('beforeunload',function(e){
 // برای هر کاربرِ وب. هر مدال تابعِ closeِ مخصوصِ خودش را دارد (بعضی متغیرِ target
 // را هم ریست می‌کنند)؛ همان تابع صدا زده می‌شود، نه صرفاً حذفِ کلاس، تا رفتار با
 // کلیکِ «انصراف» دقیقاً یکسان بماند.
-// ===== آپلودِ فایلِ صوتیِ جلسه + سینیِ «پردازش‌ها و اعلان‌ها» (migration 023) =====
+// ===== آپلود فایل صوتی جلسه + سینیِ «پردازش‌ها و اعلان‌ها» (migration 023) =====
 // تراپیست فقط فایل را انتخاب می‌کند؛ بقیه (آپلودِ مقاوم، تبدیل به متن، پرونده، اعلان) کارِ سیستم است.
 // موتورِ آپلود: public/feelia-upload.js. وضعیتِ jobها و اعلان‌ها از سرور (پایدار) خوانده می‌شود.
 let audioUploadFiles=[]; // [{file, durMs}] — به ترتیبِ رونویسی
