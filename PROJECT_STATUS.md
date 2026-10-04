@@ -220,6 +220,19 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-10-04 — GIT + DEPLOY (production) — commit `9ca373f` (رونویسیِ دوباره‌ی آپلود حذف) + deployِ `006b9fc`…`9ca373f` (به دستورِ مالک: «اره کامیت و دیپلوی و اینا رو بکن»)
+- **GIT:** `9ca373f` از worktreeِ تمیز رویِ `cf97904` (`retryPlan.ts`، `runner.ts`، RP1، subsystem 07، دو ورودیِ Event Log). push به `origin/feat/clarity`؛ merge به `main` نه.
+- **مقایسه‌ی پیش از deploy (checksum، بدونِ ``):** کدِ prod = `9a02d66`، به‌جز `public/index.html` (تغییرِ deploy‌شده‌ی نشستِ دیگر: حذفِ هشدارِ `speakers_merged`).
+  - `index.html`ِ deploy = merge سه‌طرفه (پایه `9a02d66`، prod، `cf97904`) بدونِ conflict ⇒ تغییرِ زنده‌ی آن نشست حفظ شد.
+  - **FINDING:** CSSِ دکمه‌ی «بازگشت» (Event Log می‌گوید deploy شد) **رویِ prod نبود** (احتمالاً deployِ بعدیِ همان نشست آن را برگردانده). deploy نشد؛ در working tree دست‌نخورده است.
+- **Preflight:** GO (۰ جلسه/ضبط/آپلود/job). **Backup:** `/root/backups/code-pre-9ca373f-20261004T124050Z.tar.gz` و `db-pre-9ca373f-20261004T124050Z.sql.gz` («Dump completed»).
+- **Deploy:** تار (بدونِ `.env`/`node_modules`/`data`) ⇒ استخراج ⇒ `pnpm install --frozen-lockfile` ⇒ build ⇒ `pm2 restart feelia-mysql`.
+  - لاگ: `045` و `046` applied؛ `[llm]` Metis؛ listening؛ بدونِ TypeError/unhandled.
+  - `/api/health` ok؛ `feelia-rt.js` جدید سرو می‌شود؛ `POST /rt-tokens` بدونِ auth ⇒ 401.
+  - checksumِ prod = artifact.
+- **اکنون رویِ production:** رکوردِ realtime، پیشنهادِ نقش، سنجه‌یِ هر جلسه، T59، R17، export v4، allowlistِ رویدادها، بدونِ رونویسیِ دوباره‌ی آپلود. `CANONICAL_PASS` خاموش؛ متنِ رضایت دست‌نخورده (R24 باز).
+- **Rollback:** استخراجِ `code-pre-9ca373f-…tar.gz` + build + restart. migrationها additive‌اند و جدول/ستون‌هایِ تازه برایِ کدِ قدیمی بی‌اثرند.
+
 ### 2026-10-04 — CODE + TEST + DOCS — «ساختِ دوباره»ی متنِ نهاییِ آپلود دیگر به Soniox نمی‌رود (به دستورِ مالک: «انجام بده»؛ commit/deploy نشده)
 - **چه شد:** `final-transcript/domain/retryPlan.ts#planRetry` (خالص) + `runner.ts#retryFinalTranscript`. جلسه‌ی آپلودی با متنِ asyncِ ذخیره‌شده همیشه مستقیم به polish می‌رود، حتی وقتی متن کهنه است. جلسه‌ی زنده بدونِ تغییر.
 - **چرا:** اندازه‌گیریِ prod (ورودیِ پایین‌تر): ۱ از ۱۴ آپلود با همین مسیر دو بار به Soniox رفته بود. رونویسیِ async قطعی است ⇒ همان متن با هزینه‌ی دوم.
