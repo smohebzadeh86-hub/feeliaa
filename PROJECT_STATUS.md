@@ -220,6 +220,16 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-10-04 — GIT + DEPLOY (production) — commit `3d90130`: داورِ مرز بعد از `done` (به دستورِ مالک: «بکن»)
+- **GIT:** `3d90130` (worktreeِ تمیز رویِ `a8e4411`؛ فقط ۷ فایلِ همین کار: `runner.ts`، `polishTranscript.ts`، `boundaryJudge.ts`، harness، دو سند، `PROJECT_STATUS.md`). push نشد. تغییراتِ نشستِ دیگر در همان ماژول (`adapters/versionStore.ts`، `final-transcript/index.ts`) و `public/` و … **commit و deploy نشدند**.
+- **تأیید پیش از deploy (worktreeِ تمیز):** tsc، ft 72، llm 22، up 71، cf 115، tu 19، adm 9، hist 11 — 0 FAIL؛ routes 182، arch، docs OK؛ build OK؛ تار بدونِ `.env` (۰ مورد).
+- **Preflight (§۵.۱):** GO (همه‌یِ شمارنده‌ها ۰ حتی `final_transcripts` فعال)؛ فقط یک تبِ باز polling (`/api/audio-jobs?scope=active`)؛ بررسیِ لحظه‌یِ آخر `active_total=0`.
+- **PRODUCTION:** پشتیبانِ کد `/root/backups/code-pre-judgedefer-<ts>.tar.gz` (۵۹۸KB) ⇒ `tar -xzf` ⇒ `pnpm install --frozen-lockfile` ⇒ build ⇒ `pm2 restart feelia-mysql --update-env` (restarts=۵۱). همه‌یِ migrationها `already applied`؛ `/api/health` 200 (database connected)؛ لاگِ startup بدونِ خطا؛ `.env` دست‌نخورده؛ dist: `scheduleBoundaryJudge` ۲ ارجاع، `judgeBoundaries` در polish ۰؛ تارِ موقت حذف شد.
+- **rollback:** استخراجِ تارِ backup + `pm2 restart` (بدونِ migration ⇒ بدونِ rollbackِ DB). خاموش‌کردنِ داور: `FINAL_TRANSCRIPT_BOUNDARY_JUDGE=0` + restart.
+- **UNVERIFIED / پیگیری:** اولین آپلودِ بعدی (با `trustDiarization`): `ft_polish_s` باید ≈۱–۳ دقیقه باشد (نه ۷–۱۲)، اعلانِ `final_transcript_ready` بدونِ تأخیر برسد، و `polish_report.boundary_judge` چند دقیقه **بعد از** `done` ظاهر شود (لاگ: `final_transcript.boundary_judge`).
+- **عامل:** این نشست.
+
+
 ### 2026-10-04 — CODE + TEST + DOCS — داورِ مرز بعد از `done` (بدونِ تأخیر برایِ کاربر) (به دستورِ مالک: «سمتِ کاربر نباید تأخیری باشه»)
 - **انگیزه:** دو آپلودِ پدرام بعد از deployِ داور: ساختِ «متنِ نهایی» ۷۱۵ث و ۴۳۳ث (پیش‌تر ≈۱۰۰ث) — داور داخلِ polish بود و `done`/اعلان را تا ۴–۶ دقیقه عقب می‌انداخت.
 - **تغییر:** `polishTranscript` دیگر داور را اجرا نمی‌کند (فقط `report.diarization_trusted`). `runner.ts#finish` بعد از commitِ `done`+اعلان، `scheduleBoundaryJudge` را بدونِ await فراخوانی می‌کند: صفِ سراسریِ یکی‌یکی، چکِ بودجه‌یِ روزانه، `judgeBoundaries`، سپس تراکنشِ `SELECT … FOR UPDATE … AND MD5(clean_text)=?` (اگر متن در این فاصله عوض شده/دوباره ساخته شده ⇒ ثبت نمی‌شود) و `UPDATE` رویِ `final_transcripts.polish_report` و نسخه‌یِ `generated`؛ `mergeJudgeIntoReport` (خالص) مصرفِ داور را به `usage.total` هم اضافه می‌کند (بودجه‌یِ روزانه می‌شمارد). هر خطا ⇒ فقط نمره‌ای ثبت نمی‌شود؛ ری‌استارت وسطِ داوری ⇒ همان.
