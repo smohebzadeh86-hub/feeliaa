@@ -1286,6 +1286,34 @@ async function main() {
     assert.ok(Math.abs((m1.low_conf_ratio as number) - 1 / 3) < 0.01);
   });
 
+  await t('H75 metrics: speakers_minor (۰٫۵–۳٪) و speaker_imbalance (دونفره، ≥۸۵٪، ≥۱۰۰۰ واژه)؛ حاضرین نامعلوم/واژه‌یِ کم ⇒ بدونِ پرچم؛ نویزِ <۰٫۵٪ نادیده', () => {
+    // ۱۰۰۰ واژه‌یِ گوینده‌یِ ۱ + ۱۰۰ واژه‌یِ گوینده‌یِ ۲ ⇒ ≈۹۱٪؛ ۱۵ واژه‌یِ گوینده‌یِ ۳ ⇒ ≈۱٫۳٪
+    const mk = (n1: number, n2: number, n3: number): TimedToken[] => {
+      const out: TimedToken[] = []; let at = 0;
+      for (const [sp, n] of [[1, n1], [2, n2], [3, n3]] as Array<[number, number]>) for (let i = 0; i < n; i++, at += 400) out.push({ text: ' واژه', speaker: sp, start_ms: at, end_ms: at + 300, confidence: 0.95 });
+      return out;
+    };
+    const run = (n1: number, n2: number, n3: number, expectedSpeakers?: number) =>
+      computeTranscriptMetrics({ tokens: mk(n1, n2, n3), speechSpans: null, durationMs: 600_000, lowConfRatio: null, expectedSpeakers });
+    const a = run(1000, 100, 15, 2);
+    assert.ok(a.flags.includes('speaker_imbalance') && a.flags.includes('speakers_minor'), JSON.stringify(a.flags));
+    assert.ok(!a.flags.includes('speakers_extra') && !a.flags.includes('speakers_merged'));
+    const bal = run(600, 500, 0, 2);
+    assert.ok(!bal.flags.includes('speaker_imbalance') && !bal.flags.includes('speakers_minor'));
+    const shortSess = run(80, 8, 0, 2);
+    assert.ok(!shortSess.flags.includes('speaker_imbalance'), 'جلسه‌یِ کوتاه همیشه نامتعادل است');
+    const noise = run(1000, 900, 3, 2); // ۳ واژه ≈ ۰٫۱٪
+    assert.ok(!noise.flags.includes('speakers_minor'), JSON.stringify(noise.flags));
+    const extra = run(1000, 900, 100, 2); // سهمِ ≥۳٪ ⇒ speakers_extra، نه minor
+    assert.ok(extra.flags.includes('speakers_extra') && !extra.flags.includes('speakers_minor'));
+    const unknown = run(1000, 100, 15);
+    assert.ok(!unknown.flags.some((f) => f.startsWith('speaker')), 'حاضرین نامعلوم ⇒ قضاوت نمی‌شود');
+    const three = run(1000, 100, 0, 3);
+    assert.ok(!three.flags.includes('speaker_imbalance'), 'فقط دونفره');
+    const f = metricsFindings(a);
+    assert.ok(f.some((x) => x.level === 'warn' && x.text.includes('سهمِ یک گوینده')) && f.some((x) => x.text.includes('گوینده‌یِ کوچکِ اضافه')));
+  });
+
   console.log(`\n${pass} PASS / ${fail} FAIL`);
   if (fail) process.exit(1);
 }

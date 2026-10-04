@@ -12,6 +12,8 @@
     tail_gap: 'انتها بی‌متن',
     speakers_merged: 'گوینده‌ی ادغام‌شده',
     speakers_extra: 'گوینده‌ی اضافه',
+    speakers_minor: 'گوینده‌ی فانتوم',
+    speaker_imbalance: 'سهمِ نامتعادل',
     fragmented_turns: 'نوبت‌هایِ تکه‌تکه'
   };
   var data = null;

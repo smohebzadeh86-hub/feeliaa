@@ -57,6 +57,22 @@ const parse = (v: unknown): any => (typeof v === 'string' ? JSON.parse(v || '{}'
       console.log(`${x.id}  ${x.at.toISOString().slice(0, 16).replace('T', ' ')}  ${x.model.padEnd(32).slice(0, 32)} ${String(x.chunks).padStart(4)} ${String(x.turns).padStart(4)} ${String(x.calls).padStart(5)} ${String(x.pt).padStart(7)} ${String(x.ct).padStart(6)} ${String(x.rt).padStart(7)}  ${fmt(x.cost).padStart(9)}`);
     }
 
+    // داورِ مرزِ نوبت (پس از done؛ مصرفش به usage.total هم اضافه شده) — سهمِ جدا و پوشش. فقط عدد.
+    const judged = (r.rows as any[]).map((x) => ({ x, rep: parse(x.polish_report) })).filter((y) => y.rep.boundary_judge);
+    if (judged.length) {
+      console.log(`
+داورِ مرزِ نوبت — ${judged.length} جلسه (سهم از توکنِ کلِ جلسه، پوشش، پرچم‌ها):`);
+      console.log('جلسه      فراخ.  ورودی  خروجی+استدلال  سهم%  کاندید  داوری  حذف‌شده  پرچم  زمان‌پایان');
+      let jt = 0, tt = 0;
+      for (const { x, rep } of judged.slice(0, lastN)) {
+        const ju = rep.usage?.boundary_judge, tot = rep.usage?.total, bj = rep.boundary_judge;
+        const jTok = (ju?.prompt_tokens ?? 0) + (ju?.completion_tokens ?? 0), tTok = (tot?.prompt_tokens ?? 0) + (tot?.completion_tokens ?? 0);
+        jt += jTok; tt += tTok;
+        console.log(`${String(x.session_id).slice(0, 8)}  ${String(ju?.calls ?? 0).padStart(5)}  ${String(ju?.prompt_tokens ?? 0).padStart(6)}  ${String(ju?.completion_tokens ?? 0).padStart(15)}  ${String(tTok ? Math.round((100 * jTok) / tTok) : 0).padStart(4)}  ${String(bj.candidates ?? 0).padStart(6)}  ${String(bj.checked ?? 0).padStart(6)}  ${String(bj.truncated ?? 0).padStart(8)}  ${String(Array.isArray(bj.flagged) ? bj.flagged.length : 0).padStart(5)}  ${bj.timed_out ? 'timeout' : bj.failed_batches ? 'failed×' + bj.failed_batches : 'ok'}`);
+      }
+      console.log(`جمعِ ${Math.min(judged.length, lastN)} جلسه‌یِ آخر: داور ${jt} از ${tt} توکن (${tt ? Math.round((100 * jt) / tt) : 0}٪)`);
+    }
+
     // ——— ۲) همه‌ی فراخوانی‌ها (موفق و ناموفق) از obs_events ———
     const ev = await query(
       `SELECT ts, session_id, code, duration_ms, detail FROM obs_events WHERE event = 'llm.call' AND ts >= (UTC_TIMESTAMP() - INTERVAL ? DAY) ORDER BY ts DESC`, [days]);

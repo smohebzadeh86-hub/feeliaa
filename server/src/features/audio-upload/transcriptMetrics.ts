@@ -22,6 +22,8 @@ export type MetricsFlag =
   | 'tail_gap'          // انتهایِ صدا متن ندارد
   | 'speakers_merged'   // گوینده‌هایِ پیدا‌شده کمتر از حاضرینِ جلسه
   | 'speakers_extra'    // گوینده‌هایِ پیدا‌شده بیشتر از حاضرینِ جلسه
+  | 'speakers_minor'    // برچسبِ گوینده‌یِ فانتوم با سهمِ کوچک (MINOR_SPEAKER_SHARE..MIN_SPEAKER_SHARE) — زیرِ آستانه‌یِ «پیدا‌شده»
+  | 'speaker_imbalance' // جلسه‌یِ دونفره با سهمِ واژه‌یِ یک گوینده ≥ IMBALANCE_SHARE — یا مونولوگ یا ادغامِ دو گوینده (فقط هشدارِ ادمین)
   | 'fragmented_turns'; // نوبت‌هایِ خیلی کوتاهِ زیاد (جابه‌جاییِ گوینده)
 
 export interface TranscriptMetrics {
@@ -67,6 +69,11 @@ export const METRICS = {
   MIN_SPEECH_MS: 60_000,
   // گوینده‌ای با سهمِ کمتر از این (از واژه‌ها) «پیدا‌شده» حساب نمی‌شود (برچسبِ تصادفیِ Soniox).
   MIN_SPEAKER_SHARE: 0.03,
+  // برچسبی با سهمِ بینِ این و MIN_SPEAKER_SHARE «گوینده‌یِ فانتوم» است (نویزِ کمتر از این نادیده): در متنِ نهایی به یکی از دو نقش می‌چسبد.
+  MINOR_SPEAKER_SHARE: 0.005,
+  // دونفره + سهمِ بزرگ‌ترین گوینده ≥ این ⇒ مشکوکِ ادغام؛ فقط با واژه‌هایِ کافی (جلسه‌یِ کوتاه همیشه نامتعادل است).
+  IMBALANCE_SHARE: 0.85,
+  IMBALANCE_MIN_WORDS: 1000,
   SHORT_TURN_WORDS: 3,
   MIN_TURNS_FOR_RATIO: 10,
   FRAGMENTED_RATIO: 0.4,
@@ -202,6 +209,9 @@ export function computeTranscriptMetrics(input: MetricsInput): TranscriptMetrics
   if (expected !== null && labelled) {
     if (speakers_found < expected) flags.push('speakers_merged');
     else if (speakers_found > expected) flags.push('speakers_extra');
+    if (expected === 2 && shares.length >= 2 && shares[0] >= METRICS.IMBALANCE_SHARE && words.length >= METRICS.IMBALANCE_MIN_WORDS) flags.push('speaker_imbalance');
+    // فقط وقتی حاضرین معلوم‌اند (= شماره‌یِ گوینده‌ها یکدست است؛ realtimeِ چند-run حاضرین را null می‌دهد)
+    if (!flags.includes('speakers_extra') && shares.some((s) => s >= METRICS.MINOR_SPEAKER_SHARE && s < METRICS.MIN_SPEAKER_SHARE)) flags.push('speakers_minor');
   }
   let turns = 0, shortTurns = 0, run = 0;
   let prev: string | null | undefined = undefined;

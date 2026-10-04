@@ -161,7 +161,7 @@ button.btn.btn-lg{padding:13px 16px;font-size:15px;border-radius:15px}
 .setup-actions>.btn-primary:hover:not(:disabled){background:linear-gradient(180deg,var(--sage),var(--sage-hover))}
 .setup-actions>button.btn-lg{min-height:54px;border-radius:16px}
 .setup-actions>.btn-secondary{flex:0 0 auto}
-.setup-back{display:block;margin:6px auto 0;padding:6px 14px;background:none;border:none;font-family:inherit;font-size:13px;color:var(--ink-2);cursor:pointer;border-radius:var(--r-sm)}
+.setup-back{display:block;margin:8px auto 0;padding:10px 24px;min-height:44px;background:none;border:none;font-family:inherit;font-size:16px;font-weight:600;color:var(--ink-2);cursor:pointer;border-radius:var(--r-sm)}
 .setup-back:hover{color:var(--sage-deep);background:var(--sage-mist)}
 @media(max-width:380px){.setup-actions>.btn-secondary span{display:none}.setup-actions>.btn-secondary{padding:13px 14px}}
 
@@ -10525,10 +10525,10 @@ const UPLOAD_NOTE_MSG={
   head_gap:'ابتدایِ صدا متنی ندارد.',
   tail_gap:'انتهایِ صدا متنی ندارد.',
   uncovered_gap:'در میانه‌ی صدا بخشِ بلندی بدونِ متن مانده است.',
-  low_coverage:'بخشِ قابل‌توجهی از گفتارِ فایل در متن نیامده است.',
-  speakers_merged:'ممکن است صدایِ دو نفر در بعضی بخش‌ها یک گوینده ثبت شده باشد.'
+  low_coverage:'بخشِ قابل‌توجهی از گفتارِ فایل در متن نیامده است.'
+  // speakers_merged عمداً نمایش داده نمی‌شود: حدسِ ما درباره‌ی تفکیکِ گوینده اعتمادِ تراپیست را خراب می‌کرد (2026-10-04)
 };
-const UPLOAD_NOTE_ORDER=['low_coverage','uncovered_gap','head_gap','tail_gap','speakers_merged'];
+const UPLOAD_NOTE_ORDER=['low_coverage','uncovered_gap','head_gap','tail_gap'];
 function jobNotesHtml(job){
   if(!job.transcript_ready||!job.transcript_chars)return '';
   const notes=(job.transcript_notes||[]).filter(function(f){return UPLOAD_NOTE_MSG[f];});

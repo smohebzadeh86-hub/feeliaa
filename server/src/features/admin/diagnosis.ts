@@ -53,9 +53,11 @@ export function metricsFindings(m: any | null): Array<{ level: 'ok' | 'warn' | '
   if (flags.includes('uncovered_gap')) out.push({ level: 'warn', text: `${m.uncovered_gaps} تکه‌ی بلند (≥۱۵ث) وسطِ جلسه صدا دارد ولی متن ندارد.` });
   const shares = (m.speaker_shares || []).map((s: number) => pctFa(s)).join('، ');
   const exp = m.speakers_expected ? ` (حاضرینِ جلسه: ${m.speakers_expected})` : '';
-  const spLvl = flags.includes('speakers_merged') || flags.includes('speakers_extra') ? 'warn' : 'ok';
+  const spLvl = flags.includes('speakers_merged') || flags.includes('speakers_extra') || flags.includes('speaker_imbalance') ? 'warn' : 'ok';
   out.push({ level: spLvl, text: `گوینده‌هایِ تفکیک‌شده: ${m.speakers_found}${exp}${shares ? ' — سهم: ' + shares : ''}.` });
   if (flags.includes('speakers_merged')) out.push({ level: 'warn', text: 'تعدادِ گوینده‌ها کمتر از حاضرینِ جلسه است — احتمالاً صدایِ دو نفر یکی شده؛ نقش‌ها را با «متنِ خام» چک کنید.' });
+  if (flags.includes('speaker_imbalance')) out.push({ level: 'warn', text: 'سهمِ یک گوینده بسیار بالاست (≥۸۵٪ در جلسه‌یِ دونفره) — یا گفتارِ تقریباً یک‌طرفه بوده یا صدایِ دو نفر یکی شده؛ با «متنِ خام» چک کنید.' });
+  if (flags.includes('speakers_minor')) out.push({ level: 'ok', text: 'برچسبِ گوینده‌یِ کوچکِ اضافه (کمتر از ۳٪ واژه‌ها) — معمولاً چند واژه‌یِ جابه‌جاشده؛ در متنِ نهایی به یکی از دو نقش می‌چسبد.' });
   if (flags.includes('fragmented_turns')) out.push({ level: 'warn', text: `${pctFa(m.short_turn_ratio)} از ${m.turns} نوبت ≤۳ واژه‌اند — تفکیکِ گوینده ناپایدار است.` });
   if (m.low_conf_ratio !== null && m.low_conf_ratio !== undefined) out.push({ level: 'ok', text: `اطمینانِ رونویسی: ${pctFa(m.low_conf_ratio)} از توکن‌ها زیرِ ۰٫۷، ${m.uncertain_words} واژه‌ی نامطمئن (زیرِ ۰٫۵)؛ ${m.words} واژه، ${m.words_per_min ?? '—'} واژه در دقیقه.` });
   return out;
