@@ -241,8 +241,8 @@ input::-ms-reveal{display:none}
 .client-code{font-size:13px;font-weight:700;color:var(--sage-deep);direction:ltr;font-variant-numeric:tabular-nums}
 .client-meta{font-size:12px;color:var(--muted);line-height:1.7;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .cat-badge{font-size:10px;font-weight:600;color:var(--ink-2);background:var(--field);border:1px solid var(--line-soft);border-radius:99px;padding:2px 9px;flex:none}
-.pin-badge{font-size:10px;font-weight:600;color:var(--sage-deep);background:var(--sage-mist);border:1px solid var(--sage-soft);border-radius:99px;padding:2px 9px;flex:none;display:inline-flex;align-items:center;gap:3px}
-.pin-badge svg{width:10px;height:10px}
+.pin-badge{color:var(--sage);flex:none;display:inline-flex;align-items:center;align-self:center}
+.pin-badge svg{width:14px;height:14px;fill:currentColor;transform:rotate(45deg)}
 .today-hint{font-size:12px;color:var(--ink-2);margin:0 0 10px}
 .history-heading{grid-column:1/-1;font-size:12.5px;font-weight:700;color:var(--ink-2);margin:18px 0 8px}
 .history-heading:first-child{margin-top:0}
@@ -498,6 +498,8 @@ input::-ms-reveal{display:none}
 .tu-member-head .tu-x{border:none;background:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px}
 .tu-member .cat-select{margin-bottom:0}
 .tu-add{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.tu-edit{position:absolute;top:0;left:0;display:inline-flex;align-items:center;gap:5px;border:none;background:none;color:var(--sage-deep);font:inherit;font-size:12px;cursor:pointer;padding:4px 6px;border-radius:8px}
+.tu-edit:hover{background:rgba(0,0,0,.05)}
 .tu-link{border:none;background:none;color:var(--sage-deep);font:inherit;font-size:12px;cursor:pointer;padding:0;text-decoration:underline}
 .rec-tips{border:1.5px solid var(--line);border-radius:var(--r-md);margin:0 0 14px;background:var(--card);font-size:13px;transition:border-color .15s}
 .rec-tips:hover,.rec-tips[open]{border-color:var(--gold-soft)}
@@ -1680,7 +1682,8 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
   </section>
 
   <section id="screenClientDetail" class="card screen" hidden>
-    <div class="card-head">
+    <div class="card-head" style="position:relative">
+      <button class="tu-edit" onclick="openEditUnitModal()" title="ویرایش پرونده" aria-label="ویرایش پرونده"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>ویرایش پرونده</span></button>
       <h2 id="detailTitle" data-clarity-mask="true"></h2>
       <p id="detailMeta"></p>
     </div>
@@ -1693,7 +1696,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <!-- ⭐ پرونده‌ی روندِ درمان (AI Case File) — فازِ ۱: فقط برایِ مراجعینِ غیرفعال
          نمایش داده می‌شود (تصمیمِ مالک)؛ بک‌اند/schema برایِ همه‌ی مراجعین generic است. -->
     <div id="caseFileSection" class="case-file-doc" data-clarity-mask="true" hidden style="margin-bottom:16px"></div>
-    <div class="presence-line" style="margin-bottom:14px" data-clarity-mask="true"><span id="detailUnitText"></span><button class="tu-link" onclick="openEditUnitModal()">تغییرِ نوعِ پرونده / افزودنِ عضو</button></div>
+    <div class="presence-line" style="margin-bottom:14px" data-clarity-mask="true"><span id="detailUnitText"></span></div>
     <h3 class="detail-section-title">جلساتِ ثبت‌شده</h3>
     <div id="sessionsList" data-clarity-mask="true"></div>
     <!-- جلسه‌هایِ حذف‌شده (حذفِ نرم، migration 042، 2026-10-02): مسیرِ پیدا کردن و بازگردانی -->
@@ -1706,7 +1709,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
     <!-- آپلودِ فایلِ صوتیِ جلسه‌ای که بیرون از فیلیا ضبط شده (مثلاً با ضبطِ گوشی وقتی اینترنتِ کلینیک ضعیف بود) -->
     <button class="btn btn-secondary btn-block" id="detailUploadBtn" style="margin-top:10px" onclick="openAudioUploadModal()">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-      آپلودِ فایلِ صوتیِ جلسه
+      آپلود فایل صوتی جلسه
     </button>
     <button class="btn btn-ghost btn-block" style="margin-top:10px" onclick="goBackToClients()">بازگشت</button>
   </section>
@@ -4901,7 +4904,7 @@ async function liveResumeSession(sessionId){
     currentClient=clientRes.client;
     try{localStorage.setItem('feelia_active_session',sess.id);}catch(e){}
     $('recChip').innerHTML=IC_MIC+'<span></span>';
-    $('recChip').querySelector('span').textContent=currentClient.code+(currentClient.alias?' · '+currentClient.alias:'')+' · جلسه '+toFa(currentSession.session_num)+' · '+toFa(currentSession.date);
+    $('recChip').querySelector('span').textContent=cName(currentClient)+' · جلسه '+toFa(currentSession.session_num)+' · '+toFa(currentSession.date);
     showScreen('Live');
     clearLiveConnBanner();
     $('recStatus').textContent='در حال اتصال…';
@@ -5737,7 +5740,7 @@ async function loadDeletedClients(){
     rows.forEach(function(x){
       const row=document.createElement('div');row.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line, #ddd);font-size:13px';
       const t=document.createElement('span');
-      t.textContent=x.code+(x.alias?' — '+x.alias:'')+' · '+toFa(x.session_count||0)+' جلسه';
+      t.textContent=cName(x)+' · '+toFa(x.session_count||0)+' جلسه';
       const b=document.createElement('button');b.type='button';b.className='btn btn-ghost btn-sm';b.textContent='بازگردانی';
       b.onclick=async function(){
         b.disabled=true;
@@ -6118,7 +6121,7 @@ function buildClientCard(c){
     delBtn.type='button';
     delBtn.className='danger';
     delBtn.innerHTML=IC_TRSH+'حذفِ کامل مراجع';
-    delBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();showDeleteClient(c.id,c.code,c.session_count||0);});
+    delBtn.addEventListener('click',function(e){e.stopPropagation();closeAllClientMenus();showDeleteClient(c.id,cName(c),c.session_count||0);});
     menuDrop.appendChild(delBtn);
     menuBtn.addEventListener('click',function(e){
       e.stopPropagation();
@@ -6136,33 +6139,27 @@ function buildClientCard(c){
     name.className='client-name';
     const alias=document.createElement('span');
     alias.className='client-alias';
-    alias.textContent=c.alias||'—';
-    const code=document.createElement('span');
-    code.className='client-code';
-    code.textContent=c.code;
+    alias.textContent=cName(c);
     name.appendChild(alias);
-    name.appendChild(code);
     top.appendChild(name);
     if(isPinnedClient(c)){
       const pinBadge=document.createElement('span');
       pinBadge.className='pin-badge';
-      pinBadge.innerHTML=IC_PIN+'سنجاق‌شده';
-      top.appendChild(pinBadge);
+      // فقط آیکن (مثلِ تلگرام) — متنِ «سنجاق‌شده» کارت را شلوغ می‌کرد.
+      pinBadge.title='سنجاق‌شده';
+      pinBadge.setAttribute('role','img');
+      pinBadge.setAttribute('aria-label','سنجاق‌شده');
+      pinBadge.innerHTML=IC_PIN;
+      name.appendChild(pinBadge);
     }
     div.appendChild(top);
 
     const meta=document.createElement('div');
     meta.className='client-meta';
-    const metaText=document.createElement('span');
-    metaText.textContent=toFa(c.session_count||'0')+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'');
-    meta.appendChild(metaText);
     const badgeLabel=clientBadgeLabel(c);
-    if(badgeLabel){
-      const catBadge=document.createElement('span');
-      catBadge.className='cat-badge';
-      catBadge.textContent=badgeLabel;
-      meta.appendChild(catBadge);
-    }
+    const metaText=document.createElement('span');
+    metaText.textContent=(badgeLabel?badgeLabel+' · ':'')+toFa(c.session_count||'0')+' جلسه'+(c.last_session_date?' · آخرین: '+toFa(c.last_session_date):'');
+    meta.appendChild(metaText);
     if(isInactive&&c.status_reason){
       const reasonEl=document.createElement('span');
       reasonEl.className='status-reason';
@@ -6203,8 +6200,8 @@ function buildClientCard(c){
     // مراجع بود و پیدا نمی‌شد). همان مودالِ openAudioUploadModal؛ برایِ فعال و غیرفعال یکسان.
     const upBtn=document.createElement('button');
     upBtn.className='btn btn-secondary btn-sm card-upload-btn';
-    upBtn.title='آپلودِ فایلِ صوتیِ جلسه';
-    upBtn.setAttribute('aria-label','آپلودِ فایلِ صوتیِ جلسه');
+    upBtn.title='آپلود فایل صوتی جلسه';
+    upBtn.setAttribute('aria-label','آپلود فایل صوتی جلسه');
     upBtn.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg><span>آپلود صوت</span>';
     upBtn.addEventListener('click',function(e){
       e.stopPropagation();
@@ -6240,7 +6237,7 @@ document.addEventListener('click',closeAllClientMenus);
 
 function openDeactivateModal(c){
   deactivateTargetClient=c;
-  $('deactivateClientCode').textContent=c.alias?(c.alias+' ('+c.code+')'):c.code;
+  $('deactivateClientCode').textContent=cName(c);
   const firstRadio=$('deactivateReasonGroup').querySelector('input[name=deactivateReason]');
   if(firstRadio)firstRadio.checked=true;
   $('deactivateReasonOther').value='';
@@ -6297,7 +6294,7 @@ function openEditCategoryModal(c){
   editCategoryTargetClient=c;
   editCategorySelectedCategory=c.category||null;
   editCategorySelectedGender=c.gender||null;
-  $('editCategoryClientCode').textContent=c.alias?(c.alias+' ('+c.code+')'):c.code;
+  $('editCategoryClientCode').textContent=cName(c);
   $('editAliasInput').value=c.alias||'';
   renderEditCategoryCatSelect();
   $('editCategoryModal').classList.add('open');
@@ -6328,6 +6325,7 @@ async function confirmEditCategory(){
   }catch(e){showBanner('error','خطا: '+e.message);if(aliasChanged)loadClients();}
 }
 
+function cName(c){return (c&&(c.alias||c.code))||'';}
 function showDeleteClient(id,code,sc){
   deleteTargetClient=id;
   $('deleteClientText').innerHTML='مراجع <b>'+code+'</b> از فهرستِ شما حذف می‌شود. <b>'+toFa(sc)+' جلسه</b> و یادداشت‌هایش برایِ ادمین نگه داشته می‌شود و هر وقت خواستید از «مراجعینِ حذف‌شده» برش می‌گردانید.';
@@ -6399,7 +6397,7 @@ async function openClientDetail(clientId,opts){
     currentClient=data.client;
     currentClientUnit=data.unit||null;
     $('detailUnitText').textContent=tuUnitSummary(currentClientUnit)||'';
-    $('detailTitle').textContent=data.client.code+(data.client.alias?' — '+data.client.alias:'');
+    $('detailTitle').textContent=cName(data.client);
     $('detailMeta').textContent=toFa(data.sessions.length)+' جلسه';
     // ⭐ پرونده باید با کارت یکدست باشد: مراجعِ غیرفعال جلسه‌ی زنده‌ی جدید نمی‌گیرد
     // (سرور هم 409 می‌دهد)؛ به‌جایش جلسه‌های گذشته دستی ثبت می‌شوند.
@@ -7588,7 +7586,7 @@ async function doViewTranscript(sessionId){
     const hasTranscript=!!(data.session.transcript&&data.session.transcript.trim());
     stopSessionJobPoll();
     $('uploadJobPanel').hidden=true;
-    $('sessionDetailTitle').textContent=(currentClient?(currentClient.code+(currentClient.alias?' — '+currentClient.alias:'')+' · '):'')+'جلسه '+toFa(data.session.session_num);
+    $('sessionDetailTitle').textContent=(currentClient?(cName(currentClient)+' · '):'')+'جلسه '+toFa(data.session.session_num);
     // ⭐ (2026-09-15، دورِ دوم): برایِ جلسه‌ی دستی ساعت هیچ‌جا نمایش داده نمی‌شود (بی‌معناست)
     // و تاریخِ خالی «بدونِ تاریخ» نوشته می‌شود، نه «null» (فیکسِ toFa).
     $('sessionDetailMeta').textContent=isManualSession
@@ -8197,11 +8195,11 @@ async function createNewClient(){
     // مستقیم صفحه‌ی «ثبتِ جلسه‌ی گذشته» (بازاستفاده از startManualSessionFlow، همان مسیرِ
     // تست‌شده‌ی دکمه‌ی کارت، فقط بدونِ نیازِ کلیکِ اضافه).
     if(status==='inactive'){
-      showBanner('info','مراجع <b>'+data.client.code+'</b> به فهرستِ غیرفعال‌ها اضافه شد — در حال بازکردنِ صفحه‌ی ثبتِ جلساتِ گذشته…');
+      showBanner('info','مراجع <b>'+cName(data.client)+'</b> به فهرستِ غیرفعال‌ها اضافه شد — در حال بازکردنِ صفحه‌ی ثبتِ جلساتِ گذشته…');
       currentClient=data.client;
       await startManualSessionFlow();
     }else{
-      showBanner('info','مراجع <b>'+data.client.code+'</b> ساخته شد.');
+      showBanner('info','مراجع <b>'+cName(data.client)+'</b> ساخته شد.');
       loadClients();
       setupNewSession(data.client);
     }
@@ -8252,7 +8250,7 @@ function renderSetupChips(){
 function setupNewSession(client){
   currentClient=client;
   clearBanner();
-  $('setupClientInfo').textContent=client.code+(client.alias?' — '+client.alias:'');
+  $('setupClientInfo').textContent=cName(client);
   if(setupChipsTimer)clearInterval(setupChipsTimer);
   setupChipsTimer=null;
   renderSetupChips();
@@ -8347,7 +8345,7 @@ async function startSession(){
     // P3: session فعال را برای resume بعد از reload نگه دار
     try{localStorage.setItem('feelia_active_session',currentSession.id);}catch(e){}
     $('recChip').innerHTML=IC_MIC+'<span></span>';
-    $('recChip').querySelector('span').textContent=data.client.code+(data.client.alias?' · '+data.client.alias:'')+' · جلسه '+toFa(currentSession.session_num)+' · '+toFa(currentSession.date);
+    $('recChip').querySelector('span').textContent=cName(data.client)+' · جلسه '+toFa(currentSession.session_num)+' · '+toFa(currentSession.date);
     showScreen('Live');
     clearLiveConnBanner();
     $('recStatus').textContent='در حال اتصال…';
@@ -10286,7 +10284,7 @@ function openAudioUploadModal(){
   audioUploadDateTouched=false;
   preVoiceUpload.clear();
   $('upPreNoteInput').value='';
-  $('audioUploadFor').textContent='جلسه‌ی تازه برایِ '+currentClient.code+(currentClient.alias?' — '+currentClient.alias:'');
+  $('audioUploadFor').textContent='جلسه‌ی تازه برایِ '+cName(currentClient);
   $('upPreNoteBox').open=false;
   $('audioUploadErr').hidden=true;
   $('audioUploadConsent').checked=false;
@@ -10426,7 +10424,7 @@ async function startAudioUpload(){
   requestCaseFileNotificationPermission();
   const opts={
     clientId:currentClient.id,
-    clientLabel:currentClient.alias?(currentClient.alias+' ('+currentClient.code+')'):currentClient.code,
+    clientLabel:cName(currentClient),
     sessionDate:audioUploadDateVal||'',
     preNote:pre.text, // متنِ پیش از جلسه همراهِ خودِ آپلود می‌رود تا پیش از رونویسی ذخیره شود (به‌جایِ POST /notes بعد از ساختِ جلسه)
   };
@@ -10670,7 +10668,7 @@ function renderTray(){
   }
   html+='<div class="tray-head" style="margin:16px 0 6px"><div class="tray-sec" style="margin:0">اعلان‌ها</div>'+(procUnread?'<button class="link-btn" onclick="markAllNotificationsRead()">خواندنِ همه</button>':'')+'</div>';
   if(!procNotifs.length&&!local.length&&!procJobs.length){
-    html+='<div class="tray-empty">هنوز چیزی نیست. فایلِ صوتیِ جلسه را از صفحه‌ی مراجع با «آپلودِ فایلِ صوتیِ جلسه» اضافه کنید.</div>';
+    html+='<div class="tray-empty">هنوز چیزی نیست. فایل صوتی جلسه را از صفحه‌ی مراجع با «آپلود فایل صوتی جلسه» اضافه کنید.</div>';
   }else if(!procNotifs.length){
     html+='<div class="tray-empty">اعلانی ندارید.</div>';
   }else{
