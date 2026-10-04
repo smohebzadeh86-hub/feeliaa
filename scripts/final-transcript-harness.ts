@@ -13,6 +13,7 @@ import { checkPolishedChunk, negationCount, numberBag, DEFAULT_GUARD_LIMITS } fr
 import { polishTranscript } from '../server/src/features/final-transcript/application/polishTranscript.js';
 import { judgeBoundaries, boundaryCandidates, mergeJudgeIntoReport } from '../server/src/features/final-transcript/application/boundaryJudge.js';
 import { applyRoleEdit, allowedRoles, roleNameToEntry, confirmedRolesFromEntries } from '../server/src/features/final-transcript/domain/roleEdit.js';
+import { planRetry } from '../server/src/features/final-transcript/domain/retryPlan.js';
 import type { LlmJsonPort } from '../server/src/features/final-transcript/ports.js';
 
 let pass = 0;
@@ -884,6 +885,18 @@ await t('BJ7 mergeJudgeIntoReport: گزارش + مصرفِ داور به usage.t
   assert.equal(m2.usage, undefined);
   const m3: any = mergeJudgeIntoReport(base, jr, { ...ju, cost_usd: null });
   assert.equal(m3.usage.total.cost_usd, null, 'هزینه‌ی نامعلوم دروغِ «۰ دلار» نمی‌گوید');
+});
+
+await t('RP1 «ساختِ دوباره»: آپلود همیشه از رونویسیِ موجود (بدونِ Soniox)، زنده‌ی کهنه دوباره از صدا، بدونِ async ⇒ رونویسی، busy/fresh', () => {
+  const base = { stage: 'done', source: 'async', hasAsync: true, sessionSource: 'upload', stale: true };
+  assert.equal(planRetry(base), 'reuse-async');                                   // آپلودِ کهنه: قبلاً retranscribe (هزینه‌ی دوم)
+  assert.equal(planRetry({ ...base, stage: 'failed', stale: false }), 'reuse-async');
+  assert.equal(planRetry({ ...base, sessionSource: 'live' }), 'retranscribe');     // زنده‌ی کهنه: صدایِ تازه ممکن است رسیده باشد
+  assert.equal(planRetry({ ...base, sessionSource: 'live', stale: false, stage: 'failed' }), 'reuse-async');
+  assert.equal(planRetry({ ...base, hasAsync: false }), 'retranscribe');          // متنِ async نیست ⇒ چاره‌ای جز رونویسی نیست
+  assert.equal(planRetry({ ...base, source: 'realtime' }), 'retranscribe');
+  assert.equal(planRetry({ ...base, stage: 'polishing' }), 'busy');
+  assert.equal(planRetry({ ...base, stale: false }), 'fresh');
 });
 
 console.log(`\n${pass} pass, ${fail} fail`);

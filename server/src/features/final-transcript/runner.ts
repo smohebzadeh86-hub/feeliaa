@@ -22,6 +22,7 @@ import { DEFAULT_GUARD_LIMITS } from './domain/polishGuards.js';
 import { createTranscriptLlm } from './adapters/llmJson.js';
 import { envWithReasoning, REASONING_LEVELS, type ReasoningLevel } from '../../llm/config.js';
 import { lockCurrent, snapshotBaselineIfMissing, appendCurrentAsVersion } from './adapters/versionStore.js';
+import { planRetry } from './domain/retryPlan.js';
 
 const LEASE_SECONDS = 20 * 60;
 const HEARTBEAT_MS = 60_000;
@@ -382,14 +383,16 @@ export async function enqueueFinalTranscript(sessionId: string, opts: { asyncTex
 // «تلاشِ دوباره» از UI: failed/skipped یا done ِ stale. متنِ asyncِ موجود و هنوز معتبر دوباره رونویسی نمی‌شود.
 export async function retryFinalTranscript(sessionId: string): Promise<'queued' | 'not-found' | 'busy' | 'fresh'> {
   const r = await query(
-    `SELECT f.stage, f.source, f.source_version, f.async_text IS NOT NULL AS has_async, s.transcript_version
+    `SELECT f.stage, f.source, f.source_version, f.async_text IS NOT NULL AS has_async, s.transcript_version, s.source AS session_source
        FROM final_transcripts f JOIN sessions s ON s.id = f.session_id WHERE f.session_id = ?`, [sessionId]);
   const row = r.rows[0];
   if (!row) return 'not-found';
-  if (['waiting_audio', 'transcribing', 'polishing'].includes(row.stage)) return 'busy';
-  const stale = Number(row.transcript_version || 0) > Number(row.source_version ?? -1);
-  if (row.stage === 'done' && !stale) return 'fresh';
-  const reuseAsync = !stale && row.source === 'async' && !!row.has_async;
+  const plan = planRetry({
+    stage: row.stage, source: row.source ?? null, hasAsync: !!row.has_async, sessionSource: row.session_source ?? null,
+    stale: Number(row.transcript_version || 0) > Number(row.source_version ?? -1),
+  });
+  if (plan === 'busy' || plan === 'fresh') return plan;
+  const reuseAsync = plan === 'reuse-async';
   await query(
     `UPDATE final_transcripts SET stage = ?, attempts = 0, error_code = NULL, next_attempt_at = NOW(), queued_at = NOW(),
        finished_at = NULL${reuseAsync ? '' : ', source = NULL, async_text = NULL'}
