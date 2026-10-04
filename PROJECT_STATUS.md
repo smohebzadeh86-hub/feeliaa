@@ -220,6 +220,12 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-10-04 — GIT — commit `006b9fc` (core-data-plan + دورِ دوم؛ به دستورِ مالک: «Commit از worktreeِ تمیز»)
+- **چه شد:** همه‌ی تغییراتِ این نشست (۴۶ فایل: رکوردِ realtime، پیشنهادِ نقش، سنجه‌یِ هر جلسه، T59، R17، export v4، T71، eval-asr، flagِ A/B، migrationهایِ 045/046، اسناد) از یک worktreeِ تمیز رویِ `9a02d66` commit شد. **push/deploy نشد.**
+- **عمداً بیرون ماند (تغییراتِ نشست‌هایِ دیگر در working tree):** CSSِ دکمه‌ی «بازگشت» در `public/index.html` (رویِ production deploy شده ولی commit نشده)، `docs/05-plans/upload-quality-followup-2026-10-04.md` و ردیفش در documentation-map، و سه ورودیِ Event Logِ آن نشست‌ها. همه در working tree دست‌نخورده می‌مانند.
+- **تست در worktree:** `test:rt` 117/0، `up` 75/0، `hist` 14/0، `eval` 8/0، `ft` 72/0، `cf` 115/0؛ `arch`/`routes` (183)/`docs`/`tsc` سبز.
+- **تصمیمِ مالک در همین گفتگو:** متنِ رضایت «فعلاً دست نزن» (R24 باز می‌ماند).
+
 ### 2026-10-04 — GIT + DEPLOY (production) — commit `3d90130`: داورِ مرز بعد از `done` (به دستورِ مالک: «بکن»)
 - **GIT:** `3d90130` (worktreeِ تمیز رویِ `a8e4411`؛ فقط ۷ فایلِ همین کار: `runner.ts`، `polishTranscript.ts`، `boundaryJudge.ts`، harness، دو سند، `PROJECT_STATUS.md`). push نشد. تغییراتِ نشستِ دیگر در همان ماژول (`adapters/versionStore.ts`، `final-transcript/index.ts`) و `public/` و … **commit و deploy نشدند**.
 - **تأیید پیش از deploy (worktreeِ تمیز):** tsc، ft 72، llm 22، up 71، cf 115، tu 19، adm 9، hist 11 — 0 FAIL؛ routes 182، arch، docs OK؛ build OK؛ تار بدونِ `.env` (۰ مورد).
