@@ -220,6 +220,15 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-10-04 — GIT + DEPLOY (production) — commit `507de6e` (پرچم‌هایِ `speakers_minor`/`speaker_imbalance`، CSSِ «بازگشت»، گزارشِ داورِ مرز) (به دستورِ مالک: «اره کامیت و دیپلوی رو بکن»)
+- **GIT:** `507de6e` از worktreeِ تمیز رویِ `298ba5a`: همه‌یِ تغییراتِ commitنشده‌یِ نشست‌هایِ دیگر (transcriptMetrics، diagnosis، feelia-admin-quality.js، index.html، llm-usage-report، upload-harness H75، اسناد، `docs/05-plans/upload-quality-followup-2026-10-04.md`). **push نشد**؛ merge به `main` نه.
+- **مقایسه‌ی پیش از deploy (checksumِ بدونِ `\r`):** prod = `298ba5a` به‌جز `public/index.html` (deployِ زنده‌یِ حذفِ هشدارِ `speakers_merged`؛ همان hunk در commit هست ⇒ هیچ تغییرِ زنده‌ای برنگشت).
+- **تست (worktree):** `tsc` OK، `test:up` 76/0، `test:adm` 9/0، `test:arch`، `test:docs`، `test:routes` (183) سبز.
+- **Preflight:** GO (همه ۰). **Backup:** `/root/backups/code-pre-507de6e-20261004T130414Z.tar.gz` (فقط کد؛ migration ندارد ⇒ DB backup نیاز نبود).
+- **Deploy:** تار ⇒ استخراج ⇒ `pnpm install --frozen-lockfile` ⇒ build ⇒ `pm2 restart feelia-mysql --update-env`. لاگ: migrationها تا `046` already applied، بدونِ خطا؛ `/api/health` ok؛ `speakers_minor` در `dist`؛ checksumِ `index.html` در prod = artifact.
+- **اکنون رویِ production:** هشدارهایِ ادمین `speakers_minor` و `speaker_imbalance`، دکمه‌یِ «بازگشت»ِ بزرگ‌تر، بدونِ هشدارِ `speakers_merged` برایِ تراپیست. پرچم‌ها فقط رویِ جلسه‌هایِ **جدید** محاسبه می‌شوند.
+- **Rollback:** استخراجِ `code-pre-507de6e-…tar.gz` + build + restart.
+
 ### 2026-10-04 — TEST + AUDIT — اجرایِ همه‌یِ harnessها + بازبینیِ ۴ مرزِ پرچم‌شده‌یِ ضبطِ آزمایشیِ مالک (`4ddc36bf`) (به مجوزِ مالک: «اوکیه، تست‌ها رو انجام بده»)
 - **تست‌ها:** `tsc` تمیز؛ `test:up` 76/0، `ft` 73/0، `llm` 22/0، `adm` 9/0، `hist` 14/0، `cf` 115/0، `tu` 19/0، `routes` OK (183)، `arch` OK (172 فایل)، `docs` OK، `eval` OK؛ `test:rt` 117 PASS / 0 FAIL ولی **پردازه تمام نمی‌شود** (بعد از T71 معلق می‌ماند؛ در این نشست با timeout ۲۸۰ث قطع شد، exit=124) — علتِ آن بررسی نشد؛ FINDING (احتمالاً از قبل موجود، در کدِ این نشست دست نخورده).
 - **بازبینیِ مرزها (متنِ ضبطِ خودِ مالک، فقط ۴ مرز چاپ شد):** ضبط یک **آهنگ/رپ** بود نه گفتگویِ درمانی (۹ نوبت؛ ۴ مرزِ ۰↔۱ و ۵↔۶ همه جمله‌یِ کوتاهِ «ریمیکس با ما» که برچسبِ «درمانگر» گرفته). این برچسب یا واقعاً صدایِ دیگری (برچسبِ تهیه‌کننده) یا خطایِ تفکیک است؛ بدونِ صدا نامعلوم. **نتیجه: این ضبط برایِ precisionِ داور معتبر نیست** (محتوا گفتگو نیست و مدلِ داور رویِ «درمانگر/مراجع» تعریف شده). پرچمِ ۴/۴ با نمره ۹۵ محتمل است چون هر ۴ مرز «جمله‌یِ کوتاهِ بی‌ربط» دارند، نه الزاماً خطایِ تفکیک.
