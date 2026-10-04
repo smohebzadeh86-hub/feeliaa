@@ -60,3 +60,21 @@ export async function getVersionText(sessionId: string, version: number): Promis
   const x = (r.rows as any[])[0];
   return x ? { version: Number(x.version), kind: x.kind, clean_text: x.clean_text, created_at: new Date(x.created_at).toISOString() } : null;
 }
+
+// خروجیِ ادمین (export v4، 2026-10-04): «متنِ نهایی»ِ جاری (متنِ مرتب + نوبت‌ها با نقش) + فهرستِ نسخه‌ها (فقط متادیتا؛ متنِ هر
+// نسخه با مسیرِ جداگانه‌ی ادمین). null ⇒ جلسه متنِ نهایی ندارد. polish_report عمداً بیرون است (گزارشِ داخلی).
+export async function exportFinalTranscript(sessionId: string): Promise<null | {
+  stage: string; source: string | null; source_version: number | null; finished_at: string | null;
+  clean_text: string | null; clean_turns: unknown; versions: Awaited<ReturnType<typeof listVersions>>;
+}> {
+  const r = await query('SELECT stage, source, source_version, finished_at, clean_text, clean_turns FROM final_transcripts WHERE session_id = ?', [sessionId]);
+  const x = r.rows[0];
+  if (!x) return null;
+  let turns: unknown = x.clean_turns ?? null;
+  if (typeof turns === 'string') { try { turns = JSON.parse(turns); } catch { turns = null; } }
+  return {
+    stage: x.stage, source: x.source ?? null, source_version: x.source_version ?? null,
+    finished_at: x.finished_at ? new Date(x.finished_at).toISOString() : null,
+    clean_text: x.clean_text ?? null, clean_turns: turns, versions: await listVersions(sessionId),
+  };
+}

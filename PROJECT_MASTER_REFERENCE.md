@@ -80,7 +80,7 @@ flowchart LR
 | Runtime | Node.js (ESM, `"type":"module"`)؛ نسخه pin نشده — dev: v24.19.0 |
 | زبان | TypeScript `^7.0.2` (strict)، اجرای dev با `tsx` |
 | وب‌سرور | Fastify `^5.12.1` + `@fastify/cookie`، `@fastify/multipart`، `@fastify/static`، `@fastify/websocket` |
-| DB | MySQL از طریق `mysql2`، migrationهای SQL خام (`server/src/db/mysql/migrations/001–034`) |
+| DB | MySQL از طریق `mysql2`، migrationهای SQL خام (`server/src/db/mysql/migrations/001–046`) |
 | STT | Soniox: realtime `stt-rt-v5` (WebSocket)، async `stt-async-v5` (REST) |
 | egress | `https-proxy-agent` (با `PROXY_URL`)؛ LLM: `openai` SDK (OpenAI/OpenRouter/Metis/DeepSeek/custom) — [llm-provider-layer](docs/06-platform/llm-provider-layer.md) |
 | صدا (سرور) | `ffmpeg` خارجی (resolve-speakers، نرمال‌سازیِ آپلود، سنجشِ کیفیت) |
@@ -95,7 +95,7 @@ feeliaa/
 ├── CLAUDE.md, PROJECT_MASTER_REFERENCE.md   ← نقاطِ ورود
 ├── server/            ← backend (TypeScript)
 │   ├── src/{index.ts, app.ts, features/*, auth/, db/, obs/, llm/, shared/, jobs/}
-│   ├── src/db/mysql/migrations/001..034_*
+│   ├── src/db/mysql/migrations/001..046_*
 │   └── scripts/copy-assets.mjs
 ├── public/            ← فرانتِ استاتیک (index.html, feelia-rt.js, feelia-upload.js, feelia-obs.js, feelia-analytics.js)
 ├── scripts/           ← harnessها (rt/cf/up/tu/ft/llm/api) + route-snapshot + check-backend-boundaries + check-docs
@@ -134,7 +134,7 @@ worker/queue/cache مستقل وجود ندارد؛ پردازش‌های پس�
 
 ## 12. Data Layer Overview
 
-MySQL با ۲۰ جدول (شاملِ `_migrations`؛ فهرست و مالکِ هر جدول: [database-catalog](docs/02-reference/database-catalog.md)) — هسته: `therapists`، `auth_sessions`، `clients`، `sessions`، `session_notes`، `session_audio`؛ بعدی‌ها: `client_case_file`، `audio_uploads`/`audio_jobs`/`notifications`، `final_transcripts`، `tu_*`/`client_members`، `obs_events`/`obs_ui_events`/`audit_log`.
+MySQL با ۲۸ جدول (شاملِ `_migrations`؛ فهرست و مالکِ هر جدول: [database-catalog](docs/02-reference/database-catalog.md)) — هسته: `therapists`، `auth_sessions`، `clients`، `sessions`، `session_notes`، `session_audio`؛ بعدی‌ها: `client_case_file`، `audio_uploads`/`audio_jobs`/`notifications`، `final_transcripts`، `tu_*`/`client_members`، `obs_events`/`obs_ui_events`/`audit_log`.
 زنجیره‌ی حذفِ آبشاری: therapist → clients → sessions → notes/audio-rows (جدول‌هایِ `obs_*` عمداً بدونِ FK، LAW-010). صدا روی دیسکِ سرور (`<cwd>/data/`) و در مرورگر (IndexedDB `feelia-audio`).
 [data-architecture](docs/01-architecture/data-architecture.md) · [database-catalog](docs/02-reference/database-catalog.md).
 
@@ -235,7 +235,7 @@ PROJECT_MASTER_REFERENCE.md
 | R1 | **تعارضِ متنِ رضایت با واقعیت:** UI می‌گوید «صدا هیچ‌جا ذخیره نمی‌شود» ولی صدا در IndexedDB (تا 300MB) و روی سرور (آرشیو ۳۰روزه، قابلِ پخش برای ادمین، حتی در جلساتِ موفق با `purpose=archive`) ذخیره می‌شود | **بحرانی** (اخلاقی/حقوقی) | [LAW-009](docs/00-governance/project-laws.md)، [subsystem 05](docs/07-subsystems/05-session-audio-archive-speaker-resolve.md) |
 | R2 | ~~لاگِ موقتِ `DIAG-TEMP` در `PUT /api/sessions/:id` ۸۰ کاراکترِ آخرِ متنِ جلسه را چاپ می‌کند~~ **(رفع‌شده — 2026-09-22؛ بازبینی 2026-10-02):** سرور فقط `logEvent` با طول/نسخه می‌نویسد (`sessions.routes.ts`)؛ `DIAG-TEMP`ِ باقی‌مانده در `feelia-rt.js` یک `console.warn` با `status/code/message`ِ شکستِ اتصال است، بدونِ متنِ بالینی | رفع‌شده | LAW-001، LAW-023 |
 | R3 | شاخه‌ی کاری `feat/clarity` از `main` فاصله‌ی زیادی دارد؛ وضعیتِ merge/PR فقط در `PROJECT_STATUS.md` (LAW-027) | متوسط | [master plan](docs/05-plans/master-implementation-plan.md)، [PROJECT_STATUS.md](PROJECT_STATUS.md) |
-| R4 | ~~(2026-10-01 ممیزیِ Core: رفع‌شده — `features/session-media/purge.ts`: بعد از حذفِ موفقِ ردیف فایل‌ها پاک می‌شوند، همه‌ی مسیرهایِ حذف)~~ حذفِ مراجع/جلسه/تراپیست ردیفِ `session_audio` را cascade می‌کند ولی فایل‌ها روی دیسک یتیم می‌مانند و sweeper آن‌ها را نمی‌بیند (**INFERRED** از کد) | بالا (حریم خصوصی) | subsystem 05 |
+| R4 | ~~(2026-10-01 ممیزیِ Core: رفع‌شده — `features/session-media/purge.ts`: بعد از حذفِ موفقِ ردیف فایل‌ها پاک می‌شوند، همه‌ی مسیرهایِ حذف)~~ حذفِ مراجع/جلسه/تراپیست ردیفِ `session_audio` را cascade می‌کند ولی فایل‌ها روی دیسک یتیم می‌مانند و sweeper آن‌ها را نمی‌بیند (**INFERRED** از کد) | بسته (بازبینی 2026-10-03) | subsystem 05 |
 | R5 | **(2026-10-01: رفع شد — CAS اجباری؛ `transcript` بدونِ `transcript_version` ⇒ 400 `version-required`، `TRANSCRIPT_CAS_REQUIRED=0` بازگشتِ اضطراری)** CAS در `PUT /api/sessions/:id` اتمیک است ولی اختیاری (callerِ بدونِ `transcript_version` پذیرفته می‌شود)؛ مسیرِ legacy و merge بدونِ CAS می‌نویسند | متوسط | [subsystem 03](docs/07-subsystems/03-transcript-integrity.md) |
 | R6 | مسیرِ fallback/batch پوششِ تستِ خودکارِ ناقص دارد (`test:rt` بدونِ شبکه/DB)؛ auth/clients/sessions/admin harnessِ اختصاصی ندارند (`test:api` فقط دستی) | متوسط | [module 04 plan](docs/04-modules/04-transcription/implementation-plan.md) |
 | R7 | نبودِ rate-limit برای login، نبودِ flag `secure` روی کوکی، نبودِ CSP/security headers | متوسط | [06-platform](docs/06-platform/platform-prd.md) |
@@ -246,15 +246,16 @@ PROJECT_MASTER_REFERENCE.md
 | R12 | ~~یادداشتِ صوتیِ مسیرِ اصلی هرگز به سرور ارسال نمی‌شد~~ — رفع شد (2026-09-14)؛ وضعیتِ deploy در `PROJECT_STATUS.md` | بسته | [UI audit — UI-02](docs/05-plans/ui-ux-audit-2026-09-14.md) |
 | R13 | ~~«خروج از حساب» وسطِ جلسه ضبط را متوقف نمی‌کرد~~ — رفع شد (2026-09-14)؛ ناقص در حالتِ ضبطِ محلی: R17 | بسته/جزئی | [UI audit — UI-01](docs/05-plans/ui-ux-audit-2026-09-14.md) |
 | R14 | ~~ارقامِ فارسیِ موبایل رد می‌شد؛ دوبار کلیکِ «شروع جلسه»/«ایجادِ مراجع» تکراری می‌ساخت~~ — رفع شد (2026-09-14)؛ ⚠️ دوبار کلیک روی سایرِ دکمه‌هایِ نوشتنی هنوز رفع نشده | جزئی | [UI audit — UI-03، UI-04، UI-06](docs/05-plans/ui-ux-audit-2026-09-14.md) |
-| R15 | ~~(2026-10-01 ممیزیِ Core: رفع‌شده — `NOTE_OUTBOX_KEY` در `index.html`: صفِ ماندگارِ یادداشت/علامت)~~ **یادداشت‌ها/علائم/یادداشتِ صوتی در شکستِ ذخیره (مثلاً قطعیِ اینترنت) بی‌صدا از دست می‌روند** ولی در UI و صفحه‌ی تکمیل ثبت‌شده دیده می‌شوند؛ روی production (اجرا، 2026-09-14) | **بحرانی** (داده‌ی بالینی) | [UX audit — UX-001](docs/05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) |
-| R16 | **متنِ یادداشت‌ها، علائم و یادداشت‌های صوتی در پرونده نمایش داده نمی‌شود** (فقط زمان)؛ از `f58bd29`، روی production (اجرا) | **بحرانی** | [UX audit — UX-002](docs/05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) |
+| R15 | ~~(2026-10-01 ممیزیِ Core: رفع‌شده — `NOTE_OUTBOX_KEY` در `index.html`: صفِ ماندگارِ یادداشت/علامت)~~ **یادداشت‌ها/علائم/یادداشتِ صوتی در شکستِ ذخیره (مثلاً قطعیِ اینترنت) بی‌صدا از دست می‌روند** ولی در UI و صفحه‌ی تکمیل ثبت‌شده دیده می‌شوند؛ روی production (اجرا، 2026-09-14) | بسته (بازبینی 2026-10-03؛ متنِ یادداشتِ صف‌شده تا ارسال در localStorage می‌ماند) | [UX audit — UX-001](docs/05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) |
+| R16 | ~~**متنِ یادداشت‌ها، علائم و یادداشت‌های صوتی در پرونده نمایش داده نمی‌شود** (فقط زمان)؛ از `f58bd29`~~ — رفع شد (`08e8d20`، 2026-09-14) | بسته | [UX audit — UX-002](docs/05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) |
 | R18 | **(2026-09-23)** فیچرِ آپلود صدا را رویِ سرور (۳۰ روز) و در IndexedDB نگه می‌دارد، در حالی که متنِ رضایت هنوز «صدا هیچ‌جا ذخیره نمی‌شود» است — به دستورِ مالک دست‌نخورده (تشدیدِ R1). (ریسکِ فنیِ «اجرانشده» با تستِ کاملِ واقعیِ همان روز برطرف شد) | **بحرانی** (اخلاقی/حقوقی) | LAW-009، [subsystem 06](docs/07-subsystems/06-audio-upload-pipeline.md) |
 | R19 | **(2026-09-27)** «متنِ نهایی» (پیش‌فرض خاموش) کلِ صدایِ آرشیوشده را دوباره به Soniox و متنِ جلسه را به OpenRouter/OpenAI می‌فرستد. متنِ رضایت هیچ‌کدام را نمی‌گوید و به تصمیمِ مالک فعلاً دست‌نخورده است (تشدیدِ R1/R18). هزینه‌ی Soniox هر جلسه دو برابر می‌شود و سقفِ روزانه‌ی آپلود شاملِ آن نیست. نگهبان‌هایِ قطعی جلویِ تغییرِ منفی/عدد/خلاصه‌سازی را می‌گیرند، ولی تغییرِ معنایِ ظریف‌تر (مثلاً جابه‌جاییِ نقش) فقط با اندازه‌گیری کنترل می‌شود | **بالا** (حقوقی + کیفیتِ سندِ بالینی) | LAW-009، [subsystem 07](docs/07-subsystems/07-final-transcript.md) |
 | R20 | **(2026-09-28، پلنِ B)** آستانه‌هایِ کیفیتِ فایلِ آپلودی (`too_quiet` −60، `UPLOAD_LOW_CONF_RATIO` ۰٫۰۸، `TRANSCRIPT_UNCERTAIN_CONFIDENCE` ۰٫۵) از **یک گفت‌وگویِ ساختگیِ TTS** (فاز ۰B) آمده‌اند؛ گفتارِ واقعی احتمالاً کمتر مقاوم است ⇒ ممکن است هشدار دیر یا زیاد بیاید. رصد با `obs` (`audio_job.quality_flags`، `audio_job.low_confidence`، `final_transcript.done.uncertain/role_fixes`) و بازتنظیم از env. نگهبانِ «نقشِ مجاز ولی غلط» (همان روز) فقط برایِ متنِ asyncِ با تفکیکِ ادغام‌نشده فعال است؛ وقتی Soniox گوینده‌ها را ادغام کرده، نقش همچنان فقط از قضاوتِ LLM می‌آید (دکمه‌ی «نمایشِ متنِ خام» مرجع است). | متوسط | باز — نیازمندِ دادهٔ واقعی (با رضایت) |
 | R21 | **(2026-09-28، پذیرفته‌شده توسطِ مالک)** با `LLM_PROVIDER=metis` متنِ بالینیِ جلسه (پرونده‌ی درمان + «متنِ نهایی») از متیس (Metis AI، دروازه‌ی ایرانی) به DeepSeek می‌رود. سیاستِ نگهداری/آموزشِ داده در مستنداتِ متیس نیست و معادلِ `data_collection:'deny'`ِ OpenRouter وجود ندارد. متنِ رضایت این را نمی‌گوید (تشدیدِ R19/LAW-009). `LLM_FALLBACK_PROVIDER` (پیش‌فرض خاموش) اگر روشن شود متن را به providerِ دوم هم می‌برد. DeepSeek `json_schema`ِ strict ندارد ⇒ ساختارِ پرونده به `shapeOk` + `validateCaseFileDraft` + `finalizeDraft` متکی است | **بالا** (حقوقی/حریمِ خصوصی) | [configuration-catalog](docs/02-reference/configuration-catalog.md)، `server/src/llm/config.ts` |
 | R22 | ~~drift بینِ بازسازیِ ماژولار و `feat/clarity`~~ — merge شده؛ نگاشتِ مسیرهایِ قدیمی→جدید در [repository-map](docs/02-reference/repository-map.md) | بسته | [verification](verification/2026-09-28-backend-modular-refactor-v2.md) |
+| R24 | **(2026-10-03، بازممیزیِ Core)** **نگهداریِ بی‌مدت + حذفِ نرم در برابرِ متنِ رضایت:** از 2026-10-02 («هیچ چیزی هارد دیلیت نشود»، LAW-010) صدا، متن، توکن‌هایِ زمان‌دار (038) و رکوردِ canonical بی‌مدت می‌مانند و حذفِ مراجع/جلسه نرم است؛ متنِ UI هنوز «صدا هیچ‌جا ذخیره نمی‌شود» / «صدای خام هرگز ذخیره نمی‌شود» است. «حقِ فراموشی» فقط با مداخله‌ی دستی ممکن است. تشدیدِ R1/R18 — متنِ رضایت به تصمیمِ مالک بیرون از [core-data-plan](docs/05-plans/core-data-plan-2026-10-03.md) است | **بحرانی** (اخلاقی/حقوقی) | LAW-009، LAW-010 |
 | R23 | **(2026-09-30)** ماژولاریتیِ داده و فرانت ناقص است: `sessions` توسطِ چند feature نوشته می‌شود؛ `index.html` یک اسکریپتِ بزرگِ global | متوسط | [LAW-025](docs/00-governance/project-laws.md)، [verification](verification/2026-09-30-docs-modularity-audit.md) |
-| R17 | **فیکسِ UI-01 ناقص است:** در حالتِ ضبطِ محلی (رونویسیِ زنده FAILED/قطع، بدونِ WSِ باز) خروج مسدود نیست و میکروفون روشن می‌ماند؛ هشدارِ بستنِ تب هم نمی‌آید (اجرا در FAILED) | **بحرانی** (حریمِ خصوصی) | [UX audit — UX-003](docs/05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) |
+| R17 | ~~فیکسِ UI-01 ناقص بود: در ضبطِ محلی (رونویسیِ زنده FAILED/قطع) خروج مسدود نبود و میکروفون روشن می‌ماند~~ — **رفع شد (2026-10-04):** `hasActiveRecording()`ِ `index.html` حالا `FeeliaRT.hasActiveRecording()` (recorderِ durable) را هم می‌سنجد ⇒ خروج/بازکردنِ پنلِ ادمین در ضبطِ محلی مسدود؛ تأییدشده در Chromeِ واقعی با mintِ مسدود ([verification](verification/2026-10-04-core-data-plan.md) §۷) | بسته | [UX audit — UX-003](docs/05-plans/ux-audit-2026-09-14/UX_AUDIT_REPORT.md) |
 
 ## 23. How AI Agents Must Read This Project
 

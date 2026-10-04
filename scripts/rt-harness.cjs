@@ -148,8 +148,16 @@ globalThis.fetch = async (url, opts = {}) => {
       return { ok: false, status: 409, json: async () => ({ error: 'version-conflict', code: 'version-conflict', current_version: s.transcript_version }) };
     }
   }
+  // رکوردِ realtime (core-data-plan قدمِ ۲): تکه‌هایِ توکن ثبت می‌شوند؛ rtTokensFail ⇒ 503 (شکستِ گذرا).
+  m = url.match(/^\/api\/sessions\/([^/]+)\/rt-tokens$/);
+  if (m && method === 'POST') {
+    if (globalThis.rtTokensFail) return { ok: false, status: 503, json: async () => ({ error: 'down' }) };
+    rtPosts.push({ sessionId: m[1], body: JSON.parse(opts.body) });
+    return { ok: true, status: 200, json: async () => ({ stored: 'inserted' }) };
+  }
   return rawFetch(url, opts);
 };
+const rtPosts = [];
 globalThis.FormData = class { constructor() { this.f = []; } append(k, v, n) { this.f.push(v); } };
 globalThis.window = globalThis;
 // mock حداقلیِ IndexedDB برای harness (فقط عملیاتِ AudioQueueDB)
@@ -1082,20 +1090,33 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   // ——— فاز ۰ ممیزیِ Core (2026-10-02): characterizationِ شکاف‌هایِ F1/F2/F4 ———
   // این تست‌ها رفتارِ *فعلی* را قفل می‌کنند (سبز)؛ هر کدام «KNOWN-GAP» است و با اصلاحِ فاز ۱/۲ باید عمداً وارونه شود.
-  // T59 (F1a): سگمنتِ پیش از قطع در لحظه‌ی scheduleReconnect بسته می‌شود در حالی که هنوز ACTIVE است ⇒ intent=archive؛
-  // سگمنتِ خودِ قطعی transcript می‌گیرد (T18/T46). یعنی فقط صدایِ «بعد از تشخیصِ قطع» بازیابی می‌شود.
+  // T59 (F1a، رفع 2026-10-03، core-data-plan قدمِ ۵): سگمنتِ لحظه‌ی تشخیصِ قطع، اگر گفتارِ رونویسی‌نشده (interim) در جریان بود،
+  // transcript + placeholder می‌گیرد (سرور هم‌پوشانی با متنِ زنده را حذف می‌کند — test:hist H12–H14)؛ بدونِ interim ⇒ همان archive.
   {
     newSession('s59a');
     const sa = RT.createSession('s59a', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
     sa.drainSoon = () => {}; // این تست صفِ IndexedDB را بررسی می‌کند؛ آپلودِ فوری (۱ث) کنار گذاشته شود
     const pa = sa.start(); await sleep(5); serverOpen(FakeWS.last); await pa;
-    serverTokens(FakeWS.last, [{ text: 'قبل', is_final: true }]); await sleep(5);
+    serverTokens(FakeWS.last, [{ text: 'قبل', is_final: true }, { text: ' در حالِ گفتن', is_final: false }]); await sleep(5);
     serverClose(FakeWS.last); await sleep(1200);
     serverOpen(FakeWS.last); await sleep(30);
     const rowsA = (await RT.audioQueue.listForSession('s59a')).sort((a, b) => a.seq - b.seq);
-    ok('T59 KNOWN-GAP F1a: segment closed at drop detection is archive-only; only the outage segment is transcript',
-      rowsA.length >= 2 && rowsA[0].intent === 'archive' && rowsA.some((r) => r.intent === 'transcript'), rowsA.map((r) => r.seq + ':' + r.intent).join(','));
-    sa.abort(); RT.forget(sa);
+    const phA = sa.confirmed.split('[⏳').length - 1;
+    // بدونِ interim (قطعِ تمیز بینِ دو جمله) ⇒ archive، بدونِ رونویسیِ دوباره
+    newSession('s59b');
+    const sb = RT.createSession('s59b', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    sb.drainSoon = () => {};
+    const pb = sb.start(); await sleep(5); serverOpen(FakeWS.last); await pb;
+    serverTokens(FakeWS.last, [{ text: 'قبل', is_final: true }]); await sleep(5);
+    serverClose(FakeWS.last); await sleep(1200);
+    serverOpen(FakeWS.last); await sleep(30);
+    const rowsB = (await RT.audioQueue.listForSession('s59b')).sort((a, b) => a.seq - b.seq);
+    const phB = sb.confirmed.split('[⏳').length - 1;
+    // سگمنت‌هایِ transcript بلافاصله پس از reconnect آپلود و از صف خارج می‌شوند ⇒ معیار = placeholderها (یکی برایِ هر سگمنتِ رونویسی‌شونده)
+    ok('T59 FIXED F1a: drop-time segment with in-flight interim ⇒ transcript + placeholder; clean drop without interim ⇒ archive-only',
+      phA === phB + 1 && phB >= 1,
+      'phA=' + phA + ' phB=' + phB + ' A=' + rowsA.map((r) => r.seq + ':' + r.intent).join(',') + ' B=' + rowsB.map((r) => r.seq + ':' + r.intent).join(','));
+    sa.abort(); RT.forget(sa); sb.abort(); RT.forget(sb);
   }
 
   // T60 (F1b، اصلاحِ فاز ۱ 2026-10-02): WebSocketِ «بازِ ولی مرده» (readyState=OPEN، هیچ پیامی نمی‌آید) حالا تشخیص داده می‌شود:
@@ -1296,6 +1317,107 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       immediately === 0 && afterSoon.length === 1 && queueAfterSoon.length === 0 && nonActive && queuedBefore >= 1 && queuedAfter === 0,
       JSON.stringify({ immediately, soon: afterSoon.length, queueAfterSoon: queueAfterSoon.length, nonActive, queuedBefore, queuedAfter }));
     s68.abort(); RT.forget(s68);
+  }
+
+  // T69 (core-data-plan قدمِ ۲): توکن‌هایِ finalِ زنده با زمان/گوینده/اطمینان تکه‌تکه به سرور می‌روند؛ شکستِ گذرا ⇒ همان تکه با همان
+  // chunk_seq دوباره؛ reconnect ⇒ کلیدِ گوینده‌ی تازه (همان برچسبِ متن) و زمانِ یکنوا؛ پایان ⇒ تکه‌ی final با reliable؛ حالتِ note ⇒ هیچ.
+  {
+    newSession('s69');
+    const s69 = RT.createSession('s69', { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const p69 = s69.start(); await sleep(5); serverOpen(FakeWS.last); await p69;
+    const tag = s69.runTag;
+    serverTokens(FakeWS.last, [{ text: 'سلام', is_final: true, speaker: '1', start_ms: 100, end_ms: 400, confidence: 0.91 },
+      { text: ' نیمه', is_final: false, speaker: '1' }, { text: '<end>', is_final: true, speaker: '1', start_ms: 0, end_ms: 0 }, { text: ' خوبم', is_final: true, speaker: '2', start_ms: 900, end_ms: 1300, confidence: 0.8 }]);
+    await s69.flushRtTokens(false);
+    const c0 = rtPosts.filter((p) => p.sessionId === 's69')[0];
+    const tok0 = c0 && c0.body.tokens;
+    const shape = !!c0 && c0.body.run_id === s69.runId && c0.body.chunk_seq === 0 && tok0.length === 2 &&
+      tok0[0][0] === 'سلام' && tok0[0][3] === tag + '-1' && tok0[1][3] === tag + '-2' && tok0[0][4] === 0.91 &&
+      tok0[0][1] >= 100 && tok0[0][1] < 100 + 2000 && !('final' in c0.body);
+    // شکستِ گذرا: تکه‌ی ۱ منجمد می‌ماند؛ توکنِ تازه به تکه‌ی ۲ می‌رود
+    globalThis.rtTokensFail = true;
+    serverTokens(FakeWS.last, [{ text: ' الف', is_final: true, speaker: '1', start_ms: 1500, end_ms: 1700 }]);
+    const failed = (await s69.flushRtTokens(false)) === false && !!s69.rtTok.pending && s69.rtTok.pending.chunk_seq === 1;
+    serverTokens(FakeWS.last, [{ text: ' ب', is_final: true, speaker: '1', start_ms: 1800, end_ms: 1900 }]);
+    globalThis.rtTokensFail = false;
+    await s69.flushRtTokens(false); await s69.flushRtTokens(false);
+    const posts = rtPosts.filter((p) => p.sessionId === 's69');
+    const retrySame = posts.length === 3 && posts[1].body.chunk_seq === 1 && posts[1].body.tokens.length === 1 && posts[1].body.tokens[0][0] === ' الف' &&
+      posts[2].body.chunk_seq === 2 && posts[2].body.tokens[0][0] === ' ب';
+    // reconnect ⇒ نسلِ تازه: Soniox دوباره «1» می‌گوید ولی کلید برچسبِ سراسریِ تازه (۳) است؛ زمان ≥ زمانِ نسلِ قبل
+    serverClose(FakeWS.last); await sleep(1100); serverOpen(FakeWS.last); await sleep(20);
+    serverTokens(FakeWS.last, [{ text: ' بعد', is_final: true, speaker: '1', start_ms: 0, end_ms: 200 }]);
+    await s69.finish();
+    const all = rtPosts.filter((p) => p.sessionId === 's69');
+    const last = all[all.length - 1].body;
+    const tkR = all.flatMap((p) => p.body.tokens).find((t) => t[0] === ' بعد');
+    const reconnectKey = !!tkR && tkR[3] === tag + '-3' && tkR[1] >= 1000;
+    const finalOk = last.final === true && last.reliable === false && last.dropped === 0;
+    // حالتِ note: هیچ تکه‌ای
+    newSession('s69n');
+    const n69 = RT.createSession('s69n', { mode: 'note', onState: () => {}, onResult: () => {}, onError: () => {} });
+    const pn = n69.start(); await sleep(5); serverOpen(FakeWS.last); await pn;
+    serverTokens(FakeWS.last, [{ text: 'یادداشت', is_final: true, speaker: '1', start_ms: 0, end_ms: 100 }]);
+    await n69.flushRtTokens(true);
+    const noteNone = !rtPosts.some((p) => p.sessionId === 's69n');
+    n69.abort(); RT.forget(n69);
+    ok('T69 realtime tokens: chunked with time/speaker/confidence, frozen retry keeps chunk_seq, reconnect ⇒ new speaker key + monotonic time, final chunk flags reliability, note mode sends none',
+      shape && failed && retrySame && reconnectKey && finalOk && noteNone,
+      JSON.stringify({ shape, failed, retrySame, reconnectKey, finalOk, noteNone, posts: all.length, tkR }));
+    RT.forget(s69);
+  }
+
+  // T70 (core-data-plan قدمِ ۷): flagِ localStorage feelia_durable_raw ⇒ getUserMediaِ دوم با EC/NS/AGC خاموش فقط برایِ recorderِ durable؛
+  // استریمِ زنده همان پردازش‌شده؛ بدونِ flag فقط یک getUserMedia؛ شکستِ استریمِ خام ⇒ fail-open رویِ استریمِ اصلی.
+  {
+    const gum0 = navigator.mediaDevices.getUserMedia;
+    const calls = [];
+    let failRaw = false;
+    navigator.mediaDevices.getUserMedia = async (c) => {
+      calls.push(c);
+      if (failRaw && c.audio && c.audio.noiseSuppression === false) throw new Error('NotReadableError');
+      const tag = c.audio && c.audio.noiseSuppression === false ? 'raw' : 'main';
+      return { tag, active: true, getTracks: () => [{ stop() {} }], getAudioTracks: () => [{ stop() {}, getSettings: () => ({ deviceId: 'dev-1' }) }] };
+    };
+    const store = {};
+    globalThis.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+    const run = async (id) => {
+      calls.length = 0;
+      newSession(id);
+      const s = RT.createSession(id, { mode: 'live', onState: () => {}, onResult: () => {}, onError: () => {} });
+      s.drainSoon = () => {};
+      const p = s.start(); await sleep(5); serverOpen(FakeWS.last); await p;
+      const durTag = s.durableRec && s.durableRec.stream && s.durableRec.stream.tag;
+      const liveTag = s.liveRec && s.liveRec.stream && s.liveRec.stream.tag;
+      const res = { n: calls.length, durTag, liveTag, rawC: calls[1] && calls[1].audio };
+      s.abort(); RT.forget(s);
+      return res;
+    };
+    const off = await run('s70a');
+    store.feelia_durable_raw = '1';
+    const on = await run('s70b');
+    failRaw = true;
+    const fail = await run('s70c');
+    delete globalThis.localStorage;
+    navigator.mediaDevices.getUserMedia = gum0;
+    const rawOk = !!on.rawC && on.rawC.echoCancellation === false && on.rawC.noiseSuppression === false && on.rawC.autoGainControl === false &&
+      on.rawC.deviceId && on.rawC.deviceId.exact === 'dev-1';
+    ok('T70 durable-raw A/B flag: off ⇒ one processed stream; on ⇒ durable recorder on 2nd raw stream (same device), live stays processed; raw failure ⇒ fail-open',
+      off.n === 1 && off.durTag === 'main' && on.n === 2 && on.durTag === 'raw' && on.liveTag === 'main' && rawOk && fail.n === 2 && fail.durTag === 'main',
+      JSON.stringify({ off, on: { n: on.n, durTag: on.durTag, liveTag: on.liveTag }, fail: { n: fail.n, durTag: fail.durTag } }));
+  }
+
+  // T71 (2026-10-04): هر رویدادِ کلاینت که موتور/glue می‌فرستد باید در OBS_CLIENT_EVENTSِ سرور باشد — وگرنه سرور بی‌صدا drop می‌کند
+  // (یافته‌ی 2026-10-03: شش رویدادِ ممیزیِ Core هرگز ثبت نمی‌شدند و کاشی‌هایِ core-metrics صفر بودند).
+  {
+    const types = fs.readFileSync(path.join('server', 'src', 'obs', 'types.ts'), 'utf8');
+    const i0 = types.indexOf('OBS_CLIENT_EVENTS = [');
+    const allowed = new Set([...types.slice(i0, types.indexOf('] as const', i0)).matchAll(/'([a-z_.]+)'/g)].map((m) => m[1]));
+    const srcs = src + fs.readFileSync(path.join('public', 'index.html'), 'utf8');
+    const emitted = [...new Set([...srcs.matchAll(/(?:obsEvent|FeeliaObs\.event)\('([a-z_.]+)'/g)].map((m) => m[1]))];
+    const missing = emitted.filter((e) => !allowed.has(e));
+    ok('T71 every client obs event emitted by feelia-rt.js/index.html is in OBS_CLIENT_EVENTS (no silent server drop)',
+      emitted.length > 10 && missing.length === 0, 'emitted=' + emitted.length + ' missing=' + missing.join(','));
   }
 
   console.log(results.map((r) => r[0]).join('\n'));

@@ -87,6 +87,9 @@ stateDiagram-v2
 | live pusher | 250ms | پیش‌فرضِ مرورگر | `ws.send` فقط وقتی OPEN (در غیرِ این صورت دور ریخته) |
 | durable | 1000ms، چرخش هر 60s | 24kbps | IndexedDB |
 هر اتصالِ تازه live pusher تازه (هدرِ WebM تازه) می‌سازد؛ durable ادامه می‌دهد.
+- **A/B صدایِ خامِ آرشیو (2026-10-03، [core-data-plan](../05-plans/core-data-plan-2026-10-03.md) قدمِ ۷):** با `localStorage.feelia_durable_raw='1'` (پیش‌فرض خاموش) `ensureStream` یک getUserMediaِ دوم با EC/NS/AGC خاموش (همان `deviceId`) می‌گیرد و durable رویِ آن (`durableSource()`) ضبط می‌کند؛ live pusher همان استریمِ پردازش‌شده. شکست/پایانِ استریمِ خام ⇒ استریمِ اصلی. پاکسازی/mic-lost هر دو را می‌بندند. T39 (پیش‌فرض) و T70 (flag).
+- **رکوردِ realtime (قدمِ ۲):** هر توکنِ final با زمانِ «صدایِ ضبط‌شده» (`audioClockMs` + `genOffsetMs`ِ نسل) و کلیدِ گوینده بافر و هر تیکِ autosave/`hidden`/`finish` با `flushRtTokens` فرستاده می‌شود ([subsystem 08](08-session-record.md) §۲.۱). T69.
+- **T59 (قدمِ ۵):** سگمنتِ لحظه‌ی تشخیصِ قطع با interimِ در جریان یا `watchdog-ws-not-open` ⇒ transcript + placeholder ([subsystem 03](03-transcript-integrity.md)).
 
 ### pause (از 2026-09-14 — طبقِ «Connection keepalive / Pause and resume» در مستنداتِ Soniox، به نقل از کامنتِ کد)
 state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250ms: توقفِ live pusher و `{"type":"finalize"}` (**بدونِ** رشته‌ی خالی)؛ پس از 2250ms: پاکِ interim، آزادسازیِ mic (`cleanupAudio` به WS دست نمی‌زند)، `startKeepalive()`، `persistConfirmed`. **WS بسته نمی‌شود.** resolve با `true` مگر resume وسطش آمده باشد.
@@ -124,6 +127,8 @@ state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250
 ## ۶.۵ تله‌متری (فازِ ۲ رصد — `rt.*`، از 2026-09-23)
 هر رویداد با `obsEvent(name, detail)` (تعریف‌شده بالایِ `feelia-rt.js`، همیشه try/catch + چکِ `window.FeeliaObs`) به `FeeliaObs.event(name, detail)` می‌رسد؛ چون `detail` یک object است (نه عدد)، در `feelia-obs.js` به‌جایِ `obs_ui_events` به‌عنوانِ `kind:'client_event'` بافر و به `POST /api/obs/events` فرستاده می‌شود — سرور (`server/src/obs/obs.routes.ts`) نامِ رویداد را در برابرِ `OBS_CLIENT_EVENTS` (`server/src/obs/types.ts`) چک می‌کند، `detail` را از `sanitizeDetail()` (`server/src/obs/redact.ts`، اجرایِ LAW-001) رد می‌کند و با `logEvent({source:'client', runId, ...})` به جدولِ **`obs_events`** می‌نویسد (نه `obs_ui_events` — آن جدول ستونِ `run_id`/`detail` ندارد). `run_id` همان `RTSession.runId` است که با `session_audio.run_id` (migration 017) join می‌شود.
 
+> ⚠️ (یافته‌ی 2026-10-03) شش رویدادِ فاز ۱–۳ (`rt.watchdog_silent`، `rt.health_problem`، `rt.durable_start_failed`، `rt.mic_muted/unmuted`، `rt.live_lock_denied`) تا این تاریخ در `OBS_CLIENT_EVENTS` نبودند و سرور آن‌ها را بی‌صدا drop می‌کرد؛ اضافه شدند.
+
 | رویداد | کجا فایر می‌شود | detail | معنیِ عملیاتی |
 |---|---|---|---|
 | `rt.ws_open` | `openDirectWS`، بعدِ handshakeِ موفق | — | اتصالِ WSِ مستقیم به Soniox برقرار شد |
@@ -135,11 +140,13 @@ state→MANUAL_PAUSED فوری؛ بستنِ سگمنتِ durable؛ پس از 250
 | `rt.mint_failed` | catchِ `connectWithFreshMint` | `status`، `code` (نه `message`) | mintِ credential شکست خورد (شبکه/rate-limit/۴۰۱) |
 | `rt.unreliable_set` | هرجا `self.unreliable` اولین‌بار true می‌شود (یک‌طرفه) | `reason` (`reconnect`/`reconnect_exhausted`/`start_fail_open`) | از این لحظه به بعد، fallbackِ batch لازم است |
 | `rt.watchdog_fired` | `startWsWatchdog`، قبل از `scheduleReconnect('watchdog-ws-not-open')` | — | قطعیِ «بی‌صدا» (WSای که readyState مرده ولی onclose نیامده) تشخیص داده شد |
-| `rt.watchdog_silent` | `startWsWatchdog` (WS باز ولی بی‌پیام > `WS_SILENT_MS`) | `silent_ms` | سوکتِ مرده؛ پس از آن `scheduleReconnect('watchdog-ws-silent')` (فاز ۱) |
+| `rt.watchdog_silent` | `startWsWatchdog` (WS باز ولی بی‌پیام > `WS_SILENT_MS`) | `elapsed_ms` (تا 2026-10-03 `silent_ms` بود که در allowlistِ detail نیست) | سوکتِ مرده؛ پس از آن `scheduleReconnect('watchdog-ws-silent')` (فاز ۱) |
 | `rt.health_problem` | `setHealth(code, msg)` | `code` ∈ durable/mic/mute/storage | مشکلِ پایدارِ ضبط به UI رسید (فاز ۲) |
 | `rt.durable_start_failed` | `onDurableStartFailed` | `attempt` | خطایِ `MediaRecorder` start/constructor |
 | `rt.mic_muted` / `rt.mic_unmuted` | `track.onmute/onunmute` | — | — |
 | `rt.live_lock_denied` | `RTSession.start` | — | تبِ دوم برایِ همان جلسه رد شد (F6) |
+| `rt.tokens_rejected` | `flushRtTokens` (ردِ دائمیِ 4xx) | `status`، `count` | تکه‌ی توکنِ رکوردِ realtime کنار گذاشته شد ([subsystem 08](08-session-record.md)) |
+| `rt.durable_raw` | `ensureStream` (فقط با `localStorage.feelia_durable_raw='1'`) | `ok` | A/B صدایِ خامِ آرشیو: استریمِ دومِ بدونِ EC/NS/AGC برایِ recorderِ durable گرفته شد (`ok:false` ⇒ fail-open رویِ استریمِ اصلی)؛ join با `session_audio.run_id` نشان می‌دهد کدام آرشیو خام است |
 | `rt.state_change` | `setState(s)` (چون این فایل از قبل یک state machineِ صریحِ `STATES` دارد) | `state`، `prev_state` | دنباله‌ی کاملِ گذارهایِ یک RTSession — برایِ بازسازیِ timeline |
 | `rt.gap_marked` | `noteDiscontinuity()` | — | مارکرِ ناپیوستگیِ گوینده به transcript اضافه شد (بندِ ۳ همین سند) |
 | `rt.audio_quality_warn` | `showAudioQualityHint` در `index.html` (2026-09-26) | `reason` = `no_signal`\|`too_quiet`\|`noisy`\|`clipping` | هشدارِ کیفیتِ ضبط به تراپیست نشان داده شد؛ یک بار برایِ هر reason در هر جلسه |

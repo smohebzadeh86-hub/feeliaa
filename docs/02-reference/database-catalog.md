@@ -1,7 +1,7 @@
 # Database Catalog
 
 > **وضعیت:** ACTIVE-CANONICAL (مالکِ جداول/ستون‌ها/enumها) · last-verified: 2026-09-30 @ `17d6919`
-> **منبع:** `server/src/db/mysql/migrations/001–034` به ترتیبِ نام (اجرا در startup با `server/src/db/migrate.ts`؛ ثبت در `_migrations`).
+> **منبع:** `server/src/db/mysql/migrations/001–046` به ترتیبِ نام (اجرا در startup با `server/src/db/migrate.ts`؛ ثبت در `_migrations`).
 > مدل، مالکیت و چرخه‌ی عمر: [data-architecture](../01-architecture/data-architecture.md). انضباط: [LAW-007](../00-governance/project-laws.md).
 > DB زنده **MySQL** است (مهاجرت از Postgres در 2026-09-16، به دستورِ مالک — جزئیات در Event Log). وضعیتِ اعمالِ migrationها رویِ هر محیط فقط در `PROJECT_STATUS.md` نگه‌داری می‌شود (LAW-027).
 > `server/src/db/migrations/001–014` نسخه‌ی **Postgresِ متروک** است (هیچ runnerِ زنده‌ای آن را اجرا نمی‌کند)؛ `server/src/db/mysql/schema.sql` snapshotِ دیالکتِ MySQL و تصمیم‌هایِ ترجمه (UUID→`CHAR(36)`، `TIMESTAMPTZ`→`DATETIME`، `JSONB`→`JSON`، ایندکسِ جزئی حذف) را مستند می‌کند. جداول/ستون‌هایِ زیر با نوعِ **منطقی** نوشته شده‌اند؛ نوعِ فیزیکیِ MySQL را از migration بخوانید.
@@ -26,9 +26,10 @@
 | `notifications` | `notifications` | 023 | `audio-upload` (ساخت از job) | متوسط (بدونِ متنِ بالینی) |
 | `final_transcripts` | `final-transcript` | 031، 034 | `audio-upload` (پاکسازیِ یتیم/ارجاعِ Soniox) | بسیار بالا (متن) |
 | `final_transcript_versions` | `final-transcript` | 037 | — (فقط `admin` از طریقِ `features/final-transcript/index.ts` می‌خواند) | بسیار بالا (متن) |
-| `session_transcript_tokens` | `session-record` | 038، 041 (`covers_full`، `source_version`) | `audio-upload` (`jobStore.sql.ts`) و `final-transcript` (`runner.ts`) از طریقِ `saveCanonicalRecord` می‌نویسند | بسیار بالا (متنِ زمان‌دار؛ بعد از پاکسازیِ صدا می‌ماند) |
+| `session_transcript_tokens` | `session-record` | 038، 041 (`covers_full`، `source_version`)، 045 (`meta`)، 046 (`metrics`، `metrics_at` — نوشته‌شده توسطِ `audio-upload/recordMetrics.ts` از طریقِ `saveRecordMetrics`) | `audio-upload` (`jobStore.sql.ts`) و `final-transcript` (`runner.ts`) از طریقِ `saveCanonicalRecord` می‌نویسند؛ گذرِ `source='realtime'` از `buildRealtimeRecord` (`sessions` در پایانِ جلسه) | بسیار بالا (متنِ زمان‌دار؛ بعد از پاکسازیِ صدا می‌ماند) |
 | `session_segments` | `session-record` | 041 | همان | بسیار بالا (نوبت‌هایِ گوینده) |
 | `session_speaker_roles` | `session-record` | 041 | — | بالا (فقط نقش/برچسب) |
+| `session_rt_token_chunks` | `session-record` (`record.repository.ts#insertRtChunk`) | 045 | — | بسیار بالا (توکن‌هایِ زمان‌دارِ رونویسیِ زنده؛ staging، ماندگار) |
 | `session_transcript_revisions` | `sessions` (`sessions.routes.ts`) | 040 | — | بسیار بالا (متنِ جایگزین‌شده) |
 | `session_note_revisions` | `sessions` (`notes.routes.ts`) | 044 | — | بسیار بالا (متنِ قبلیِ یادداشت) |
 | `client_case_file_versions` | `case-file` (`caseFileRepository.sql.ts`) | 044 | — | بسیار بالا (محتوایِ قبلیِ پرونده) |
@@ -87,6 +88,8 @@
 | `042_session_soft_delete.sql` | `sessions.deleted_at DATETIME NULL`، `sessions.deleted_by CHAR(36) NULL` (بدونِ FK)، `idx_sessions_deleted` — **حذفِ نرمِ جلسه** (تصمیمِ مالک 2026-10-02؛ additive) |
 | `043_soft_delete_everything.sql` | `clients.deleted_at/deleted_by` (+`idx_clients_deleted`)، `session_notes.deleted_at/deleted_by`، `client_members.deleted_at` — حذفِ نرمِ مراجع/یادداشت/عضو («هیچ چیزی هارد دیلیت نشود»، 2026-10-02؛ additive) |
 | `044_edit_history.sql` | `session_note_revisions` (متنِ قبلیِ یادداشت)، `client_case_file_versions` (محتوایِ قبلیِ پرونده؛ `UNIQUE(client_id, content_version)`) — «همه‌چیز قابلِ بازیابی باشد» (2026-10-02؛ additive) |
+| `045_session_rt_token_chunks.sql` | جدولِ `session_rt_token_chunks` (تکه‌هایِ توکنِ finalِ رونویسیِ زنده از مرورگر؛ `UNIQUE(session_id, run_id, chunk_seq)` ⇒ idempotent؛ پرچم‌هایِ `is_final/reliable/dropped`) + `session_transcript_tokens.meta JSON` (فقط عدد/پرچمِ گذر) — رکوردِ realtime ([subsystem 08](../07-subsystems/08-session-record.md)؛ additive) |
+| `046_record_metrics.sql` | `session_transcript_tokens.metrics JSON`، `metrics_at DATETIME` — سنجه‌هایِ «کیفیت به عدد» برایِ هر گذرِ رکورد (realtime/async/upload)؛ فقط عدد/پرچم ([subsystem 08](../07-subsystems/08-session-record.md)؛ additive) |
 
 جدولِ سیستمی: `_migrations(id INT AUTO_INCREMENT PK, name VARCHAR(255) UNIQUE, applied_at DATETIME)` — ساخته‌شده در `server/src/db/migrate.ts`.
 

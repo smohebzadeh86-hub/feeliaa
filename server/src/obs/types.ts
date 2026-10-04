@@ -115,6 +115,18 @@ export const OBS_CLIENT_EVENTS = [
   'rt.local_audio_expired',
   'rt.storage_persist_denied',
   'rt.local_audio_expiring',
+  // (2026-10-02، فاز ۱–۳ ممیزیِ Core) — تا 2026-10-03 در این allowlist نبودند ⇒ سرور بی‌صدا drop می‌کرد و کاشی‌هایِ
+  // core-metrics (watchdog_silent/health_problem/live_lock_denied) همیشه صفر بودند. detail فقط کلیدهایِ مجاز (code/attempt/elapsed_ms).
+  'rt.health_problem',
+  'rt.mic_muted',
+  'rt.mic_unmuted',
+  'rt.durable_start_failed',
+  'rt.live_lock_denied',
+  'rt.watchdog_silent',
+  // رکوردِ realtime (core-data-plan قدمِ ۲): تکه‌ی توکنی که سرور برایِ همیشه رد کرد (detail: status، count)
+  'rt.tokens_rejected',
+  // A/B صدایِ خامِ آرشیو (core-data-plan قدمِ ۷، localStorage feelia_durable_raw): detail {ok} — استریمِ خام گرفته شد یا نه
+  'rt.durable_raw',
   // فازِ ۱: افتِ رویدادِ سمتِ کلاینت به‌خاطرِ سرریزِ ring buffer (feelia-obs.js)
   'obs.client_dropped',
 ] as const;

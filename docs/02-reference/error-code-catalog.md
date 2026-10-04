@@ -24,6 +24,8 @@
 | `unit-type-invalid`، `members-invalid`، `members-count`، `member-role-invalid`، `member-category-invalid`، `member-gender-invalid`، `alias-too-long` | 400 | `POST /api/clients`، `PUT /api/clients/:id/unit` (treatment-unit، `VErr` در `domain/rules.ts`) | نوع/اعضایِ واحدِ درمان نامعتبر | UI: پیامِ خطا |
 | `attendees-invalid`، `attendees-empty`، `attendees-unknown` | 400 | `POST /api/sessions` (زنده) | فهرستِ حاضرین نامعتبر/خالی/ناشناخته | UI |
 | `modalities-invalid`، `modality-unknown` | 400 | `PUT /api/therapist/modalities` | رویکردِ درمانیِ نامعتبر | UI |
+| `run-invalid`، `seq-invalid`، `tokens-invalid`، `too-many-tokens`، `empty` | 400 | `POST /api/sessions/:id/rt-tokens` (2026-10-03) | تکه‌ی توکنِ زنده نامعتبر | RT: ردِ دائمی ⇒ تکه کنار گذاشته و در `dropped`ِ تکه‌ی پایانی شمرده می‌شود (رکورد ناقص؛ متن/صدا دست‌نخورده) |
+| `not-live` | 409 | همان | جلسه‌ی دستی/آپلودی/لغوشده | RT: همان ردِ دائمی |
 | `audio-pending` | 409 | `DELETE /api/admin/sessions/:id/audio` (B2) | صدایِ transcript/late/note هنوز در صفِ batch است | UI ادمین |
 | `conflict` | 409 | `PATCH …/final-transcript/roles` | هم‌زمان دوباره ساخته شد | UI |
 | `no-key` | 500 (realtime-session) / 200 `ok:false` (check) | `stt.ts`، `tempkey.ts` | `SONIOX_API_KEY` تنظیم نیست | durable-only |

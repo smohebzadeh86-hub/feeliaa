@@ -11,7 +11,7 @@
  *  - finish event/state-based است (نه sleep کور) با timeout صریح.
  *  - abort از هر state امن است (بدون promise معلق، بدون نشت mic/WS/recorder).
  *  - صوت durable به سرور می‌رود: در failure برایِ رونویسی (صف batch)، و در حالتِ سالم فقط برایِ آرشیوِ
- *    ۱۴روزه‌ی ادمین (تدریجی حینِ جلسه + باقی‌مانده در پایان). نسخه‌ی محلی بعد از آپلودِ موفق حذف می‌شود.
+ *    ادمین (تدریجی حینِ جلسه + باقی‌مانده در پایان). نسخه‌ی محلی بعد از آپلودِ موفق حذف می‌شود.
  */
 'use strict';
 (function () {
@@ -104,6 +104,12 @@
   // رونویسیِ زنده اثر می‌ذاره. ۲۴kbps مونو برایِ گفتار و برایِ رونویسیِ batch/شنیدنِ
   // ادمین کاملاً کافیه، ولی حجم رو تقریباً ۵ برابر نسبت به پیش‌فرضِ مرورگر کم می‌کنه.
   var DURABLE_BITRATE = 24000;
+  // ⭐ (2026-10-03، core-data-plan قدمِ ۲) رکوردِ realtime: توکن‌هایِ finalِ Soniox (متن، زمان، گوینده، اطمینان) که قبلاً
+  // فقط به متن تبدیل و دور ریخته می‌شدند، تکه‌تکه به POST /api/sessions/:id/rt-tokens می‌روند تا هر جلسه‌ی زنده — بدونِ
+  // هزینه‌ی دوباره‌ی Soniox — رکوردِ ساخت‌یافته (نوبت/نقش/سنجه) داشته باشد. fail-open: هرگز ضبط یا ذخیره‌ی متن را متوقف نمی‌کند.
+  var RT_TOKENS_MAX_PER_CHUNK = 2000;
+  var RT_TOKENS_MAX_BUFFER = 20000; // سقفِ حافظه وقتی سرور مدتی در دسترس نیست؛ بیشتر ⇒ قدیمی‌ترها دور (رکورد ناقص، متن سالم)
+  var RT_TOKENS_FLUSH_TIMEOUT_MS = 4000;
 
   function pickMime() {
     try {
@@ -124,6 +130,22 @@
     return navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
+  }
+
+  // ⭐ (2026-10-03، core-data-plan قدمِ ۷) A/B «صدایِ خامِ آرشیو»: فقط وقتی localStorage['feelia_durable_raw']==='1' (پیش‌فرض خاموش، فقط
+  // همان مرورگر). recorderِ durable (صدایِ آرشیو/batch) از یک getUserMediaِ دوم با EC/NS/AGC خاموش تغذیه می‌شود؛ استریمِ زنده‌ی Soniox
+  // دست نمی‌خورد (همان reqStream بالا). هر شکست ⇒ همان استریمِ اصلی (fail-open). سنجش با eval-asr رویِ جلسه‌هایِ نقش‌آفرینی.
+  function durableRawEnabled() {
+    try { return window.localStorage && window.localStorage.getItem('feelia_durable_raw') === '1'; } catch (e) { return false; }
+  }
+  function reqRawStream(mainStream) {
+    var audio = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+    try {
+      var t = mainStream.getAudioTracks()[0];
+      var dev = t && t.getSettings ? t.getSettings().deviceId : null;
+      if (dev) audio.deviceId = { exact: dev };
+    } catch (e) {}
+    return navigator.mediaDevices.getUserMedia({ audio: audio });
   }
 
   // شناسه‌ی یکتایِ هر RTSession (هر بارِ start/resume یکی تازه می‌گیره) — کلیدِ
@@ -486,6 +508,12 @@
     this.durableRotateTimer = null;
     this.durableSeq = 0; // شماره‌ی افزایشیِ سگمنت — کلیدِ ردیفِ IndexedDB می‌شه (sessionId_seq)
     this.pendingEmptySeqs = []; // سگمنت‌هایِ خالی که هنوز همراهِ یک سگمنتِ واقعی به سرور گزارش نشده‌اند
+    // رکوردِ realtime (core-data-plan قدمِ ۲): buf = توکن‌هایِ ارسال‌نشده؛ pending = تکه‌ی منجمدِ در حالِ ارسال (retry با همان
+    // محتوا و همان chunk_seq ⇒ سرور idempotent)؛ genOffsetMs = «زمانِ صدایِ ضبط‌شده» در لحظه‌ی شروعِ نسلِ فعلیِ اتصال.
+    this.rtTok = { buf: [], pending: null, seq: 0, inflight: false, genOffsetMs: 0, dropped: 0 };
+    this.runTag = String(this.runId).slice(-5);
+    this.pausedTotalMs = 0;
+    this.pauseStartedAt = 0;
     requestPersistentStorage();
     // (chunkهای durable عمداً رویِ self نیستند — محلیِ هر recorder در startDurable؛ race چرخش)
     this.confirmed = '';
@@ -587,7 +615,24 @@
   RTSession.prototype.ensureStream = function () {
     var self = this;
     if (self.stream && self.stream.active) return Promise.resolve(self.stream);
-    return reqStream().then(function (s) { self.stream = s; self.watchTrackEnded(s); return s; });
+    return reqStream().then(function (s) {
+      self.stream = s; self.watchTrackEnded(s);
+      if (!durableRawEnabled() || self.mode !== 'live') return s;
+      return reqRawStream(s).then(function (raw) {
+        self.durableStream = raw;
+        try { raw.getAudioTracks().forEach(function (t) { t.onended = function () { if (self.durableStream === raw) self.durableStream = null; }; }); } catch (e) {}
+        if (!self._rawReported) { self._rawReported = true; obsEvent('rt.durable_raw', { ok: true }, self); }
+        return s;
+      }, function () {
+        self.durableStream = null;
+        if (!self._rawReported) { self._rawReported = true; obsEvent('rt.durable_raw', { ok: false }, self); }
+        return s;
+      });
+    });
+  };
+  // منبعِ recorderِ durable: استریمِ خام (A/B قدمِ ۷) اگر زنده است، وگرنه همان استریمِ اصلی.
+  RTSession.prototype.durableSource = function () {
+    return (this.durableStream && this.durableStream.active) ? this.durableStream : this.stream;
   };
 
   // مشکلِ پایدارِ ضبط: msg=falsy ⇒ برداشتنِ مشکل. برخلافِ cb.onError (بنرِ گذرا که با اولین stateِ سالم پاک می‌شود)، تا رفعِ واقعی می‌ماند.
@@ -629,6 +674,7 @@
     var wasDurable = !!(self.durableRec && self.durableRec.state === 'recording');
     self.stopDurableSegment();
     self.stream = null;
+    stopStream(self.durableStream); self.durableStream = null;
     var attempt = function (n) {
       if (self.aborted || self.state === STATES.COMPLETED || self.state === STATES.CANCELED) { self._micRecovering = false; return; }
       self.ensureStream().then(function () {
@@ -708,12 +754,12 @@
     var mime = pickMime();
     try {
       self.durableRec = mime
-        ? new MediaRecorder(self.stream, { mimeType: mime, audioBitsPerSecond: DURABLE_BITRATE })
-        : new MediaRecorder(self.stream, { audioBitsPerSecond: DURABLE_BITRATE });
+        ? new MediaRecorder(self.durableSource(), { mimeType: mime, audioBitsPerSecond: DURABLE_BITRATE })
+        : new MediaRecorder(self.durableSource(), { audioBitsPerSecond: DURABLE_BITRATE });
     } catch (e) {
       // بعضی مرورگرها ترکیبِ mimeType+audioBitsPerSecond رو رد می‌کنن؛ بدونِ بیت‌ریتِ صریح امتحان کن
       try {
-        self.durableRec = mime ? new MediaRecorder(self.stream, { mimeType: mime }) : new MediaRecorder(self.stream);
+        self.durableRec = mime ? new MediaRecorder(self.durableSource(), { mimeType: mime }) : new MediaRecorder(self.durableSource());
       } catch (e2) { self.onDurableStartFailed(e2, null); return; }
     }
     // ⭐ mimeِ واقعیِ گزارش‌شده توسطِ خودِ MediaRecorder (audit صدا/۲۰۲۶-۰۹-۱۶، بخشِ E) —
@@ -982,6 +1028,7 @@
         }
         self.confirmed += tk.text;
         grew = true;
+        if (self.persist) self.captureRtToken(tk);
       } else {
         nonFinal += tk.text;
       }
@@ -1041,7 +1088,12 @@
     // هم صدایِ سالمِ قبل از قطعی هم صدایِ بعدِ قطعی را با هم داشته باشد و با یک intent
     // (لزوماً درست برایِ کلِ محتوایش نه) آپلود شود.
     if (self.state === STATES.ACTIVE && self.durableRec) {
-      self.stopDurableSegment();
+      // ⭐ (2026-10-03، core-data-plan قدمِ ۵ — T59) این سگمنت تا لحظه‌ی *تشخیصِ* قطع ضبط کرده و با ACTIVE فقط archive می‌شد. اگر
+      // نشانه‌ای از گفتارِ رونویسی‌نشده هست — متنِ interim (Soniox شنیده ولی final نکرده) یا تشخیصِ دیرِ watchdog (تا ۳ث بعد از قطعِ
+      // واقعی) — همین سگمنت رونویسی می‌شود (placeholder در جایِ زمانی). سرور پیشوندی از متنِ بازیابی‌شده را که دُمِ متنِ زنده است
+      // حذف می‌کند (recoveryMerge#trimOverlapWithPreceding) ⇒ بدونِ تکرار. بدونِ نشانه ⇒ همان archive (رونویسیِ دوباره‌ی بی‌فایده نه).
+      var lossLikely = !!(self.interim && self.interim.trim()) || reason === 'watchdog-ws-not-open';
+      self.stopDurableSegment(lossLikely ? STATES.RECONNECTING : undefined);
       self.startDurable();
     }
     if (self.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
@@ -1248,6 +1300,7 @@
         var isReconnect = self.generation > 0;
         var attemptsUsed = self.reconnectAttempts;
         self.generation++;
+        self.rtTok.genOffsetMs = self.audioClockMs();
         self.reconnectAttempts = 0;
         self._failedReported = false;
         self.realtimeUp = true;
@@ -1467,7 +1520,7 @@
       if (self.state === STATES.ACTIVE && self.ws && self.ws.readyState === WebSocket.OPEN && self.lastWsMsgAt &&
           Date.now() - self.lastWsMsgAt > silentMs) {
         var since = self.lastWsMsgAt;
-        obsEvent('rt.watchdog_silent', { silent_ms: Date.now() - since }, self);
+        obsEvent('rt.watchdog_silent', { elapsed_ms: Date.now() - since }, self);
         self.lastWsMsgAt = Date.now(); // یک بار در هر دورِ سکوت
         self.requeueSilentAudio(since).then(function () { self.scheduleReconnect('watchdog-ws-silent'); });
       }
@@ -1493,6 +1546,7 @@
     self.autosaveInFlight = false;
     self.lastAutosaveAt = 0;
     self.autosaveTimer = setInterval(function () {
+      self.flushRtTokens(false);
       if (self.autosaveInFlight) return;
       if (Date.now() - self.lastAutosaveAt < autosaveGapMs(self.confirmed.length) - 500) return;
       if (self.dirty && (self.state === STATES.ACTIVE || self.state === STATES.RECOVERED)) {
@@ -1520,6 +1574,80 @@
   // ذخیره امن با CAS؛ هرگز overwrite کور نیست. برمی‌گرداند متن مرجع فعلی.
   // ⭐ (A1.6، 2026-09-26) نسخه‌ی بعد از PUT از پاسخِ خودِ سرور خوانده می‌شود، نه ++ِ محلی — هر نویسنده‌ی دیگری
   // (merge batch، legacy) که بینِ دو ذخیره نسخه را بالا برده باشد، دیگر حدسِ ما را به‌هم نمی‌ریزد.
+  // «زمانِ صدایِ ضبط‌شده» از شروعِ این RTSession: زمانِ دیواری منهای توقف‌هایِ دستی (میکروفون آزاد است، durable و Soniox
+  // هر دو صدایی ندارند). قطعیِ شبکه کم نمی‌شود چون durable در آن بازه ضبط می‌کند. تقریبی (±۱–۲ث: تأخیرِ گرفتنِ میکروفون/بافرِ pause).
+  RTSession.prototype.audioClockMs = function () {
+    if (!this.startedAt) return 0;
+    var now = Date.now();
+    var paused = this.pausedTotalMs + (this.pauseStartedAt ? Math.max(0, now - this.pauseStartedAt) : 0);
+    return Math.max(0, now - this.startedAt - paused);
+  };
+  // توکنِ finalِ Soniox ⇒ [text, start_ms, end_ms, speaker_key, confidence]. زمان = genOffset + زمانِ Soniox (که در هر اتصال از صفر
+  // است و توقفِ keepalive را نمی‌شمارد). کلیدِ گوینده «runTag-برچسبِ سراسری» — همان «گوینده N»ِ متن، یکتا بینِ رفرش‌ها (run).
+  RTSession.prototype.captureRtToken = function (tk) {
+    // توکن‌هایِ کنترلیِ Soniox (<end> از endpoint detection، <fin> از finalize) زمانِ ۰ دارند و واژه نیستند (E2E 2026-10-04).
+    if (/^\s*<\/?[a-z_]+>\s*$/i.test(String(tk.text))) return;
+    var o = this.rtTok;
+    var num = function (v) { return (typeof v === 'number' && isFinite(v)) ? Math.round(v) : null; };
+    var st = num(tk.start_ms), en = num(tk.end_ms);
+    var key = null;
+    if (tk.speaker != null) {
+      var g = this.speakerLabelMap[this.generation + ':' + tk.speaker];
+      if (g != null) key = this.runTag + '-' + g;
+    }
+    o.buf.push([String(tk.text), st === null ? null : st + o.genOffsetMs, en === null ? null : en + o.genOffsetMs, key,
+      (typeof tk.confidence === 'number' && isFinite(tk.confidence)) ? Math.round(tk.confidence * 1000) / 1000 : null]);
+    if (o.buf.length > RT_TOKENS_MAX_BUFFER) { o.dropped += o.buf.length - RT_TOKENS_MAX_BUFFER; o.buf.splice(0, o.buf.length - RT_TOKENS_MAX_BUFFER); }
+  };
+  // ارسالِ یک تکه. final=true (پایانِ جلسه): همه‌ی بافر + پرچمِ «آخرین تکه» با reliable — مبنایِ covers_fullِ سرور. همیشه resolve می‌شود.
+  RTSession.prototype.flushRtTokens = function (final, onUnload) {
+    var self = this;
+    var o = self.rtTok;
+    if (!self.persist) return Promise.resolve(false);
+    if (o.inflight) {
+      if (!final) return Promise.resolve(false);
+      // پایان: منتظرِ ارسالِ در جریان بمان (حداکثر همان سقف) و بعد تکه‌ی آخر را بفرست.
+      return new Promise(function (res) {
+        var t0 = Date.now();
+        var iv = setInterval(function () {
+          if (!o.inflight || Date.now() - t0 > RT_TOKENS_FLUSH_TIMEOUT_MS) { clearInterval(iv); res(o.inflight ? false : self.flushRtTokens(true)); }
+        }, 100);
+      });
+    }
+    if (!o.pending) {
+      if (!o.buf.length && !final) return Promise.resolve(false);
+      o.pending = { chunk_seq: o.seq, tokens: o.buf.splice(0, RT_TOKENS_MAX_PER_CHUNK) };
+    }
+    var p = o.pending;
+    var isLast = !!final && !o.buf.length;
+    var body = { run_id: self.runId, chunk_seq: p.chunk_seq, tokens: p.tokens };
+    if (isLast) { body.final = true; body.reliable = !self.unreliable; body.dropped = o.dropped; }
+    o.inflight = true;
+    // سقفِ سخت مستقل از AbortController: fetchی که هرگز settle نشود نباید flush (و finish) را معلق کند. پاسخِ دیررسیده‌ی موفق بی‌اثر
+    // است (pending همان می‌ماند و تلاشِ بعدی همان chunk_seq را می‌فرستد ⇒ سرور idempotent).
+    var req = reqJson('/api/sessions/' + self.sessionId + '/rt-tokens', {
+      method: 'POST', body: body, keepalive: !!onUnload, timeoutMs: RT_TOKENS_FLUSH_TIMEOUT_MS
+    });
+    var hard = new Promise(function (res, rej) {
+      setTimeout(function () { var e = new Error('rt-tokens-timeout'); e.status = 0; rej(e); }, RT_TOKENS_FLUSH_TIMEOUT_MS + 500);
+    });
+    return Promise.race([req, hard]).then(function () {
+      o.inflight = false;
+      if (o.pending === p) { o.pending = null; o.seq++; }
+      if (final && !isLast) return self.flushRtTokens(true);
+      return true;
+    }, function (err) {
+      o.inflight = false;
+      var st = err && err.status;
+      // ردِ دائمی (4xx به‌جز 401/408/429): همان تکه هرگز پذیرفته نمی‌شود ⇒ کنار گذاشته و شمرده می‌شود (رکورد ناقص، نه حلقه‌ی بی‌پایان).
+      if (typeof st === 'number' && st >= 400 && st < 500 && st !== 401 && st !== 408 && st !== 429 && o.pending === p) {
+        o.dropped += p.tokens.length; o.pending = null; o.seq++;
+        obsEvent('rt.tokens_rejected', { status: st, count: p.tokens.length }, self);
+      }
+      return false; // گذرا: pending می‌ماند؛ تلاشِ بعدی همان محتوا را با همان chunk_seq می‌فرستد
+    });
+  };
+
   function applyPutVersion(self, r) {
     var v = r && r.session && r.session.transcript_version;
     self.baseVersion = (typeof v === 'number') ? v : self.baseVersion + 1;
@@ -1647,6 +1775,7 @@
     var self = this;
     if (self.state !== STATES.ACTIVE && self.state !== STATES.RECOVERED) return Promise.resolve(false);
     self.setState(STATES.MANUAL_PAUSED);
+    self.pauseStartedAt = Date.now();
     self.stopDurableSegment(); // سگمنت durable این بازه بسته شد — مستقل از Soniox، فوری
     // باگِ ریشه‌ای: این پاکسازی همیشه ۲ ثانیه (PAUSE_FLUSH_MS) بعد اجرا می‌شد، بدونِ
     // هیچ چک‌ای که آیا کاربر توی همین فاصله «ادامه» زده یا نه. اگه زده باشه، resume()
@@ -1704,6 +1833,7 @@
     var self = this;
     if (self.state !== STATES.MANUAL_PAUSED) return Promise.resolve(false);
     self.pauseToken++; // هر pauseِ درحال‌انتظار رو باطل کن — دیگه حق نداره WS/streamِ تازه رو ببنده
+    if (self.pauseStartedAt) { self.pausedTotalMs += Math.max(0, Date.now() - self.pauseStartedAt); self.pauseStartedAt = 0; }
     self.stopKeepalive();
     self.setState(STATES.STARTING);
     if (self.aborted) return Promise.resolve(false);
@@ -1881,6 +2011,9 @@
       // archiveQueuedAudioOnly/uploadBatchSegments (پایین همین زنجیره) صفِ خالی
       // می‌دیدن و برایِ جلساتِ کوتاه‌تر از ۶۰ثانیه هیچ صدایی آرشیو نمی‌شد.
       return self.stopDurableSegment(stateAtFinish).then(function () {
+        // سقفِ کل (تکه‌های پشتِ‌سرِ‌هم): پایانِ جلسه هرگز منتظرِ رکوردِ realtime نمی‌ماند (LAW-012).
+        return Promise.race([self.flushRtTokens(true), new Promise(function (res) { setTimeout(res, RT_TOKENS_FLUSH_TIMEOUT_MS * 2 + 1000); })]);
+      }).then(function () {
         var realtimeText = cleanText(self.confirmed);
         if (!self.unreliable) {
           // مسیر موفق: persist نهایی و تمام
@@ -2123,6 +2256,8 @@
     this.stopDurableSegment();
     stopStream(this.stream);
     this.stream = null;
+    stopStream(this.durableStream);
+    this.durableStream = null;
     syncWakeLock();
   };
 
@@ -2249,6 +2384,7 @@
   function flushAllTranscripts(onUnload) {
     live.forEach(function (s) {
       try { s.flushTranscriptNow(onUnload); } catch (e) {}
+      try { if (s.persist && !s.aborted && s.state !== STATES.COMPLETED && s.state !== STATES.CANCELED) s.flushRtTokens(false, onUnload); } catch (e) {}
     });
   }
   try {

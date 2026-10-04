@@ -8,6 +8,7 @@ import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
 import { maybeAutoGenerateCaseFile } from '../case-file/index.js';
 import { enqueueFinalTranscript } from '../final-transcript/index.js';
+import { buildRealtimeRecord } from '../session-record/index.js';
 
 export const AUTO_CLOSE_IDLE_SECONDS = Number(process.env.SESSION_AUTO_CLOSE_IDLE_SECONDS || 2 * 60 * 60);
 export const AUTO_CLOSE_INTERVAL_MS = 15 * 60 * 1000;
@@ -41,6 +42,7 @@ export async function autoCloseAbandonedSessions(opts: { therapistId?: string } 
       await recordAudit({ actorId: null, action: 'session.auto_closed', targetType: 'session', targetId: row.id, detail: { elapsed_ms: idle * 1000 } });
       void maybeAutoGenerateCaseFile(row.client_id, row.therapist_id);
       void enqueueFinalTranscript(row.id);
+      void buildRealtimeRecord(row.id);
     }
     if (closed) console.log(`[session] auto-closed ${closed} abandoned session(s)`);
   } catch (e) {

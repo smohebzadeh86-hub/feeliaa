@@ -7,7 +7,7 @@
 
 **فیلیا (Feelia)** یک وب‌اپ فارسی برای تراپیست‌هاست: مدیریتِ مراجعین، ثبتِ جلسه‌ی درمانی با **رضایتِ مراجع**،
 رونویسیِ زنده‌ی فارسی با Soniox (مستقیم از مرورگر با کلیدِ موقت)، ثبتِ علائم/یادداشت/یادداشتِ صوتی،
-و پنلِ ادمین. Backend: Node.js + Fastify 5 + MySQL (TypeScript، `server/`؛ ۲۰ جدول، migration تا 034). Frontend: یک SPA بدونِ build
+و پنلِ ادمین. Backend: Node.js + Fastify 5 + MySQL (TypeScript، `server/`؛ ۲۸ جدول، migration تا 046). Frontend: یک SPA بدونِ build
 (`public/index.html` + `feelia-rt.js` + `feelia-upload.js` + `feelia-obs.js` + `feelia-analytics.js`).
 **داده‌ها بالینی و فوق‌حساس‌اند.**
 
@@ -140,6 +140,8 @@ cd server && npx tsc --noEmit
 - `pnpm test:adm` = harness پنلِ ادمین (`scripts/admin-monitor-harness.ts`، 2026-10-01) — `liveHealth`، heartbeat و متریکِ HTTP (سطل/p95)؛ توابعِ خالص، بدونِ DB/شبکه.
 - `pnpm test:hist` = harness تاریخچه‌یِ متنِ جلسه (`scripts/session-history-harness.ts`، 2026-10-02) — diffِ پاراگرافیِ نسخه‌ها (F8) و بستنِ placeholderِ «⏳»ِ بازه‌ای که هرگز رونویسی نمی‌شود (`mergeRecoveryLost`)؛ توابعِ خالص، بدونِ DB/شبکه.
 - `pnpm backup` = پشتیبانِ فقط‌افزودنیِ DB (NDJSON + schema + manifest با sha256) و mirrorِ پایدارِ فایل‌هایِ `server/data/{session-audio,uploads,batch-queue}` (`scripts/backup-data.mjs`، 2026-10-02): فقط SELECT، هرگز چیزی را پاک/بازنویسی نمی‌کند؛ `--dry-run`، `--only=t1,t2`، `--no-files`، `--out=DIR`، `--data-dir=DIR`. خروجی (`backups/`) حاویِ دادهٔ بالینی است و در `.gitignore` است.
+- `pnpm eval:asr -- --ref=<ref.txt> --hyp=<export.json|hyp.txt> [--session=<uuid>] [--json]` = سنجشِ دقتِ رونویسی/تفکیکِ گوینده (`scripts/eval-asr.mjs`، 2026-10-03، core-data-plan قدمِ ۶): WER (کلی/هر گوینده/بدونِ نیم‌فاصله)، خطایِ انتسابِ گوینده در سطحِ واژه، اطمینان↔خطا؛ آفلاین، فقط عدد چاپ می‌کند (بدونِ متن). داده فقط نقش‌آفرینی یا رضایتِ صریحِ جداگانه.
+- `pnpm test:eval` = تست‌هایِ داخلیِ همان ابزار (`eval-asr.mjs --self-test`)؛ بدونِ فایل/DB/شبکه.
 - `pnpm test:routes` = قراردادِ routeها (method/path + hookهایِ مؤثر مثلِ `requireAuth`/`requireAdmin` + bodyLimit) در برابرِ `scripts/route-snapshot.txt`؛ بدونِ DB. `-- --update` فقط وقتی route عمداً عوض شده.
 - `pnpm test:arch` = قواعدِ مرزِ ماژول‌هایِ backend (`scripts/check-backend-boundaries.mjs`، 2026-09-28): importِ بینِ featureها فقط از `features/<x>/index.ts`، platform (`shared/db/auth/obs/llm`) هرگز از features، بدونِ چرخه‌ی importِ استاتیک، لایه‌بندیِ case-file/treatment-unit/final-transcript، و `index.ts` برایِ هر feature (allowlistِ نام‌دار برایِ ۴ بدهی). ساختار: `docs/01-architecture/application-architecture.md` §1.
 - `pnpm test:api` = characterizationِ APIِ backend رویِ **DBِ مشترکِ dev** با fixtureِ ساختگی + Sonioxِ mock (`scripts/api-contract-harness.mts`). فقط با `FEELIA_E2E_OK=1` و **مجوزِ صریحِ مالک در همان گفتگو** اجرا می‌شود؛ `FEELIA_E2E_ENV_FILE` (مسیرِ `.env` برایِ فقط `DATABASE_URL`)، `FEELIA_API_GOLDEN` برایِ مقایسه. fixtureها در پایان پاک می‌شوند.

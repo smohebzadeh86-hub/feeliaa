@@ -74,6 +74,7 @@ feeliaa/
 ├── scripts/final-transcript-harness.ts U  تستِ «متنِ نهایی» (`pnpm test:ft`؛ ماشینِ حالت، نگهبان‌ها، تکه‌بندی، polish با LLMِ جعلی) — 2026-09-27
 ├── scripts/llm-harness.ts             U  تستِ لایه‌ی LLM (`pnpm test:llm`؛ config هر provider، رگرسیونِ بدنه‌ی OpenRouter/OpenAI، JSON، providerِ جایگزین؛ کلاینتِ جعلی) — 2026-09-28
 ├── scripts/upload-harness.ts          T  تستِ pipelineِ آپلودِ صدا (`pnpm test:up`؛ ماشینِ حالت با portهایِ جعلی + ffmpegِ واقعی) — 2026-09-23
+├── scripts/eval-asr.mjs              U  سنجشِ دقتِ رونویسی/گوینده (`pnpm eval:asr`، `pnpm test:eval`؛ WER/خطایِ انتساب؛ آفلاین، فقط عدد) — 2026-10-03
 ├── scripts/route-snapshot.ts (+ .txt) T  `pnpm test:routes` — قراردادِ routeها و guardهایِ مؤثر (2026-09-28)
 ├── scripts/api-contract-harness.mts   T  `pnpm test:api` (فقط با FEELIA_E2E_OK=1) — characterizationِ APIِ رویِ DBِ dev با fixture (2026-09-28)
 ├── scripts/check-backend-boundaries.mjs T `pnpm test:arch` — قواعدِ مرز/چرخه‌ی ماژول‌هایِ backend (2026-09-28)

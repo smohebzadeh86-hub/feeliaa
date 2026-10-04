@@ -64,7 +64,8 @@
     var el = document.createElement('div'); el.className = 'card admin-row';
     var head = document.createElement('div'); head.className = 'admin-row-head';
     var title = document.createElement('div'); title.className = 'admin-row-title';
-    var label = (r.therapist_name || '—') + ' · ' + (r.client_code || '—') + (r.session_num ? ' · جلسه‌ی ' + toFa(r.session_num) : '');
+    var label = (r.therapist_name || '—') + ' · ' + (r.client_code || '—') + (r.session_num ? ' · جلسه‌ی ' + toFa(r.session_num) : '') +
+      (r.source === 'realtime' ? ' · زنده' : r.source === 'async' ? ' · زنده (رونویسیِ کامل)' : '');
     title.textContent = label;
     var badges = document.createElement('div'); badges.className = 'admin-row-badges';
     if (!flags.length) badges.appendChild(adminBadge('ok', 'بدونِ هشدار'));

@@ -2,7 +2,7 @@
 // اجرا: pnpm test:hist
 import assert from 'node:assert/strict';
 import { diffParagraphs, diffSummary, splitParagraphs } from '../server/src/features/sessions/transcriptDiff.js';
-import { mergeRecoveryLost, mergeRecoveredSegment, recoveryKey, RECOVERY_LOST_LABEL } from '../server/src/features/transcription/batch/recoveryMerge.js';
+import { mergeRecoveryLost, mergeRecoveredSegment, recoveryKey, RECOVERY_LOST_LABEL, trimOverlapWithPreceding, RECOVERED_DUP_LABEL } from '../server/src/features/transcription/batch/recoveryMerge.js';
 
 let pass = 0;
 let fail = 0;
@@ -97,6 +97,32 @@ t('H11 ترتیبِ رویدادها: بعد از «بازیابی نشد»، ر
   const lost = mergeRecoveryLost('الف\n\n' + PH(key), key)!;
   const late = mergeRecoveredSegment(lost, 'متنِ دیرهنگام', key);
   assert.ok(late && late.includes('متنِ دیرهنگام') && late.includes(RECOVERY_LOST_LABEL), late || '');
+});
+
+t('H12 (T59) هم‌پوشانیِ سگمنتِ لحظه‌ی قطع: پیشوندی که دُمِ متنِ قبلی است حذف، بقیه دست‌نخورده؛ برچسبِ گوینده حفظ', () => {
+  const prev = 'گوینده ۱: سلام امروز حالتون چطوره\n\nگوینده ۲: راستش این هفته خیلی سخت گذشت و';
+  const rec = 'گوینده ۱: این هفته خیلی سخت گذشت و نتونستم بخوابم\n\nگوینده ۲: چرا؟';
+  const r = trimOverlapWithPreceding(prev, rec);
+  assert.equal(r.trimmedWords, 6);
+  assert.equal(r.text, 'نتونستم بخوابم\n\nگوینده ۲: چرا؟');
+  // ي/ك عربی و علامت‌گذاری هم‌ارزند
+  assert.equal(trimOverlapWithPreceding('او گفت كه خيلي خسته است،', 'گفت که خیلی خسته است. بعد رفت').text, 'بعد رفت');
+});
+
+t('H13 (T59) محافظه‌کاری: کمتر از ۴ واژه، شروعِ نابرابر یا شباهتِ کم ⇒ هیچ حذفی', () => {
+  assert.equal(trimOverlapWithPreceding('من خوبم', 'من خوبم و تو').trimmedWords, 0);
+  assert.equal(trimOverlapWithPreceding('الف ب پ ت ث', 'ج ب پ ت ث چ').trimmedWords, 0);
+  assert.equal(trimOverlapWithPreceding('یک دو سه چهار پنج شش', 'هفت هشت نه ده یازده').trimmedWords, 0);
+  assert.equal(trimOverlapWithPreceding('', 'یک دو سه چهار').text, 'یک دو سه چهار');
+});
+
+t('H14 (T59) پرکردنِ placeholder با حذفِ هم‌پوشانی؛ کاملاً تکراری ⇒ نشانگرِ «پیش‌تر ثبت شده» با همان کلید', () => {
+  const key = recoveryKey('runA1', 4);
+  const cur = 'گوینده ۱: یک دو سه چهار پنج\n\n' + PH(key) + '\n\nبعد';
+  const out = mergeRecoveredSegment(cur, 'دو سه چهار پنج شش هفت', key)!;
+  assert.ok(out.includes('شش هفت') && !out.includes('سه چهار پنج شش'), out);
+  const dup = mergeRecoveredSegment(cur, 'دو سه چهار پنج', key)!;
+  assert.ok(dup.includes(RECOVERED_DUP_LABEL + ' · #' + key) && dup.endsWith('بعد'), dup);
 });
 
 console.log(`\n${pass} pass, ${fail} fail`);

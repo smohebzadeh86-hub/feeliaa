@@ -2,7 +2,7 @@
 
 > **نقش:** سندِ زنده. ساختارش مطابقِ «دستورِ ساختِ سیستمِ مستندسازی و مرجعِ اصلیِ پروژه» (مراحلِ کار + ۲۷ بخش + checklistِ validation + خروجیِ نهایی) است.
 > **قانون:** [LAW-024](docs/00-governance/project-laws.md) — **هر رویداد باید همین‌جا ثبت شود.**
-> **آخرین به‌روزرسانی:** 2026-10-02 — آخرین رویداد: **Product Thesis به‌عنوانِ سندِ governance افزوده شد (DOCS؛ بدونِ تغییرِ کد).** رویدادِ قبلی: **پلنِ مستندات کامل شد (فازهایِ ۰–۷ + bannerهایِ فرانت) و commit شد؛ تست‌هایِ رفتاریِ همه‌ی harnessها و `test:api` سبز؛ push/deploy نشد.** سابقه‌ی زنجیره‌ی «قبل‌ترش»ها: [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md).
+> **آخرین به‌روزرسانی:** 2026-10-04 — آخرین رویداد: **اجرایِ core-data-plan (رکوردِ realtime، پیشنهادِ نقش، سنجه‌یِ هر جلسه، T59، eval-asr، A/B میکروفون) با E2E؛ commit/deploy نشده.** رویدادِ قبلی: **Product Thesis به‌عنوانِ سندِ governance افزوده شد (DOCS؛ بدونِ تغییرِ کد).** رویدادِ قبلی: **پلنِ مستندات کامل شد (فازهایِ ۰–۷ + bannerهایِ فرانت) و commit شد؛ تست‌هایِ رفتاریِ همه‌ی harnessها و `test:api` سبز؛ push/deploy نشد.** سابقه‌ی زنجیره‌ی «قبل‌ترش»ها: [docs/08-history/event-log-2026-09.md](docs/08-history/event-log-2026-09.md).
 > **مالکِ:** Event Log و وضعیتِ انطباق با ساختار. factهای جزئی مالکِ خودشان را دارند (لینک‌ها)؛ در تعارض، سندِ مالک برنده است ([source-of-truth](docs/00-governance/source-of-truth.md)).
 
 ---
@@ -238,6 +238,70 @@
 - **UNVERIFIED:** اجرایِ واقعیِ مسیرِ `finish → scheduleBoundaryJudge → UPDATE` داخلِ pipelineِ prod (حلقه‌یِ DBِ runner با harness پوشش داده نمی‌شود)؛ اولین آپلودِ بعد از deploy باید `ft_polish_s` را ≈۱–۳ دقیقه و `boundary_judge` را چند دقیقه بعد از `done` نشان دهد.
 - **عامل:** این نشست.
 
+
+### 2026-10-04 — CODE + TEST + FINDING + DOCS — دورِ دومِ بهبودهایِ Core (به دستورِ مالک: «الان چه مواردی باقی موندن برای بهبودی انجامشون بده»؛ commit/deploy نشده)
+- **R17 رفع شد:** `hasActiveRecording()`ِ `index.html` ضبطِ محلی (recorderِ durable بدونِ WS) را هم می‌بیند ⇒ خروج/پنلِ ادمین مسدود. Chromeِ واقعی با mintِ مسدود تأیید کرد.
+- **export v4:** هر جلسه `final_transcript` (متنِ مرتب، نوبت‌ها، فهرستِ نسخه‌ها) و `canonical.{engine, model, meta, metrics}` دارد؛ `schema_version: 4`. E2Eِ DBِ dev: 5/0.
+- **نگهبان:** `test:rt` T71 — رویدادِ کلاینتِ بیرون از allowlist دیگر بی‌صدا نمی‌ماند.
+- **اسناد:** ۲۸ جدول / migration تا 046 در CLAUDE.md و Master Reference؛ api-catalog (export v4)؛ R17 بسته؛ [verification](verification/2026-10-04-core-data-plan.md) §۷.
+- **بررسی:** کندیِ `test:rt` (≈۴٫۵ دقیقه) از پیش موجود است (HEAD ۴:۳۰)؛ تغییری لازم نبود.
+- **FINDING:** نشستِ دیگری هم‌زمان `final-transcript` (`boundaryJudge`/`polishTranscript`/`runner`) را ویرایش می‌کرد؛ `tsc` لحظه‌ای قرمز و بعد سبز شد. دست زده نشد.
+- **تست:** `up` 75/0، `ft` 72/0، `cf` 115/0، `hist` 14/0، `tu` 19/0، `adm` 9/0؛ `arch`/`routes` (183)/`docs`/`tsc` سبز؛ `test:rt` 117/0 (T71: 27 رویداد، ۰ گم‌شده).
+- **باقی‌مانده = فقط تصمیمِ مالک:**
+  - متنِ رضایت و سیاستِ نگهداری/حذفِ واقعی (R1/R24)
+  - `CANONICAL_PASS=1` رویِ production (هزینه)
+  - commit/deploy (migrationهایِ 045/046)
+  - جلساتِ نقش‌آفرینی برایِ مجموعه‌ی طلایی و A/B
+
+### 2026-10-04 — CODE + MIGRATION + TEST + FINDING + DOCS — اجرایِ core-data-plan، قدم‌های ۱–۸ (به دستورِ مالک: «به ترتیب همه رو انجام بده»؛ commit/deploy نشده)
+- **کد:**
+  - (۲) رکوردِ realtime از توکن‌هایِ finalِ زنده: `POST /api/sessions/:id/rt-tokens`، `buildRealtimeRecord` در پایانِ جلسه و پس از تکه‌ی دیررس؛ `covers_full` همیشه false.
+  - (۳) پیشنهادِ نقشِ گوینده (متنِ نهایی / حدسِ دونفره) — فقط «تأیید» ذخیره می‌کند.
+  - (۴) سنجه‌یِ کیفیت برایِ هر گذر؛ `audio-status.transcript_quality`؛ ردیفِ «زنده» در نمایِ کیفیتِ ادمین.
+  - (۵) T59: سگمنتِ لحظه‌ی قطع با interim رونویسی می‌شود و هم‌پوشانی در سرور حذف می‌شود.
+  - (۶) `scripts/eval-asr.mjs` (`pnpm eval:asr`، `pnpm test:eval`).
+  - (۷) flagِ A/B `localStorage.feelia_durable_raw` (پیش‌فرض خاموش).
+- **migration:** 045 (`session_rt_token_chunks` + `session_transcript_tokens.meta`) و 046 (`metrics`، `metrics_at`) — **رویِ DBِ مشترکِ dev اعمال شد**؛ production نه.
+- **FINDING:**
+  - شش رویدادِ کلاینتِ ممیزیِ Core در `OBS_CLIENT_EVENTS` نبودند ⇒ کاشی‌هایِ `core-metrics` همیشه صفر بودند. اضافه شدند؛ `silent_ms` ⇒ `elapsed_ms`.
+  - Soniox در realtime توکنِ کنترلیِ `<end>`/`<fin>` با زمانِ ۰ می‌فرستد ⇒ فیلتر شد (یافته‌ی E2E).
+  - `finish()` رویِ fetchِ معلق می‌ایستاد ⇒ سقفِ سخت.
+- **تست:**
+  - `test:rt` 116/0 (≈۴٫۷ دقیقه)، `test:up` 75/0، `test:hist` 14/0، `test:eval` 8/0، `ft` 71/0، `cf` 115/0، `tu` 19/0، `llm` 22/0، `adm` 9/0؛ `arch`/`routes` (183)/`docs`/`tsc` سبز.
+  - E2Eِ backend رویِ DBِ dev: 18/0.
+  - E2Eِ مرورگرِ واقعی (Chrome + میکروفونِ جعلی + Sonioxِ واقعی، دو اجرا): رکورد کامل، پوشش ۹۶٫۵٪، تأییدِ نقش از UI، ۰ خطایِ console.
+  - fixtureهایِ canary، پوشه‌هایِ صدا و اسکریپت‌هایِ موقت پاک شدند. [verification](verification/2026-10-04-core-data-plan.md).
+- **اسناد:** subsystem 01/03/08، api/error/database/configuration-catalog، feature-index، repository-map، CLAUDE.md §8، Master Reference §22، پلن (EXECUTED + پروتکلِ مجموعه‌ی طلایی).
+- **باز:**
+  - (الف) جمع‌آوریِ مجموعه‌ی طلایی و مقایسه‌ی A/B نیازمندِ جلساتِ نقش‌آفرینیِ مالک است.
+  - (ب) متنِ رضایت و `CANONICAL_PASS` بیرونِ پلن‌اند؛ R24 بحرانی می‌ماند.
+  - (ج) R17 (logout در ضبطِ محلی) باز است.
+  - (د) migrationهایِ 045/046 پیش از deploy باید با کد commit شوند.
+
+### 2026-10-03 — DOCS — پلنِ تکمیلِ Core به‌جز رضایت (به درخواستِ مالک: «به جز رضایت برای بقیش یه پلن بنویس»)
+- سندِ جدید: [core-data-plan-2026-10-03](docs/05-plans/core-data-plan-2026-10-03.md) (PROPOSED)، ثبت در documentation-map.
+- ۸ قدم:
+  1. بهداشتِ اسنادِ ریسک
+  2. **رکوردِ realtime از توکن‌هایِ final که مرورگر دارد، برایِ هر جلسه‌یِ زنده و بدونِ هزینه‌یِ Soniox**
+  3. پیشنهادِ نقشِ گوینده
+  4. سنجه‌یِ کیفیت برایِ هر جلسه
+  5. بستنِ T59
+  6. ابزارِ WER/DER با جلساتِ نقش‌آفرینی
+  7. A/B پردازشِ میکروفون فقط رویِ recorderِ durable
+  8. E2Eِ مرورگرِ واقعی
+- متنِ رضایت و `CANONICAL_PASS` بیرونِ پلن‌اند. هیچ کدی تغییر نکرد. اجرا فقط با دستور.
+
+### 2026-10-03 — AUDIT + TEST + FINDING — بازممیزیِ «Core = منبعِ قابل‌اعتمادِ داده‌ی جلسه» (فقط‌خواندنی؛ کدی تغییر نکرد)
+- **حکم:** نسبت به ممیزیِ 2026-10-01 به‌طورِ محسوس بهتر شده‌ایم:
+  - **ضبط و ذخیره:** gap-check با `client_seq`/skips، `fsync`، `storage.persist()`، `audio-status`، بنرهایِ F4.
+  - **داده:** توکن‌ها، `session_segments`، تاریخچه‌ی متن، CASِ اجباری، پرونده/export از رکوردِ canonical.
+  - **باز:** گوینده و دقت نیمه‌کاره‌اند. نقش از `attendees` پیش‌پر نمی‌شود. `CANONICAL_PASS` پیش‌فرض خاموش است ⇒ جلسه‌ی زنده رکوردِ canonical ندارد. `transcriptMetrics` فقط برایِ آپلود است. WER/DER روی صدایِ واقعی سنجیده نشده. `noiseSuppression/AGC` روشن است.
+- **FINDING (بحرانی، تشدیدِ R1):**
+  - متنِ UI هنوز «صدا هیچ‌جا ذخیره نمی‌شود» (`public/index.html:1519`) و «صدای خام هرگز ذخیره نمی‌شود» (`:1805`) است.
+  - در همین حال سیاستِ «هیچ چیز هارد دیلیت نشود» صدا را **بی‌مدت** نگه می‌دارد (`archive/sweep.ts:18,82`، `shared/retention.ts`) و حذفِ مراجع نرم است.
+  - جدولِ §22ِ Master Reference این ریسک را ندارد و R15/R4 را هنوز باز نشان می‌دهد (در کد رفع شده‌اند).
+- **تست (working tree):** `test:up` 71/0، `test:ft` 71/0، `test:cf` 115/0، `test:hist` 11/0، `test:rt` بدونِ FAIL؛ `test:arch`/`test:routes` (182)/`test:docs` OK؛ `tsc` تمیز.
+- **پلن:** `~/.claude/plans/pasted-content-id-4dc7-core-abundant-catmull.md`. اجرا فقط با دستورِ صریحِ مالک.
 
 ### 2026-10-03 — CODE (UI) — بزرگ‌کردنِ دکمه‌ی «بازگشت» در صفحه‌ی شروعِ جلسه (commit/deploy نشده)
 - به درخواستِ مالک: `.setup-back` در `public/index.html` (فقط CSS): `font-size` 13→16px، `font-weight:600`، `padding` 6×14→10×24، `min-height:44px`، `margin-top` 6→8px. بدونِ تغییرِ منطق/HTML.

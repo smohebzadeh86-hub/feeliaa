@@ -1,4 +1,4 @@
-// حذف و جاروبِ صدایِ آرشیو: حذفِ همراهِ جلسه/مراجع (LAW-010)، صدایِ جلسه‌ی ناموجود، سقفِ نگهداریِ ۱۴روزه.
+// حذف و جاروبِ صدایِ آرشیو: حذفِ همراهِ جلسه/مراجع (LAW-010)، صدایِ جلسه‌ی ناموجود، سقفِ نگهداریِ ۳۰روزه (فقط با ALLOW_HARD_DELETE=1).
 import { readdirSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { query } from '../../../db/connection.js';
@@ -9,7 +9,7 @@ import { ARCHIVE_DIR, RETENTION_MS, ensureArchiveDir, sessionDir } from './store
 
 // LAW-010 («حذفِ مراجع/جلسه باید صدای مربوط را هم پاک کند») — قبلاً فقط `ON DELETE CASCADE`
 // ردیفِ DBِ `session_audio` را پاک می‌کرد؛ خودِ فایل‌هایِ رویِ دیسک (`data/session-audio/<id>/`)
-// می‌ماندند و sweepِ ۱۴روزه هم آن‌ها را نمی‌دید (چون ردیفِ متناظرِ DB دیگر وجود نداشت که
+// می‌ماندند و sweepِ نگهداری هم آن‌ها را نمی‌دید (چون ردیفِ متناظرِ DB دیگر وجود نداشت که
 // `created_at`ش چک شود) — صدای یک مراجعِ حذف‌شده برایِ همیشه رویِ دیسک باقی می‌ماند.
 // caller باید این را *بعدِ* موفقیتِ DELETEِ DB صدا بزند (تا صدایی که هنوز به‌درستی حذف
 // نشده — مثلاً owner-check رد شده — پاک نشود). fail-open: خطایِ حذفِ فایل کلِ عملیاتِ
@@ -77,7 +77,7 @@ export async function sweepAudioWithoutSession(): Promise<number> {
 }
 
 // اجرا در startup + هر ۲۴ ساعت — نه فقط سرِ راه‌اندازی، چون سروری که هفته‌ها ری‌استارت
-// نمی‌شه نباید صدایِ بیشتر از ۱۴ روز رو نگه داره.
+// نمی‌شه نباید صدایِ بیشتر از سقفِ نگهداری رو نگه داره.
 export async function sweepOldSessionAudio(): Promise<void> {
   // ⭐ سقفِ نگهداریِ ۳۰روزه خاموش است (تصمیمِ مالک 2026-10-02) مگر ALLOW_HARD_DELETE=1
   if (!hardDeleteAllowed()) return;
@@ -93,7 +93,7 @@ export async function sweepOldSessionAudio(): Promise<void> {
     }
     // پوشه‌هایِ session که دیگر هیچ ردیفِ session_audio ندارند (همه منقضی شده‌اند) ⇒ کلِ پوشه، شاملِ فایلِ
     // کاملِ کش‌شده (full.*). ⭐ (A4) قبلاً فقط پوشه‌ی کاملاً خالی پاک می‌شد، پس full.webmِ ساخته‌شده برایِ ادمین
-    // بعد از ۱۴ روز برایِ همیشه می‌ماند. پوشه‌ی تازه (<۱ ساعت) دست نمی‌خورد (نوشتنِ در جریان).
+    // بعد از سقفِ نگهداری برایِ همیشه می‌ماند. پوشه‌ی تازه (<۱ ساعت) دست نمی‌خورد (نوشتنِ در جریان).
     ensureArchiveDir();
     const withRows = new Set((await query('SELECT DISTINCT session_id FROM session_audio')).rows.map((r: { session_id: string }) => String(r.session_id)));
     for (const name of readdirSync(ARCHIVE_DIR)) {

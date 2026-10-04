@@ -18,6 +18,8 @@
     "test:api": "pnpm --filter server exec tsx ../scripts/api-contract-harness.mts",
     "test:routes": "pnpm --filter server exec tsx ../scripts/route-snapshot.ts",
     "test:arch": "node scripts/check-backend-boundaries.mjs",
-    "test:docs": "node scripts/check-docs.mjs"
+    "test:docs": "node scripts/check-docs.mjs",
+    "test:eval": "node scripts/eval-asr.mjs --self-test",
+    "eval:asr": "node scripts/eval-asr.mjs"
   }
 }

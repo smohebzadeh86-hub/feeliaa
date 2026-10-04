@@ -2,6 +2,7 @@
 // فقط عدد و پرچم (audio_jobs.transcript_metrics) و برچسبِ جلسه — بدونِ متن، نامِ فایل یا speech_spans (LAW-001).
 import { query } from '../../db/connection.js';
 import { parseTranscriptMetrics, type TranscriptMetrics, type MetricsFlag } from './transcriptMetrics.js';
+import { listRecordMetricsForAdmin } from '../session-record/index.js';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const QUALITY_DAYS_DEFAULT = 30;
@@ -16,6 +17,8 @@ export interface QualityRow {
   therapist_name: string | null;
   created_at: string;
   duration_ms: number | null;
+  // (2026-10-03، core-data-plan قدمِ ۴) upload = audio_jobs؛ realtime/async = رکوردِ جلسه‌ی زنده
+  source: string;
   metrics: TranscriptMetrics;
 }
 
@@ -79,8 +82,23 @@ export async function listAdminUploadQuality(f: { therapistId?: string | null; d
     rows.push({
       job_id: x.id, session_id: x.session_id, session_num: x.session_num ?? null, client_code: x.client_code ?? null,
       therapist_id: x.therapist_id, therapist_name: x.therapist_name ?? null, created_at: new Date(x.created_at).toISOString(),
-      duration_ms: x.duration_ms ?? null, metrics,
+      duration_ms: x.duration_ms ?? null, source: 'upload', metrics,
     });
+  }
+  // جلسه‌هایِ زنده: سنجه‌هایِ آخرین گذرِ رکورد (realtime/async). fail-open: خطا ⇒ فقط آپلودها.
+  try {
+    const tid = f.therapistId && UUID_RE.test(f.therapistId) ? f.therapistId : null;
+    for (const x of await listRecordMetricsForAdmin({ therapistId: tid, days })) {
+      const metrics = parseTranscriptMetrics(x.metrics);
+      if (!metrics) continue;
+      rows.push({
+        job_id: 'rec:' + x.record_id, session_id: x.session_id, session_num: x.session_num, client_code: x.client_code,
+        therapist_id: x.therapist_id, therapist_name: x.therapist_name, created_at: x.created_at,
+        duration_ms: metrics.duration_ms, source: x.source, metrics,
+      });
+    }
+  } catch (e) {
+    console.log('[admin-quality] live records skipped:', String((e as Error)?.message || e).slice(0, 120));
   }
   return { rows: rankQualityRows(rows), summary: summarizeQuality(rows), days };
 }

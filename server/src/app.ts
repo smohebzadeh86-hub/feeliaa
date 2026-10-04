@@ -15,14 +15,15 @@ import { sttRoutes } from './features/transcription/stt.routes.js';
 import { clientConfigRoutes } from './features/client-config/clientConfig.routes.js';
 import { transcriptionRoutes } from './features/legacy-ws/transcription.routes.js';
 import { caseFileRoutes } from './features/case-file/api/caseFile.routes.js';
-import { treatmentUnitRoutes } from './features/treatment-unit/index.js';
+import { treatmentUnitRoutes, treatmentUnits } from './features/treatment-unit/index.js';
 import { obsRoutes } from './obs/obs.routes.js';
 import { registerObsHooks } from './obs/httpHook.js';
 import { flushObsQueue } from './obs/eventLog.js';
 import { audioUploadRoutes, registerUploadChunkParser } from './features/audio-upload/uploads.routes.js';
+import { enqueueRecordMetrics } from './features/audio-upload/index.js';
 import { notificationRoutes } from './features/notifications/notifications.routes.js';
-import { finalTranscriptRoutes } from './features/final-transcript/index.js';
-import { sessionRecordRoutes } from './features/session-record/index.js';
+import { finalTranscriptRoutes, finalTranscriptSpeakerRoles } from './features/final-transcript/index.js';
+import { sessionRecordRoutes, setSpeakerSuggestionSources, setRecordSavedListener } from './features/session-record/index.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -90,6 +91,13 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     await uploadScope.register(notificationRoutes);
   });
   await app.register(finalTranscriptRoutes);
+  // پیشنهادِ نقشِ گوینده (core-data-plan قدمِ ۳): حاضرینِ واحدِ درمان + نقش‌هایِ «متنِ نهایی». تزریق از ریشه‌ی ترکیب (بدونِ چرخه).
+  setSpeakerSuggestionSources({
+    roster: async (sid) => (await treatmentUnits.sessionSpeakerRoster(sid))?.speakers ?? null,
+    finalRoles: finalTranscriptSpeakerRoles,
+  });
+  // سنجه‌هایِ کیفیت برایِ هر گذرِ تازه‌ی رکورد (core-data-plan قدمِ ۴) — صفِ سریالِ fail-open در audio-upload.
+  setRecordSavedListener(enqueueRecordMetrics);
   await app.register(sessionRecordRoutes);
 
   // Serve static (فرانت)

@@ -27,6 +27,9 @@ import { parseEmptySeqs } from '../server/src/features/transcription/archive/ski
 import { shouldRecordRevision, revisionCause, casRequired } from '../server/src/features/sessions/transcriptRevision.js';
 import { buildSegments, renderCanonicalText, rolesComplete, cleanLabel } from '../server/src/features/session-record/segments.js';
 import { deterministicJobId } from '../server/src/features/session-record/record.repository.js';
+import { parseRtChunk, assembleRtChunks, type StoredRtChunk } from '../server/src/features/session-record/rtChunks.js';
+import { suggestRoles, speakerDisplays } from '../server/src/features/session-record/suggest.js';
+import { measureRecord, alignmentFor } from '../server/src/features/audio-upload/recordMetrics.js';
 import { jobView } from '../server/src/features/audio-upload/jobView.js';
 import { randomUUID } from 'node:crypto';
 import { readdirSync } from 'node:fs';
@@ -1186,6 +1189,101 @@ async function main() {
     // کلیدِ قطعیِ گذر: یکسان برایِ ورودیِ یکسان، شکلِ UUID
     assert.equal(deterministicJobId('ft:abc'), deterministicJobId('ft:abc'));
     assert.match(deterministicJobId('ft:abc'), /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+  });
+
+  await t('H71 رکوردِ realtime: اعتبارسنجیِ تکه (توکنِ نامعتبر دور، کلید/اطمینانِ نامعتبر ⇒ null، تهیِ غیرپایانی رد، سقف)', () => {
+    const ok = parseRtChunk({ run_id: 'mg1abc12345', chunk_seq: 0, tokens: [['سلام', 0, 400, 'ab12c-1', 0.9], ['<end>', 0, 0, 'ab12c-1', 1], ['<fin>', 0, 0, null, 1], ['', 1, 2, null, 1], [' خوب', 400, 900, 'bad key!', 7], 5, ['x'.repeat(300), 0, 1, null, 1]] });
+    assert.ok(!('error' in ok));
+    if ('error' in ok) return;
+    assert.equal(ok.tokens.length, 2);
+    assert.deepEqual(ok.tokens[0], { text: 'سلام', start_ms: 0, end_ms: 400, speaker: 'ab12c-1', confidence: 0.9 });
+    assert.equal(ok.tokens[1].speaker, null); assert.equal(ok.tokens[1].confidence, undefined);
+    assert.equal(ok.final, false); assert.equal(ok.reliable, null);
+    const fin = parseRtChunk({ run_id: 'r1', chunk_seq: 3, tokens: [], final: true, reliable: true, dropped: 2 });
+    assert.ok(!('error' in fin) && fin.final && fin.reliable === true && fin.dropped === 2);
+    assert.deepEqual(parseRtChunk({ run_id: 'r1', chunk_seq: 0, tokens: [] }), { error: 'empty' });
+    assert.deepEqual(parseRtChunk({ run_id: 'a b', chunk_seq: 0, tokens: [['x']] }), { error: 'run-invalid' });
+    assert.deepEqual(parseRtChunk({ run_id: 'r', chunk_seq: -1, tokens: [['x']] }), { error: 'seq-invalid' });
+    assert.deepEqual(parseRtChunk({ run_id: 'r', chunk_seq: 0, tokens: new Array(2001).fill(['x']) }), { error: 'too-many-tokens' });
+  });
+
+  await t('H72 رکوردِ realtime: مونتاژ به ترتیبِ run/تکه، جابه‌جاییِ زمانِ run بعدی، شکاف، پایان، complete، کلیدِ تغییرپذیر', () => {
+    const tk = (text: string, s: number, e: number, sp: string) => ({ text, start_ms: s, end_ms: e, speaker: sp, confidence: 0.9 });
+    const c = (id: number, runId: string, chunkSeq: number, tokens: any[], fin = false, reliable: boolean | null = null): StoredRtChunk =>
+      ({ id, runId, chunkSeq, tokens, isFinal: fin, reliable, dropped: fin ? 0 : null });
+    // یک run، تکه‌ها نامرتب رسیده‌اند ⇒ ترتیبِ chunk_seq؛ پایانِ قابل‌اعتماد ⇒ complete
+    const one = assembleRtChunks('s1', [c(2, 'A', 1, [tk(' دوم', 500, 900, 'A-2')], true, true), c(1, 'A', 0, [tk('اول', 0, 400, 'A-1')])])!;
+    assert.deepEqual(one.tokens.map((x) => x.text), ['اول', ' دوم']);
+    assert.equal(one.meta.complete, true); assert.equal(one.meta.missing_chunks, 0);
+    // شکاف در chunk_seq ⇒ ناقص
+    const gap = assembleRtChunks('s1', [c(1, 'A', 0, [tk('اول', 0, 400, 'A-1')]), c(2, 'A', 2, [tk('سوم', 900, 1200, 'A-1')], true, true)])!;
+    assert.equal(gap.meta.missing_chunks, 1); assert.equal(gap.meta.complete, false);
+    // دو run (رفرش): زمانِ run دوم بعد از پایانِ run اول؛ دو run ⇒ ناقص
+    const two = assembleRtChunks('s1', [c(1, 'A', 0, [tk('a', 0, 1000, 'A-1')]), c(2, 'B', 0, [tk('b', 0, 500, 'B-1')], true, true)])!;
+    assert.deepEqual(two.tokens.map((x) => [x.start_ms, x.end_ms]), [[0, 1000], [1000, 1500]]);
+    assert.equal(two.meta.runs, 2); assert.equal(two.meta.complete, false);
+    // بدونِ پایان یا unreliable ⇒ ناقص؛ تهی ⇒ null
+    assert.equal(assembleRtChunks('s1', [c(1, 'A', 0, [tk('a', 0, 1, 'A-1')])])!.meta.final_seen, false);
+    assert.equal(assembleRtChunks('s1', [c(1, 'A', 0, [tk('a', 0, 1, 'A-1')], true, false)])!.meta.complete, false);
+    assert.equal(assembleRtChunks('s1', []), null);
+    // کلید با تکه‌ی تازه یا پرچمِ پایان عوض می‌شود (گذرِ تازه)، برایِ ورودیِ یکسان ثابت است
+    const k1 = assembleRtChunks('s1', [c(1, 'A', 0, [tk('a', 0, 1, 'A-1')])])!.key;
+    assert.equal(k1, assembleRtChunks('s1', [c(1, 'A', 0, [tk('a', 0, 1, 'A-1')])])!.key);
+    assert.notEqual(k1, assembleRtChunks('s1', [c(1, 'A', 0, [tk('a', 0, 1, 'A-1')], true, true)])!.key);
+    // نوبت‌ها با کلیدِ run-برچسب ساخته می‌شوند (همان «گوینده N»ِ متن)
+    assert.deepEqual(buildSegments(one.tokens).map((x) => x.speaker_key), ['A-1', 'A-2']);
+  });
+
+  await t('H73 پیشنهادِ نقشِ گوینده: متنِ نهایی (فقط async، اکثریت/فارسی⇒لاتین)، حدسِ دونفره‌ی فردی، بدونِ حدس برایِ چندعضوی، برچسبِ نمایش', () => {
+    const sp = (key: string, firstStartMs: number | null, firstSeq: number) => ({ key, firstStartMs, firstSeq });
+    // ۱) متنِ نهایی: کلیدِ فارسی ⇒ لاتین؛ «مراجع»/«درمانگر»/عضوِ نام‌دار
+    const ft = suggestRoles({ speakers: [sp('1', 0, 0), sp('2', 500, 1), sp('3', 900, 2)], recordSource: 'async',
+      finalRoles: { '۱': 'درمانگر', '2': 'مراجع', '۳': 'همسر' }, rosterMembers: null });
+    assert.deepEqual(ft, { '1': { role: 'therapist', label: null, source: 'final_transcript' }, '2': { role: 'client', label: null, source: 'final_transcript' },
+      '3': { role: 'member', label: 'همسر', source: 'final_transcript' } });
+    // نقش‌هایِ متنِ نهایی برایِ گذرِ realtime به کار نمی‌روند (شماره‌ها یکی نیستند) ⇒ حدس
+    const rt = suggestRoles({ speakers: [sp('ab12c-1', 3000, 0), sp('ab12c-2', 100, 1)], recordSource: 'realtime', finalRoles: { '1': 'مراجع' }, rosterMembers: ['مراجع'] });
+    assert.equal(rt['ab12c-2'].role, 'therapist'); assert.equal(rt['ab12c-2'].source, 'guess'); assert.equal(rt['ab12c-1'].role, 'client');
+    // عضوِ نام‌دار (alias) ⇒ client با برچسب
+    const al = suggestRoles({ speakers: [sp('1', 0, 0), sp('2', 10, 1)], recordSource: 'upload', finalRoles: null, rosterMembers: ['سارا'] });
+    assert.deepEqual(al['2'], { role: 'client', label: 'سارا', source: 'guess' });
+    // زوج (دو عضو) یا سه گوینده ⇒ بدونِ حدس
+    assert.deepEqual(suggestRoles({ speakers: [sp('1', 0, 0), sp('2', 10, 1)], recordSource: 'async', finalRoles: null, rosterMembers: ['همسر ۱', 'همسر ۲'] }), {});
+    assert.deepEqual(suggestRoles({ speakers: [sp('1', 0, 0), sp('2', 1, 1), sp('3', 2, 2)], recordSource: 'async', finalRoles: null, rosterMembers: null }), {});
+    // برچسبِ نمایش: realtime همان «گوینده N»ِ متن، با «بخش» وقتی چند run؛ async ترتیبِ ظهور
+    assert.deepEqual(speakerDisplays(['ab12c-1', 'ab12c-3']), { 'ab12c-1': 'گوینده ۱', 'ab12c-3': 'گوینده ۳' });
+    assert.deepEqual(speakerDisplays(['ab12c-1', 'zz9yx-1']), { 'ab12c-1': 'گوینده ۱ (بخشِ ۱)', 'zz9yx-1': 'گوینده ۱ (بخشِ ۲)' });
+    assert.deepEqual(speakerDisplays(['2', '1']), { '2': 'گوینده ۱', '1': 'گوینده ۲' });
+  });
+
+  await t('H74 سنجه‌یِ هر گذر: realtimeِ تک-run ⇒ پوشش؛ چند-run ⇒ پوششِ null بدونِ پرچمِ غلط؛ ناقص ⇒ بدونِ مقایسه‌ی گوینده؛ ذخیره رویِ همان گذر', async () => {
+    const tok = (text: string, s: number, e: number, sp: string, c = 0.9) => ({ text, start_ms: s, end_ms: e, speaker: sp, confidence: c });
+    const tokens = [tok('سلام', 0, 500, 'a-1'), tok(' خوبی', 600, 1200, 'a-1'), tok(' ممنون', 2000, 2600, 'a-2', 0.4)];
+    const saved: any[] = [];
+    const deps = (rec: any, spans: Array<[number, number]> | null, expected: number | null) => ({
+      load: async () => rec, speechSpans: async () => spans, expectedSpeakers: async () => expected,
+      save: async (id: number, m: any) => { saved.push([id, m]); },
+    });
+    // تک-run و کامل: پوشش و مقایسه‌ی گوینده؛ صدادارِ بی‌متن (۵ تا ۲۵ث، ≥ سقفِ ۱۵ث) ⇒ حفره‌ی انتها
+    const m1 = (await measureRecord('s', deps({ recordId: 7, source: 'realtime', meta: { runs: 1, complete: true }, tokens }, [[0, 2600], [5000, 25000]], 3)))!;
+    assert.ok(m1.coverage !== null && m1.coverage < 1);
+    assert.ok(m1.flags.includes('uncovered_gap') || m1.flags.includes('tail_gap'));
+    assert.equal(m1.speakers_expected, 3); assert.ok(m1.flags.includes('speakers_merged'));
+    assert.equal(saved[0][0], 7);
+    // چند run ⇒ speechSpans حتی فراخوانی نمی‌شود، پوشش null، بدونِ پرچمِ پوشش
+    let spansCalled = false;
+    const d2 = deps({ recordId: 8, source: 'realtime', meta: { runs: 2, complete: false }, tokens }, [[0, 99999]], 2);
+    d2.speechSpans = async () => { spansCalled = true; return [[0, 99999]]; };
+    const m2 = (await measureRecord('s', d2))!;
+    assert.equal(spansCalled, false); assert.equal(m2.coverage, null);
+    assert.ok(!m2.flags.some((x) => ['low_coverage', 'uncovered_gap', 'head_gap', 'tail_gap', 'speakers_merged', 'speakers_extra'].includes(x)));
+    assert.equal(m2.speakers_expected, null);
+    // async همیشه هم‌تراز؛ بدونِ رکورد ⇒ null و چیزی ذخیره نمی‌شود
+    assert.deepEqual(alignmentFor({ source: 'async', meta: null }), { coverage: true, speakers: true });
+    const n = saved.length;
+    assert.equal(await measureRecord('s', deps(null, null, null)), null); assert.equal(saved.length, n);
+    // کم‌اطمینان: یک از سه واژه زیرِ ۰٫۷
+    assert.ok(Math.abs((m1.low_conf_ratio as number) - 1 / 3) < 0.01);
   });
 
   console.log(`\n${pass} PASS / ${fail} FAIL`);

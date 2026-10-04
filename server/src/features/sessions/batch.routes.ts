@@ -1,10 +1,12 @@
 // صدایِ جلسه رویِ سرور: batch fallback + آرشیو، وضعیت/تلاشِ دوباره، و بازسازیِ اختیاریِ گوینده‌ها —
 // pluginِ فرزندِ sessionRoutes (گاردِ requireAuth از آن به ارث می‌رسد).
+import { getCurrentRecordMetrics } from '../session-record/index.js';
 import { FastifyInstance } from 'fastify';
 import { getOwnedSession } from '../../db/ownership.js';
 import {
   enqueueBatch, processBatchQueue, pendingAudioFor, validateAudioBuffer, type BatchPurpose, getResolveJob, startResolveSpeakers, listSessionAudio,
   parseEmptySeqs, recordSkippedSegments, listSkips, deriveSessionStatus, pendingAudiosFor, SESSION_AUDIO_RETENTION_MS,
+  lowConfidenceWarnRatio,
 } from '../transcription/index.js';
 import { logEvent } from '../../obs/eventLog.js';
 
@@ -94,6 +96,19 @@ export async function sessionBatchRoutes(app: FastifyInstance) {
   // archived_ms = جمعِ مدتِ سگمنت‌هایِ آرشیوشده؛ expected_ms = مدتِ ثبت‌شده‌یِ جلسه (می‌تواند null باشد)؛
   // missing_count = سگمنت‌هایی که هرگز نرسیده‌اند (checkSeqContiguous با client_seq)؛ pending_count = هنوز در صفِ سرور.
   // expired = صدا طبقِ سیاستِ ۳۰روزه پاک شده ⇒ «نبودنِ صدا» هشدار نیست.
+  async function transcriptQualitySummary(sessionId: string) {
+    try {
+      const q = await getCurrentRecordMetrics(sessionId);
+      if (!q || !q.metrics) return null;
+      const m = q.metrics;
+      return {
+        source: q.source, coverage: m.coverage ?? null, uncovered_gaps: m.uncovered_gaps ?? null, low_conf_ratio: m.low_conf_ratio ?? null,
+        low_conf_warn: typeof m.low_conf_ratio === 'number' && m.low_conf_ratio >= lowConfidenceWarnRatio(),
+        speakers_found: m.speakers_found ?? null, speakers_expected: m.speakers_expected ?? null, flags: Array.isArray(m.flags) ? m.flags : [],
+      };
+    } catch { return null; }
+  }
+
   app.get('/api/sessions/:id/audio-status', async (request, reply) => {
     const { id } = request.params as { id: string };
     const owned = await getOwnedSession(id, request.therapistId!);
@@ -115,6 +130,8 @@ export async function sessionBatchRoutes(app: FastifyInstance) {
       pending_count: pending,
       transcript_status: d.transcriptStatus,
       expired: Number.isFinite(createdMs) && Date.now() - createdMs > SESSION_AUDIO_RETENTION_MS,
+      // سنجه‌هایِ کیفیتِ متن از آخرین گذرِ رکورد (core-data-plan قدمِ ۴) — فقط عدد/پرچم؛ null ⇒ هنوز سنجیده نشده.
+      transcript_quality: await transcriptQualitySummary(id),
     };
   });
 

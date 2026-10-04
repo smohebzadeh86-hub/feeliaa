@@ -3,6 +3,7 @@ import { FastifyInstance } from 'fastify';
 import { logEvent } from '../../obs/eventLog.js';
 import { recordAudit } from '../../obs/audit.js';
 import { exportCanonicalRecord } from '../session-record/index.js';
+import { exportFinalTranscript } from '../final-transcript/index.js';
 import {
   getTherapistForExport, listClientsForExport, listSessionsForExport, listNotesForExport, listTherapistIdsForExport,
   listTranscriptRevisionsForExport, listNoteRevisionsForExport, listCaseFilesForExport, listCaseFileVersionsForExport,
@@ -36,7 +37,9 @@ async function buildTherapistExport(therapistId: string) {
   const sessionsByClient = new Map<string, any[]>();
   for (const s of sessions) {
     // schema v2: رکوردِ canonical (نوبت‌هایِ گوینده با نقش، زمان و اطمینان) کنارِ متنِ خام؛ null برایِ جلسه‌یِ بدونِ رکورد
+    // schema v4 (2026-10-04): «متنِ نهایی» (متنِ مرتب، نوبت‌ها با نقش، فهرستِ نسخه‌ها) + منشأ/سنجه‌هایِ رکوردِ canonical
     const withNotes = { ...s, notes: notesBySession.get(s.id) || [], canonical: await exportCanonicalRecord(s.id),
+      final_transcript: await exportFinalTranscript(s.id),
       transcript_revisions: revBySession.get(s.id) || [], note_revisions: noteRevBySession.get(s.id) || [] };
     if (!sessionsByClient.has(s.client_id)) sessionsByClient.set(s.client_id, []);
     sessionsByClient.get(s.client_id)!.push(withNotes);
@@ -79,6 +82,6 @@ export async function exportAdminRoutes(app: FastifyInstance) {
     await recordAudit({ actorId: request.therapistId, actorIsAdmin: true, action: 'admin.export', targetType: 'system', detail: { kind: 'full', count: all.length } });
     reply.header('Content-Disposition', `attachment; filename="feelia-export-${new Date().toISOString().slice(0, 10)}.json"`);
     reply.type('application/json');
-    return { schema_version: 3, exported_at: new Date().toISOString(), therapists: all };
+    return { schema_version: 4, exported_at: new Date().toISOString(), therapists: all };
   });
 }

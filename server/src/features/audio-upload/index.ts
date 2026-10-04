@@ -9,3 +9,5 @@ export { retryFailedAudioJob } from './jobRetry.js';
 export { listAdminUploadJobs, countAdminUploadJobsByStage } from './adminJobs.js';
 // نمایِ کلیِ «کیفیت به عدد» (Session Data Engine)
 export { listAdminUploadQuality } from './adminQuality.js';
+// سنجه‌هایِ کیفیتِ هر گذرِ رکوردِ جلسه (core-data-plan قدمِ ۴؛ سیم‌کشی در app.ts)
+export { enqueueRecordMetrics } from './recordMetrics.js';

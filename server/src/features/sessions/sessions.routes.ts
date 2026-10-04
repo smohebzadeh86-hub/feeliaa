@@ -18,6 +18,7 @@ import { hasStoredConsent, recordClientConsent } from '../clients/index.js';
 import { maybeAutoGenerateCaseFile } from '../case-file/index.js';
 import { recordAudit } from '../../obs/audit.js';
 import { enqueueFinalTranscript } from '../final-transcript/index.js';
+import { buildRealtimeRecord } from '../session-record/index.js';
 import { treatmentUnits, TreatmentUnitValidationError } from '../treatment-unit/index.js';
 import {
   createManualSession, createLiveSession, getSessionRow, getClientConsentRow, getOwnedSessionWithClient, listSessionNotes,
@@ -356,6 +357,8 @@ export async function sessionRoutes(app: FastifyInstance) {
       void maybeAutoGenerateCaseFile(owned.client_id, request.therapistId!);
       // «متنِ نهایی» (فقط اگر درمانگر روشن کرده) — idempotent، هرگز پرتاب نمی‌کند. جلسه‌ی دستی متنِ رونویسی ندارد.
       if (owned.source !== 'manual') void enqueueFinalTranscript(id);
+      // رکوردِ realtime از توکن‌هایِ زنده (core-data-plan قدمِ ۲) — بدونِ هزینه‌ی Soniox؛ هرگز پرتاب نمی‌کند.
+      if (owned.source !== 'manual' && owned.source !== 'upload') void buildRealtimeRecord(id);
     }
     return { session: updatedSession };
   });

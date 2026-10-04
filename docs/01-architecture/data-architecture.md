@@ -2,7 +2,7 @@
 
 > **وضعیت:** ACTIVE-CANONICAL · last-verified: 2026-09-30 @ `17d6919`
 > مالکِ جزئیاتِ ستون‌ها و **مالکِ هر جدول**: [database-catalog](../02-reference/database-catalog.md). این سند مدل، مالکیت و چرخه‌ی عمر را توضیح می‌دهد.
-> منبعِ schema: `server/src/db/mysql/migrations/001–034` (MySQL 8؛ اجرا در startup با `server/src/db/migrate.ts`).
+> منبعِ schema: `server/src/db/mysql/migrations/001–046` (MySQL 8؛ اجرا در startup با `server/src/db/migrate.ts`).
 
 ## ۱. محل‌های نگهداریِ داده
 

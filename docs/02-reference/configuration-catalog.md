@@ -175,6 +175,7 @@
 |---|---|---|---|---|
 | localStorage | `feelia_active_session` | UUID جلسه | `startSession`، `liveResumeSession` | پایان/لغو/خطای «یافت نشد» |
 | localStorage | `feelia_note_outbox` | آرایه‌ی `{qid, sessionId, body, ts}` — علامت/یادداشتِ سریع/متنِ یادداشتِ صوتی‌ای که POSTش گذرا شکست خورد (⚠️ شاملِ متنِ یادداشت تا ارسالِ موفق) | `postNoteReliably` (`index.html`) | ارسالِ موفق، خطایِ دائمی (400/404/413)، حذفِ آیتم توسطِ تراپیست؛ تلاشِ دوباره هر ۲۰ث + `online` + لودِ صفحه (A1.5، 2026-09-26) |
+| localStorage | `feelia_durable_raw` | `'1'` = A/B «صدایِ خامِ آرشیو»: recorderِ durable از getUserMediaِ دوم با EC/NS/AGC خاموش (فقط همین مرورگر؛ استریمِ زنده دست‌نخورده؛ شکست ⇒ استریمِ اصلی) | دستی در DevTools (2026-10-03، [core-data-plan](../05-plans/core-data-plan-2026-10-03.md) قدمِ ۷) | پاک‌کردنِ کلید |
 | localStorage | `feelia_direct` | `'0'` = اجبارِ proxy | دستی (`setDirectMode`) | — |
 | localStorage | `feelia_theme` | `light`/`dark` | تغییرِ تم در `index.html` | — |
 | localStorage | `feelia_pending_complete` | آرایه‌ی شناسه‌ی جلسه‌هایِ «پایان»ِ هنوز تأییدنشده (retry با backoff، A3) | `writePendingCompletes` | بعد از تأییدِ سرور (409 هم تأیید است) |

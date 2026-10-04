@@ -6,7 +6,7 @@
 
 - **مرزها:** بینِ‌featureای: نویسندگانِ `sessions.transcript`: `sessions` (PUT/tail)، `transcription/batch` و `speakerResolve`، `audio-upload` (آپلود)، `legacy-ws` (LEGACY) — همه باید LAW-008 را رعایت کنند؛ API واحدِ نوشتن در backlog است (LAW-025).
 - **داده:** `sessions.transcript`، `transcript_version` (CAS)؛ `session_notes` (یادداشتِ صوتی هرگز واردِ transcript نمی‌شود).
-- **تست:** `test:rt` (merge/placeholder/marker)، `test:up` (exactly-once با `transcript_applied_at`)؛ CAS/409 فقط در E2Eِ دستی (پوششِ `test:api` بازبینی نشده — UNKNOWN).
+- **تست:** `test:rt` (merge/placeholder/marker، T59)، `test:hist` (H9–H14: placeholderِ ابدی و حذفِ هم‌پوشانی)، `test:up` (exactly-once با `transcript_applied_at`)؛ CAS/409 فقط در E2Eِ دستی (پوششِ `test:api` بازبینی نشده — UNKNOWN).
 - **ریسک و بدهی:** CAS در `PUT` اتمیک است (`AND transcript_version = ?`) ولی **اختیاری**: callerهایِ بدونِ `transcript_version` پذیرفته می‌شوند (سازگاریِ عقب‌رو)؛ مسیرِ legacy بدونِ CAS (LAW-015).
 
 ## ۱. همه‌ی نویسنده‌های `sessions.transcript`
@@ -66,6 +66,7 @@
 - **کلاینت:** هر سگمنتِ durable که در قطعی بسته می‌شود (intent=`transcript`) همان لحظه placeholderِ `[⏳ بازه‌ی قطعیِ اینترنت — متن در حالِ بازیابی · #<run>:<seq>]` را در `confirmed` می‌گذارد (`insertRecoveryPlaceholder`؛ قبل از نشانگرِ «اتصال دوباره برقرار شد» اگر همان لحظه اضافه شده باشد).
 - **سرور:** `applyBatchSegmentOnce(…, key)` با `mergeRecoveredSegment` همان placeholder را **درجا** با `[بازیابی‌شده از صدایِ بازه‌ی قطعی · #key]
 <متن>` جایگزین می‌کند؛ سکوت ⇒ `[بازه‌ی قطعی — گفتاری تشخیص داده نشد · #key]`. بدونِ placeholder (کلاینتِ قدیمی یا placeholderِ هنوز ذخیره‌نشده) ⇒ append با همان برچسب/کلید (رفتارِ قبلیِ append، حالا برچسب‌دار). LAW-008 («batch همیشه append») به این شکل اصلاح می‌شود: متنِ batch هرگز متنِ موجود را حذف/بازنویسی نمی‌کند؛ فقط placeholderِ خودش را پر می‌کند.
+- **سگمنتِ لحظه‌ی قطع (T59، 2026-10-03، [core-data-plan](../05-plans/core-data-plan-2026-10-03.md) قدمِ ۵):** سگمنتی که در `scheduleReconnect` از حالتِ ACTIVE بسته می‌شود فقط وقتی `transcript` + placeholder می‌گیرد که گفتارِ رونویسی‌نشده محتمل است — `interim`ِ غیرخالی (Soniox شنیده ولی final نکرده بود) یا تشخیصِ دیرِ `watchdog-ws-not-open`؛ وگرنه همان archive. ابتدایِ این سگمنت را Soniox زنده نوشته ⇒ سرور هنگامِ پرکردنِ placeholder پیشوندی از متنِ بازیابی‌شده را که دُمِ متنِ پیش از placeholder است حذف می‌کند (`trimOverlapWithPreceding`: واژه‌به‌واژه بدونِ برچسبِ گوینده/علائم، ≥۴ واژه، ≥۸۵٪ جایگاهِ برابر، دو سرِ هم‌پوشانی دقیقاً برابر؛ وگرنه هیچ حذفی). فقط متنِ batch کوتاه می‌شود، متنِ موجود هرگز (LAW-008). کاملاً تکراری ⇒ `[بازه‌ی قطعی — گفتارِ این بخش پیش‌تر در متن ثبت شده بود · #key]`. تست: `test:rt` T59، `test:hist` H12–H14.
 - **rebaseِ 409:** `serverFilledPlaceholders` (سرور placeholderهایِ متنِ پایه را پر کرده ⇒ متنِ سرور + دُمِ تازه) و `dropResolvedPlaceholders` (placeholderِ دُمِ محلی که کلیدش در متنِ سرور هست حذف می‌شود).
 - **ترتیب:** صفِ سرور (`filesFor`) و صفِ مرورگر (`listForSession`) به ترتیبِ ضبط: (زمانِ شروعِ run، seq) / (createdAt، seq)؛ آرشیو با `client_seq` (migration 027).
 - **تست:** `test:rt` T46–T48؛ E2E رویِ DBِ dev ۱۰ تست ([verification](../../verification/2026-09-26-storage-fixes-full-test-run.md)).
