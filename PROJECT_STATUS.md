@@ -220,6 +220,15 @@
 
 > append-only · جدیدترین بالا · قالب در §0.
 
+### 2026-10-04 — CODE + TEST + DOCS — داورِ مرز بعد از `done` (بدونِ تأخیر برایِ کاربر) (به دستورِ مالک: «سمتِ کاربر نباید تأخیری باشه»)
+- **انگیزه:** دو آپلودِ پدرام بعد از deployِ داور: ساختِ «متنِ نهایی» ۷۱۵ث و ۴۳۳ث (پیش‌تر ≈۱۰۰ث) — داور داخلِ polish بود و `done`/اعلان را تا ۴–۶ دقیقه عقب می‌انداخت.
+- **تغییر:** `polishTranscript` دیگر داور را اجرا نمی‌کند (فقط `report.diarization_trusted`). `runner.ts#finish` بعد از commitِ `done`+اعلان، `scheduleBoundaryJudge` را بدونِ await فراخوانی می‌کند: صفِ سراسریِ یکی‌یکی، چکِ بودجه‌یِ روزانه، `judgeBoundaries`، سپس تراکنشِ `SELECT … FOR UPDATE … AND MD5(clean_text)=?` (اگر متن در این فاصله عوض شده/دوباره ساخته شده ⇒ ثبت نمی‌شود) و `UPDATE` رویِ `final_transcripts.polish_report` و نسخه‌یِ `generated`؛ `mergeJudgeIntoReport` (خالص) مصرفِ داور را به `usage.total` هم اضافه می‌کند (بودجه‌یِ روزانه می‌شمارد). هر خطا ⇒ فقط نمره‌ای ثبت نمی‌شود؛ ری‌استارت وسطِ داوری ⇒ همان.
+- **تأیید رویِ prod (فقط‌خواندنی):** `MD5(clean_text)` در MySQL = md5ِ JS برایِ ۶ از ۶ ردیف؛ `EXPLAIN` برایِ SELECT…FOR UPDATE و هر دو UPDATE معتبر؛ هر دو ستونِ `polish_report` از نوعِ JSON.
+- **تست:** tsc OK؛ `test:ft` 72 pass (BJ6 بازنویسی: polish داور را اجرا نمی‌کند؛ BJ7 جدید: ادغامِ گزارش/مصرف، ورودیِ دست‌نخورده، هزینه‌یِ نامعلوم).
+- **UNVERIFIED:** اجرایِ واقعیِ مسیرِ `finish → scheduleBoundaryJudge → UPDATE` داخلِ pipelineِ prod (حلقه‌یِ DBِ runner با harness پوشش داده نمی‌شود)؛ اولین آپلودِ بعد از deploy باید `ft_polish_s` را ≈۱–۳ دقیقه و `boundary_judge` را چند دقیقه بعد از `done` نشان دهد.
+- **عامل:** این نشست.
+
+
 ### 2026-10-03 — CODE (UI) — بزرگ‌کردنِ دکمه‌ی «بازگشت» در صفحه‌ی شروعِ جلسه (commit/deploy نشده)
 - به درخواستِ مالک: `.setup-back` در `public/index.html` (فقط CSS): `font-size` 13→16px، `font-weight:600`، `padding` 6×14→10×24، `min-height:44px`، `margin-top` 6→8px. بدونِ تغییرِ منطق/HTML.
 - تأیید نشده در مرورگر (صفحه نیازمندِ ورود و مراجعِ واقعی است؛ طبق قانون حساب ساخته نشد).

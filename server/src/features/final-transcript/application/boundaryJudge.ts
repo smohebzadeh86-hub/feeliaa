@@ -111,3 +111,25 @@ export async function judgeBoundaries(out: CleanTurn[], cfg: BoundaryJudgeConfig
   } : null;
   return { report, usage };
 }
+
+// ادغامِ نتیجه‌یِ داور در polish_report (خالص): boundary_judge + usage.boundary_judge، و مصرفِ داور به usage.total اضافه می‌شود
+// تا سقفِ بودجه‌یِ روزانه (spentToday) آن را هم بشمارد. ورودی را تغییر نمی‌دهد.
+export function mergeJudgeIntoReport(report: Record<string, unknown>, judge: BoundaryJudgeReport, usage: LlmUsageSnapshot | null): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...report, boundary_judge: judge };
+  const u = report.usage as { total?: LlmUsageSnapshot } | undefined;
+  if (usage && u && u.total) {
+    const t = u.total;
+    out.usage = {
+      ...u,
+      total: {
+        calls: t.calls + usage.calls, prompt_tokens: t.prompt_tokens + usage.prompt_tokens,
+        completion_tokens: t.completion_tokens + usage.completion_tokens, reasoning_tokens: t.reasoning_tokens + usage.reasoning_tokens,
+        cost_usd: t.cost_usd === null || usage.cost_usd === null ? null : Math.round((t.cost_usd + usage.cost_usd) * 1e8) / 1e8,
+      },
+      boundary_judge: usage,
+    };
+  } else if (usage) {
+    out.usage = { ...(u || {}), boundary_judge: usage };
+  }
+  return out;
+}

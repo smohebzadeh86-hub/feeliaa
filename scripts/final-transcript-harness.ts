@@ -11,7 +11,7 @@ import type { CleanTurn } from '../server/src/features/final-transcript/domain/t
 import { parseTurns, chunkTurns, renderClean, sampleForOverview, UPLOAD_LABEL, appendUploadForPolish, maxSpeakerNumber } from '../server/src/features/final-transcript/domain/transcriptText.js';
 import { checkPolishedChunk, negationCount, numberBag, DEFAULT_GUARD_LIMITS } from '../server/src/features/final-transcript/domain/polishGuards.js';
 import { polishTranscript } from '../server/src/features/final-transcript/application/polishTranscript.js';
-import { judgeBoundaries, boundaryCandidates } from '../server/src/features/final-transcript/application/boundaryJudge.js';
+import { judgeBoundaries, boundaryCandidates, mergeJudgeIntoReport } from '../server/src/features/final-transcript/application/boundaryJudge.js';
 import { applyRoleEdit, allowedRoles, roleNameToEntry, confirmedRolesFromEntries } from '../server/src/features/final-transcript/domain/roleEdit.js';
 import type { LlmJsonPort } from '../server/src/features/final-transcript/ports.js';
 
@@ -853,21 +853,37 @@ function idPolishLlm(): LlmJsonPort {
     },
   };
 }
-await t('BJ6 در polish: گزارش ثبت می‌شود، متن/نقش‌ها با و بدونِ داور یکسان‌اند؛ بدونِ trustDiarization اجرا نمی‌شود؛ خطایِ داور polish را نمی‌شکند', async () => {
-  const base = await polishTranscript(BJ_RAW, ROSTER1, idPolishLlm(), { ...PCFG, trustDiarization: true });
+await t('BJ6 polish دیگر داور را اجرا نمی‌کند (بدونِ تأخیرِ کاربر)؛ فقط برچسبِ diarization_trusted می‌گذارد', async () => {
   const llm = bjLlm((ids) => ids.map((id) => ({ id, a: 80, b: 10 })));
-  const r = await polishTranscript(BJ_RAW, ROSTER1, idPolishLlm(), { ...PCFG, trustDiarization: true, boundaryJudge: { llm } });
-  assert.ok(r.report.boundary_judge && r.report.boundary_judge.checked >= 1, JSON.stringify(r.report.boundary_judge));
-  assert.equal(r.report.boundary_judge!.flagged[0][1], 80);
-  assert.equal(r.text, base.text);
-  assert.deepEqual(r.turns, base.turns);
-  const llm2 = bjLlm(() => [{ id: 1, a: 99, b: 99 }]);
-  const r2 = await polishTranscript(BJ_RAW, ROSTER1, idPolishLlm(), { ...PCFG, trustDiarization: false, boundaryJudge: { llm: llm2 } });
-  assert.equal(llm2.calls, 0);
-  assert.equal(r2.report.boundary_judge, undefined);
-  const r3 = await polishTranscript(BJ_RAW, ROSTER1, idPolishLlm(), { ...PCFG, trustDiarization: true, boundaryJudge: { llm: bjLlm(() => 'throw') } });
-  assert.equal(r3.text, base.text);
-  assert.equal(r3.report.boundary_judge!.failed_batches >= 1, true);
+  // حتی اگر کسی cfg.boundaryJudge بدهد، polish آن را نادیده می‌گیرد (داور بعد از done در runner اجرا می‌شود)
+  const r = await polishTranscript(BJ_RAW, ROSTER1, idPolishLlm(), { ...PCFG, trustDiarization: true, boundaryJudge: { llm } } as any);
+  assert.equal(llm.calls, 0);
+  assert.equal(r.report.boundary_judge, undefined);
+  assert.equal(r.report.diarization_trusted, true);
+  const r2 = await polishTranscript(BJ_RAW, ROSTER1, idPolishLlm(), { ...PCFG, trustDiarization: false });
+  assert.equal(r2.report.diarization_trusted, false);
+  assert.equal(r2.text, r.text);
+});
+await t('BJ7 mergeJudgeIntoReport: گزارش + مصرفِ داور به usage.total اضافه می‌شود؛ ورودی دست‌نخورده؛ بدونِ usage هم کار می‌کند', async () => {
+  const base = { turns: 10, usage: { total: { calls: 5, prompt_tokens: 100, completion_tokens: 50, reasoning_tokens: 0, cost_usd: 0.01 }, chunks: [] } };
+  const copy = JSON.parse(JSON.stringify(base));
+  const jr = { v: 1 as const, candidates: 3, checked: 3, truncated: 0, failed_batches: 0, timed_out: false, min_score: 50, flagged: [[5, 90, 0]] as Array<[number, number, number]> };
+  const ju = { calls: 2, prompt_tokens: 10, completion_tokens: 1000, reasoning_tokens: 900, cost_usd: 0.02 };
+  const m: any = mergeJudgeIntoReport(base, jr, ju);
+  assert.deepEqual(base, copy, 'ورودی دست‌نخورده');
+  assert.equal(m.turns, 10);
+  assert.deepEqual(m.boundary_judge, jr);
+  assert.equal(m.usage.total.calls, 7);
+  assert.equal(m.usage.total.prompt_tokens, 110);
+  assert.equal(m.usage.total.completion_tokens, 1050);
+  assert.equal(m.usage.total.reasoning_tokens, 900);
+  assert.equal(m.usage.total.cost_usd, 0.03);
+  assert.deepEqual(m.usage.boundary_judge, ju);
+  const m2: any = mergeJudgeIntoReport({ turns: 1 }, jr, null);
+  assert.deepEqual(m2.boundary_judge, jr);
+  assert.equal(m2.usage, undefined);
+  const m3: any = mergeJudgeIntoReport(base, jr, { ...ju, cost_usd: null });
+  assert.equal(m3.usage.total.cost_usd, null, 'هزینه‌ی نامعلوم دروغِ «۰ دلار» نمی‌گوید');
 });
 
 console.log(`\n${pass} pass, ${fail} fail`);

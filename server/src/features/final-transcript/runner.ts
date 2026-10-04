@@ -1,5 +1,6 @@
 // workerِ پس‌زمینه‌ی «متنِ نهایی» + ذخیره‌سازیِ SQL + enqueue. همان الگویِ features/audio-upload/jobRunner.ts:
 // تمامِ وضعیت در DB، lease + heartbeat، آزادسازیِ leaseها در startup (LAW-013: تک‌پروسه).
+import { createHash } from 'node:crypto';
 import { query, pool } from '../../db/connection.js';
 import { logEvent } from '../../obs/eventLog.js';
 import { beat } from '../../obs/heartbeat.js';
@@ -15,6 +16,8 @@ import {
   type FtDeps, type FtJob, type FtPatch, type FtStore, type AudioState,
 } from './domain/jobMachine.js';
 import { polishTranscript } from './application/polishTranscript.js';
+import { judgeBoundaries, mergeJudgeIntoReport, type BoundaryJudgeConfig } from './application/boundaryJudge.js';
+import type { CleanTurn } from './domain/transcriptText.js';
 import { DEFAULT_GUARD_LIMITS } from './domain/polishGuards.js';
 import { createTranscriptLlm } from './adapters/llmJson.js';
 import { envWithReasoning, REASONING_LEVELS, type ReasoningLevel } from '../../llm/config.js';
@@ -101,6 +104,8 @@ export const sqlFtStore: FtStore = {
       conn.release();
     }
     job.stage = 'done';
+    // داورِ مرز بعد از done و خارج از مسیرِ کاربر: متنِ نهایی و اعلان همین الان آماده‌اند؛ نمره‌ها بعداً به polish_report اضافه می‌شوند.
+    scheduleBoundaryJudge(job, cleanText, turns, report);
     const rep = (report || {}) as { usage?: { total?: { calls: number; prompt_tokens: number; completion_tokens: number; reasoning_tokens: number; cost_usd: number | null } }; chunks?: number; fallback_chunks?: number; turns?: number; fallback_turns?: number; retries?: number; uncertain?: number; role_fixes?: number; role_reverts?: number; role_overrides?: number };
     logEvent({ event: 'final_transcript.done', sessionId: job.sessionId, therapistId: job.therapistId, source: 'job',
       detail: { source: job.source, chunks: rep.chunks, fallback_chunks: rep.fallback_chunks, turns: rep.turns, fallback_turns: rep.fallback_turns, retries: rep.retries, uncertain: rep.uncertain, role_fixes: rep.role_fixes, role_reverts: rep.role_reverts, role_overrides: rep.role_overrides,
@@ -190,6 +195,58 @@ function boundaryJudgeFor(sessionId: string) {
   }
 }
 
+// صفِ سراسریِ داورِ مرز: یکی‌یکی (هزینه‌ی LLM) و کاملاً جدا از jobِ «متنِ نهایی» — خطا/ری‌استارت فقط یعنی نمره‌ای ثبت نمی‌شود.
+let judgeChain: Promise<void> = Promise.resolve();
+
+async function overDailyBudget(): Promise<boolean> {
+  const capUsd = Number(process.env.FINAL_TRANSCRIPT_DAILY_BUDGET_USD ?? DEFAULT_DAILY_BUDGET_USD);
+  const capTok = Number(process.env.FINAL_TRANSCRIPT_DAILY_BUDGET_TOKENS ?? DEFAULT_DAILY_BUDGET_TOKENS);
+  if (!((Number.isFinite(capUsd) && capUsd > 0) || (Number.isFinite(capTok) && capTok > 0))) return false;
+  const s = await spentToday();
+  return (capUsd > 0 && s.usd >= capUsd) || (capTok > 0 && s.tokens >= capTok);
+}
+
+function scheduleBoundaryJudge(job: FtJob, cleanText: string, turns: unknown[] | undefined, report: unknown): void {
+  try {
+    const rep = (report || {}) as { diarization_trusted?: boolean };
+    if (!rep.diarization_trusted || !Array.isArray(turns) || !turns.length) return;
+    const cfg = boundaryJudgeFor(job.sessionId);
+    if (!cfg) return;
+    const md5 = createHash('md5').update(cleanText).digest('hex');
+    judgeChain = judgeChain.then(() => runBoundaryJudge(job.sessionId, job.therapistId, turns as CleanTurn[], md5, cfg)).catch(() => {});
+  } catch { /* فقط ثبت: هرگز jobِ اصلی را نمی‌شکند */ }
+}
+
+async function runBoundaryJudge(sessionId: string, therapistId: string, turns: CleanTurn[], md5: string, cfg: BoundaryJudgeConfig): Promise<void> {
+  try {
+    if (await overDailyBudget()) return;
+    const j = await judgeBoundaries(turns, cfg);
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      // فقط اگر ردیف هنوز همان متنِ ساخته‌شده است (ساختِ دوباره/ویرایش در این فاصله ⇒ اندیس‌ها کهنه‌اند ⇒ ثبت نمی‌شود)
+      const [rows] = await conn.query("SELECT polish_report FROM final_transcripts WHERE session_id = ? AND stage = 'done' AND MD5(clean_text) = ? FOR UPDATE", [sessionId, md5]);
+      const row = (rows as any[])[0];
+      if (!row) { await conn.rollback(); return; }
+      const cur = (typeof row.polish_report === 'string' ? JSON.parse(row.polish_report) : row.polish_report) || {};
+      const merged = JSON.stringify(mergeJudgeIntoReport(cur, j.report, j.usage));
+      await conn.query('UPDATE final_transcripts SET polish_report = ? WHERE session_id = ?', [merged, sessionId]);
+      await conn.query(
+        "UPDATE final_transcript_versions SET polish_report = ? WHERE session_id = ? AND kind = 'generated' AND version = (SELECT mv FROM (SELECT MAX(version) AS mv FROM final_transcript_versions WHERE session_id = ? AND kind = 'generated') t)",
+        [merged, sessionId, sessionId]);
+      await conn.commit();
+    } catch (e) {
+      try { await conn.rollback(); } catch {}
+      throw e;
+    } finally {
+      conn.release();
+    }
+    logEvent({ event: 'final_transcript.boundary_judge', sessionId, therapistId, source: 'job',
+      detail: { candidates: j.report.candidates, checked: j.report.checked, flagged: j.report.flagged.length, failed_batches: j.report.failed_batches, timed_out: j.report.timed_out,
+        llm_calls: j.usage?.calls, prompt_tokens: j.usage?.prompt_tokens, completion_tokens: j.usage?.completion_tokens, reasoning_tokens: j.usage?.reasoning_tokens } });
+  } catch { /* فقط ثبت: خطا یعنی نمره‌ای ثبت نمی‌شود */ }
+}
+
 async function polishFor(sessionId: string, text: string, opts?: { trustDiarization: boolean }) {
   try {
     const capUsd = Number(process.env.FINAL_TRANSCRIPT_DAILY_BUDGET_USD ?? DEFAULT_DAILY_BUDGET_USD);
@@ -207,7 +264,6 @@ async function polishFor(sessionId: string, text: string, opts?: { trustDiarizat
     // نقش‌هایِ تأییدشده‌ی درمانگر (ویرایشِ قبلی) فقط وقتی معتبرند که شماره‌گذاریِ گوینده‌ها یک گذرِ کاملِ async باشد (F7).
     const confirmedRoles = opts?.trustDiarization ? confirmedRolesFromEntries(await getRoles(sessionId).catch(() => ({}))) : {};
     const res = await polishTranscript(text, roster, llm, {
-      boundaryJudge: opts?.trustDiarization ? boundaryJudgeFor(sessionId) : undefined,
       briefing,
       confirmedRoles,
       trustDiarization: !!opts?.trustDiarization,
