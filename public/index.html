@@ -626,6 +626,11 @@ input::-ms-reveal{display:none}
 .tbox-copy{position:absolute;top:8px;left:8px;width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;display:grid;place-items:center;padding:0;opacity:.85}
 .tbox-copy:hover{color:var(--sage-deep);border-color:var(--sage);opacity:1}
 .tbox-copy svg{width:15px;height:15px}
+.tbox-copy .tbox-check{display:none;width:18px;height:18px}
+.tbox-copy.copied{background:#1f9d55;border-color:#1f9d55;color:#fff;opacity:1;animation:tboxPop .28s ease-out}
+.tbox-copy.copied svg:not(.tbox-check){display:none}
+.tbox-copy.copied .tbox-check{display:block}
+@keyframes tboxPop{0%{transform:scale(.7)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
 .transcript-box{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:400px;overflow-y:auto;font-size:13.5px;line-height:2.1;white-space:pre-wrap;color:var(--ink-2)}
 .transcript-notes{background:var(--field);border:1px solid var(--line);border-radius:var(--r-lg);padding:16px;max-height:200px;overflow-y:auto;margin-top:12px}
 .transcript-notes .inline-note{background:var(--sage-mist);border-right:3px solid var(--sage);padding:8px 12px;margin:6px 0;border-radius:8px;font-size:12.5px;color:var(--ink-2)}
@@ -1762,6 +1767,7 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
         <div class="transcript-box" id="transcriptBox"></div>
         <button type="button" class="tbox-copy" id="transcriptCopyBtn" title="کپیِ کلِ متن" aria-label="کپیِ کلِ متن" hidden>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"/></svg>
+          <svg class="tbox-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>
         </button>
       </div>
       <div class="transcript-notes" id="transcriptNotes" hidden></div>
@@ -3729,7 +3735,7 @@ function attachTranscriptExpander(box,text,durationMs,note){
   if(box.id==='transcriptBox'){
     const cb=$('transcriptCopyBtn');
     cb.hidden=box.hidden||!text;
-    cb.onclick=function(){ftCopyText(text);};
+    cb.onclick=function(){ftCopyText(text,cb);};
   }
   if(!text)return;
   // شمارش نویسه/مدت برای تراپیست فایده‌ای ندارد؛ فقط یادداشت هشدار (note) نشان داده می‌شود.
@@ -7965,7 +7971,7 @@ async function ftApplyRole(idx,role,sameSpeaker,menu){
     menu.querySelectorAll('button').forEach(function(b){b.disabled=false;});
   }
 }
-async function ftCopyText(text){
+async function ftCopyText(text,btn){
   const t=String(text||'').replace(/⟦([^⟧]*)⟧/g,function(_,w){return w.replace(/؟$/,'');});
   if(!t.trim()){showBanner('warn','متنی برایِ کپی نیست.');return;}
   // Clipboard API ممکن است وجود داشته باشد ولی رد کند (سیاستِ مجوز، Safari، مرورگرِ داخلِ اپ) ⇒ همیشه راهِ دوم هم امتحان می‌شود
@@ -7980,7 +7986,13 @@ async function ftCopyText(text){
     }catch(e){ok=false;}
     if(ta)ta.remove();
   }
-  if(ok)showBanner('info','کلِ متن کپی شد.');
+  if(ok&&btn){
+    // بازخورد درجا: آیکن کپی ⇒ تیک سبز پررنگ، سپس بازگشت
+    btn.classList.add('copied');
+    clearTimeout(btn._copiedT);
+    btn._copiedT=setTimeout(function(){btn.classList.remove('copied');},1800);
+  }
+  else if(ok)showBanner('success','کل متن کپی شد.');
   else showBanner('error','کپی انجام نشد؛ متن را دستی انتخاب کنید.');
 }
 function ftButton(label,fn,cls){
