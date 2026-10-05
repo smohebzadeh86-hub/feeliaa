@@ -3703,8 +3703,17 @@ function transcriptProgressNote(s){
   if(s.batch_status==='failed')return 'بخشی از متن از صدا بازیابی نشد';
   return '';
 }
-// متنِ بلند در جعبه‌ی ۴۰۰پیکسلی فقط چند خطِ اول را نشان می‌داد و ناقص به نظر می‌رسید (جلسه‌ی ۱ساعته ~۵۵هزار نویسه).
-// بالایِ جعبه: طولِ متن + مدت؛ برایِ متنِ بلند دکمه‌ی «نمایشِ کامل» که سقفِ ارتفاع را برمی‌دارد.
+// ⭐ (2026-10-04) نشانگرهایِ فنیِ بازه‌ی قطعی («[بازیابی‌شده از صدایِ بازه‌ی قطعی · #کلید:n]») فقط برایِ ماشین‌اند
+// (کلاینت با کلید placeholder را پیدا/حذف می‌کند) و نباید به کاربر نشان داده شوند. متن ذخیره‌شده دست‌نخورده می‌ماند؛
+// فقط نمایش/کپی پاک می‌شود: خط «بازیابی‌شده…» کامل حذف، و کلید باقی نشانگرها (⏳ / بازه‌ی قطعی — …) بریده می‌شود.
+function displayTranscript(t){
+  return String(t||'')
+    .replace(/\[بازیابی‌شده از صدایِ بازه‌ی قطعی · #[A-Za-z0-9]+:\d+\][ \t]*\n?/g,'')
+    .replace(/\[([^\]\n]*?) · #[A-Za-z0-9]+:\d+\]/g,'[$1]')
+    .replace(/\n{3,}/g,'\n\n');
+}
+// متن بلند در جعبه‌ی ۴۰۰پیکسلی فقط چند خط اول را نشان می‌داد و ناقص به نظر می‌رسید (جلسه‌ی ۱ساعته ~۵۵هزار نویسه).
+// بالای جعبه: طول متن + مدت؛ برای متن بلند دکمه‌ی «نمایش کامل» که سقف ارتفاع را برمی‌دارد.
 function attachTranscriptExpander(box,text,durationMs,note){
   const infoId=box.id+'Info';
   let info=document.getElementById(infoId);
@@ -4795,15 +4804,15 @@ async function openAdminSessionDetail(sessionId,clientTitle){
         r.revisions.forEach(function(x){
           const b=document.createElement('button');b.type='button';b.className='btn btn-ghost btn-sm';b.style.margin='2px 4px 2px 0';
           b.textContent=historyTimeFa(x.created_at)+' · '+(HISTORY_CAUSE_FA[x.cause]||x.cause)+' · '+toFa(x.chars)+' نویسه';
-          b.onclick=async function(){const d=await api('/api/admin/sessions/'+sessionId+'/transcript-revisions/'+x.id);const pre=document.createElement('div');pre.style.cssText='white-space:pre-wrap;border:1px solid var(--line, #ddd);border-radius:8px;padding:8px;margin:6px 0;max-height:260px;overflow:auto';pre.textContent=d.text;const old=rvBody.querySelector('.rv-text');if(old)old.remove();pre.className='rv-text';rvBody.appendChild(pre);};
+          b.onclick=async function(){const d=await api('/api/admin/sessions/'+sessionId+'/transcript-revisions/'+x.id);const pre=document.createElement('div');pre.style.cssText='white-space:pre-wrap;border:1px solid var(--line, #ddd);border-radius:8px;padding:8px;margin:6px 0;max-height:260px;overflow:auto';pre.textContent=displayTranscript(d.text);const old=rvBody.querySelector('.rv-text');if(old)old.remove();pre.className='rv-text';rvBody.appendChild(pre);};
           rvBody.appendChild(b);
         });
       }catch(e){rvBody.textContent='';showBanner('error',e.message);}
     });
     $('adminSessionDetailMeta').insertAdjacentElement('afterend',rv);
     const tBox=$('adminSessionDetailTranscript');
-    tBox.textContent=s.transcript||'(متنی ثبت نشده)';
-    attachTranscriptExpander(tBox,s.transcript||'',s.duration_ms,transcriptProgressNote(s));
+    tBox.textContent=displayTranscript(s.transcript)||'(متنی ثبت نشده)';
+    attachTranscriptExpander(tBox,displayTranscript(s.transcript),s.duration_ms,transcriptProgressNote(s));
     renderAdminSessionDiagnosis(sessionId);
     try{if(window.FeeliaAdminQuality)window.FeeliaAdminQuality.renderFtHistory(sessionId);}catch(e){}
     const nb=$('adminSessionDetailNotes');
@@ -7577,13 +7586,14 @@ async function showRevisionDetail(rid){
     const view=document.createElement('div');view.style.cssText='max-height:300px;overflow:auto;border:1px solid var(--line, #ddd);border-radius:8px;padding:8px;font-size:13px;line-height:1.9;white-space:pre-wrap';
     if(d.diff&&d.diff.ops){
       d.diff.ops.forEach(function(o){
+        const t=displayTranscript(o.text);if(!t.trim())return;
         const p=document.createElement('div');p.style.cssText='padding:2px 6px;margin-bottom:4px;border-radius:6px';
         if(o.op==='removed'){p.style.background='var(--clay-soft, #fbe9e7)';p.style.textDecoration='line-through';p.title='فقط در این نسخه';}
         else if(o.op==='added'){p.style.background='var(--sage-mist, #e8f3ec)';p.title='فقط در متنِ فعلی';}
         else{p.style.opacity='.65';}
-        p.textContent=o.text;view.appendChild(p);
+        p.textContent=t;view.appendChild(p);
       });
-    }else{view.textContent=d.text;}
+    }else{view.textContent=displayTranscript(d.text);}
     box.appendChild(view);
     const act=document.createElement('div');act.className='modal-actions';act.style.marginTop='10px';
     const rb=document.createElement('button');rb.type='button';rb.className='btn btn-primary';rb.textContent='بازگردانیِ این نسخه';
@@ -7627,10 +7637,10 @@ async function doViewTranscript(sessionId){
         ?('فایلِ صوتیِ آپلودشده · '+(data.session.date?toFa(data.session.date):'بدونِ تاریخ')+(data.session.duration_ms?' · '+fmtDurationFa(data.session.duration_ms):''))
         :(sessionStatusFa(data.session)+' · '+toFa(data.session.date)+' · '+toFa(data.session.start_time)+(data.session.duration_ms?' · '+fmtDurationFa(data.session.duration_ms):''));
     delete $('transcriptBox').dataset.ft;
-    $('transcriptBox').textContent=data.session.transcript||(isManualSession?'جلسه‌ی ثبت‌شده‌ی دستی — بدونِ رونویسی.':'(متنی ثبت نشده)');
+    $('transcriptBox').textContent=displayTranscript(data.session.transcript)||(isManualSession?'جلسه‌ی ثبت‌شده‌ی دستی — بدون رونویسی.':'(متنی ثبت نشده)');
     $('transcriptBox').hidden=isManualSession||(isUploadSession&&!hasTranscript);
-    // (2026-09-26) طولِ متن + «نمایشِ کامل» (متنِ بلند در جعبه‌ی ۴۰۰پیکسلی ناقص به نظر می‌رسید) + وضعیتِ بازیابیِ متن
-    attachTranscriptExpander($('transcriptBox'),hasTranscript?data.session.transcript:'',data.session.duration_ms,transcriptProgressNote(data.session));
+    // (2026-09-26) طول متن + «نمایش کامل» (متن بلند در جعبه‌ی ۴۰۰پیکسلی ناقص به نظر می‌رسید) + وضعیت بازیابی متن
+    attachTranscriptExpander($('transcriptBox'),hasTranscript?displayTranscript(data.session.transcript):'',data.session.duration_ms,transcriptProgressNote(data.session));
     $('resolveSpeakersBtn').hidden=(data.session.status!=='completed'||isManualSession||isUploadSession);
     $('historyBtn').hidden=true;loadHistoryButton(sessionId);
     // ⭐ فیکسِ باگِ واقعیِ UX: برایِ جلسه‌ی دستی «ویرایش» بی‌معنی بود (چیزی از قبل
@@ -8001,10 +8011,10 @@ function renderFinalTranscript(){
     box.dataset.ft='1';
     attachTranscriptExpander(box,st.clean_text,s.duration_ms,'');
   }else if(box.dataset.ft==='1'){
-    // از نهایی به خام (دکمه، یا «ساختِ دوباره» که متنِ نهایی را کنار گذاشت)
-    box.textContent=raw||'(متنی ثبت نشده)';
+    // از نهایی به خام (دکمه، یا «ساخت دوباره» که متن نهایی را کنار گذاشت)
+    box.textContent=displayTranscript(raw)||'(متنی ثبت نشده)';
     delete box.dataset.ft;
-    attachTranscriptExpander(box,raw,s.duration_ms,transcriptProgressNote(s));
+    attachTranscriptExpander(box,displayTranscript(raw),s.duration_ms,transcriptProgressNote(s));
   }
   // «بازسازیِ شماره‌گذاریِ گوینده‌ها» کارش را متنِ نهایی پوشش می‌دهد
   if(st.stage==='done')$('resolveSpeakersBtn').hidden=true;
@@ -8082,7 +8092,7 @@ async function startResolveSpeakersUI(){
       if(r.status==='done'){
         status.hidden=true;
         resolveSpeakersLatestText=r.text;
-        $('resolveSpeakersPreview').textContent=r.text;
+        $('resolveSpeakersPreview').textContent=displayTranscript(r.text);
         $('resolveSpeakersModal').classList.add('open');
       }else{
         status.hidden=true;
@@ -8113,8 +8123,8 @@ async function applyResolvedSpeakers(){
     // نسخه از پاسخِ سرور (مثلِ A1.6) — نه +1ِ محلی
     currentViewSession.transcript_version=(put&&put.session&&typeof put.session.transcript_version==='number')
       ?put.session.transcript_version:(currentViewSession.transcript_version||0)+1;
-    $('transcriptBox').textContent=resolveSpeakersLatestText;
-    attachTranscriptExpander($('transcriptBox'),resolveSpeakersLatestText,currentViewSession.duration_ms,'');
+    $('transcriptBox').textContent=displayTranscript(resolveSpeakersLatestText);
+    attachTranscriptExpander($('transcriptBox'),displayTranscript(resolveSpeakersLatestText),currentViewSession.duration_ms,'');
     closeResolveSpeakersModal();
     showBanner('success','متن جلسه با شماره‌گذاری یکدست گوینده‌ها جایگزین شد.');
   }catch(e){
@@ -8494,7 +8504,7 @@ async function startNewRTSession(){
     onState:rtOnState,
     onResult:function(r){
       lastPreviewAt=Date.now();
-      if(!$('liveText').hidden)setLiveTextParts($('liveText'),r.final,r.interim);
+      if(!$('liveText').hidden)setLiveTextParts($('liveText'),displayTranscript(r.final),r.interim);
       $('recStatus').classList.remove('warn');
     },
     onError:function(m){
@@ -10872,9 +10882,9 @@ async function renderSessionUploadJob(sessionId){
       const d=await api('/api/sessions/'+sessionId);
       if(currentViewSession&&currentViewSession.id===sessionId){
         currentViewSession=d.session;
-        $('transcriptBox').textContent=d.session.transcript||'';
+        $('transcriptBox').textContent=displayTranscript(d.session.transcript);
         $('transcriptBox').hidden=!d.session.transcript;
-        attachTranscriptExpander($('transcriptBox'),d.session.transcript||'',d.session.duration_ms,'');
+        attachTranscriptExpander($('transcriptBox'),displayTranscript(d.session.transcript),d.session.duration_ms,'');
       }
     }catch(e){}
   }
