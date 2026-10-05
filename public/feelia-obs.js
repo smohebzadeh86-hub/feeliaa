@@ -1,17 +1,17 @@
-/* FeeliaObs — لایه‌ی رصد/حسابرسیِ فازِ ۱، سمتِ کلاینت.
+/* FeeliaObs — لایه‌ی رصد/حسابرسی فاز ۱، سمت کلاینت.
  *
- * ⚠️ قاعده‌ی سخت (LAW-001): این فایل هرگز نباید محتوایِ متنیِ صفحه را بخواند.
+ * ⚠️ قاعده‌ی سخت (LAW-001): این فایل هرگز نباید محتوای متنی صفحه را بخواند.
  * جست‌وجو کن، نباید هیچ‌کدام از این‌ها این‌جا باشد:
  *   textContent, innerText, innerHTML, .value, placeholder, title, alt,
  *   aria-label, dataset (به‌جز data-obs)
- * برایِ هر کلیک فقط ۴ خاصیت از DOM خوانده می‌شود: data-obs/id → target_id،
- * role → target_role، tagName → target_tag، و value_num که همیشه برایِ کلیک null است.
+ * برای هر کلیک فقط ۴ خاصیت از DOM خوانده می‌شود: data-obs/id → target_id،
+ * role → target_role، tagName → target_tag، و value_num که همیشه برای کلیک null است.
  *
  * اصول (هم‌راستا با feelia-analytics.js):
- *  - dependencyِ حیاتی نیست: هر خطا/آفلاین/بلاک‌شدن → بی‌صدا خاموش، هیچ throw.
- *  - برخلافِ Clarity، برایِ ادمین هم فعال است (نیازِ خودِ ادمین به دیدنِ کلیک/ناوبریِ خودش).
- *  - کلیدِ روشن/خاموش از سرور (GET /api/client-config → obs:{enabled,sample}).
- *  - مستندات: docs/02-reference/api-catalog.md, PROJECT_STATUS.md (فازِ ۱ِ رصد).
+ *  - dependency حیاتی نیست: هر خطا/آفلاین/بلاک‌شدن → بی‌صدا خاموش، هیچ throw.
+ *  - برخلاف Clarity، برای ادمین هم فعال است (نیاز خود ادمین به دیدن کلیک/ناوبری خودش).
+ *  - کلید روشن/خاموش از سرور (GET /api/client-config → obs:{enabled,sample}).
+ *  - مستندات: docs/02-reference/api-catalog.md, PROJECT_STATUS.md (فاز ۱ رصد).
  */
 'use strict';
 (function () {
@@ -24,15 +24,15 @@
   var BACKOFF_STEPS = [5000, 15000, 60000, 300000];
   var SAFE_TOKEN_RE = /^[A-Za-z0-9_.:-]{1,64}$/;
   var SAFE_ROLE_RE = /^[a-z-]{1,32}$/;
-  // فازِ ۲ — allowlistِ کلیدهایِ detailِ رویدادهایِ rt.* (باید زیرمجموعه‌یِ
-  // ALLOWED_DETAIL_KEYSِ سرور در server/src/obs/redact.ts باشد؛ این‌جا فقط یک لایه‌ی
-  // دفاعیِ اضافه‌ست، مرجعِ نهایی همیشه sanitizeDetail سمتِ سرور است).
+  // فاز ۲ — allowlist کلیدهای detail رویدادهای rt.* (باید زیرمجموعه‌ی
+  // ALLOWED_DETAIL_KEYS سرور در server/src/obs/redact.ts باشد؛ این‌جا فقط یک لایه‌ی
+  // دفاعی اضافه‌ست، مرجع نهایی همیشه sanitizeDetail سمت سرور است).
   var CLIENT_DETAIL_KEYS = {
     attempt: 1, attempts: 1, duration_ms: 1, delay_ms: 1, elapsed_ms: 1,
     status: 1, code: 1, reason: 1, state: 1, prev_state: 1,
     close_code: 1, was_clean: 1, retries: 1, ok: 1,
     // (2026-09-26) rt.transcript_diverged {len, chars}، rt.final_persist_failed {count}، rt.local_audio_expired {count} —
-    // هر سه در ALLOWED_DETAIL_KEYSِ سرور هستند (فقط شمارش/طول، بدونِ محتوا).
+    // هر سه در ALLOWED_DETAIL_KEYS سرور هستند (فقط شمارش/طول، بدون محتوا).
     len: 1, chars: 1, count: 1
   };
   var MAX_DETAIL_KEYS = 12;
@@ -74,7 +74,7 @@
     try {
       if (window.crypto && typeof window.crypto.randomUUID === 'function') return window.crypto.randomUUID();
     } catch (e) {}
-    // fallback ساده — فقط وقتی crypto.randomUUID نباشد (مرورگرِ خیلی قدیمی)
+    // fallback ساده — فقط وقتی crypto.randomUUID نباشد (مرورگر خیلی قدیمی)
     var s = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
     return s.replace(/[xy]/g, function (c) {
       var r = Math.random() * 16 | 0;
@@ -198,7 +198,7 @@
   function tryFlush() {
     try {
       if (state !== 'active' || sending || !buffer.length) return;
-      if (backoffTimer) return; // در حالِ backoff — نگه‌دار تا تایمر برسد
+      if (backoffTimer) return; // در حال backoff — نگه‌دار تا تایمر برسد
       var items = buildPayload(batchMax);
       if (!items.length) return;
       sending = true;
@@ -225,8 +225,8 @@
     }
   }
 
-  // مسیرِ unload — sendBeacon (Blob با نوعِ صریح، وگرنه متنِ خام با text/plain می‌رود
-  // که body-parserِ Fastify نمی‌گیرد)؛ fallback fetch keepalive.
+  // مسیر unload — sendBeacon (Blob با نوع صریح، وگرنه متن خام با text/plain می‌رود
+  // که body-parser Fastify نمی‌گیرد)؛ fallback fetch keepalive.
   function flushUnload() {
     try {
       if (state !== 'active' || !buffer.length) return;
@@ -273,7 +273,7 @@
     });
   }
 
-  // از enterApp() صدا زده می‌شود — fire-and-forget، بدونِ promiseِ برگشتی.
+  // از enterApp() صدا زده می‌شود — fire-and-forget، بدون promise برگشتی.
   function boot() {
     try {
       bootSeq++;
@@ -290,7 +290,7 @@
         enabled = !!(obs && obs.enabled);
         var s = obs && typeof obs.sample === 'number' ? obs.sample : 1;
         sample = (s > 0 && s <= 1) ? s : 1;
-        // sample per-page-load — یک قرعه‌کشیِ واحد در همین boot، نه به‌ازایِ هر رویداد.
+        // sample per-page-load — یک قرعه‌کشی واحد در همین boot، نه به‌ازای هر رویداد.
         var picked = Math.random() < sample;
         if (!enabled || !picked) { state = 'disabled'; buffer = []; return; }
         state = 'active';
@@ -337,19 +337,19 @@
       if (typeof v === 'number' && isFinite(v)) { out[k] = Math.trunc(v); n++; continue; }
       if (typeof v === 'boolean') { out[k] = v; n++; continue; }
       if (typeof v === 'string' && SAFE_TOKEN_RE.test(v)) { out[k] = v; n++; }
-      // بقیه (رشته‌ی ناامن، object تودرتو، array، null) بی‌صدا حذف می‌شود — دفاعِ
-      // این‌جا مکملِ sanitizeDetailِ سمتِ سرور است، نه جایگزینِ آن.
+      // بقیه (رشته‌ی ناامن، object تودرتو، array، null) بی‌صدا حذف می‌شود — دفاع
+      // این‌جا مکمل sanitizeDetail سمت سرور است، نه جایگزین آن.
     }
     return out;
   }
 
-  // فازِ ۲ — rt.* از خودِ feelia-rt.js صدا زده می‌شود (window.FeeliaObs.event، همیشه
-  // در try/catch سمتِ caller). دو شکلِ ورودی پشتیبانی می‌شود تا سازگاریِ عقب‌رو حفظ شود:
-  //  - event(name, {..detail..})  → رویدادِ ساختاریافته (kind='client_event')، برایِ
-  //    obs_events سمتِ سرور (که run_id/detail JSON دارد) — نه obs_ui_events.
-  //  - event(name, number)        → شکلِ سادهِ فازِ ۱ (lifecycle/value_num)، دست‌نخورده.
-  // ctx (اختیاری): {session_id, run_id} صاحبِ واقعیِ رویداد — بر مقدارِ سراسریِ setSession مقدم است.
-  // (2026-09-26) WSِ جلسه‌ی قبلی ممکن است دقیقه‌ها بعد، وسطِ جلسه‌ی بعدی بسته شود؛ بدونِ ctx رویدادش به نامِ
+  // فاز ۲ — rt.* از خود feelia-rt.js صدا زده می‌شود (window.FeeliaObs.event، همیشه
+  // در try/catch سمت caller). دو شکل ورودی پشتیبانی می‌شود تا سازگاری عقب‌رو حفظ شود:
+  //  - event(name, {..detail..})  → رویداد ساختاریافته (kind='client_event')، برای
+  //    obs_events سمت سرور (که run_id/detail JSON دارد) — نه obs_ui_events.
+  //  - event(name, number)        → شکل ساده فاز ۱ (lifecycle/value_num)، دست‌نخورده.
+  // ctx (اختیاری): {session_id, run_id} صاحب واقعی رویداد — بر مقدار سراسری setSession مقدم است.
+  // (2026-09-26) WS جلسه‌ی قبلی ممکن است دقیقه‌ها بعد، وسط جلسه‌ی بعدی بسته شود؛ بدون ctx رویدادش به نام
   // جلسه‌ی جاری ثبت می‌شد.
   function event(name, arg, ctx) {
     try {
@@ -378,8 +378,8 @@
     try { tryFlush(); } catch (e) {}
   }
 
-  // true یعنی این تب واقعاً در حالِ فرستادن بود — index.html می‌تواند تصمیمِ reload بگیرد
-  // (هم‌راستا با الگویِ onLogout در feelia-analytics.js).
+  // true یعنی این تب واقعاً در حال فرستادن بود — index.html می‌تواند تصمیم reload بگیرد
+  // (هم‌راستا با الگوی onLogout در feelia-analytics.js).
   function onLogout() {
     try {
       flushUnload();

@@ -1,20 +1,20 @@
-// ===== [feature:admin-quality] ===== «کیفیتِ رونویسی» در پنلِ ادمین (Session Data Engine، 2026-10-01).
-// نمایِ کلیِ audio_jobs.transcript_metrics: جمع‌بندی + جلساتِ آپلودی، بدترین اول. فقط عدد/پرچم — هیچ متنِ بالینی (LAW-001).
-// از helperهایِ سراسریِ index.html (api، $، toFa، fmtDur، adminStatTile، adminBadge، adminBtn، fillAdminTherapistFilter،
-// openAdminSessionDetail، showScreen، hasActiveRecording، showBanner، clearBanner، adminDetailReturn) فقط در زمانِ فراخوانی استفاده می‌کند.
+// ===== [feature:admin-quality] ===== «کیفیت رونویسی» در پنل ادمین (Session Data Engine، 2026-10-01).
+// نمای کلی audio_jobs.transcript_metrics: جمع‌بندی + جلسات آپلودی، بدترین اول. فقط عدد/پرچم — هیچ متن بالینی (LAW-001).
+// از helperهای سراسری index.html (api، $، toFa، fmtDur، adminStatTile، adminBadge، adminBtn، fillAdminTherapistFilter،
+// openAdminSessionDetail، showScreen، hasActiveRecording، showBanner، clearBanner، adminDetailReturn) فقط در زمان فراخوانی استفاده می‌کند.
 (function () {
   'use strict';
 
   var FLAG_FA = {
-    low_coverage: 'پوششِ کم',
+    low_coverage: 'پوشش کم',
     uncovered_gap: 'حفره‌ی وسط',
     head_gap: 'ابتدا بی‌متن',
     tail_gap: 'انتها بی‌متن',
     speakers_merged: 'گوینده‌ی ادغام‌شده',
     speakers_extra: 'گوینده‌ی اضافه',
     speakers_minor: 'گوینده‌ی فانتوم',
-    speaker_imbalance: 'سهمِ نامتعادل',
-    fragmented_turns: 'نوبت‌هایِ تکه‌تکه'
+    speaker_imbalance: 'سهم نامتعادل',
+    fragmented_turns: 'نوبت‌های تکه‌تکه'
   };
   var data = null;
 
@@ -44,7 +44,7 @@
     var flagged = s.flagged || 0;
     $('adminQualityStats').innerHTML =
       adminStatTile('جلسه‌ی سنجیده‌شده', toFa(s.sessions || 0)) +
-      adminStatTile('میانه‌ی پوششِ متن', pct(s.coverage_median), s.coverage_median !== null && s.coverage_median < 0.85) +
+      adminStatTile('میانه‌ی پوشش متن', pct(s.coverage_median), s.coverage_median !== null && s.coverage_median < 0.85) +
       adminStatTile('کمترین پوشش', pct(s.coverage_min), s.coverage_min !== null && s.coverage_min < 0.85) +
       adminStatTile('جلسه با هشدار', toFa(flagged), flagged > 0);
     var fc = s.flag_counts || {};
@@ -67,10 +67,10 @@
     var head = document.createElement('div'); head.className = 'admin-row-head';
     var title = document.createElement('div'); title.className = 'admin-row-title';
     var label = (r.therapist_name || '—') + ' · ' + (r.client_code || '—') + (r.session_num ? ' · جلسه‌ی ' + toFa(r.session_num) : '') +
-      (r.source === 'realtime' ? ' · زنده' : r.source === 'async' ? ' · زنده (رونویسیِ کامل)' : '');
+      (r.source === 'realtime' ? ' · زنده' : r.source === 'async' ? ' · زنده (رونویسی کامل)' : '');
     title.textContent = label;
     var badges = document.createElement('div'); badges.className = 'admin-row-badges';
-    if (!flags.length) badges.appendChild(adminBadge('ok', 'بدونِ هشدار'));
+    if (!flags.length) badges.appendChild(adminBadge('ok', 'بدون هشدار'));
     flags.forEach(function (f) { badges.appendChild(adminBadge(cls, FLAG_FA[f] || f)); });
     head.appendChild(title); head.appendChild(badges);
     var meta = document.createElement('div'); meta.className = 'admin-row-meta';
@@ -89,9 +89,9 @@
     return el;
   }
 
-  // ——— تاریخچه‌ی «متنِ نهایی» در جزئیاتِ جلسه‌ی ادمین (migration 037) ———
-  // فهرست فقط متادیتاست؛ متنِ هر نسخه فقط با کلیکِ «نمایش» گرفته می‌شود (سرور مشاهده را ممیزی می‌کند).
-  var KIND_FA = { baseline: 'نسخه‌ی پیش از تاریخچه', generated: 'ساختِ خودکار', role_edit: 'اصلاحِ نقش توسطِ درمانگر' };
+  // ——— تاریخچه‌ی «متن نهایی» در جزئیات جلسه‌ی ادمین (migration 037) ———
+  // فهرست فقط متادیتاست؛ متن هر نسخه فقط با کلیک «نمایش» گرفته می‌شود (سرور مشاهده را ممیزی می‌کند).
+  var KIND_FA = { baseline: 'نسخه‌ی پیش از تاریخچه', generated: 'ساخت خودکار', role_edit: 'اصلاح نقش توسط درمانگر' };
   async function renderFtHistory(sessionId) {
     var box = $('adminFtHistory');
     if (!box) return;
@@ -102,13 +102,13 @@
     if (!vs.length) return;
     var card = document.createElement('div'); card.className = 'card';
 
-    // سوییچِ «متنِ خام / متنِ نهایی» رویِ باکسِ اصلیِ جلسه. نسخه‌ی جاری = بالاترین نسخه (هر نوشتنِ final_transcripts نسخه می‌گذارد).
+    // سوییچ «متن خام / متن نهایی» روی باکس اصلی جلسه. نسخه‌ی جاری = بالاترین نسخه (هر نوشتن final_transcripts نسخه می‌گذارد).
     var tBox = $('adminSessionDetailTranscript');
     if (tBox) {
       var rawText = tBox.textContent, showingFinal = false, finalText = null;
       var sw = document.createElement('div'); sw.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px';
-      var swLabel = document.createElement('span'); swLabel.textContent = 'متنِ نمایش‌داده‌شده: متنِ خام';
-      var swBtn = adminBtn('نمایشِ متنِ نهایی', 'btn-primary', async function () {
+      var swLabel = document.createElement('span'); swLabel.textContent = 'متن نمایش‌داده‌شده: متن خام';
+      var swBtn = adminBtn('نمایش متن نهایی', 'btn-primary', async function () {
         try {
           if (!showingFinal) {
             if (finalText === null) {
@@ -117,10 +117,10 @@
             }
             if ($('adminSessionDetailTranscript') !== tBox || box.hidden) return;
             tBox.textContent = finalText; showingFinal = true;
-            swLabel.textContent = 'متنِ نمایش‌داده‌شده: متنِ نهایی (نسخه‌ی ' + toFa(vs[0].version) + ')'; swBtn.textContent = 'نمایشِ متنِ خام';
+            swLabel.textContent = 'متن نمایش‌داده‌شده: متن نهایی (نسخه‌ی ' + toFa(vs[0].version) + ')'; swBtn.textContent = 'نمایش متن خام';
           } else {
             tBox.textContent = rawText; showingFinal = false;
-            swLabel.textContent = 'متنِ نمایش‌داده‌شده: متنِ خام'; swBtn.textContent = 'نمایشِ متنِ نهایی';
+            swLabel.textContent = 'متن نمایش‌داده‌شده: متن خام'; swBtn.textContent = 'نمایش متن نهایی';
           }
           attachTranscriptExpander(tBox, tBox.textContent, null, null);
         } catch (e) { showBanner('error', e.message); }
@@ -128,7 +128,7 @@
       sw.appendChild(swLabel); sw.appendChild(swBtn); card.appendChild(sw);
     }
 
-    var h = document.createElement('strong'); h.textContent = 'تاریخچه‌ی متنِ نهایی (' + toFa(vs.length) + ' نسخه)';
+    var h = document.createElement('strong'); h.textContent = 'تاریخچه‌ی متن نهایی (' + toFa(vs.length) + ' نسخه)';
     card.appendChild(h);
     vs.forEach(function (v, i) {
       var row = document.createElement('div'); row.className = 'admin-row-meta'; row.style.marginTop = '8px';

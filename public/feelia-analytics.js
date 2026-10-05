@@ -1,14 +1,14 @@
-/* FeeliaAnalytics — Microsoft Clarity، فقط برای تحلیلِ رفتارِ UI.
+/* FeeliaAnalytics — Microsoft Clarity، فقط برای تحلیل رفتار UI.
  *
  * اصول:
- *  - Clarity dependencyِ حیاتی نیست: هر خطا/قطعی/offline/بلاک‌شدن → بی‌صدا خاموش.
- *    هیچ مسیری از اپ منتظرِ این فایل نمی‌ماند و هیچ متدی throw نمی‌کند.
- *  - هرگز داده ارسال نمی‌شود: فقط نامِ رویداد از EVENTS، نامِ صفحه از SCREENS و نامِ
- *    خطای میکروفونِ مرورگر از MIC_ERRORS. identify هرگز صدا زده نمی‌شود (نه ID تراپیست، نه مراجع).
+ *  - Clarity dependency حیاتی نیست: هر خطا/قطعی/offline/بلاک‌شدن → بی‌صدا خاموش.
+ *    هیچ مسیری از اپ منتظر این فایل نمی‌ماند و هیچ متدی throw نمی‌کند.
+ *  - هرگز داده ارسال نمی‌شود: فقط نام رویداد از EVENTS، نام صفحه از SCREENS و نام
+ *    خطای میکروفون مرورگر از MIC_ERRORS. identify هرگز صدا زده نمی‌شود (نه ID تراپیست، نه مراجع).
  *  - فقط وقتی لود می‌شود که: login شده + ادمین نیست + CLARITY_PROJECT_ID روی سرور ست است.
- *    (تصمیمِ مالک D1، 2026-09-15: بدونِ پرسیدنِ اجازه از تراپیست — نقضِ آگاهانه‌ی LAW-011.)
- *  - پوشاندنِ محتوا (data-clarity-mask) در خودِ index.html روی عناصرِ حساس است، مستقل از
- *    تنظیمِ داشبورد. data-clarity-unmask در این پروژه ممنوع است.
+ *    (تصمیم مالک D1، 2026-09-15: بدون پرسیدن اجازه از تراپیست — نقض آگاهانه‌ی LAW-011.)
+ *  - پوشاندن محتوا (data-clarity-mask) در خود index.html روی عناصر حساس است، مستقل از
+ *    تنظیم داشبورد. data-clarity-unmask در این پروژه ممنوع است.
  *  - مستندات: docs/analytics-clarity.md
  */
 'use strict';
@@ -19,7 +19,7 @@
   var PROJECT_ID_RE = /^[a-z0-9]{6,20}$/;
   var MAX_BUFFER = 50;
 
-  // ⚠️ فقط نام — هیچ رویدادی پارامتر ندارد. رویدادِ جدید = اضافه‌کردن به همین لیست + docs.
+  // ⚠️ فقط نام — هیچ رویدادی پارامتر ندارد. رویداد جدید = اضافه‌کردن به همین لیست + docs.
   var EVENTS = toSet([
     'signup_completed', 'login_completed', 'logout_clicked',
     'client_create_opened', 'client_created', 'client_create_failed',
@@ -34,12 +34,12 @@
     'live_text_toggled', 'sign_added', 'quick_note_added', 'text_note_added',
     'voice_note_started', 'voice_note_stop_clicked',
     'final_transcript_viewed_raw', 'final_transcript_retry', 'final_transcript_viewed_edits', 'final_transcript_role_edit',
-    // پلنِ B (2026-09-28): هشدارِ «بخش‌هایی از صدا واضح نبود» رویِ کارتِ فایلِ آپلودی نمایش داده شد (یک بار برایِ هر job)
+    // پلن B (2026-09-28): هشدار «بخش‌هایی از صدا واضح نبود» روی کارت فایل آپلودی نمایش داده شد (یک بار برای هر job)
     'upload_quality_warned',
-    // فاز ۳ (2026-10-01): تراپیست نقشِ گوینده‌ها را تأیید کرد (بدونِ پارامتر)
+    // فاز ۳ (2026-10-01): تراپیست نقش گوینده‌ها را تأیید کرد (بدون پارامتر)
     'speaker_roles_confirmed'
   ]);
-  // نامِ screen در index.html → نامِ امن. Auth و Admin* عمداً اینجا نیستند.
+  // نام screen در index.html → نام امن. Auth و Admin* عمداً اینجا نیستند.
   var SCREENS = {
     Clients: 'clients',
     AllClients: 'all_clients',
@@ -54,12 +54,12 @@
     'AbortError', 'SecurityError', 'NotSupportedError', 'TypeError'
   ]);
 
-  // off: قبل از boot / بعد از logout | pending: در حالِ گرفتنِ config | active: Clarity فعال |
+  // off: قبل از boot / بعد از logout | pending: در حال گرفتن config | active: Clarity فعال |
   // disabled: ادمین/سرور/شبکه — تا boot بعدی خاموش
-  // ⭐ (تصمیمِ مالک D1، 2026-09-15): دیگر حالتِ ask/denied و پرسیدنِ اجازه وجود ندارد —
-  // با projectId معتبر مستقیم activate می‌شود. نقضِ آگاهانه‌ی LAW-011 («هرگز بدونِ رضایتِ
-  // ذخیره‌شده‌ی تراپیست») به دستورِ مالک؛ باقیِ LAW-011 (بدونِ identify، فقط allowlist،
-  // mask، هرگز برایِ ادمین) دست‌نخورده می‌ماند.
+  // ⭐ (تصمیم مالک D1، 2026-09-15): دیگر حالت ask/denied و پرسیدن اجازه وجود ندارد —
+  // با projectId معتبر مستقیم activate می‌شود. نقض آگاهانه‌ی LAW-011 («هرگز بدون رضایت
+  // ذخیره‌شده‌ی تراپیست») به دستور مالک؛ باقی LAW-011 (بدون identify، فقط allowlist،
+  // mask، هرگز برای ادمین) دست‌نخورده می‌ماند.
   var state = 'off';
   var projectId = null;
   var scriptInjected = false;
@@ -85,7 +85,7 @@
     if (item[0] === 'event') callClarity('event', item[1]);
     else if (item[0] === 'tag') callClarity('set', item[1], item[2]);
   }
-  // قبل از boot/در حینِ گرفتنِ config (مثلاً login_completed) نگه داشته می‌شود؛ فقط اگر
+  // قبل از boot/در حین گرفتن config (مثلاً login_completed) نگه داشته می‌شود؛ فقط اگر
   // اجازه از قبل داده شده باشد ارسال می‌شود، وگرنه دور ریخته می‌شود.
   function enqueue(item) {
     if (state === 'active') { send(item); return; }
@@ -102,8 +102,8 @@
     renderUI();
   }
 
-  // معادلِ snippetِ رسمیِ Microsoft (Settings → Setup → Install manually) ولی بدونِ inline
-  // script: صفِ window.clarity + یک <script async> به www.clarity.ms/tag/<id>. فقط یک‌بار.
+  // معادل snippet رسمی Microsoft (Settings → Setup → Install manually) ولی بدون inline
+  // script: صف window.clarity + یک <script async> به www.clarity.ms/tag/<id>. فقط یک‌بار.
   function injectScript(id) {
     if (scriptInjected) return true;
     try {
@@ -213,8 +213,8 @@
     } catch (e) {}
   }
 
-  // true یعنی اسکریپتِ Clarity در این صفحه لود شده و index.html باید reload کند تا
-  // ضبط برای کاربرِ بعدیِ همین تب/دستگاه ادامه پیدا نکند.
+  // true یعنی اسکریپت Clarity در این صفحه لود شده و index.html باید reload کند تا
+  // ضبط برای کاربر بعدی همین تب/دستگاه ادامه پیدا نکند.
   function onLogout() {
     try {
       bootSeq++;

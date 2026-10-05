@@ -1,23 +1,23 @@
-/* FeeliaUpload — موتورِ آپلودِ مقاومِ فایلِ صوتیِ جلسه (بدونِ build، بدونِ وابستگیِ خارجی — LAW-014).
+/* FeeliaUpload — موتور آپلود مقاوم فایل صوتی جلسه (بدون build، بدون وابستگی خارجی — LAW-014).
  *
- * مسیر: انتخابِ فایل → اثرِ انگشت (sha256 از نام/حجم/تاریخ + ۱MBِ اول و آخر) → نگه‌داریِ فایل در
- * IndexedDB (تا بعد از رفرش/بستنِ تب بدونِ انتخابِ دوباره ادامه یابد) → POST /api/uploads (سرور
- * تکه‌هایِ از قبل رسیده را برمی‌گرداند) → فقط تکه‌هایِ نرسیده با PUT (۴MB، sha256 در هدر) →
- * POST complete → از این لحظه همه‌چیز رویِ سرور است و صفحه می‌تواند بسته شود.
+ * مسیر: انتخاب فایل → اثر انگشت (sha256 از نام/حجم/تاریخ + ۱MB اول و آخر) → نگه‌داری فایل در
+ * IndexedDB (تا بعد از رفرش/بستن تب بدون انتخاب دوباره ادامه یابد) → POST /api/uploads (سرور
+ * تکه‌های از قبل رسیده را برمی‌گرداند) → فقط تکه‌های نرسیده با PUT (۴MB، sha256 در هدر) →
+ * POST complete → از این لحظه همه‌چیز روی سرور است و صفحه می‌تواند بسته شود.
  *
- * شبکه‌ی ضعیف: هر تکه جدا تکرار می‌شود (backoff)؛ با offline منتظرِ رویدادِ online می‌ماند؛ با قطعیِ
- * وسطِ آپلود، از همان تکه ادامه می‌دهد — هرگز از صفر.
- * آفلاینِ کامل هنگامِ انتخاب: کار با وضعیتِ «منتظرِ اینترنت» در IndexedDB می‌ماند و به‌محضِ وصل‌شدن
+ * شبکه‌ی ضعیف: هر تکه جدا تکرار می‌شود (backoff)؛ با offline منتظر رویداد online می‌ماند؛ با قطعی
+ * وسط آپلود، از همان تکه ادامه می‌دهد — هرگز از صفر.
+ * آفلاین کامل هنگام انتخاب: کار با وضعیت «منتظر اینترنت» در IndexedDB می‌ماند و به‌محض وصل‌شدن
  * (تا وقتی اپ باز است) خودکار شروع می‌شود.
  *
- * حریمِ خصوصی: فایل فقط در IndexedDBِ همین مرورگر و فقط تا پایانِ آپلود می‌ماند (بعد پاک می‌شود)؛
- * هر کار به therapistId گره خورده و برایِ حسابِ دیگرِ همین مرورگر ادامه داده نمی‌شود. خروج با آپلودِ ناتمام
- * (index.html) از تراپیست می‌پرسد فایل بماند (دستگاهِ شخصی) یا پاک شود (کامپیوترِ مشترک — purgeLocal).
+ * حریم خصوصی: فایل فقط در IndexedDB همین مرورگر و فقط تا پایان آپلود می‌ماند (بعد پاک می‌شود)؛
+ * هر کار به therapistId گره خورده و برای حساب دیگر همین مرورگر ادامه داده نمی‌شود. خروج با آپلود ناتمام
+ * (index.html) از تراپیست می‌پرسد فایل بماند (دستگاه شخصی) یا پاک شود (کامپیوتر مشترک — purgeLocal).
  * چندتب: Web Locks — هر فایل فقط در یک تب آپلود می‌شود (withTaskLock).
  *
- * چندبخشی (migration 025، startGroup): چند فایلِ یک جلسه ⇒ هر فایل یک task با groupId/partIndex/partsTotal مشترک.
- * بخش‌ها به ترتیب (یکی‌یکی) آپلود می‌شوند؛ بخشِ رسیده ⇒ 'part-done'؛ رسیدنِ آخرین بخش ⇒ سرور یک جلسه می‌سازد و
- * بخش‌ها را به همین ترتیب به هم وصل و یک‌جا رونویسی می‌کند. لغو/خطایِ دائمیِ یک بخش ⇒ کلِ گروه لغو می‌شود.
+ * چندبخشی (migration 025، startGroup): چند فایل یک جلسه ⇒ هر فایل یک task با groupId/partIndex/partsTotal مشترک.
+ * بخش‌ها به ترتیب (یکی‌یکی) آپلود می‌شوند؛ بخش رسیده ⇒ 'part-done'؛ رسیدن آخرین بخش ⇒ سرور یک جلسه می‌سازد و
+ * بخش‌ها را به همین ترتیب به هم وصل و یک‌جا رونویسی می‌کند. لغو/خطای دائمی یک بخش ⇒ کل گروه لغو می‌شود.
  */
 (function () {
   'use strict';
@@ -25,13 +25,13 @@
   var STORE = 'tasks';
   var EDGE = 1024 * 1024;
   var MAX_CHUNK_RETRIES = 8;
-  var CHUNK_STALL_MS = 60000; // بدونِ هیچ پیشرفتِ بایت در این مدت → قطع و retry (putChunk)
+  var CHUNK_STALL_MS = 60000; // بدون هیچ پیشرفت بایت در این مدت → قطع و retry (putChunk)
   var PERMANENT_CODES = ['consent-required', 'file-too-small', 'file-too-large', 'unsupported-format', 'bad-fingerprint',
     'not-audio', 'no-audio', 'unreadable', 'too-long', 'upload-closed', 'read-failed', 'group-closed', 'part-mismatch', 'bad-part'];
 
-  var tasks = {};          // key → task (حالتِ درون‌حافظه‌ای برایِ UI)
-  var groupChains = {};    // groupId → Promise: بخش‌هایِ یک گروه یکی‌یکی آپلود می‌شوند (ترتیب + پهنای‌باندِ کامل برایِ هر بخش)
-  // «لغو» در یک تب به تب‌هایِ دیگرِ فیلیا هم برسد (همان فایل ممکن است آن‌جا در حالِ آپلود باشد — L2).
+  var tasks = {};          // key → task (حالت درون‌حافظه‌ای برای UI)
+  var groupChains = {};    // groupId → Promise: بخش‌های یک گروه یکی‌یکی آپلود می‌شوند (ترتیب + پهنای‌باند کامل برای هر بخش)
+  // «لغو» در یک تب به تب‌های دیگر فیلیا هم برسد (همان فایل ممکن است آن‌جا در حال آپلود باشد — L2).
   var bc = null;
   try { if (typeof BroadcastChannel !== 'undefined') bc = new BroadcastChannel('feelia-upload'); } catch (e) {}
   var listeners = [];
@@ -137,7 +137,7 @@
     });
   }
 
-  // PUT با XHR تا پیشرفتِ واقعیِ بایت‌ها (نوارِ روان رویِ اینترنتِ کند) دیده شود.
+  // PUT با XHR تا پیشرفت واقعی بایت‌ها (نوار روان روی اینترنت کند) دیده شود.
   function putChunk(task, n, blob, digest) {
     return new Promise(function (resolve, reject) {
       var xhr = new XMLHttpRequest();
@@ -145,9 +145,9 @@
       xhr.open('PUT', '/api/uploads/' + task.uploadId + '/chunks/' + n);
       xhr.setRequestHeader('Content-Type', 'application/octet-stream');
       xhr.setRequestHeader('X-Chunk-Sha256', digest);
-      // ⭐ (2026-09-26) قبلاً سقفِ ثابتِ ۱۲۰ثانیه برایِ کلِ chunkِ ۴MB بود — زیرِ ~۳۵KB/s هیچ chunkی
-      // هیچ‌وقت کامل نمی‌شد و آپلود بی‌پایان retry می‌کرد. حالا: سقفِ کل متناسب با حجم (حداقل ۴KB/s)،
-      // و قطعِ زودهنگام فقط وقتی ۶۰ثانیه هیچ بایتی جلو نرفته (stall)، نه وقتی شبکه فقط کند است.
+      // ⭐ (2026-09-26) قبلاً سقف ثابت ۱۲۰ثانیه برای کل chunk ۴MB بود — زیر ~۳۵KB/s هیچ chunkی
+      // هیچ‌وقت کامل نمی‌شد و آپلود بی‌پایان retry می‌کرد. حالا: سقف کل متناسب با حجم (حداقل ۴KB/s)،
+      // و قطع زودهنگام فقط وقتی ۶۰ثانیه هیچ بایتی جلو نرفته (stall)، نه وقتی شبکه فقط کند است.
       xhr.timeout = Math.max(120000, Math.ceil(blob.size / 4096) * 1000);
       var stalled = false;
       var stallTimer = null;
@@ -161,7 +161,7 @@
         armStall();
         if (e.lengthComputable) { task.inflightBytes = e.loaded; throttleEmit(); }
       };
-      xhr.upload.onload = clearStall; // بدنه رسید؛ از اینجا فقط xhr.timeout (پاسخِ سرور)
+      xhr.upload.onload = clearStall; // بدنه رسید؛ از اینجا فقط xhr.timeout (پاسخ سرور)
       xhr.onloadend = clearStall;
       xhr.onload = function () {
         task._xhr = null;
@@ -209,7 +209,7 @@
     return Object.keys(tasks).map(function (k) { return tasks[k]; }).filter(function (t) { return t.groupId === groupId; });
   }
 
-  // لغوِ کلِ گروه (سرور + این تب). keepKey: کارتِ خطایِ همان بخشی که علتِ لغو بود بماند تا تراپیست پیامش را ببیند.
+  // لغو کل گروه (سرور + این تب). keepKey: کارت خطای همان بخشی که علت لغو بود بماند تا تراپیست پیامش را ببیند.
   function cancelGroup(groupId, keepKey) {
     groupTasks(groupId).forEach(function (t) {
       if (t.key === keepKey) return;
@@ -224,14 +224,14 @@
   function finishTask(task, state, extra) {
     setState(task, state, extra);
     idbDelete(task.key);
-    task.file = null; // رهاکردنِ ارجاع به فایل (حافظه)
+    task.file = null; // رهاکردن ارجاع به فایل (حافظه)
   }
 
-  // ————— رفعِ L2 (audit 2026-09-24): یک فایل فقط در یک تب آپلود شود —————
-  // هر تبِ فیلیا کارهایِ IndexedDB را resume می‌کند؛ بدونِ قفل، دو تبِ باز همان فایل را هم‌زمان می‌فرستادند (پهنای‌باندِ
-  // دوبرابر) و تبِ دوم پیامِ کاذبِ «قبلاً آپلود شده» می‌داد. Web Locks (هم‌مبدأ، با بسته‌شدنِ تب خودکار آزاد می‌شود):
-  // تبِ دوم «در تبِ دیگر» منتظر می‌ماند و اگر تبِ اول بسته شد خودش ادامه می‌دهد؛ اگر تبِ اول کار را تمام کرد
-  // (رکورد از IndexedDB رفته)، تبِ دوم کارت را بی‌صدا برمی‌دارد. مرورگرِ بدونِ Web Locks ⇒ رفتارِ قبلی.
+  // ————— رفع L2 (audit 2026-09-24): یک فایل فقط در یک تب آپلود شود —————
+  // هر تب فیلیا کارهای IndexedDB را resume می‌کند؛ بدون قفل، دو تب باز همان فایل را هم‌زمان می‌فرستادند (پهنای‌باند
+  // دوبرابر) و تب دوم پیام کاذب «قبلاً آپلود شده» می‌داد. Web Locks (هم‌مبدأ، با بسته‌شدن تب خودکار آزاد می‌شود):
+  // تب دوم «در تب دیگر» منتظر می‌ماند و اگر تب اول بسته شد خودش ادامه می‌دهد؛ اگر تب اول کار را تمام کرد
+  // (رکورد از IndexedDB رفته)، تب دوم کارت را بی‌صدا برمی‌دارد. مرورگر بدون Web Locks ⇒ رفتار قبلی.
   function withTaskLock(task, fn) {
     if (!(navigator.locks && navigator.locks.request)) return fn();
     var name = 'feelia-upload:' + task.key;
@@ -247,7 +247,7 @@
         if (task.canceled) return;
         return idbGet(task.key).then(function (rec) {
           if (rec === undefined && task.persistable) {
-            // تبِ دیگر کار را تمام/لغو کرد ⇒ این‌جا چیزی برایِ ادامه نیست.
+            // تب دیگر کار را تمام/لغو کرد ⇒ این‌جا چیزی برای ادامه نیست.
             if (tasks[task.key] === task) { delete tasks[task.key]; emit(); }
             return;
           }
@@ -266,7 +266,7 @@
       return withTaskLock(task, function () { return runBody(task); }).then(function () { task.running = false; }, function () { task.running = false; });
     };
     if (!task.groupId) { go(); return; }
-    // بخشِ گروه: پشتِ بخش‌هایِ قبلیِ همین گروه در صف (بخشی که منتظر است «در صف» نمایش داده می‌شود).
+    // بخش گروه: پشت بخش‌های قبلی همین گروه در صف (بخشی که منتظر است «در صف» نمایش داده می‌شود).
     if (task.state !== 'error' && task.state !== 'paused-auth') setState(task, 'queued');
     var prev = groupChains[task.groupId] || Promise.resolve();
     groupChains[task.groupId] = prev.then(go, go);
@@ -274,8 +274,8 @@
 
   async function runBody(task) {
     try {
-      // ⭐ آپلودی که سرور بسته است (مثلاً بعد از > ۲۴ساعت بی‌فعالیتی آزاد شد — `upload-closed`) دیگر «خطایِ دائمی» نیست:
-      // کار با یک آپلودِ تازه از نو شروع می‌شود، به‌جایِ پاک‌کردنِ نسخه‌ی IndexedDB و خواستنِ انتخابِ دوباره‌ی فایل.
+      // ⭐ آپلودی که سرور بسته است (مثلاً بعد از > ۲۴ساعت بی‌فعالیتی آزاد شد — `upload-closed`) دیگر «خطای دائمی» نیست:
+      // کار با یک آپلود تازه از نو شروع می‌شود، به‌جای پاک‌کردن نسخه‌ی IndexedDB و خواستن انتخاب دوباره‌ی فایل.
       for (var restart = 0; ; restart++) {
         try {
           await uploadOnce(task);
@@ -293,22 +293,22 @@
       if (e && e.status === 401) { setState(task, 'paused-auth'); return; }
       var code = (e && e.code) || 'upload-failed';
       var extra = { errorCode: code, errorMessage: (e && e.message) || 'آپلود ناموفق بود' };
-      // خطایی که با تلاشِ دوباره درست نمی‌شود ⇒ فایل رها می‌شود؛ بقیه (مثلاً خطایِ سرور) فایل را نگه
-      // می‌دارند تا «تلاشِ دوباره» بدونِ انتخابِ دوباره ممکن باشد.
+      // خطایی که با تلاش دوباره درست نمی‌شود ⇒ فایل رها می‌شود؛ بقیه (مثلاً خطای سرور) فایل را نگه
+      // می‌دارند تا «تلاش دوباره» بدون انتخاب دوباره ممکن باشد.
       if (PERMANENT_CODES.indexOf(code) !== -1) {
         finishTask(task, 'error', extra);
-        // یک بخشِ غیرقابلِ‌قبول ⇒ جلسه ساخته نمی‌شود؛ بقیه‌ی بخش‌ها بی‌فایده آپلود نشوند.
+        // یک بخش غیرقابل‌قبول ⇒ جلسه ساخته نمی‌شود؛ بقیه‌ی بخش‌ها بی‌فایده آپلود نشوند.
         if (task.groupId) cancelGroup(task.groupId, task.key);
       } else setState(task, 'error', extra);
     }
   }
 
-  // بخشی رسید ولی جلسه منتظرِ بقیه است — فایل دیگر لازم نیست (رویِ سرور است).
+  // بخشی رسید ولی جلسه منتظر بقیه است — فایل دیگر لازم نیست (روی سرور است).
   function finishPart(task, res) {
     finishTask(task, 'part-done', { partsReceived: res && res.parts_received });
   }
 
-  // جلسه‌ی گروه ساخته شد ⇒ کارت‌هایِ «بخش رسید» دیگر لازم نیستند.
+  // جلسه‌ی گروه ساخته شد ⇒ کارت‌های «بخش رسید» دیگر لازم نیستند.
   function clearGroupParts(task) {
     if (!task.groupId) return;
     groupTasks(task.groupId).forEach(function (t) { if (t !== task && t.state === 'part-done') delete tasks[t.key]; });
@@ -325,12 +325,12 @@
           client_id: task.clientId, file_name: task.fileName, size: task.size, mime: task.mime,
           fingerprint: task.fingerprint, session_date: task.sessionDate || undefined,
         };
-        // ⭐ (A1.8، 2026-09-26) رضایت فقط با شروعِ دستیِ همین آپلود (تیکِ مودال) فرستاده می‌شود و فقط تا اولین پاسخِ
-        // موفق؛ قبلاً هر resume/retry (حتی بعد از رفرش یا لغوِ رضایت) consent:true می‌فرستاد و رضایتِ لغوشده را
-        // بی‌صدا دوباره ثبت می‌کرد. بعد از آن سرور به رضایتِ ثبت‌شده‌ی مراجع تکیه می‌کند.
+        // ⭐ (A1.8، 2026-09-26) رضایت فقط با شروع دستی همین آپلود (تیک مودال) فرستاده می‌شود و فقط تا اولین پاسخ
+        // موفق؛ قبلاً هر resume/retry (حتی بعد از رفرش یا لغو رضایت) consent:true می‌فرستاد و رضایت لغوشده را
+        // بی‌صدا دوباره ثبت می‌کرد. بعد از آن سرور به رضایت ثبت‌شده‌ی مراجع تکیه می‌کند.
         if (task.consent) body.consent = true;
-        // یادداشتِ متنیِ پیش از جلسه (2026-10-01): فقط در حافظه و فقط تا اولین پاسخِ موفق؛ سرور آن را همراهِ ساختِ جلسه ذخیره می‌کند
-        // (پیش از رونویسی). در گروه فقط بخشِ اول می‌فرستد.
+        // یادداشت متنی پیش از جلسه (2026-10-01): فقط در حافظه و فقط تا اولین پاسخ موفق؛ سرور آن را همراه ساخت جلسه ذخیره می‌کند
+        // (پیش از رونویسی). در گروه فقط بخش اول می‌فرستد.
         if (task.preNote) body.pre_note = task.preNote;
         if (task.groupId) { body.group_id = task.groupId; body.part_index = task.partIndex; body.parts_total = task.partsTotal; }
         init = await jsonReq('POST', '/api/uploads', body);
@@ -354,7 +354,7 @@
     task.chunkSize = init.upload.chunk_size;
     task.chunksTotal = init.upload.chunks_total;
     // عمداً دوباره persist نمی‌شود: ادامه بعد از رفرش با fingerprint انجام می‌شود (سرور همان آپلود را برمی‌گرداند)،
-    // و put ِ دوباره‌ی رکورد ممکن بود کلِ فایل (تا ۱GB) را دوباره در IndexedDB بنویسد.
+    // و put  دوباره‌ی رکورد ممکن بود کل فایل (تا ۱GB) را دوباره در IndexedDB بنویسد.
     var have = {};
     (init.upload.received || []).forEach(function (n) { have[n] = true; });
     task.doneBytes = 0;
@@ -422,7 +422,7 @@
         if (!retryable) throw e;
         if (!navigator.onLine) { await waitOnlineWithState(task); continue; }
         if (attempt >= MAX_CHUNK_RETRIES) {
-          // شبکه مدتی است جواب نمی‌دهد ولی «online» است (اینترنتِ خیلی ضعیف) — بی‌نهایت صبر، با فاصله‌ی ثابت.
+          // شبکه مدتی است جواب نمی‌دهد ولی «online» است (اینترنت خیلی ضعیف) — بی‌نهایت صبر، با فاصله‌ی ثابت.
           setState(task, 'waiting-network');
           await sleep(15000);
           continue;
@@ -442,10 +442,10 @@
   var FeeliaUpload = {
     setTherapist: function (id) {
       therapistId = id || null;
-      // کارهایِ حسابِ دیگر از نمایش حذف می‌شوند (ولی رویِ دیسک برایِ خودِ آن حساب می‌مانند).
+      // کارهای حساب دیگر از نمایش حذف می‌شوند (ولی روی دیسک برای خود آن حساب می‌مانند).
       Object.keys(tasks).forEach(function (k) {
         if (tasks[k].therapistId !== therapistId) {
-          // canceled برایِ همه (نه فقط XHRِ در جریان) — وگرنه taskی که وسطِ hash/انتظار بود بعد از خروج ادامه می‌داد.
+          // canceled برای همه (نه فقط XHR در جریان) — وگرنه taskی که وسط hash/انتظار بود بعد از خروج ادامه می‌داد.
           stopTask(tasks[k]);
           delete tasks[k];
         }
@@ -480,8 +480,8 @@
         key: null, therapistId: therapistId, clientId: opts.clientId, clientLabel: opts.clientLabel || '',
         sessionDate: opts.sessionDate || '', fileName: file.name, size: file.size, mime: file.type || '',
         file: file, state: 'hashing', createdAt: Date.now(), persistable: true, doneBytes: 0, inflightBytes: 0,
-        consent: true, // فقط در حافظه (persist نمی‌شود) — شروعِ دستی بعد از تیکِ رضایت
-        preNote: String(opts.preNote || ''), // فقط در حافظه — به همراهِ اولین POST /api/uploads
+        consent: true, // فقط در حافظه (persist نمی‌شود) — شروع دستی بعد از تیک رضایت
+        preNote: String(opts.preNote || ''), // فقط در حافظه — به همراه اولین POST /api/uploads
       };
       var tmpKey = 'tmp-' + task.createdAt;
       task.key = tmpKey;
@@ -491,7 +491,7 @@
         task.fingerprint = fp;
         var key = fp + ':' + opts.clientId;
         delete tasks[tmpKey];
-        // همان فایل برایِ همان مراجع هنوز در جریان است (حتی اگر هنوز به run نرسیده، مثلاً وسطِ persist) ⇒ کارِ دوم ساخته نشود.
+        // همان فایل برای همان مراجع هنوز در جریان است (حتی اگر هنوز به run نرسیده، مثلاً وسط persist) ⇒ کار دوم ساخته نشود.
         var ex = tasks[key];
         if (ex && ex.state !== 'error' && ex.state !== 'done' && ex.state !== 'duplicate') { emit(); return ex; }
         task.key = key;
@@ -501,11 +501,11 @@
         delete tasks[tmpKey];
         task.key = tmpKey;
         tasks[tmpKey] = task;
-        finishTask(task, 'error', { errorCode: 'read-failed', errorMessage: 'خواندنِ فایل از دستگاه ممکن نشد' });
+        finishTask(task, 'error', { errorCode: 'read-failed', errorMessage: 'خواندن فایل از دستگاه ممکن نشد' });
         return task;
       });
     },
-    // چند فایلِ یک جلسه (به همین ترتیب). opts: {files, clientId, clientLabel, sessionDate}
+    // چند فایل یک جلسه (به همین ترتیب). opts: {files, clientId, clientLabel, sessionDate}
     startGroup: function (opts) {
       var files = opts.files || [];
       if (files.length < 2) return FeeliaUpload.start({ file: files[0], clientId: opts.clientId, clientLabel: opts.clientLabel, sessionDate: opts.sessionDate, preNote: opts.preNote });
@@ -517,14 +517,14 @@
           sessionDate: opts.sessionDate || '', fileName: file.name, size: file.size, mime: file.type || '',
           file: file, state: 'hashing', createdAt: createdAt, persistable: true, doneBytes: 0, inflightBytes: 0,
           groupId: groupId, partIndex: i, partsTotal: files.length,
-          consent: true, // فقط در حافظه — شروعِ دستی بعد از تیکِ رضایت
-          preNote: i === 0 ? String(opts.preNote || '') : '', // فقط بخشِ اول
+          consent: true, // فقط در حافظه — شروع دستی بعد از تیک رضایت
+          preNote: i === 0 ? String(opts.preNote || '') : '', // فقط بخش اول
         };
         tasks[task.key] = task;
         return task;
       });
       emit();
-      // اثرِ انگشت و ذخیره در IndexedDB برایِ همه پیش از شروع ⇒ رفرش وسطِ بخشِ اول، بخش‌هایِ بعدی را گم نمی‌کند.
+      // اثر انگشت و ذخیره در IndexedDB برای همه پیش از شروع ⇒ رفرش وسط بخش اول، بخش‌های بعدی را گم نمی‌کند.
       return list.reduce(function (p, task) {
         return p.then(function () {
           if (task.canceled) return;
@@ -538,20 +538,20 @@
         return list;
       }).catch(function () {
         var bad = list.filter(function (t) { return !t.fingerprint; })[0] || list[0];
-        finishTask(bad, 'error', { errorCode: 'read-failed', errorMessage: 'خواندنِ فایل از دستگاه ممکن نشد' });
+        finishTask(bad, 'error', { errorCode: 'read-failed', errorMessage: 'خواندن فایل از دستگاه ممکن نشد' });
         cancelGroup(groupId, bad.key);
         return list;
       });
     },
-    // بعد از ورود: کارهایِ نیمه‌کاره‌ی همین حساب از IndexedDB ادامه می‌یابند.
+    // بعد از ورود: کارهای نیمه‌کاره‌ی همین حساب از IndexedDB ادامه می‌یابند.
     resumePending: function () {
       if (!therapistId || !window.indexedDB) return Promise.resolve();
-      // کارهایی که به‌خاطرِ نشستِ منقضی (۴۰۱) متوقف شده بودند، بعد از ورودِ دوباره ادامه می‌یابند.
+      // کارهایی که به‌خاطر نشست منقضی (۴۰۱) متوقف شده بودند، بعد از ورود دوباره ادامه می‌یابند.
       Object.keys(tasks).forEach(function (k) {
         if (tasks[k].state === 'paused-auth' && tasks[k].therapistId === therapistId) run(tasks[k]);
       });
       return idbAll().then(function (items) {
-        // بخش‌هایِ هر گروه به ترتیب در صف بروند.
+        // بخش‌های هر گروه به ترتیب در صف بروند.
         items.sort(function (a, b) { return (a.createdAt - b.createdAt) || ((a.partIndex || 0) - (b.partIndex || 0)); });
         items.forEach(function (rec) {
           if (rec.therapistId !== therapistId || tasks[rec.key]) return;
@@ -574,7 +574,7 @@
       if (!t) return;
       stopTask(t);
       if (!fromOtherTab && bc) try { bc.postMessage({ type: 'cancel', key: key }); } catch (e) {}
-      // بخشی از یک جلسه‌ی چندبخشی ⇒ بدونِ آن جلسه ساخته نمی‌شود ⇒ کلِ گروه لغو.
+      // بخشی از یک جلسه‌ی چندبخشی ⇒ بدون آن جلسه ساخته نمی‌شود ⇒ کل گروه لغو.
       if (t.groupId) { cancelGroup(t.groupId); return; }
       if (t.uploadId && t.state !== 'done' && t.state !== 'duplicate') jsonReq('DELETE', '/api/uploads/' + t.uploadId).catch(function () {});
       idbDelete(key);
@@ -584,15 +584,15 @@
     dismiss: function (key) {
       var t = tasks[key];
       if (!t || t.running) return;
-      // رفعِ B3 (audit 2026-09-24): بستنِ کارتِ خطا یعنی رهاکردنِ آپلود ⇒ ردیفِ نیمه‌کاره‌ی سرور هم لغو شود؛ وگرنه تا
-      // ۷ روز جزوِ سقفِ ۵ آپلودِ هم‌زمان می‌ماند. (برایِ آپلودِ complete/failed سرور 409 می‌دهد — بی‌اثر.)
+      // رفع B3 (audit 2026-09-24): بستن کارت خطا یعنی رهاکردن آپلود ⇒ ردیف نیمه‌کاره‌ی سرور هم لغو شود؛ وگرنه تا
+      // ۷ روز جزو سقف ۵ آپلود هم‌زمان می‌ماند. (برای آپلود complete/failed سرور 409 می‌دهد — بی‌اثر.)
       if (t.groupId && t.state === 'error') { idbDelete(key); delete tasks[key]; cancelGroup(t.groupId); return; }
       if (t.uploadId && t.state === 'error') jsonReq('DELETE', '/api/uploads/' + t.uploadId).catch(function () {});
       idbDelete(key);
       delete tasks[key];
       emit();
     },
-    // رفعِ M5 (audit 2026-09-24): پیش از خروج — چند فایلِ این حساب هنوز در این مرورگر نگه داشته شده (آپلودِ ناتمام)؟
+    // رفع M5 (audit 2026-09-24): پیش از خروج — چند فایل این حساب هنوز در این مرورگر نگه داشته شده (آپلود ناتمام)؟
     localPendingCount: function () {
       if (!therapistId || !window.indexedDB) return Promise.resolve(0);
       var mine = therapistId;
@@ -600,9 +600,9 @@
         return items.filter(function (r) { return r.therapistId === mine; }).length;
       }).catch(function () { return 0; });
     },
-    // «کامپیوترِ مشترک»: نسخه‌یِ فایل‌هایِ این حساب از همین مرورگر پاک می‌شود. هیچ داده‌ای از دست نمی‌رود: فایلِ اصلی
-    // رویِ دستگاهِ کاربر است و تکه‌هایِ رسیده رویِ سرور ۷ روز می‌مانند — انتخابِ دوباره‌ی همان فایل (حتی از دستگاهِ
-    // دیگر) از همان‌جا ادامه می‌دهد، چون اثرِ انگشت از خودِ فایل است. آپلودِ سرور عمداً لغو نمی‌شود.
+    // «کامپیوتر مشترک»: نسخه‌ی فایل‌های این حساب از همین مرورگر پاک می‌شود. هیچ داده‌ای از دست نمی‌رود: فایل اصلی
+    // روی دستگاه کاربر است و تکه‌های رسیده روی سرور ۷ روز می‌مانند — انتخاب دوباره‌ی همان فایل (حتی از دستگاه
+    // دیگر) از همان‌جا ادامه می‌دهد، چون اثر انگشت از خود فایل است. آپلود سرور عمداً لغو نمی‌شود.
     purgeLocal: function () {
       var mine = therapistId;
       Object.keys(tasks).forEach(function (k) {
