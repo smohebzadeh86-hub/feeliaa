@@ -338,8 +338,8 @@ input::-ms-reveal{display:none}
 @keyframes rrPulse{0%{box-shadow:0 0 0 0 rgba(62,107,94,.45)}100%{box-shadow:0 0 0 7px rgba(62,107,94,0)}}
 .rec-status{font-size:13.5px;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:8px;min-height:22px}
 .rec-status::before{content:'';flex:none;width:7px;height:7px;border-radius:50%;background:var(--sage)}
-.rec-status.warn{color:var(--clay-deep);font-weight:700}
-.rec-status.warn::before{background:var(--clay)}
+.rec-status.warn{color:var(--gold-deep);font-weight:700}
+.rec-status.warn::before{background:var(--gold)}
 .level-meter{display:flex;gap:4px;align-items:center;justify-content:center;height:56px;margin:18px 0 6px}
 .level-meter span{display:block;width:5px;border-radius:99px;background:var(--sage);opacity:.9;height:5px;transition:height .09s linear}
 .live-para+.live-para{margin-top:2em}
@@ -583,6 +583,11 @@ input::-ms-reveal{display:none}
 .pn-panel .pre-note-hint{padding-top:8px;margin-top:10px;border-top:1px dashed var(--line)}
 /* یادداشتِ پیش از جلسه — متنی + صوتی (2026-09-29): Setup، مودالِ آپلود، Wrapup و صفحه‌ی جلسه */
 .pre-note-area textarea{width:100%;min-height:64px;font-size:13px}
+.up-pre-row{display:flex;gap:10px;align-items:center}
+.up-pre-row textarea{flex:1;min-width:0;min-height:64px;height:64px;padding:8px 12px;line-height:1.65;resize:vertical}
+.up-pre-row .pre-note-actions{margin-top:0;flex:none}
+.up-pre-row .btn{white-space:nowrap;height:44px}
+@media(max-width:420px){.up-pre-row{flex-direction:column;align-items:stretch}.up-pre-row .pre-note-actions{order:-1}}
 .pre-voice-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 .pre-voice-list:empty{display:none}
 .pre-voice-live{margin-top:8px;padding:10px 12px;border-radius:var(--r-sm);border-inline-start:3px solid var(--sage);background:var(--sage-mist);font-size:13px;line-height:2;color:var(--ink-2);min-height:44px;white-space:pre-wrap}
@@ -978,8 +983,9 @@ input::-ms-reveal{display:none}
 .up-modal .up-drop{padding:22px 16px;gap:6px}
 .up-modal .up-drop span{font-size:12.5px;color:var(--ink-2);direction:ltr;unicode-bidi:plaintext}
 .up-modal .up-drop em{font-style:normal;font-size:11.5px;color:var(--muted);line-height:1.8}
-.up-tip{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.8;color:var(--muted);margin:0 0 14px}
-.up-tip svg{flex:none;width:16px;height:16px;margin-top:3px;color:var(--sage)}
+.up-tip{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.8;font-weight:600;color:var(--gold-deep);background:var(--gold-soft);border:1.5px solid #ecdfc2;border-radius:var(--r-md);padding:10px 12px;margin:0 0 14px}
+[data-theme="dark"] .up-tip{border-color:#453a1f}
+.up-tip svg{flex:none;width:16px;height:16px;margin-top:4px;color:var(--gold-deep)}
 .up-field{margin-bottom:14px}
 .up-modal label small,.up-more summary small{font-weight:500;color:var(--muted);font-size:11.5px}
 .up-hint{font-size:11.5px;color:var(--muted);line-height:1.8;margin-top:6px}
@@ -1891,14 +1897,16 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <details class="up-more" id="upPreNoteBox">
         <summary>یادداشتِ پیش از جلسه <small>(اختیاری)</small></summary>
         <div class="pre-note-area" data-clarity-mask="true">
+          <div class="up-pre-row">
           <textarea id="upPreNoteInput" maxlength="2000" placeholder="توضیحی درباره‌ی این جلسه، متنی یا صوتی…"></textarea>
+          <div class="pre-note-actions"><button type="button" class="btn btn-secondary btn-sm" id="upPreVoiceBtn" onclick="preVoiceUpload.start()">ضبط یادداشت صوتی</button></div>
+          </div>
           <div class="pre-voice-list" id="upPreVoiceList"></div>
           <div class="pre-voice-live" id="upPreVoiceLive" hidden></div>
           <div class="pre-voice-rec" id="upPreVoiceRec" hidden><span class="pre-voice-dot"></span><span>در حال ضبط</span><span id="upPreVoiceTimer">۰۰:۰۰</span>
             <span class="pv-rec-btns"><button type="button" class="btn btn-ghost btn-sm" onclick="preVoiceUpload.cancel()">انصراف</button>
             <button type="button" class="btn btn-primary btn-sm" onclick="preVoiceUpload.stop()">پایان ضبط</button></span></div>
-          <div class="pre-note-actions"><button type="button" class="btn btn-secondary btn-sm" id="upPreVoiceBtn" onclick="preVoiceUpload.start()">ضبطِ یادداشتِ صوتی</button></div>
-          <div class="pre-note-hint">تا «دریافت شد» صفحه را نبندید؛ متنِ تایپ‌شده و فایل‌هایِ انتخابی ذخیره نمی‌شوند.</div>
+          <div class="pre-note-hint">تا «دریافت شد» صفحه را نبندید؛ متن تایپ‌شده و فایل‌های انتخابی ذخیره نمی‌شوند.</div>
         </div>
       </details>
       <label class="up-consent" id="audioUploadConsentLabel"><input type="checkbox" id="audioUploadConsent" onchange="updateAudioUploadButton()"> مراجع به ضبط و رونویسیِ این جلسه رضایت داده است.</label>
@@ -2100,11 +2108,17 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
 <div class="modal-back" id="editSessionModal" data-clarity-mask="true">
   <div class="modal">
     <h3>ویرایش تاریخ و ساعت جلسه</h3>
-    <label>تاریخ</label>
-    <div id="editSessionDatePicker" style="margin-bottom:14px"></div>
-    <label>ساعت شروع</label>
-    <input type="time" id="editSessionTime" style="margin-bottom:0">
-    <div class="modal-actions" style="margin-top:14px">
+    <div style="display:flex;gap:12px;align-items:flex-start">
+      <div style="flex:1;min-width:0">
+        <label>ساعت شروع</label>
+        <input type="time" id="editSessionTime" style="margin-bottom:0">
+      </div>
+      <div style="flex:1;min-width:0">
+        <label>تاریخ</label>
+        <div id="editSessionDatePicker"></div>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:14px;justify-content:flex-end">
       <button class="btn btn-ghost" onclick="closeEditSessionMeta()">انصراف</button>
       <button class="btn btn-primary" onclick="saveSessionMeta()">ذخیره</button>
     </div>
