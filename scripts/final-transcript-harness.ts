@@ -11,7 +11,7 @@ import type { CleanTurn } from '../server/src/features/final-transcript/domain/t
 import { parseTurns, chunkTurns, renderClean, sampleForOverview, UPLOAD_LABEL, appendUploadForPolish, maxSpeakerNumber } from '../server/src/features/final-transcript/domain/transcriptText.js';
 import { checkPolishedChunk, negationCount, numberBag, DEFAULT_GUARD_LIMITS } from '../server/src/features/final-transcript/domain/polishGuards.js';
 import { polishTranscript } from '../server/src/features/final-transcript/application/polishTranscript.js';
-import { judgeBoundaries, boundaryCandidates, mergeJudgeIntoReport } from '../server/src/features/final-transcript/application/boundaryJudge.js';
+import { judgeBoundaries, boundaryCandidates, mergeJudgeIntoReport, BATCH as BOUNDARY_BATCH } from '../server/src/features/final-transcript/application/boundaryJudge.js';
 import { applyRoleEdit, allowedRoles, roleNameToEntry, confirmedRolesFromEntries } from '../server/src/features/final-transcript/domain/roleEdit.js';
 import { planRetry } from '../server/src/features/final-transcript/domain/retryPlan.js';
 import type { LlmJsonPort } from '../server/src/features/final-transcript/ports.js';
@@ -835,6 +835,19 @@ await t('BJ5 سقفِ تعداد و سقفِ زمان', async () => {
   const r2 = await judgeBoundaries(BJ_TURNS, { llm: llm2, budgetMs: -1 });
   assert.equal(r2.report.timed_out, true);
   assert.equal(llm2.calls, 0);
+});
+await t('BJ8 اندازه‌یِ دسته: پیش‌فرض ۵ (سقفِ توکنِ استدلال)، batchSize قابلِ تنظیم؛ همه‌یِ مرزها نمره می‌گیرند', async () => {
+  assert.equal(BOUNDARY_BATCH, 5);
+  const many: CleanTurn[] = Array.from({ length: 13 }, (_, k) => T(k % 2 ? 'مراجع' : 'درمانگر', 'آره.'));
+  const llm = bjLlm((ids) => ids.map((id) => ({ id, a: 90, b: 0 })));
+  const r = await judgeBoundaries(many, { llm });
+  assert.equal(r.report.candidates, 12);
+  assert.equal(r.report.checked, 12);
+  assert.equal(llm.calls, 3); // ۵+۵+۲
+  const llm2 = bjLlm((ids) => ids.map((id) => ({ id, a: 90, b: 0 })));
+  const r2 = await judgeBoundaries(many, { llm: llm2, batchSize: 12 });
+  assert.equal(r2.report.checked, 12);
+  assert.equal(llm2.calls, 1);
 });
 
 const BJ_RAW = [

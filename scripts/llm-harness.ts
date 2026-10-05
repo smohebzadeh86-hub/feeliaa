@@ -214,6 +214,9 @@ await t('L12 validate: ساختارِ عمیقِ نامعتبر ⇒ یک تلا�
   const e = fake([null, OK]);
   await assert.rejects(() => completeJsonWith(e.client, s, 'S', 'U', SCHEMA), /پاسخ خالی از OpenRouter/);
   assert.equal(e.bodies.length, 1);
+  // استدلال کلِ سقف را خورد ⇒ content خالی با finish=length — علت در پیام دیده شود (prod 2026-10-05)
+  const l = fake([{ content: '', finish: 'length' }]);
+  await assert.rejects(() => completeJsonWith(l.client, metisCfg(), 'S', 'U', SCHEMA), /پاسخ خالی از Metis \(بریده به سقفِ توکن\)/);
 });
 
 await t('L13 providerِ جایگزین: پیش‌فرض خاموش؛ فقط با خطایِ گذرا؛ modelTag = مدلی که جواب داد', async () => {

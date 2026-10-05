@@ -16,7 +16,7 @@ import {
   type FtDeps, type FtJob, type FtPatch, type FtStore, type AudioState,
 } from './domain/jobMachine.js';
 import { polishTranscript } from './application/polishTranscript.js';
-import { judgeBoundaries, mergeJudgeIntoReport, type BoundaryJudgeConfig } from './application/boundaryJudge.js';
+import { judgeBoundaries, mergeJudgeIntoReport, BATCH as BOUNDARY_JUDGE_BATCH, type BoundaryJudgeConfig } from './application/boundaryJudge.js';
 import type { CleanTurn } from './domain/transcriptText.js';
 import { DEFAULT_GUARD_LIMITS } from './domain/polishGuards.js';
 import { createTranscriptLlm } from './adapters/llmJson.js';
@@ -190,6 +190,7 @@ function boundaryJudgeFor(sessionId: string) {
       llm: createTranscriptLlm(envWithReasoning('final-transcript', process.env, level), undefined, { sessionId }),
       maxItems: envInt('FINAL_TRANSCRIPT_BOUNDARY_JUDGE_MAX', 120),
       budgetMs: envInt('FINAL_TRANSCRIPT_BOUNDARY_JUDGE_BUDGET_MS', 6 * 60_000),
+      batchSize: envInt('FINAL_TRANSCRIPT_BOUNDARY_JUDGE_BATCH', BOUNDARY_JUDGE_BATCH),
     };
   } catch {
     return undefined;

@@ -13,6 +13,7 @@ export interface BoundaryJudgeConfig {
   budgetMs?: number;   // سقفِ زمانِ کل؛ بعد از آن دسته‌یِ جدید شروع نمی‌شود
   concurrency?: number;
   minScore?: number;   // نمره‌یِ حداقلِ ثبت در flagged
+  batchSize?: number;  // مرز در هر فراخوانی (پیش‌فرض BATCH)
 }
 
 export interface BoundaryJudgeReport {
@@ -28,7 +29,9 @@ export interface BoundaryJudgeReport {
 }
 
 export const BOUNDARY_EDGE_MAX_WORDS = 6;
-const BATCH = 10;
+// ۵ (نه ۱۰): استدلالِ DeepSeek با `low` ≈۱٫۳k توکن به‌ازایِ هر مرز است؛ دسته‌یِ ۱۰تایی (~۱۳k) مرتب به سقفِ ۱۶٬۳۸۴ می‌خورد
+// ⇒ finish=length با content ِ خالی («پاسخ خالی») و تلاشِ دوباره‌یِ کامل (prod 2026-10-05، `7c8788ee`: ۷ از ~۲۱ فراخوانی).
+export const BATCH = 5;
 const CTX_SENTENCES = 3;
 const FLAGGED_CAP = 80;
 
@@ -70,7 +73,8 @@ export async function judgeBoundaries(out: CleanTurn[], cfg: BoundaryJudgeConfig
   const before = cfg.llm.usage?.() ?? null;
   const deadline = Date.now() + (cfg.budgetMs ?? 6 * 60_000);
   const batches: Cand[][] = [];
-  for (let k = 0; k < cands.length; k += BATCH) batches.push(cands.slice(k, k + BATCH));
+  const size = Math.max(1, Math.floor(cfg.batchSize ?? BATCH));
+  for (let k = 0; k < cands.length; k += size) batches.push(cands.slice(k, k + size));
   let next = 0;
   const worker = async () => {
     for (;;) {

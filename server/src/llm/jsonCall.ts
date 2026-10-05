@@ -174,9 +174,9 @@ export async function completeJsonWith<T>(client: ChatClient, cfg: LlmConfig, sy
       throw new LlmError('llm-failed', `فراخوانی ${cfg.label} ناموفق بود: ` + (err instanceof Error ? err.message : 'خطای نامشخص'), transient, status);
     }
     reportHealth({ ok: true, provider: cfg.provider, purpose: cfg.purpose });
-    if (!raw) { why = `پاسخ خالی از ${cfg.label}`; continue; }
-    // خروجیِ بریده به سقفِ توکن ⇒ JSONِ ناقص؛ فقط کدِ آن در پیام (نه متن)
+    // خروجیِ بریده به سقفِ توکن ⇒ JSONِ ناقص، یا خالی وقتی استدلال کلِ سقف را خورد؛ فقط کدِ آن در پیام (نه متن)
     const cut = finish === 'length' ? ' (بریده به سقفِ توکن)' : '';
+    if (!raw) { why = `پاسخ خالی از ${cfg.label}${cut}`; continue; }
     if (strict) {
       try { return JSON.parse(raw) as T; } catch { throw new LlmError('llm-invalid-output', `پاسخ ${cfg.label} JSON معتبر نبود${cut}`); }
     }
