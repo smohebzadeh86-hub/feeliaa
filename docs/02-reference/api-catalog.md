@@ -21,6 +21,7 @@
 | POST | `/api/auth/login` | public | `{phone, password}` | 200 `{therapist}` + Set-Cookie | 400، 401 (عمومی)، 403 غیرفعال | UI |
 | POST | `/api/auth/logout` | public | — | `{ok:true}`؛ حذفِ نشست و کوکی | — | UI |
 | GET | `/api/auth/me` | (بررسیِ دستی) | — | `{therapist}` | 401 | UI (`init`) |
+| PATCH | `/api/auth/recording-tips` | (بررسیِ دستی) | `{dismissed: boolean}` | 200 `{recording_tips_dismissed: boolean}` | 401، 400 (`dismissed` غیرِboolean) | UI (مودالِ نکته‌هایِ ضبط، «دیگر نشان نده»؛ `/api/auth/me` فیلدِ `recording_tips_dismissed` را برمی‌گرداند) |
 | PATCH | `/api/auth/case-file-auto-generate` | (بررسیِ دستی) | `{enabled: boolean}` | 200 `{case_file_auto_generate: boolean}` | 401، 400 (`enabled` غیرِboolean) | UI (toggle/مودالِ یک‌باره‌ی پرونده) |
 
 `therapist` = `{id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate}` — سه‌حالته (`null`/`true`/`false`، migration 020). کوکی: `feelia_session`، `path=/`، `httpOnly`، `sameSite=lax`، `maxAge=2592000`.

@@ -512,6 +512,8 @@ input::-ms-reveal{display:none}
 .rec-tips-hint svg{width:14px;height:14px;transition:transform .2s}
 .rec-tips[open] .rec-tips-hint svg{transform:rotate(180deg)}
 .rec-tips summary:focus-visible{outline:2px solid var(--gold);outline-offset:-2px;border-radius:var(--r-md)}
+.rec-tips-modal-list{margin:0;padding:0;padding-inline-start:22px;line-height:1.9;color:var(--ink-2);font-size:14px}
+.rec-tips-modal-list li{margin-bottom:6px}
 .rec-tips ul{margin:0;padding:2px 12px 12px;padding-inline-start:40px;line-height:1.9;color:var(--ink-2)}
 .pf-box{margin-bottom:14px}
 .pf-strip{display:flex;align-items:stretch;gap:8px}
@@ -1909,6 +1911,19 @@ body.admin-mode .wrap>.admin-nav{grid-column:1}
       <button class="btn btn-primary" onclick="doLogout(false)">خروج — فایل در این مرورگر بماند (دستگاهِ شخصیِ من)</button>
       <button class="btn btn-secondary" onclick="doLogout(true)">خروج و پاک‌کردنِ فایل از این مرورگر (کامپیوترِ مشترک)</button>
       <button class="btn btn-ghost" onclick="closeLogoutUploadModal()">ماندن و ادامه‌ی آپلود</button>
+    </div>
+  </div>
+</div>
+
+<!-- (2026-10-04) نکته‌هایِ ضبط: اولین چیزی که تراپیست در صفحه‌ی شروعِ جلسه می‌بیند؛ «دیگر نشان نده» در DB (therapists.recording_tips_ack_at). متنِ فهرست از همان #recTips کپی می‌شود (یک منبع) -->
+<div class="modal-back" id="recTipsModal" data-clarity-mask="true">
+  <div class="modal" role="dialog" aria-labelledby="recTipsModalTitle">
+    <h3 id="recTipsModalTitle">پیش از شروع، چند نکته برای متن دقیق‌تر</h3>
+    <ul class="rec-tips-modal-list" id="recTipsModalList"></ul>
+    <label class="radio-opt" style="margin:12px 0 0"><input type="checkbox" id="recTipsDontShow"> دیگر این پیام را نشان نده</label>
+    <div style="font-size:12px;color:var(--ink-3,var(--ink-2));margin-top:6px;line-height:1.8">نکته‌ها همیشه در صفحه‌ی «شروع جلسه» (بخش «نکته‌هایی برای متن دقیق‌تر») قابل‌خواندن می‌مانند.</div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn btn-primary" style="flex:1" onclick="closeRecTipsModal(true)">متوجه شدم</button>
     </div>
   </div>
 </div>
@@ -8260,6 +8275,25 @@ function setupNewSession(client){
   loadPresenceForSetup(client);
   showScreen('Setup');
   runPreflight();
+  if(currentTherapist&&!currentTherapist.recording_tips_dismissed)openRecTipsModal();
+}
+
+// ===== مودالِ نکته‌هایِ ضبط (قبل از شروعِ جلسه) =====
+function openRecTipsModal(){
+  const src=document.querySelector('#recTips ul');
+  if(!src)return;
+  $('recTipsModalList').innerHTML=src.innerHTML;
+  $('recTipsDontShow').checked=false;
+  $('recTipsModal').classList.add('open');
+}
+function closeRecTipsModal(confirmed){
+  $('recTipsModal').classList.remove('open');
+  if(!confirmed||!$('recTipsDontShow').checked)return;
+  // best-effort: شکست = فقط دفعه‌ی بعد دوباره نشان داده می‌شود
+  if(currentTherapist)currentTherapist.recording_tips_dismissed=true;
+  api('/api/auth/recording-tips',{method:'PATCH',body:{dismissed:true}}).catch(function(){
+    if(currentTherapist)currentTherapist.recording_tips_dismissed=false;
+  });
 }
 
 // ===== بررسی پیش از شروع: میکروفون + اتصال به سرویس رونویسی =====
@@ -10837,6 +10871,7 @@ const MODAL_CLOSERS={
   logoutUploadModal:closeLogoutUploadModal,
   newClientModal:closeNewClientModal,
   resolveSpeakersModal:closeResolveSpeakersModal,
+  recTipsModal:function(){closeRecTipsModal(false);},
   deactivateClientModal:closeDeactivateModal,
   editCategoryModal:closeEditCategoryModal,
   editUnitModal:closeEditUnitModal,

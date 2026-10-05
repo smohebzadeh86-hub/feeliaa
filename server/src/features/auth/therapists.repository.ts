@@ -18,7 +18,7 @@ export async function insertTherapist(t: {
 // ستون‌هایِ عمومیِ پروفایل (publicTherapist)
 export async function getTherapistProfile(id: string): Promise<any | undefined> {
   const r = await query(
-    'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate, case_file_enabled, final_transcript_enabled FROM therapists WHERE id = ?',
+    'SELECT id, phone, email, name, specialty, is_admin, created_at, case_file_auto_generate, case_file_enabled, final_transcript_enabled, recording_tips_ack_at FROM therapists WHERE id = ?',
     [id]
   );
   return r.rows[0];
@@ -41,4 +41,8 @@ export async function findTherapistByPhone(phone: string): Promise<any | undefin
 
 export async function setCaseFileAutoGenerate(id: string, enabled: boolean): Promise<void> {
   await query('UPDATE therapists SET case_file_auto_generate = ? WHERE id = ?', [enabled, id]);
+}
+
+export async function setRecordingTipsDismissed(id: string, dismissed: boolean): Promise<void> {
+  await query('UPDATE therapists SET recording_tips_ack_at = ' + (dismissed ? 'NOW()' : 'NULL') + ' WHERE id = ?', [id]);
 }

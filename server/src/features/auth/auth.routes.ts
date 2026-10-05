@@ -9,7 +9,7 @@ import { recordAudit } from '../../obs/audit.js';
 import { toLatinDigits } from '../../shared/persianDigits.js';
 import {
   findTherapistIdByPhone, insertTherapist, getTherapistProfile, getIsAdmin, grantAdminFlag,
-  findTherapistByPhone, setCaseFileAutoGenerate,
+  findTherapistByPhone, setCaseFileAutoGenerate, setRecordingTipsDismissed,
 } from './therapists.repository.js';
 
 function isValidEmail(email: string): boolean {
@@ -30,8 +30,8 @@ function normalizePhone(raw: string): string | null {
   return d;
 }
 
-function publicTherapist(row: { id: string; phone: string; email: string | null; name: string | null; specialty: string | null; is_admin: boolean; created_at: string; case_file_auto_generate: boolean | null; case_file_enabled: boolean; final_transcript_enabled?: boolean }) {
-  return { id: row.id, phone: row.phone, email: row.email, name: row.name, specialty: row.specialty, is_admin: row.is_admin, created_at: row.created_at, case_file_auto_generate: row.case_file_auto_generate, case_file_enabled: row.case_file_enabled, final_transcript_enabled: !!row.final_transcript_enabled };
+function publicTherapist(row: { id: string; phone: string; email: string | null; name: string | null; specialty: string | null; is_admin: boolean; created_at: string; case_file_auto_generate: boolean | null; case_file_enabled: boolean; final_transcript_enabled?: boolean; recording_tips_ack_at?: unknown }) {
+  return { id: row.id, phone: row.phone, email: row.email, name: row.name, specialty: row.specialty, is_admin: row.is_admin, created_at: row.created_at, case_file_auto_generate: row.case_file_auto_generate, case_file_enabled: row.case_file_enabled, final_transcript_enabled: !!row.final_transcript_enabled, recording_tips_dismissed: !!row.recording_tips_ack_at };
 }
 
 // ⭐ هش ثابتِ ساختگی — وقتی شماره پیدا نشه هم scrypt اجرا میشه تا زمان پاسخ
@@ -194,5 +194,20 @@ export async function authRoutes(app: FastifyInstance) {
     }
     await setCaseFileAutoGenerate(request.therapistId, enabled);
     return { case_file_auto_generate: enabled };
+  });
+
+  // PATCH /api/auth/recording-tips — «دیگر نشان نده»ِ مودالِ نکته‌هایِ ضبط (قابلِ برگشت؛ نکته‌ها همیشه در صفحه‌ی شروعِ جلسه خواندنی‌اند)
+  app.patch('/api/auth/recording-tips', async (request, reply) => {
+    if (!request.therapistId) {
+      reply.code(401);
+      return { error: 'وارد نشده‌اید' };
+    }
+    const { dismissed } = (request.body as { dismissed?: unknown }) || {};
+    if (typeof dismissed !== 'boolean') {
+      reply.code(400);
+      return { error: 'dismissed باید boolean باشد' };
+    }
+    await setRecordingTipsDismissed(request.therapistId, dismissed);
+    return { recording_tips_dismissed: dismissed };
   });
 }
