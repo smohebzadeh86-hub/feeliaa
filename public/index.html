@@ -3732,10 +3732,13 @@ function attachTranscriptExpander(box,text,durationMs,note){
     cb.onclick=function(){ftCopyText(text);};
   }
   if(!text)return;
-  const label=document.createElement('span');
-  label.textContent='متنِ جلسه: '+toFa(text.length.toLocaleString('en-US'))+' نویسه'+(durationMs?' · '+fmtDur(durationMs):'')+(note?' · '+note:'');
-  if(note)label.style.color='var(--gold-deep)';
-  info.appendChild(label);
+  // شمارش نویسه/مدت برای تراپیست فایده‌ای ندارد؛ فقط یادداشت هشدار (note) نشان داده می‌شود.
+  if(note){
+    const label=document.createElement('span');
+    label.textContent=note;
+    label.style.color='var(--gold-deep)';
+    info.appendChild(label);
+  }
   if(text.length>1500){
     info.appendChild(adminBtn('نمایشِ کامل','btn-ghost',function(){
       const open=box.style.maxHeight==='none';
@@ -3743,6 +3746,7 @@ function attachTranscriptExpander(box,text,durationMs,note){
       this.textContent=open?'نمایشِ کامل':'جمع کردن';
     }));
   }
+  if(!info.childNodes.length)info.hidden=true;
 }
 function adminStatTile(label,value,warn){
   return '<div class="card stat-tile'+(warn?' warn':'')+'"><div class="v">'+escapeHtml(value)+'</div><div class="l">'+escapeHtml(label)+'</div></div>';
@@ -7566,7 +7570,7 @@ async function openTranscriptHistory(){
     r.revisions.forEach(function(rv){
       const b=document.createElement('button');
       b.type='button';b.className='btn btn-ghost btn-sm btn-block';b.style.cssText='justify-content:space-between;margin-bottom:6px';
-      b.textContent=historyTimeFa(rv.created_at)+' · '+(HISTORY_CAUSE_FA[rv.cause]||rv.cause)+' · '+toFa(rv.chars)+' نویسه';
+      b.textContent=historyTimeFa(rv.created_at)+' · '+(HISTORY_CAUSE_FA[rv.cause]||rv.cause);
       b.onclick=function(){showRevisionDetail(rv.id);};
       list.appendChild(b);
     });
@@ -7780,22 +7784,12 @@ function audioStatusMessage(st,localPending){
   }else{
     const have=st.archived_ms||0,want=st.expected_ms||0;
     if(want>0&&have<want*0.9){parts.push('صدا: '+fmtDurationFa(have)+' از '+fmtDurationFa(want)+' ذخیره شد');warn=true;}
-    else parts.push('صدایِ جلسه ذخیره شده است ('+fmtDurationFa(have)+')');
+    // حالت سالم (صدا کامل ذخیره شده) پیامی ندارد؛ فقط مشکل/در حال انتقال به کاربر گفته می‌شود.
     if(st.missing_count>0){parts.push(toFa(st.missing_count)+' بخش از صدا هرگز به سرور نرسید');warn=true;}
-    if(st.pending_count>0)parts.push(toFa(st.pending_count)+' بخش در حالِ انتقال به سرور');
+    if(st.pending_count>0)parts.push(toFa(st.pending_count)+' بخش در حال انتقال به سرور');
   }
-  if(localPending>0){parts.push(toFa(localPending)+' بخش هنوز روی این دستگاه است و با اتصالِ اینترنت خودکار ارسال می‌شود');warn=true;}
-  // سنجه‌هایِ کیفیتِ متن (core-data-plan قدمِ ۴، 2026-10-03): یک جمله‌ی ساده، فقط وقتی سنجیده شده.
-  const q=st.transcript_quality;
-  if(q){
-    const qp=[];const f=q.flags||[];
-    if(typeof q.coverage==='number')qp.push('پوششِ متن '+toFa(Math.round(q.coverage*100))+'٪');
-    if(f.indexOf('uncovered_gap')>=0&&q.uncovered_gaps>0)qp.push(toFa(q.uncovered_gaps)+' بخشِ گفتار بدونِ متن');
-    if(f.indexOf('speakers_merged')>=0)qp.push('گوینده‌هایِ کمتری از حاضرین تشخیص داده شد');
-    if(f.indexOf('speakers_extra')>=0)qp.push('گوینده‌هایِ بیشتری از حاضرین تشخیص داده شد');
-    if(q.low_conf_warn)qp.push('بخش‌هایی از صدا نامفهوم بود');
-    if(qp.length){parts.push(qp.join('، '));if(f.length||q.low_conf_warn)warn=true;}
-  }
+  if(localPending>0){parts.push(toFa(localPending)+' بخش هنوز روی این دستگاه است و با اتصال اینترنت خودکار ارسال می‌شود');warn=true;}
+  // (2026-10-04، گزارش مالک) سنجه‌های کیفیت متن (پوشش٪، گوینده‌ها، نامفهوم) برای تراپیست بی‌ربط بود؛ فقط در پنل ادمین می‌ماند.
   if(!warn&&st.transcript_status!=='complete'&&st.transcript_status!=='none')return {text:parts.join(' · ')};
   return {text:parts.join(' · '),warn:warn};
 }
