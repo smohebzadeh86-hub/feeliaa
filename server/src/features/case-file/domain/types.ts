@@ -41,7 +41,7 @@ export const FINDING_ROLES = [
 ] as const;
 export type FindingRole = typeof FINDING_ROLES[number];
 export const FINDING_ROLE_LABEL: Record<FindingRole, string> = {
-  state: 'وضعیتِ فعلی',
+  state: 'وضعیت فعلی',
   evidence: 'نشانه‌ها و شواهد',
   impact: 'تأثیر بر عملکرد',
   cognition: 'افکار و باورها',
@@ -54,7 +54,7 @@ export const FINDING_ROLE_LABEL: Record<FindingRole, string> = {
   treatment_response: 'پاسخ به مداخله',
   goals: 'اهداف و ارزش‌ها',
   change: 'تغییر نسبت به قبل',
-  unknown: 'ابهام و اطلاعاتِ ناکافی',
+  unknown: 'ابهام و اطلاعات ناکافی',
   session_note: 'نکته برای جلسه',
   other: 'سایر',
 };
