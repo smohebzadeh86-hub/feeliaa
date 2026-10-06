@@ -61,6 +61,10 @@ pnpm --filter server start
 4. restart ⇒ در لاگِ شروع دو خطِ `[llm] case-file: Metis model=deepseek-v4-flash json=object reasoning=low …` و `[llm] final-transcript: Metis … reasoning=low` دیده شود؛ خطِ «پیکربندی نامعتبر» یعنی env ناقص است.
 5. **rollback:** `LLM_PROVIDER=openrouter` + restart. providerِ جدا برایِ هر مسیر: `CASE_FILE_LLM_PROVIDER` / `FINAL_TRANSCRIPT_LLM_PROVIDER`.
 
+**2026-10-06 (تصمیمِ مالک، هزینه):** `.env`ِ production شاملِ `FINAL_TRANSCRIPT_BOUNDARY_JUDGE=0` است (داورِ مرزِ «فقط ثبت» ≈۷۰٪ توکنِ خروجیِ Metis را می‌خورد؛ متنِ نهایی به آن وابسته نیست). backup: `/root/backups/env-pre-judge-off-20261006-1443.bak`.
+**قیمتِ Metis (2026-10-06):** `METIS_PRICE_IN_PER_M=0.31`، `METIS_PRICE_OUT_PER_M=0.62` (دلار/میلیون توکن) = نرخِ مؤثرِ صورت‌حسابِ پنلِ متیس (Sep 30–Oct 6: ۷۴۹٬۵۵۲ ورودی + ۲٬۴۰۸٬۸۳۹ خروجی = ۱٫۷۱۶ دلار)، ≈۲٫۲ برابرِ فهرستِ `https://www.metisai.ir/models.json` (0.14/0.28). با تغییرِ مدل/نرخ، دوباره از پنل کالیبره شود. backupها: `/root/backups/env-pre-metis-price-20261006-1454.bak`، `env-pre-metis-price2-20261006-1531.bak`.
+**کلیدِ Metis:** production و dev باید کلیدِ **جدا** داشته باشند تا مصرفِ تست از اعتبارِ سایت کم نشود و جداگانه دیده شود. تا 2026-10-06 هر دو یکی بودند؛ کلیدِ dev در `server/.env` comment شد و کلیدِ جدیدِ dev را مالک می‌گذارد.
+
 nginx رویِ پورتِ ۳۰۰۰ به `feelia-mysql` وصل است (`ss -tlnp` تأیید کرد فقط یک پروسه‌ی node رویِ ۳۰۰۰ گوش می‌دهد).
 `$HOME/server-deploy` (ادعایِ قدیمیِ `diag-collect.sh`) دیگر بررسی نشد — با دو پروسه‌ی بالا بی‌ربط به نظر می‌رسد.
 
