@@ -1,6 +1,6 @@
 // ساختِ اپِ Fastify — همه‌ی pluginها و routeها، بدونِ listen و بدونِ jobهایِ پس‌زمینه.
 // index.ts (سرورِ واقعی) و ابزارهایِ تست (route snapshot، API contract harness) هر دو از همین استفاده می‌کنند.
-import Fastify, { type FastifyInstance, type RouteOptions } from 'fastify';
+import Fastify, { LogController, type FastifyInstance, type RouteOptions } from 'fastify';
 import { fastifyStatic } from '@fastify/static';
 import multipart from '@fastify/multipart';
 import path from 'node:path';
@@ -35,7 +35,7 @@ export interface BuildAppOptions {
 export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInstance> {
   // فیکسِ نشتِ حریمِ‌خصوصی (فازِ ۱ِ رصد/حسابرسی، 2026-09-22): پیش‌فرضِ logger:true
   // هر کوکی (شاملِ feelia_session) و هدرِ Authorization را در stdout چاپ می‌کرد.
-  // disableRequestLogging:true چون log-per-request حالا کارِ registerObsHooks
+  // لاگِ هر درخواست خاموش (disableRequestLogging) چون log-per-request حالا کارِ registerObsHooks
   // (server/src/obs/httpHook.ts) است، نه لاگرِ خامِ Fastify.
   const app = Fastify({
     logger: {
@@ -45,7 +45,8 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
         remove: true,
       },
     },
-    disableRequestLogging: true,
+    // از fastify 5.12 گزینه‌یِ سطحِ بالایِ disableRequestLogging منسوخ است (هشدارِ FSTDEP023 در هر startup).
+    logController: new LogController({ disableRequestLogging: true }),
   });
   if (opts.onRoute) app.addHook('onRoute', opts.onRoute);
 

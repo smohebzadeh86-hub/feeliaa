@@ -1,7 +1,7 @@
 // APIِ اعلان‌هایِ تراپیست (migration 023) — فهرست + علامتِ «خوانده‌شده».
 //
 // GET    /api/notifications
-// POST   /api/notifications/read          { ids?: string[] } | { all: true }
+// POST   /api/notifications/read          { ids?: string[] } | { all: true } | { session_id: string }
 //
 // مالکیت (LAW-004): همه با therapist_id.
 import type { FastifyInstance } from 'fastify';
@@ -28,9 +28,12 @@ export async function notificationRoutes(app: FastifyInstance) {
   });
 
   app.post('/api/notifications/read', async (request) => {
-    const b = (request.body || {}) as { ids?: string[]; all?: boolean };
+    const b = (request.body || {}) as { ids?: string[]; all?: boolean; session_id?: string };
     if (b.all) {
       await query('UPDATE notifications SET read_at = NOW() WHERE therapist_id = ? AND read_at IS NULL', [request.therapistId]);
+    } else if (typeof b.session_id === 'string' && UUID_RE.test(b.session_id)) {
+      // بازکردنِ خودِ جلسه (نه فقط کلیک رویِ اعلان) یعنی تراپیست نتیجه را دیده است.
+      await query('UPDATE notifications SET read_at = NOW() WHERE therapist_id = ? AND read_at IS NULL AND session_id = ?', [request.therapistId, b.session_id]);
     } else if (Array.isArray(b.ids) && b.ids.length) {
       const ids = b.ids.filter((x) => UUID_RE.test(String(x))).slice(0, 100);
       if (ids.length) {

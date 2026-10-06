@@ -62,7 +62,9 @@
   function row(r) {
     var m = r.metrics || {};
     var flags = m.flags || [];
-    var cls = flags.length ? (flags.indexOf('low_coverage') >= 0 || flags.indexOf('speakers_merged') >= 0 ? 'bad' : 'warn') : 'ok';
+    // speakers_minor فقط اطلاعی است (همان سطحِ 'ok' در diagnosis.ts) ⇒ به‌تنهایی هشدار نیست.
+    var serious = flags.filter(function (f) { return f !== 'speakers_minor'; });
+    var cls = serious.length ? (flags.indexOf('low_coverage') >= 0 || flags.indexOf('speakers_merged') >= 0 ? 'bad' : 'warn') : 'ok';
     var el = document.createElement('div'); el.className = 'card admin-row';
     var head = document.createElement('div'); head.className = 'admin-row-head';
     var title = document.createElement('div'); title.className = 'admin-row-title';

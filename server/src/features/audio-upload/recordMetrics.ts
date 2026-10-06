@@ -73,7 +73,8 @@ async function drain(): Promise<void> {
       const sid = queue.shift()!;
       try {
         const m = await measureRecord(sid, realDeps);
-        if (m) logEvent({ event: 'session_record.metrics', sessionId: sid, source: 'server', detail: { count: m.words, ok: m.flags.length === 0, reason: m.flags.join(',').slice(0, 64) || undefined } });
+        // speakers_minor فقط اطلاعی است (diagnosis.ts: level 'ok') ⇒ جلسه را «ناسالم» نشان نمی‌دهد.
+        if (m) logEvent({ event: 'session_record.metrics', sessionId: sid, source: 'server', detail: { count: m.words, ok: m.flags.every((f) => f === 'speakers_minor'), reason: m.flags.join(',').slice(0, 64) || undefined } });
       } catch (e) {
         console.log('[record-metrics] failed (ignored):', String((e as Error)?.message || e).slice(0, 120));
       }

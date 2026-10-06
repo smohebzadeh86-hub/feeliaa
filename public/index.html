@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="color-scheme" content="light dark">
 <title>فیلیا — دستیار جلسات درمان</title>
+<!-- آیکنِ inline: بدونِ آن مرورگر در هر بارگذاری /favicon.ico را می‌خواست و ۴۰۴ می‌گرفت -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%233e6b5e'/%3E%3Cpath d='M16 24c-5-3.2-8-6-8-9.4A4.3 4.3 0 0 1 16 12a4.3 4.3 0 0 1 8 2.6c0 3.4-3 6.2-8 9.4z' fill='%23fff'/%3E%3C/svg%3E">
 <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -7655,6 +7657,7 @@ async function doViewTranscript(sessionId){
     const data=await api('/api/sessions/'+sessionId);
     currentViewSession=data.session;
     currentViewNotes=data.notes||[];
+    markSessionNotificationsRead(sessionId);
     const isManualSession=data.session.source==='manual';
     // جلسه‌ای که از فایل صوتی آپلودی ساخته شده (migration 023): مثل جلسه‌ی دستی ساعت ندارد و
     // تاریخش اختیاری است؛ تا متن آماده شود به‌جای «(متنی ثبت نشده)» وضعیت پردازش نشان داده می‌شود.
@@ -10811,6 +10814,7 @@ function onFreshNotification(n){
   try{
     if(n.kind.indexOf('case_file')===0&&currentClient&&currentClient.id===n.client_id&&!$('screenClientDetail').hidden&&!caseFileEditMode&&currentTherapist&&currentTherapist.case_file_enabled)loadCaseFile(n.client_id);
     if(n.kind==='final_transcript_ready'&&currentViewSession&&currentViewSession.id===n.session_id&&!$('screenSessionDetail').hidden){ftStopPoll();loadFinalTranscriptKeepView(n.session_id);}
+    if(n.session_id&&currentViewSession&&currentViewSession.id===n.session_id&&!$('screenSessionDetail').hidden&&!document.hidden)markSessionNotificationsRead(n.session_id);
   }catch(e){}
 }
 function processingTick(){
@@ -10834,6 +10838,13 @@ function stopProcessingWatch(){
 }
 document.addEventListener('visibilitychange',function(){if(!document.hidden&&currentTherapist&&procTimer)refreshProcessing();});
 
+// بازکردنِ خودِ جلسه (مثلاً از صفحه‌ی مراجع) هم اعلان‌هایِ همان جلسه را خوانده‌شده می‌کند؛ وگرنه
+// تراپیستی که از سینی وارد نمی‌شود نشانِ اعلان را همیشه پر می‌بیند.
+async function markSessionNotificationsRead(sessionId){
+  if(!currentTherapist||!procUnread||!sessionId)return;
+  try{await api('/api/notifications/read',{method:'POST',body:{session_id:sessionId}});}catch(e){return;}
+  refreshProcessing();
+}
 async function markAllNotificationsRead(){
   try{await api('/api/notifications/read',{method:'POST',body:{all:true}});}catch(e){}
   refreshProcessing();

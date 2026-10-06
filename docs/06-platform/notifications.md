@@ -7,7 +7,7 @@
 - **تصمیم‌ها** (Event Log 2026-09-23 «آپلودِ فایلِ صوتی»، 2026-09-28): اعلانِ درون‌اپِ پایدار در DB؛ `UNIQUE(job_id, kind)` تا retry اعلانِ تکراری نسازد؛ **بدونِ متنِ بالینی** (فقط kind + شناسه)؛ `llm_unavailable` فقط برایِ ادمین‌ها (2026-09-28).
 
 ## ۲. چه می‌کند (What)
-`notify.ts` اعلان می‌سازد (`transcript_ready`، `transcript_low_quality`، `transcript_empty`، `processing_failed`، `case_file_updated`، `case_file_failed`، `final_transcript_ready`، `llm_unavailable`). `GET /api/notifications` ۳۰ اعلانِ اخیر + شمارنده‌ی خوانده‌نشده؛ `POST /api/notifications/read` علامتِ خوانده. `sweepOldNotifications` روزانه (نگهداری: [configuration-catalog](../02-reference/configuration-catalog.md)).
+`notify.ts` اعلان می‌سازد (`transcript_ready`، `transcript_low_quality`، `transcript_empty`، `processing_failed`، `case_file_updated`، `case_file_failed`، `final_transcript_ready`، `llm_unavailable`). `GET /api/notifications` ۳۰ اعلانِ اخیر + شمارنده‌ی خوانده‌نشده؛ `POST /api/notifications/read` علامتِ خوانده (با کلیک رویِ اعلان، «خواندن همه»، یا — از 2026-10-05 — بازکردنِ خودِ جلسه: `{session_id}` از `doViewTranscript` و وقتی اعلانِ تازه برایِ جلسه‌یِ بازِ قابلِ‌دیدن می‌رسد). `sweepOldNotifications` روزانه (نگهداری: [configuration-catalog](../02-reference/configuration-catalog.md)).
 
 ## ۳. مرزها (Boundaries)
 `features/notifications/index.ts` (export `createNotification`، `notifyAdmins`، `sweepOldNotifications`)؛ routeها در `notifications.routes.ts` (طبقِ R3 مستقیم از `app.ts` import می‌شود). مصرف: `audio-upload`، `final-transcript`، `case-file`، `jobs/backgroundJobs.ts` (هشدارِ LLM). route در scopeِ آپلود ثبت می‌شود (parserِ `application/octet-stream`؛ قراردادِ عمدی — [route-map §۲](../02-reference/route-map.md)).
