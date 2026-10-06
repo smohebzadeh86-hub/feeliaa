@@ -47,6 +47,7 @@ waiting_audio ──(صدا کامل)──→ transcribing ──→ polishing 
   - اگر خروجی کوتاه‌تر از ۶۰٪ متنِ realtime باشد ⇒ realtime.
 - **polishing:** پیش از فراخوانیِ LLM، `source_version` برابرِ نسخه‌ی فعلیِ متنِ جلسه می‌شود.
 - **backoff:** ۳۰ث، ۲م، ۱۰م، ۳۰م، ۶۰م. وقتی transcription از قبل وجود دارد، retry ارزان است: هر ۲۰ثانیه، حداکثر ۹۰ بار.
+- **اعتبارِ تمام‌شده‌یِ LLM (402 ⇒ `llm-credit`، 2026-10-06):** بعد از همان ۵ پله هر ساعت یک تلاش تا ≈۷۲ ساعت (`CREDIT_MAX_ATTEMPTS`) ⇒ جلسه‌هایِ دورانِ قطعی بعد از شارژ خودکار ساخته می‌شوند. 402 درجا تکرار نمی‌شود (`adapters/llmJson.ts`)؛ 401/402/403 وسطِ تکه‌ها کلِ ویرایش را رها می‌کند (نه «done»ِ نیمه‌خام)؛ داورِ مرز با همین خطاها دسته‌هایِ باقی‌مانده را نمی‌فرستد (`boundary_judge.aborted`).
 - **worker** (`runner.ts`): هم‌زمانی ۱، lease ۲۰ دقیقه‌ای با heartbeat. leaseها در startup آزاد می‌شوند.
 
 ## مرتب‌سازی (`application/polishTranscript.ts`)

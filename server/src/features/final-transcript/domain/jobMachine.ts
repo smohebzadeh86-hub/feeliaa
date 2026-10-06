@@ -90,6 +90,9 @@ export const DEFAULT_FT_CONFIG: FtConfig = { audioWaitMs: 30 * 60_000, settleMs:
 export const AUDIO_RECHECK_MS = 30_000;
 export const BACKOFF_MS = [30_000, 2 * 60_000, 10 * 60_000, 30 * 60_000, 60 * 60_000];
 export const MAX_ATTEMPTS = BACKOFF_MS.length;
+// اعتبارِ LLM تمام شده (llm-credit، 2026-10-06): خودبه‌خود رفع نمی‌شود و ممکن است شارژ ساعت‌ها طول بکشد ⇒ بعد از
+// BACKOFF_MS هر ساعت یک تلاش (یک پاسخِ 402ِ بی‌هزینه) تا ≈۷۲ ساعت، تا جلسه‌هایِ همان فاصله بعد از شارژ خودکار ساخته شوند.
+export const CREDIT_MAX_ATTEMPTS = BACKOFF_MS.length + 72;
 export const CHEAP_RETRY_MS = 20_000;
 export const CHEAP_MAX_ATTEMPTS = 90;
 // همان نگهبانِ speakerResolve: خروجیِ async خیلی کوتاه‌تر از متنِ realtime ⇒ صدا ناقص بوده، realtime مبنا می‌شود.
@@ -105,7 +108,7 @@ const WAIT: StepResult = { continueNow: false };
 
 async function transient(job: FtJob, deps: FtDeps, code: string, cause?: unknown, cheap = false): Promise<StepResult> {
   const attempts = job.attempts + 1;
-  const max = cheap ? CHEAP_MAX_ATTEMPTS : MAX_ATTEMPTS;
+  const max = cheap ? CHEAP_MAX_ATTEMPTS : code === 'llm-credit' ? CREDIT_MAX_ATTEMPTS : MAX_ATTEMPTS;
   const why = cause ? ` (${String((cause as any)?.message || cause).slice(0, 160)})` : '';
   if (attempts > max) {
     await cleanupRemote(job, deps);
@@ -113,7 +116,7 @@ async function transient(job: FtJob, deps: FtDeps, code: string, cause?: unknown
     deps.log(`[final-transcript] ${job.sessionId} giving up after ${attempts - 1} attempts: ${code}${why}`);
     return WAIT;
   }
-  const delay = cheap ? CHEAP_RETRY_MS : BACKOFF_MS[attempts - 1];
+  const delay = cheap ? CHEAP_RETRY_MS : BACKOFF_MS[Math.min(attempts, BACKOFF_MS.length) - 1];
   await deps.store.update(job, { attempts, errorCode: code, nextAttemptInMs: delay });
   deps.log(`[final-transcript] ${job.sessionId} transient ${code}, attempt ${attempts}/${max}, next in ${Math.round(delay / 1000)}s${why}`);
   return WAIT;

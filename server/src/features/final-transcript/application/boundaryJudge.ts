@@ -23,6 +23,8 @@ export interface BoundaryJudgeReport {
   truncated: number;         // کاندیدهایِ حذف‌شده به‌خاطرِ سقفِ maxItems
   failed_batches: number;
   timed_out: boolean;
+  // خطایِ کلید/اعتبار ⇒ دسته‌هایِ باقی‌مانده فرستاده نشدند
+  aborted?: boolean;
   min_score: number;
   // [اندیسِ نوبتِ «قبل» در clean_turns (مرز بینِ i و i+1)، a، b] — به ترتیبِ نمره‌یِ نزولی، حداکثر ۸۰ مورد
   flagged: Array<[number, number, number]>;
@@ -94,8 +96,11 @@ export async function judgeBoundaries(out: CleanTurn[], cfg: BoundaryJudgeConfig
           batch[id - 1].a = a;
           batch[id - 1].b = b;
         }
-      } catch {
+      } catch (e) {
         report.failed_batches++;
+        // کلید/اعتبار (401/402/403) ⇒ دسته‌هایِ بعدی هم بی‌فایده‌اند (prod 2026-10-06: ۴۲ پاسخِ 402 پشتِ سرِ هم)
+        const st = (e as { status?: number })?.status;
+        if (st === 401 || st === 402 || st === 403) { report.aborted = true; next = batches.length; }
       }
     }
   };

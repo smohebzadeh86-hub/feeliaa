@@ -280,7 +280,8 @@ async function polishFor(sessionId: string, text: string, opts?: { trustDiarizat
     return { ok: true as const, text: res.text, report: res.report, turns: res.turns };
   } catch (e) {
     const transient = !!(e as { transient?: boolean })?.transient;
-    const code = e && (e as Error).name === 'FinalTranscriptConfigError' ? 'llm-not-configured' : transient ? 'llm-unavailable' : 'llm-failed';
+    const code = e && (e as Error).name === 'FinalTranscriptConfigError' ? 'llm-not-configured'
+      : (e as { status?: number })?.status === 402 ? 'llm-credit' : transient ? 'llm-unavailable' : 'llm-failed';
     return { ok: false as const, transient, code };
   }
 }

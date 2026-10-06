@@ -44,6 +44,9 @@ export function createTranscriptLlm(env: NodeJS.ProcessEnv = process.env, makeCl
           // فقط کد/پیامِ خطایِ provider (بدونِ پرامپت/پاسخ — LAW-001) تا علتِ شکست در لاگ دیده شود
           const why = String((e as Error)?.message || '').replace(/\s+/g, ' ').slice(0, 140);
           console.log(`[final-transcript] ${label} call failed after ${Date.now() - startedAt}ms: ${why}`);
+          // 402 (اعتبار تمام شده) با تلاشِ چندثانیه‌ای رفع نمی‌شود ⇒ درجا تکرار نمی‌شود؛ backoffِ job (llm-credit) منتظرِ شارژ می‌ماند
+          // (prod 2026-10-06: ۴۲ پاسخِ 402 در ۸۵ثانیه).
+          if ((e as { status?: number })?.status === 402) throw e;
           if (!(transient || (invalid && attempt < 1)) || attempt >= retries) throw e;
           await new Promise((r) => setTimeout(r, 5000 * (attempt + 1)));
         }

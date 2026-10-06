@@ -4,7 +4,7 @@
 // اجرا: pnpm test:ft
 import assert from 'node:assert/strict';
 import {
-  stepFinalTranscript, BACKOFF_MS, MAX_ATTEMPTS, AUDIO_RECHECK_MS,
+  stepFinalTranscript, BACKOFF_MS, MAX_ATTEMPTS, CREDIT_MAX_ATTEMPTS, AUDIO_RECHECK_MS,
   type FtJob, type FtDeps, type FtPatch, type AudioState, type FullAudio, type PolishOutcome,
 } from '../server/src/features/final-transcript/domain/jobMachine.js';
 import type { CleanTurn } from '../server/src/features/final-transcript/domain/transcriptText.js';
@@ -910,6 +910,46 @@ await t('RP1 «ساختِ دوباره»: آپلود همیشه از رونوی�
   assert.equal(planRetry({ ...base, source: 'realtime' }), 'retranscribe');
   assert.equal(planRetry({ ...base, stage: 'polishing' }), 'busy');
   assert.equal(planRetry({ ...base, stale: false }), 'fresh');
+});
+
+// ————————————————— اعتبارِ تمام‌شده‌یِ LLM (402، prod 2026-10-06) —————————————————
+await t('CR1 ماشینِ حالت: llm-credit بعد از MAX_ATTEMPTS رها نمی‌شود؛ هر ساعت تا CREDIT_MAX_ATTEMPTS، بعد failed', async () => {
+  const w = world({ job: newJob({ stage: 'polishing', source: 'realtime' }), polish: () => ({ ok: false, transient: true, code: 'llm-credit' }) });
+  for (let i = 0; i < MAX_ATTEMPTS + 3; i++) await stepFinalTranscript(w.job, deps(w));
+  assert.equal(w.job.stage, 'polishing');
+  assert.equal(w.job.errorCode, 'llm-credit');
+  assert.equal(w.job.nextAttemptInMs, BACKOFF_MS[BACKOFF_MS.length - 1]);
+  for (let i = MAX_ATTEMPTS + 3; i < CREDIT_MAX_ATTEMPTS + 1; i++) await stepFinalTranscript(w.job, deps(w));
+  assert.equal(w.job.stage, 'failed');
+  // خطایِ گذرایِ دیگر همان سقفِ قبلی را دارد
+  const v = world({ job: newJob({ stage: 'polishing', source: 'realtime' }), polish: () => ({ ok: false, transient: true, code: 'llm-unavailable' }) });
+  for (let i = 0; i < MAX_ATTEMPTS + 1; i++) await stepFinalTranscript(v.job, deps(v));
+  assert.equal(v.job.stage, 'failed');
+});
+
+await t('CR2 polish: 402 وسطِ کار (بعد از تکه‌یِ موفق) ⇒ پرتاب (نه «done»ِ نیمه‌خام)؛ خطایِ گذرایِ عادیِ یک تکه ⇒ مثلِ قبل خام', async () => {
+  const g = { minLengthRatio: 0.65, maxLengthRatio: 1.15, minOverlap: 0.7 };
+  const last = (u: string) => (u.split('تکه‌ای که باید مرتب شود')[1] || '').includes('بیشتر بگو');
+  const credit = fakeLlm((u) => { if (last(u)) throw Object.assign(new Error('402 Payment Required'), { transient: true, status: 402 }); return { turns: [] }; });
+  await assert.rejects(polishTranscript(RAW_SESSION, null, credit, { chunkChars: 30, overviewChars: 60000, guards: g }), (e: any) => e.status === 402);
+  const flaky = fakeLlm((u) => { if (last(u)) throw Object.assign(new Error('timeout'), { transient: true }); return { turns: [] }; });
+  const r = await polishTranscript(RAW_SESSION, null, flaky, { chunkChars: 30, overviewChars: 60000, guards: g });
+  assert.ok(r.report.chunks >= 3, String(r.report.chunks));
+});
+
+await t('CR3 داور: 402 ⇒ دسته‌هایِ بعدی فرستاده نمی‌شوند (aborted)؛ خطایِ عادی ⇒ ادامه', async () => {
+  const mk = (status?: number) => {
+    const o = { calls: 0 };
+    return Object.assign(o, { model: 'fake', async completeJson() { o.calls++; throw Object.assign(new Error('x'), { status }); } }) as unknown as LlmJsonPort & { calls: number };
+  };
+  const many = Array.from({ length: 4 }, () => BJ_TURNS).flat();
+  const credit = mk(402);
+  const r = await judgeBoundaries(many, { llm: credit, batchSize: 1, concurrency: 1 });
+  assert.equal(credit.calls, 1);
+  assert.equal(r.report.aborted, true);
+  const plain = mk(500);
+  const r2 = await judgeBoundaries(many, { llm: plain, batchSize: 1, concurrency: 1 });
+  assert.ok(plain.calls > 1 && !r2.report.aborted, String(plain.calls));
 });
 
 console.log(`\n${pass} pass, ${fail} fail`);
