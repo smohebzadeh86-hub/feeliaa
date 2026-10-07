@@ -26,6 +26,7 @@
   var EDGE = 1024 * 1024;
   var MAX_CHUNK_RETRIES = 8;
   var CHUNK_STALL_MS = 60000; // بدون هیچ پیشرفت بایت در این مدت → قطع و retry (putChunk)
+  var RESPONSE_WAIT_MS = 45000; // بدنه کامل فرستاده شد ولی پاسخ نیامد → قطع و retry (putChunk)
   var PERMANENT_CODES = ['consent-required', 'file-too-small', 'file-too-large', 'unsupported-format', 'bad-fingerprint',
     'not-audio', 'no-audio', 'unreadable', 'too-long', 'upload-closed', 'read-failed', 'group-closed', 'part-mismatch', 'bad-part'];
 
@@ -161,7 +162,13 @@
         armStall();
         if (e.lengthComputable) { task.inflightBytes = e.loaded; throttleEmit(); }
       };
-      xhr.upload.onload = clearStall; // بدنه رسید؛ از اینجا فقط xhr.timeout (پاسخ سرور)
+      // بدنه رسید ⇒ سرور در چند ثانیه جواب می‌دهد. قبلاً از اینجا فقط xhr.timeout (برایِ chunkِ ۴MB ≈۱۷ دقیقه) می‌ماند و پاسخِ
+      // گم‌شده در شبکه‌یِ موبایل آپلود را دقیقه‌ها معطل می‌کرد (prod 2026-10-07: chunk ۱۵ ساعتِ 10:59:22 با 200 ذخیره شد و
+      // تازه 11:04:48 دوباره فرستاده شد). حالا بعد از RESPONSE_WAIT_MS همان chunk دوباره فرستاده می‌شود (سرور تکرار را می‌پذیرد).
+      xhr.upload.onload = function () {
+        if (stallTimer) clearTimeout(stallTimer);
+        stallTimer = setTimeout(function () { stalled = true; try { xhr.abort(); } catch (e) {} }, RESPONSE_WAIT_MS);
+      };
       xhr.onloadend = clearStall;
       xhr.onload = function () {
         task._xhr = null;

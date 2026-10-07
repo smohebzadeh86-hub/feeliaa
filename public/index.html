@@ -10785,11 +10785,20 @@ function closeTray(){trayOpen=false;$('trayPanel').hidden=true;}
 function toggleTray(e){if(e)e.stopPropagation();if(trayOpen)closeTray();else openTray();}
 document.addEventListener('click',function(){if(trayOpen)closeTray();});
 
-async function refreshProcessing(){
-  if(!currentTherapist)return;
+// فقط یک درخواست در جریان (prod 2026-10-07، شبکه‌ی موبایلِ پدرام حینِ آپلود): هر ۵ثانیه درخواستِ تازه‌ای ساخته می‌شد حتی وقتی
+// قبلی هنوز معلق بود ⇒ با برگشتِ شبکه ۱۰ درخواستِ هم‌زمان رسید و با آپلود بر سرِ پهنای‌باند رقابت کرد. حالا درخواستِ در جریان
+// به اشتراک گذاشته می‌شود و سقفِ ۲۰ثانیه دارد.
+let procInFlight=null;
+function refreshProcessing(){
+  if(!currentTherapist)return Promise.resolve();
+  if(procInFlight)return procInFlight;
+  procInFlight=refreshProcessingNow().finally(function(){procInFlight=null;});
+  return procInFlight;
+}
+async function refreshProcessingNow(){
   procLastRefresh=Date.now();
   try{
-    const r=await Promise.all([api('/api/audio-jobs?scope=active'),api('/api/notifications')]);
+    const r=await Promise.all([api('/api/audio-jobs?scope=active',{timeoutMs:20000}),api('/api/notifications',{timeoutMs:20000})]);
     procJobs=r[0].jobs||[];
     procNotifs=r[1].notifications||[];
     procUnread=r[1].unread||0;
@@ -10820,8 +10829,11 @@ function onFreshNotification(n){
 }
 function processingTick(){
   if(!currentTherapist)return;
-  const active=(window.FeeliaUpload&&window.FeeliaUpload.isBusy())||procJobs.some(function(j){return j.stage!=='done'&&j.stage!=='failed';})||trayOpen||Date.now()<procFastUntil;
-  const every=active?5000:30000;
+  const jobsActive=procJobs.some(function(j){return j.stage!=='done'&&j.stage!=='failed';});
+  // آپلودِ محلیِ در جریان پیشرفتش را خودش دارد و پایانش refreshProcessing را صدا می‌زند ⇒ پرسیدنِ هر ۵ثانیه‌یِ فهرستِ اعلان‌ها
+  // (≈۸KB) حینِ آپلود فقط پهنای‌باندِ همان آپلود را روی شبکه‌ی ضعیف می‌گیرد (prod 2026-10-07) ⇒ تا jobی در سرور فعال نیست ۲۰ثانیه.
+  const uploading=window.FeeliaUpload&&window.FeeliaUpload.isBusy();
+  const every=jobsActive?5000:uploading?20000:(trayOpen||Date.now()<procFastUntil)?5000:30000;
   if(Date.now()-procLastRefresh>=every)refreshProcessing();
 }
 function startProcessingWatch(){
